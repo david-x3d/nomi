@@ -1,0 +1,1662 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "f17b4588c6c5acefbf680d5ccdc05037",
+    "entities": [
+      {
+        "tableName": "user_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `date_of_birth` TEXT NOT NULL, `energy_calculation_sex` TEXT, `height_cm` REAL, `starting_weight_kg` REAL NOT NULL, `goal_type` TEXT NOT NULL, `target_weight_kg` REAL, `activity_level` TEXT NOT NULL, `progression_rate` TEXT, `onboarding_completed` INTEGER NOT NULL DEFAULT 0, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateOfBirth",
+            "columnName": "date_of_birth",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "energyCalculationSex",
+            "columnName": "energy_calculation_sex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "heightCm",
+            "columnName": "height_cm",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "startingWeightKg",
+            "columnName": "starting_weight_kg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "goalType",
+            "columnName": "goal_type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetWeightKg",
+            "columnName": "target_weight_kg",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "activityLevel",
+            "columnName": "activity_level",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "progressionRate",
+            "columnName": "progression_rate",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "onboardingCompleted",
+            "columnName": "onboarding_completed",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "nutrition_plans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profile_id` INTEGER NOT NULL, `version` INTEGER NOT NULL, `effective_from_local_date` TEXT NOT NULL, `calculation_method` TEXT NOT NULL, `activity_multiplier` REAL, `bmr_kcal` REAL, `maintenance_kcal` REAL, `goal_adjustment_kcal` REAL, `calorie_target_kcal` REAL NOT NULL, `protein_target_grams` REAL NOT NULL, `carbohydrate_target_grams` REAL NOT NULL, `fat_target_grams` REAL NOT NULL, `calorie_target_custom` INTEGER NOT NULL DEFAULT 0, `protein_target_custom` INTEGER NOT NULL DEFAULT 0, `carbohydrate_target_custom` INTEGER NOT NULL DEFAULT 0, `fat_target_custom` INTEGER NOT NULL DEFAULT 0, `change_reason` TEXT, `created_at_epoch_millis` INTEGER NOT NULL, FOREIGN KEY(`profile_id`) REFERENCES `user_profiles`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileId",
+            "columnName": "profile_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "effectiveFromLocalDate",
+            "columnName": "effective_from_local_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "calculationMethod",
+            "columnName": "calculation_method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activityMultiplier",
+            "columnName": "activity_multiplier",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "bmrKcal",
+            "columnName": "bmr_kcal",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "maintenanceKcal",
+            "columnName": "maintenance_kcal",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "goalAdjustmentKcal",
+            "columnName": "goal_adjustment_kcal",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "calorieTargetKcal",
+            "columnName": "calorie_target_kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "proteinTargetGrams",
+            "columnName": "protein_target_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "carbohydrateTargetGrams",
+            "columnName": "carbohydrate_target_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fatTargetGrams",
+            "columnName": "fat_target_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "calorieTargetCustom",
+            "columnName": "calorie_target_custom",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "proteinTargetCustom",
+            "columnName": "protein_target_custom",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "carbohydrateTargetCustom",
+            "columnName": "carbohydrate_target_custom",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "fatTargetCustom",
+            "columnName": "fat_target_custom",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "changeReason",
+            "columnName": "change_reason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_nutrition_plans_profile_id_version",
+            "unique": true,
+            "columnNames": [
+              "profile_id",
+              "version"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_nutrition_plans_profile_id_version` ON `${TABLE_NAME}` (`profile_id`, `version`)"
+          },
+          {
+            "name": "index_nutrition_plans_profile_id_effective_from_local_date",
+            "unique": false,
+            "columnNames": [
+              "profile_id",
+              "effective_from_local_date"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrition_plans_profile_id_effective_from_local_date` ON `${TABLE_NAME}` (`profile_id`, `effective_from_local_date`)"
+          },
+          {
+            "name": "index_nutrition_plans_created_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "created_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrition_plans_created_at_epoch_millis` ON `${TABLE_NAME}` (`created_at_epoch_millis`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "user_profiles",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "profile_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "nutrition_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `provider_name` TEXT, `display_name` TEXT NOT NULL, `external_id` TEXT, `url` TEXT, `license` TEXT, `retrieved_at_epoch_millis` INTEGER NOT NULL, `verified_at_epoch_millis` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerName",
+            "columnName": "provider_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalId",
+            "columnName": "external_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "license",
+            "columnName": "license",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "retrievedAtEpochMillis",
+            "columnName": "retrieved_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verifiedAtEpochMillis",
+            "columnName": "verified_at_epoch_millis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_nutrition_sources_kind_provider_name",
+            "unique": false,
+            "columnNames": [
+              "kind",
+              "provider_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrition_sources_kind_provider_name` ON `${TABLE_NAME}` (`kind`, `provider_name`)"
+          },
+          {
+            "name": "index_nutrition_sources_provider_name_external_id",
+            "unique": false,
+            "columnNames": [
+              "provider_name",
+              "external_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrition_sources_provider_name_external_id` ON `${TABLE_NAME}` (`provider_name`, `external_id`)"
+          },
+          {
+            "name": "index_nutrition_sources_verified_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "verified_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_nutrition_sources_verified_at_epoch_millis` ON `${TABLE_NAME}` (`verified_at_epoch_millis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "foods",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `canonical_name` TEXT NOT NULL, `normalized_name` TEXT NOT NULL, `brand` TEXT, `barcode` TEXT, `nutrition_source_id` INTEGER, `is_user_created` INTEGER NOT NULL DEFAULT 0, `is_estimated` INTEGER NOT NULL DEFAULT 0, `last_verified_at_epoch_millis` INTEGER, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL, `per_100g_calories_kcal` REAL NOT NULL, `per_100g_protein_grams` REAL NOT NULL, `per_100g_carbohydrate_grams` REAL NOT NULL, `per_100g_fat_grams` REAL NOT NULL, `per_100g_fiber_grams` REAL, `per_100g_sugar_grams` REAL, `per_100g_saturated_fat_grams` REAL, `per_100g_sodium_milligrams` REAL, FOREIGN KEY(`nutrition_source_id`) REFERENCES `nutrition_sources`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canonicalName",
+            "columnName": "canonical_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedName",
+            "columnName": "normalized_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "barcode",
+            "columnName": "barcode",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "nutritionSourceId",
+            "columnName": "nutrition_source_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "isUserCreated",
+            "columnName": "is_user_created",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "isEstimated",
+            "columnName": "is_estimated",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "lastVerifiedAtEpochMillis",
+            "columnName": "last_verified_at_epoch_millis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionPer100g.caloriesKcal",
+            "columnName": "per_100g_calories_kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionPer100g.proteinGrams",
+            "columnName": "per_100g_protein_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionPer100g.carbohydrateGrams",
+            "columnName": "per_100g_carbohydrate_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionPer100g.fatGrams",
+            "columnName": "per_100g_fat_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionPer100g.fiberGrams",
+            "columnName": "per_100g_fiber_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionPer100g.sugarGrams",
+            "columnName": "per_100g_sugar_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionPer100g.saturatedFatGrams",
+            "columnName": "per_100g_saturated_fat_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionPer100g.sodiumMilligrams",
+            "columnName": "per_100g_sodium_milligrams",
+            "affinity": "REAL"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_foods_normalized_name",
+            "unique": false,
+            "columnNames": [
+              "normalized_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_normalized_name` ON `${TABLE_NAME}` (`normalized_name`)"
+          },
+          {
+            "name": "index_foods_brand",
+            "unique": false,
+            "columnNames": [
+              "brand"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_brand` ON `${TABLE_NAME}` (`brand`)"
+          },
+          {
+            "name": "index_foods_barcode",
+            "unique": true,
+            "columnNames": [
+              "barcode"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_foods_barcode` ON `${TABLE_NAME}` (`barcode`)"
+          },
+          {
+            "name": "index_foods_nutrition_source_id",
+            "unique": false,
+            "columnNames": [
+              "nutrition_source_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_nutrition_source_id` ON `${TABLE_NAME}` (`nutrition_source_id`)"
+          },
+          {
+            "name": "index_foods_last_verified_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "last_verified_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_foods_last_verified_at_epoch_millis` ON `${TABLE_NAME}` (`last_verified_at_epoch_millis`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "nutrition_sources",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "nutrition_source_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "food_servings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `food_id` INTEGER NOT NULL, `name` TEXT NOT NULL, `normalized_name` TEXT NOT NULL, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, `grams` REAL NOT NULL, `is_default` INTEGER NOT NULL DEFAULT 0, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL, FOREIGN KEY(`food_id`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "food_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedName",
+            "columnName": "normalized_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDefault",
+            "columnName": "is_default",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_food_servings_food_id",
+            "unique": false,
+            "columnNames": [
+              "food_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_servings_food_id` ON `${TABLE_NAME}` (`food_id`)"
+          },
+          {
+            "name": "index_food_servings_food_id_normalized_name_amount_unit",
+            "unique": true,
+            "columnNames": [
+              "food_id",
+              "normalized_name",
+              "amount",
+              "unit"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_food_servings_food_id_normalized_name_amount_unit` ON `${TABLE_NAME}` (`food_id`, `normalized_name`, `amount`, `unit`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "food_aliases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `food_id` INTEGER NOT NULL, `alias` TEXT NOT NULL, `normalized_alias` TEXT NOT NULL, `locale` TEXT, `created_at_epoch_millis` INTEGER NOT NULL, FOREIGN KEY(`food_id`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "food_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alias",
+            "columnName": "alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedAlias",
+            "columnName": "normalized_alias",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "locale",
+            "columnName": "locale",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_food_aliases_normalized_alias",
+            "unique": false,
+            "columnNames": [
+              "normalized_alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_aliases_normalized_alias` ON `${TABLE_NAME}` (`normalized_alias`)"
+          },
+          {
+            "name": "index_food_aliases_food_id_normalized_alias",
+            "unique": true,
+            "columnNames": [
+              "food_id",
+              "normalized_alias"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_food_aliases_food_id_normalized_alias` ON `${TABLE_NAME}` (`food_id`, `normalized_alias`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "food_logs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `food_id` INTEGER, `food_serving_id` INTEGER, `nutrition_source_id` INTEGER, `entry_group_id` TEXT, `meal_category` TEXT NOT NULL, `display_name_snapshot` TEXT NOT NULL, `brand_snapshot` TEXT, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, `grams` REAL, `is_estimated` INTEGER NOT NULL DEFAULT 0, `input_method` TEXT NOT NULL, `notes` TEXT, `local_date` TEXT NOT NULL, `logged_at_epoch_millis` INTEGER NOT NULL, `zone_id` TEXT NOT NULL, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL, `nutrition_snapshot_calories_kcal` REAL NOT NULL, `nutrition_snapshot_protein_grams` REAL NOT NULL, `nutrition_snapshot_carbohydrate_grams` REAL NOT NULL, `nutrition_snapshot_fat_grams` REAL NOT NULL, `nutrition_snapshot_fiber_grams` REAL, `nutrition_snapshot_sugar_grams` REAL, `nutrition_snapshot_saturated_fat_grams` REAL, `nutrition_snapshot_sodium_milligrams` REAL, `source_snapshot_kind` TEXT NOT NULL, `source_snapshot_provider_name` TEXT, `source_snapshot_display_name` TEXT, `source_snapshot_external_id` TEXT, `source_snapshot_url` TEXT, `source_snapshot_retrieved_at_epoch_millis` INTEGER, `source_snapshot_verified_at_epoch_millis` INTEGER, FOREIGN KEY(`food_id`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`food_serving_id`) REFERENCES `food_servings`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`nutrition_source_id`) REFERENCES `nutrition_sources`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "food_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "foodServingId",
+            "columnName": "food_serving_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "nutritionSourceId",
+            "columnName": "nutrition_source_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "entryGroupId",
+            "columnName": "entry_group_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mealCategory",
+            "columnName": "meal_category",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayNameSnapshot",
+            "columnName": "display_name_snapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brandSnapshot",
+            "columnName": "brand_snapshot",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "isEstimated",
+            "columnName": "is_estimated",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "inputMethod",
+            "columnName": "input_method",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "local_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "loggedAtEpochMillis",
+            "columnName": "logged_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "zoneId",
+            "columnName": "zone_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.caloriesKcal",
+            "columnName": "nutrition_snapshot_calories_kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.proteinGrams",
+            "columnName": "nutrition_snapshot_protein_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.carbohydrateGrams",
+            "columnName": "nutrition_snapshot_carbohydrate_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.fatGrams",
+            "columnName": "nutrition_snapshot_fat_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.fiberGrams",
+            "columnName": "nutrition_snapshot_fiber_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.sugarGrams",
+            "columnName": "nutrition_snapshot_sugar_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.saturatedFatGrams",
+            "columnName": "nutrition_snapshot_saturated_fat_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.sodiumMilligrams",
+            "columnName": "nutrition_snapshot_sodium_milligrams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "sourceSnapshot.kind",
+            "columnName": "source_snapshot_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceSnapshot.providerName",
+            "columnName": "source_snapshot_provider_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.displayName",
+            "columnName": "source_snapshot_display_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.externalId",
+            "columnName": "source_snapshot_external_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.url",
+            "columnName": "source_snapshot_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.retrievedAtEpochMillis",
+            "columnName": "source_snapshot_retrieved_at_epoch_millis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sourceSnapshot.verifiedAtEpochMillis",
+            "columnName": "source_snapshot_verified_at_epoch_millis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_food_logs_local_date_logged_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "local_date",
+              "logged_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_local_date_logged_at_epoch_millis` ON `${TABLE_NAME}` (`local_date`, `logged_at_epoch_millis`)"
+          },
+          {
+            "name": "index_food_logs_local_date_meal_category",
+            "unique": false,
+            "columnNames": [
+              "local_date",
+              "meal_category"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_local_date_meal_category` ON `${TABLE_NAME}` (`local_date`, `meal_category`)"
+          },
+          {
+            "name": "index_food_logs_entry_group_id",
+            "unique": false,
+            "columnNames": [
+              "entry_group_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_entry_group_id` ON `${TABLE_NAME}` (`entry_group_id`)"
+          },
+          {
+            "name": "index_food_logs_food_id",
+            "unique": false,
+            "columnNames": [
+              "food_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_food_id` ON `${TABLE_NAME}` (`food_id`)"
+          },
+          {
+            "name": "index_food_logs_food_serving_id",
+            "unique": false,
+            "columnNames": [
+              "food_serving_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_food_serving_id` ON `${TABLE_NAME}` (`food_serving_id`)"
+          },
+          {
+            "name": "index_food_logs_nutrition_source_id",
+            "unique": false,
+            "columnNames": [
+              "nutrition_source_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_nutrition_source_id` ON `${TABLE_NAME}` (`nutrition_source_id`)"
+          },
+          {
+            "name": "index_food_logs_display_name_snapshot",
+            "unique": false,
+            "columnNames": [
+              "display_name_snapshot"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_display_name_snapshot` ON `${TABLE_NAME}` (`display_name_snapshot`)"
+          },
+          {
+            "name": "index_food_logs_brand_snapshot",
+            "unique": false,
+            "columnNames": [
+              "brand_snapshot"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_food_logs_brand_snapshot` ON `${TABLE_NAME}` (`brand_snapshot`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "food_servings",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_serving_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "nutrition_sources",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "nutrition_source_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "favorite_foods",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `food_id` INTEGER NOT NULL, `food_serving_id` INTEGER, `typical_amount` REAL NOT NULL, `typical_unit` TEXT NOT NULL, `typical_grams` REAL, `created_at_epoch_millis` INTEGER NOT NULL, `last_used_at_epoch_millis` INTEGER, FOREIGN KEY(`food_id`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`food_serving_id`) REFERENCES `food_servings`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "food_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodServingId",
+            "columnName": "food_serving_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "typicalAmount",
+            "columnName": "typical_amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "typicalUnit",
+            "columnName": "typical_unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "typicalGrams",
+            "columnName": "typical_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUsedAtEpochMillis",
+            "columnName": "last_used_at_epoch_millis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_favorite_foods_food_id",
+            "unique": true,
+            "columnNames": [
+              "food_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_favorite_foods_food_id` ON `${TABLE_NAME}` (`food_id`)"
+          },
+          {
+            "name": "index_favorite_foods_food_serving_id",
+            "unique": false,
+            "columnNames": [
+              "food_serving_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_favorite_foods_food_serving_id` ON `${TABLE_NAME}` (`food_serving_id`)"
+          },
+          {
+            "name": "index_favorite_foods_last_used_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "last_used_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_favorite_foods_last_used_at_epoch_millis` ON `${TABLE_NAME}` (`last_used_at_epoch_millis`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "foods",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "food_servings",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_serving_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "saved_meals",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `normalized_name` TEXT NOT NULL, `notes` TEXT, `default_meal_category` TEXT, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL, `last_used_at_epoch_millis` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "normalizedName",
+            "columnName": "normalized_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "defaultMealCategory",
+            "columnName": "default_meal_category",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastUsedAtEpochMillis",
+            "columnName": "last_used_at_epoch_millis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_saved_meals_normalized_name",
+            "unique": false,
+            "columnNames": [
+              "normalized_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_saved_meals_normalized_name` ON `${TABLE_NAME}` (`normalized_name`)"
+          },
+          {
+            "name": "index_saved_meals_last_used_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "last_used_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_saved_meals_last_used_at_epoch_millis` ON `${TABLE_NAME}` (`last_used_at_epoch_millis`)"
+          },
+          {
+            "name": "index_saved_meals_created_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "created_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_saved_meals_created_at_epoch_millis` ON `${TABLE_NAME}` (`created_at_epoch_millis`)"
+          }
+        ]
+      },
+      {
+        "tableName": "saved_meal_items",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `saved_meal_id` INTEGER NOT NULL, `food_id` INTEGER, `food_serving_id` INTEGER, `sort_order` INTEGER NOT NULL, `display_name_snapshot` TEXT NOT NULL, `brand_snapshot` TEXT, `amount` REAL NOT NULL, `unit` TEXT NOT NULL, `grams` REAL, `is_estimated` INTEGER NOT NULL DEFAULT 0, `nutrition_snapshot_calories_kcal` REAL NOT NULL, `nutrition_snapshot_protein_grams` REAL NOT NULL, `nutrition_snapshot_carbohydrate_grams` REAL NOT NULL, `nutrition_snapshot_fat_grams` REAL NOT NULL, `nutrition_snapshot_fiber_grams` REAL, `nutrition_snapshot_sugar_grams` REAL, `nutrition_snapshot_saturated_fat_grams` REAL, `nutrition_snapshot_sodium_milligrams` REAL, `source_snapshot_kind` TEXT NOT NULL, `source_snapshot_provider_name` TEXT, `source_snapshot_display_name` TEXT, `source_snapshot_external_id` TEXT, `source_snapshot_url` TEXT, `source_snapshot_retrieved_at_epoch_millis` INTEGER, `source_snapshot_verified_at_epoch_millis` INTEGER, FOREIGN KEY(`saved_meal_id`) REFERENCES `saved_meals`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`food_id`) REFERENCES `foods`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`food_serving_id`) REFERENCES `food_servings`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "savedMealId",
+            "columnName": "saved_meal_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foodId",
+            "columnName": "food_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "foodServingId",
+            "columnName": "food_serving_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sortOrder",
+            "columnName": "sort_order",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayNameSnapshot",
+            "columnName": "display_name_snapshot",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brandSnapshot",
+            "columnName": "brand_snapshot",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "amount",
+            "columnName": "amount",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unit",
+            "columnName": "unit",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grams",
+            "columnName": "grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "isEstimated",
+            "columnName": "is_estimated",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.caloriesKcal",
+            "columnName": "nutrition_snapshot_calories_kcal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.proteinGrams",
+            "columnName": "nutrition_snapshot_protein_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.carbohydrateGrams",
+            "columnName": "nutrition_snapshot_carbohydrate_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.fatGrams",
+            "columnName": "nutrition_snapshot_fat_grams",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nutritionSnapshot.fiberGrams",
+            "columnName": "nutrition_snapshot_fiber_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.sugarGrams",
+            "columnName": "nutrition_snapshot_sugar_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.saturatedFatGrams",
+            "columnName": "nutrition_snapshot_saturated_fat_grams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "nutritionSnapshot.sodiumMilligrams",
+            "columnName": "nutrition_snapshot_sodium_milligrams",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "sourceSnapshot.kind",
+            "columnName": "source_snapshot_kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceSnapshot.providerName",
+            "columnName": "source_snapshot_provider_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.displayName",
+            "columnName": "source_snapshot_display_name",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.externalId",
+            "columnName": "source_snapshot_external_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.url",
+            "columnName": "source_snapshot_url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceSnapshot.retrievedAtEpochMillis",
+            "columnName": "source_snapshot_retrieved_at_epoch_millis",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "sourceSnapshot.verifiedAtEpochMillis",
+            "columnName": "source_snapshot_verified_at_epoch_millis",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_saved_meal_items_saved_meal_id_sort_order",
+            "unique": true,
+            "columnNames": [
+              "saved_meal_id",
+              "sort_order"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_saved_meal_items_saved_meal_id_sort_order` ON `${TABLE_NAME}` (`saved_meal_id`, `sort_order`)"
+          },
+          {
+            "name": "index_saved_meal_items_food_id",
+            "unique": false,
+            "columnNames": [
+              "food_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_saved_meal_items_food_id` ON `${TABLE_NAME}` (`food_id`)"
+          },
+          {
+            "name": "index_saved_meal_items_food_serving_id",
+            "unique": false,
+            "columnNames": [
+              "food_serving_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_saved_meal_items_food_serving_id` ON `${TABLE_NAME}` (`food_serving_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "saved_meals",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "saved_meal_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "foods",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "food_servings",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "food_serving_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "weight_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `weight_kg` REAL NOT NULL, `local_date` TEXT NOT NULL, `measured_at_epoch_millis` INTEGER NOT NULL, `zone_id` TEXT NOT NULL, `note` TEXT, `source` TEXT NOT NULL, `external_id` TEXT, `created_at_epoch_millis` INTEGER NOT NULL, `updated_at_epoch_millis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weightKg",
+            "columnName": "weight_kg",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "localDate",
+            "columnName": "local_date",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "measuredAtEpochMillis",
+            "columnName": "measured_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "zoneId",
+            "columnName": "zone_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalId",
+            "columnName": "external_id",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMillis",
+            "columnName": "updated_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_weight_entries_local_date_measured_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "local_date",
+              "measured_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_weight_entries_local_date_measured_at_epoch_millis` ON `${TABLE_NAME}` (`local_date`, `measured_at_epoch_millis`)"
+          },
+          {
+            "name": "index_weight_entries_measured_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "measured_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_weight_entries_measured_at_epoch_millis` ON `${TABLE_NAME}` (`measured_at_epoch_millis`)"
+          },
+          {
+            "name": "index_weight_entries_source",
+            "unique": false,
+            "columnNames": [
+              "source"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_weight_entries_source` ON `${TABLE_NAME}` (`source`)"
+          }
+        ]
+      },
+      {
+        "tableName": "ai_debug_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `pipeline` TEXT NOT NULL, `provider_id` TEXT NOT NULL, `model` TEXT NOT NULL, `duration_millis` INTEGER NOT NULL, `cache_hit` INTEGER NOT NULL, `source_summary` TEXT, `parsed_result_json` TEXT, `validation_status` TEXT NOT NULL, `failure_category` TEXT, `safe_message` TEXT, `created_at_epoch_millis` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pipeline",
+            "columnName": "pipeline",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "providerId",
+            "columnName": "provider_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "model",
+            "columnName": "model",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "durationMillis",
+            "columnName": "duration_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cacheHit",
+            "columnName": "cache_hit",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceSummary",
+            "columnName": "source_summary",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "parsedResultJson",
+            "columnName": "parsed_result_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "validationStatus",
+            "columnName": "validation_status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failureCategory",
+            "columnName": "failure_category",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "safeMessage",
+            "columnName": "safe_message",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "createdAtEpochMillis",
+            "columnName": "created_at_epoch_millis",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ai_debug_events_created_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "created_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ai_debug_events_created_at_epoch_millis` ON `${TABLE_NAME}` (`created_at_epoch_millis`)"
+          },
+          {
+            "name": "index_ai_debug_events_pipeline_created_at_epoch_millis",
+            "unique": false,
+            "columnNames": [
+              "pipeline",
+              "created_at_epoch_millis"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ai_debug_events_pipeline_created_at_epoch_millis` ON `${TABLE_NAME}` (`pipeline`, `created_at_epoch_millis`)"
+          },
+          {
+            "name": "index_ai_debug_events_validation_status",
+            "unique": false,
+            "columnNames": [
+              "validation_status"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ai_debug_events_validation_status` ON `${TABLE_NAME}` (`validation_status`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'f17b4588c6c5acefbf680d5ccdc05037')"
+    ]
+  }
+}

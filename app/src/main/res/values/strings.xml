@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Nomi</string>
+    <string name="tagline">Nutrition tracking without the homework.</string>
+    <string name="welcome_supporting_text">Tell Nomi what you ate. We’ll handle the numbers.</string>
+</resources>

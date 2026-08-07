@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Nomi" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/nomi_seed</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Theme.Nomi.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/nomi_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/nomi_icon_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Nomi</item>
+    </style>
+</resources>

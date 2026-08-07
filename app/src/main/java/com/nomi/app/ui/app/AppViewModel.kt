@@ -1,0 +1,1609 @@
+package com.nomi.app.ui.app
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.nomi.app.BuildConfig
+import com.nomi.app.ai.model.AiProcessingStage
+import com.nomi.app.ai.model.AiProviderConfig
+import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.ai.model.AiRuntimeCredential
+import com.nomi.app.ai.model.AnalyzedFoodItem
+import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.ParsedFoodIntent
+import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.parsing.LocalFoodIntentParser
+import com.nomi.app.ai.validation.AiValidationException
+import com.nomi.app.ai.validation.ServingNutritionNormalizer
+import com.nomi.app.data.local.entity.AiDebugEventEntity
+import com.nomi.app.data.local.entity.FavoriteFoodEntity
+import com.nomi.app.data.local.entity.FoodEntity
+import com.nomi.app.data.local.entity.FoodLogEntity
+import com.nomi.app.data.local.entity.NutritionPlanEntity
+import com.nomi.app.data.local.entity.NutritionSourceSnapshot
+import com.nomi.app.data.local.entity.NutritionValues
+import com.nomi.app.data.local.entity.UserProfileEntity
+import com.nomi.app.data.local.entity.WeightEntryEntity
+import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
+import com.nomi.app.data.local.model.SavedMealWithItems
+import com.nomi.app.data.preferences.AppPreferences
+import com.nomi.app.data.preferences.HeightUnitPreference
+import com.nomi.app.data.preferences.ProviderPipeline
+import com.nomi.app.data.preferences.ProviderSelection
+import com.nomi.app.data.preferences.ThemePreference
+import com.nomi.app.data.preferences.WeightUnitPreference
+import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
+import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
+import com.nomi.app.data.repository.AddSavedMealToLogRequest
+import com.nomi.app.data.repository.SaveLoggedMealRequest
+import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
+import com.nomi.app.data.repository.mapping.toPersistedDraft
+import com.nomi.app.data.repository.mapping.toEntity
+import com.nomi.app.di.AppContainer
+import com.nomi.app.domain.model.NutritionPlan
+import com.nomi.app.domain.model.OnboardingDraft
+import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
+import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
+import com.nomi.app.ui.profile.ProfileEdit
+import com.nomi.app.integration.health.HealthConnectAvailability
+import com.nomi.app.integration.health.HealthFeatures
+import com.nomi.app.ui.history.HistoryDay
+import com.nomi.app.ui.history.HistoryUiState
+import com.nomi.app.ui.capture.BarcodeAmountSupport
+import com.nomi.app.ui.capture.BarcodeAmountUiState
+import com.nomi.app.ui.library.LibraryItem
+import com.nomi.app.ui.library.LibraryItemKind
+import com.nomi.app.ui.library.LibraryUiState
+import com.nomi.app.ui.logging.FoodLoggingUiState
+import com.nomi.app.ui.logging.ManualFoodDraft
+import com.nomi.app.ui.logging.PortionEditUiState
+import com.nomi.app.ui.logging.toPortionContext
+import com.nomi.app.ui.progress.NutritionPoint
+import com.nomi.app.ui.progress.ProgressRange
+import com.nomi.app.ui.progress.ProgressUiState
+import com.nomi.app.ui.progress.WeightPoint
+import com.nomi.app.ui.settings.AiProviderEditorState
+import com.nomi.app.ui.settings.AiProviderSetting
+import com.nomi.app.ui.settings.NutritionTargetSetting
+import com.nomi.app.ui.settings.SettingsUiState
+import com.nomi.app.ui.settings.ThemeMode
+import com.nomi.app.ui.settings.UnitSystem
+import com.nomi.app.ui.today.AddFoodMethod
+import com.nomi.app.ui.today.MacroProgress
+import com.nomi.app.ui.today.MealCategory
+import com.nomi.app.ui.today.TodayFoodEntry
+import com.nomi.app.ui.today.TodayUiState
+import java.net.URI
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.util.Locale
+import java.security.MessageDigest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+sealed interface AppStartState {
+    data object Loading : AppStartState
+    data object Onboarding : AppStartState
+    data object Main : AppStartState
+}
+
+sealed interface AppEvent {
+    data class Message(val text: String) : AppEvent
+    data object FoodSaved : AppEvent
+    data object OnboardingSaved : AppEvent
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AppViewModel(
+    private val container: AppContainer,
+) : ViewModel() {
+    private val repository = container.repository
+    private val zoneId: ZoneId = ZoneId.systemDefault()
+    private val today: LocalDate get() = LocalDate.now(zoneId)
+
+    val preferences: StateFlow<AppPreferences> = repository.preferences.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        AppPreferences(),
+    )
+
+    val startState: StateFlow<AppStartState> = repository.profile
+        .map { profile ->
+            if (profile?.onboardingCompleted == true) AppStartState.Main
+            else AppStartState.Onboarding
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AppStartState.Loading)
+
+    val profile: StateFlow<UserProfileEntity?> = repository.profile.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        null,
+    )
+
+    val currentPlan: StateFlow<NutritionPlanEntity?> = repository.currentPlan.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        null,
+    )
+    val latestWeight: StateFlow<WeightEntryEntity?> = repository.latestWeight.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        null,
+    )
+
+
+    private val mutableEvents = MutableSharedFlow<AppEvent>(extraBufferCapacity = 8)
+    val events = mutableEvents.asSharedFlow()
+
+    private val mutableOnboardingSaving = MutableStateFlow(false)
+    val onboardingSaving = mutableOnboardingSaving.asStateFlow()
+
+    private val selectedDate = MutableStateFlow(today)
+    private var dayLogSnapshot: List<FoodLogEntity> = emptyList()
+
+    val todayState: StateFlow<TodayUiState> = combine(
+        selectedDate.flatMapLatest { repository.dayLogs(it.toString()) }
+            .onEach { dayLogSnapshot = it },
+        repository.currentPlan,
+        selectedDate,
+    ) { logs, plan, date -> mapToday(date, logs, plan) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(isLoading = true))
+    val aiDebugEvents: StateFlow<List<AiDebugEventEntity>> = repository.aiDebugEvents().stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        emptyList(),
+    )
+
+
+    private val historyQuery = MutableStateFlow("")
+    private val historyDate = MutableStateFlow(today)
+    private val historyLogs: Flow<List<FoodLogEntity>> = historyDate.flatMapLatest { endDate ->
+        repository.history(endDate.minusDays(29).toString(), endDate.toString())
+    }
+    val historyState: StateFlow<HistoryUiState> = combine(
+        historyLogs,
+        historyQuery,
+        historyDate,
+        repository.currentPlan,
+    ) { logs, query, date, plan -> mapHistory(logs, query, date, plan) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+
+    private val progressRange = MutableStateFlow(ProgressRange.THIRTY_DAYS)
+    val progressState: StateFlow<ProgressUiState> = progressRange.flatMapLatest { range ->
+        val totalDays = range.dayCount()
+        val start = today.minusDays((totalDays - 1).toLong())
+        combine(
+            repository.weights(start.toString(), today.toString()),
+            repository.nutritionHistory(start.toString(), today.toString()),
+            repository.profile,
+        ) { weights, nutrition, profile ->
+            ProgressUiState(
+                range = range,
+                weights = weights.map { WeightPoint(LocalDate.parse(it.localDate), it.weightKg) },
+                nutrition = nutrition.map {
+                    NutritionPoint(
+                        date = LocalDate.parse(it.localDate),
+                        calories = it.caloriesKcal,
+                        protein = it.proteinGrams,
+                        carbohydrates = it.carbohydrateGrams,
+                        fat = it.fatGrams,
+                    )
+                },
+                startingWeightKg = profile?.startingWeightKg,
+                targetWeightKg = profile?.targetWeightKg,
+                loggingDays = nutrition.size,
+                totalDays = totalDays,
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
+
+    private val keyPresence = MutableStateFlow<Map<ProviderPipeline, Boolean>>(emptyMap())
+    private val healthConnected = MutableStateFlow(false)
+    val settingsState: StateFlow<SettingsUiState> = combine(
+        repository.preferences,
+        repository.currentPlan,
+        keyPresence,
+        healthConnected,
+    ) { prefs, plan, keys, connected -> mapSettings(prefs, plan, keys, connected) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    private var recentFoodsSnapshot: List<FoodEntity> = emptyList()
+    private var favoriteSnapshot: List<FavoriteFoodWithCatalog> = emptyList()
+    private var savedMealSnapshot: List<SavedMealWithItems> = emptyList()
+    val libraryState: StateFlow<LibraryUiState> = combine(
+        repository.recentFoods(),
+        repository.favorites,
+        repository.savedMeals,
+    ) { recent, favorites, meals ->
+        recentFoodsSnapshot = recent
+        favoriteSnapshot = favorites
+        savedMealSnapshot = meals
+        LibraryUiState(
+            recent = recent.map { food -> food.toLibraryItem(LibraryItemKind.RECENT) },
+            favorites = favorites.map { favorite ->
+                favorite.food.toLibraryItem(
+                    kind = LibraryItemKind.FAVORITE,
+                    amountText = "${favorite.favorite.typicalAmount.cleanNumber()} ${favorite.favorite.typicalUnit}",
+                )
+            },
+            savedMeals = meals.map { saved ->
+                LibraryItem(
+                    id = saved.meal.id,
+                    kind = LibraryItemKind.SAVED_MEAL,
+                    title = saved.meal.name,
+                    subtitle = "${saved.items.size} item${if (saved.items.size == 1) "" else "s"}",
+                    calories = saved.items.sumOf { it.nutritionSnapshot.caloriesKcal },
+                )
+            },
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
+
+    private val mutableLoggingState = MutableStateFlow<FoodLoggingUiState>(FoodLoggingUiState.Input())
+    val loggingState = mutableLoggingState.asStateFlow()
+    private val recentFoodAnalysisCache = RecentFoodAnalysisCache()
+    private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
+    val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
+    private var lastLoggingText = ""
+    private var barcodeLookupRequestId = 0L
+    private val mutablePortionEditState = MutableStateFlow<PortionEditUiState?>(null)
+    val portionEditState = mutablePortionEditState.asStateFlow()
+    private var portionEditIndex: Int? = null
+    private val pendingDeletedLogs = PendingDeletedLogStore()
+    private val earlyUndoDeleteRequests = mutableSetOf<Long>()
+    private val earlyDiscardDeleteRequests = mutableSetOf<Long>()
+
+
+    init {
+        refreshProviderAndHealthStatus()
+        viewModelScope.launch {
+            runCatching { container.reminderScheduler.reconcileFrom(repository.appPreferencesStore) }
+        }
+    }
+
+    fun completeOnboarding(draft: OnboardingDraft, plan: NutritionPlan) {
+        if (mutableOnboardingSaving.value) return
+        viewModelScope.launch {
+            mutableOnboardingSaving.value = true
+            runCatching {
+                val now = System.currentTimeMillis()
+                repository.completeOnboarding(
+                    draft.toCompleteOnboardingRequest(plan, now, today, zoneId),
+                )
+            }.onSuccess {
+                mutableEvents.emit(AppEvent.OnboardingSaved)
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message("Nomi couldn't save your plan. Please try again."))
+            }
+            mutableOnboardingSaving.value = false
+        }
+    }
+
+    fun previousDay() { selectedDate.value = selectedDate.value.minusDays(1) }
+    fun nextDay() { if (selectedDate.value < today) selectedDate.value = selectedDate.value.plusDays(1) }
+    fun persistOnboardingDraft(draft: OnboardingDraft) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setOnboardingDraft(
+                draft.toPersistedDraft(currentStep = 0, updatedAtEpochMillis = System.currentTimeMillis()),
+            )
+        }
+    }
+    fun selectToday() { selectedDate.value = today }
+    fun setHistoryQuery(value: String) { historyQuery.value = value }
+    fun setHistoryDate(value: LocalDate) { historyDate.value = value.coerceAtMost(today) }
+    fun setProgressRange(value: ProgressRange) { progressRange.value = value }
+
+    fun beginLogging(method: AddFoodMethod, initialText: String = "") {
+        barcodeLookupRequestId += 1
+        mutableBarcodeAmountState.value = null
+        val category = defaultMealCategory()
+        mutableLoggingState.value = when (method) {
+            AddFoodMethod.TYPE, AddFoodMethod.VOICE -> FoodLoggingUiState.Input(initialText, category)
+            else -> FoodLoggingUiState.Input("", category)
+        }
+        lastLoggingText = initialText
+    }
+
+    fun updateLoggingText(value: String) {
+        lastLoggingText = value
+        val current = mutableLoggingState.value
+        if (current is FoodLoggingUiState.Input) mutableLoggingState.value = current.copy(text = value)
+    }
+
+    fun editLoggingText() {
+        val category = when (val current = mutableLoggingState.value) {
+            is FoodLoggingUiState.Input -> current.mealCategory
+            is FoodLoggingUiState.Preview -> current.mealCategory
+            is FoodLoggingUiState.Manual -> current.draft.mealCategory
+            else -> defaultMealCategory()
+        }
+        mutableLoggingState.value = FoodLoggingUiState.Input(lastLoggingText, category)
+    }
+
+    fun dismissLoggingDraft() {
+        barcodeLookupRequestId += 1
+        mutableBarcodeAmountState.value = null
+        lastLoggingText = ""
+        dismissPortionEdit()
+        mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
+    }
+
+    fun updateLoggingMealCategory(category: MealCategory) {
+        mutableLoggingState.value = when (val current = mutableLoggingState.value) {
+            is FoodLoggingUiState.Input -> current.copy(mealCategory = category)
+            is FoodLoggingUiState.Preview -> current.copy(mealCategory = category)
+            is FoodLoggingUiState.Manual -> current.copy(draft = current.draft.copy(mealCategory = category))
+            else -> current
+        }
+    }
+
+    fun showManualLogging(prefillName: String = lastLoggingText) {
+        val category = when (val current = mutableLoggingState.value) {
+            is FoodLoggingUiState.Input -> current.mealCategory
+            is FoodLoggingUiState.Preview -> current.mealCategory
+            else -> defaultMealCategory()
+        }
+        mutableLoggingState.value = FoodLoggingUiState.Manual(
+            ManualFoodDraft(name = prefillName, amount = "100", unit = "g", mealCategory = category),
+        )
+    }
+
+    fun updateManualDraft(value: ManualFoodDraft) {
+        mutableLoggingState.value = FoodLoggingUiState.Manual(value)
+    }
+
+    fun updatePreviewItem(index: Int, item: AnalyzedFoodItem) {
+        val current = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
+        if (index !in current.analysis.items.indices) return
+        val updated = current.analysis.items.toMutableList().apply { this[index] = item }
+        mutableLoggingState.value = current.copy(
+            analysis = current.analysis.copy(items = updated),
+        )
+    }
+
+    fun beginPortionEdit(index: Int) {
+        val preview = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
+        val item = preview.analysis.items.getOrNull(index) ?: return
+        portionEditIndex = index
+        mutablePortionEditState.value = PortionEditUiState(current = item.toPortionContext())
+    }
+
+    fun updatePortionCorrection(correction: String) {
+        mutablePortionEditState.value = mutablePortionEditState.value?.copy(
+            correction = correction.take(500),
+            proposed = null,
+            errorMessage = null,
+        )
+    }
+
+    fun dismissPortionEdit() {
+        portionEditIndex = null
+        mutablePortionEditState.value = null
+    }
+
+    fun interpretPortionCorrection() {
+        val edit = mutablePortionEditState.value ?: return
+        if (edit.correction.isBlank() || edit.isProcessing) return
+        mutablePortionEditState.value = edit.copy(isProcessing = true, proposed = null, errorMessage = null)
+        viewModelScope.launch {
+            runCatching {
+                withConfiguredProvider(ProviderPipeline.PORTION_CHANGE) { config, key ->
+                    providerFor(config, key).interpretAdjustment(edit.current, edit.correction)
+                }
+            }.onSuccess { adjustment ->
+                mutablePortionEditState.value = edit.copy(isProcessing = false, proposed = adjustment)
+            }.onFailure { error ->
+                mutablePortionEditState.value = edit.copy(
+                    isProcessing = false,
+                    errorMessage = error.safeAiMessage(),
+                )
+            }
+        }
+    }
+
+    fun applyPortionCorrection() {
+        val index = portionEditIndex ?: return
+        val edit = mutablePortionEditState.value ?: return
+        val adjustment = edit.proposed ?: return
+        val preview = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
+        val item = preview.analysis.items.getOrNull(index) ?: return
+        val multiplier = adjustment.multiplier
+        val updated = runCatching {
+            if (item.requiresServingValidation) {
+                ServingNutritionNormalizer.rescaleValidatedItemTo(
+                    item = item,
+                    loggedQuantity = adjustment.newQuantity,
+                    loggedUnit = adjustment.newUnit,
+                    loggedGramsEquivalent = adjustment.newGrams
+                        ?: item.gramsEquivalent?.times(multiplier),
+                ).copy(
+                    isEstimate = item.isEstimate || adjustment.requiresConfirmation,
+                    assumptions = (item.assumptions +
+                        "Portion change: ${adjustment.interpretation}").takeLast(12),
+                )
+            } else {
+                item.copy(
+                    quantity = adjustment.newQuantity,
+                    unit = adjustment.newUnit,
+                    gramsEquivalent = adjustment.newGrams
+                        ?: item.gramsEquivalent?.times(multiplier),
+                    calories = item.calories * multiplier,
+                    proteinGrams = item.proteinGrams * multiplier,
+                    carbohydrateGrams = item.carbohydrateGrams * multiplier,
+                    fatGrams = item.fatGrams * multiplier,
+                    fiberGrams = item.fiberGrams?.times(multiplier),
+                    isEstimate = item.isEstimate || adjustment.requiresConfirmation,
+                    assumptions = (item.assumptions +
+                        "Portion change: ${adjustment.interpretation}").takeLast(12),
+                )
+            }
+        }.getOrElse { error ->
+            mutablePortionEditState.value = edit.copy(errorMessage = error.safeAiMessage())
+            return
+        }
+        updatePreviewItem(index, updated)
+        dismissPortionEdit()
+    }
+
+    fun analyzeText() {
+        val current = mutableLoggingState.value as? FoodLoggingUiState.Input ?: return
+        val text = current.text.trim()
+        if (text.isBlank()) return
+        lastLoggingText = text
+        val cacheKey = foodAnalysisCacheKey(text)
+        recentFoodAnalysisCache.get(cacheKey)?.let { analysis ->
+            mutableLoggingState.value = FoodLoggingUiState.Preview(
+                analysis = analysis,
+                mealCategory = current.mealCategory,
+                originalText = text,
+            )
+            return
+        }
+
+        // Claim the input synchronously so repeated taps cannot launch duplicate provider calls.
+        mutableLoggingState.value = FoodLoggingUiState.Processing(
+            AiProcessingStage.UNDERSTANDING_MEAL,
+            originalText = text,
+        )
+        viewModelScope.launch {
+            runCatching {
+                val intent = LocalFoodIntentParser.parseOrNull(text)
+                    ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
+                        providerFor(config, key).parseFood(text)
+                    }
+                mutableLoggingState.value = FoodLoggingUiState.Processing(
+                    AiProcessingStage.FINDING_NUTRITION,
+                    originalText = text,
+                    sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
+                )
+                val analysis = researchNutrition(intent)
+                val researchSourceUrls = analysis.researchSourceUrls()
+                mutableLoggingState.value = FoodLoggingUiState.Processing(
+                    AiProcessingStage.CHECKING_PORTIONS,
+                    originalText = text,
+                    sourceUrls = researchSourceUrls,
+                )
+                mutableLoggingState.value = FoodLoggingUiState.Processing(
+                    AiProcessingStage.PUTTING_IT_TOGETHER,
+                    originalText = text,
+                    sourceUrls = researchSourceUrls,
+                )
+                analysis
+            }.onSuccess { analysis ->
+                recentFoodAnalysisCache.put(cacheKey, analysis)
+                mutableLoggingState.value = FoodLoggingUiState.Preview(
+                    analysis,
+                    current.mealCategory,
+                    originalText = text,
+                )
+            }.onFailure { error ->
+                mutableLoggingState.value = FoodLoggingUiState.Error(
+                    error.safeAiMessage(),
+                    canRetry = true,
+                    originalText = text,
+                )
+            }
+        }
+    }
+
+    fun retryAnalysis() {
+        editLoggingText()
+        analyzeText()
+    }
+
+    fun analyzePhoto(bytes: ByteArray, mediaType: String) {
+        val analysisJob = viewModelScope.launch {
+            val category = defaultMealCategory()
+            runCatching {
+                mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.UNDERSTANDING_MEAL)
+                val vision = withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
+                    providerFor(config, key).identifyFood(bytes, mediaType)
+                }
+                val intent = ParsedFoodIntent(
+                    originalText = "Food identified from a selected photo",
+                    items = vision.items.map {
+                        ParsedFoodItem(
+                            name = it.name,
+                            quantity = it.estimatedQuantity,
+                            unit = it.unit,
+                            gramsEquivalent = it.estimatedGrams,
+                            assumptions = it.visibleIngredients,
+                        )
+                    },
+                )
+                mutableLoggingState.value = FoodLoggingUiState.Processing(
+                    AiProcessingStage.FINDING_NUTRITION,
+                    sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
+                )
+                researchNutrition(intent)
+            }.onSuccess { analysis ->
+                mutableLoggingState.value = FoodLoggingUiState.Preview(analysis, category)
+            }.onFailure { error ->
+                mutableLoggingState.value = FoodLoggingUiState.Error(error.safeAiMessage(), canRetry = false)
+            }
+        }
+        analysisJob.invokeOnCompletion { bytes.fill(0) }
+    }
+
+    fun lookupBarcode(barcode: String) {
+        val requestId = ++barcodeLookupRequestId
+        val category = defaultMealCategory()
+        mutableBarcodeAmountState.value = null
+        viewModelScope.launch {
+            mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.FINDING_NUTRITION)
+            runCatching {
+                val cached = repository.foodByBarcode(barcode)
+                var servingLabel: String? = null
+                val analyzedItem = if (cached != null) {
+                    cached.toAnalyzedItem("Local barcode cache")
+                } else {
+                    val product = container.openFoodFacts.findByBarcode(barcode)
+                    servingLabel = product?.servingSize
+                    product?.toAnalyzedItemOrNull() ?: run {
+                        val label = product?.name?.takeIf { it.isNotBlank() }
+                            ?: "Product with barcode $barcode"
+                        val basisUnit = product?.nutritionBasisUnit ?: "g"
+                        researchNutrition(
+                        ParsedFoodIntent(
+                            originalText = "Barcode lookup",
+                            items = listOf(
+                                ParsedFoodItem(
+                                    name = label,
+                                    brand = product?.brand,
+                                    quantity = 100.0,
+                                    unit = basisUnit,
+                                    gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+                                ),
+                            ),
+                        ),
+                        ).items.single()
+                    }
+                }
+                cacheAnalyzedFood(analyzedItem, barcode)
+                val sourceItem = analyzedItem.asBarcodeSourceServing()
+                val suggestion = BarcodeAmountSupport.initialSuggestion(servingLabel, sourceItem.unit)
+                BarcodeAmountUiState(
+                    barcode = barcode,
+                    sourceItem = sourceItem,
+                    amount = suggestion.amount,
+                    unit = suggestion.unit,
+                    compatibleUnits = BarcodeAmountSupport.compatibleUnits(sourceItem.unit),
+                    mealCategory = category,
+                    servingLabel = servingLabel,
+                )
+            }.onSuccess { amountState ->
+                if (requestId != barcodeLookupRequestId) return@onSuccess
+                updateBarcodeAmountState(amountState)
+            }.onFailure { error ->
+                if (requestId != barcodeLookupRequestId) return@onFailure
+                mutableLoggingState.value = FoodLoggingUiState.Error(error.safeAiMessage(), canRetry = false)
+            }
+        }
+    }
+
+    fun updateBarcodeAmount(value: String) {
+        val current = mutableBarcodeAmountState.value ?: return
+        updateBarcodeAmountState(
+            current.copy(
+                amount = BarcodeAmountSupport.sanitizeAmount(value),
+                errorMessage = null,
+            ),
+        )
+    }
+
+    fun updateBarcodeUnit(unit: String) {
+        val current = mutableBarcodeAmountState.value ?: return
+        if (unit !in current.compatibleUnits) return
+        updateBarcodeAmountState(current.copy(unit = unit, errorMessage = null))
+    }
+
+    fun confirmBarcodeAmount() {
+        val current = mutableBarcodeAmountState.value ?: return
+        val quantity = current.parsedAmount ?: run {
+            mutableBarcodeAmountState.value = current.copy(errorMessage = "Enter an amount greater than zero")
+            return
+        }
+        runCatching {
+            ServingNutritionNormalizer.normalizeSourceServingTo(
+                sourceServingItem = current.sourceItem,
+                loggedQuantity = quantity,
+                loggedUnit = current.unit,
+                loggedGramsEquivalent = BarcodeAmountSupport.gramsEquivalent(quantity, current.unit),
+            )
+        }.onSuccess { item ->
+            val description = BarcodeAmountSupport.description(current.amount, current.unit, item.name)
+            lastLoggingText = description
+            mutableBarcodeAmountState.value = null
+            mutableLoggingState.value = FoodLoggingUiState.Preview(
+                analysis = FoodAnalysis(listOf(item), overallConfidence = item.confidence),
+                mealCategory = current.mealCategory,
+                originalText = description,
+            )
+        }.onFailure { error ->
+            mutableBarcodeAmountState.value = current.copy(errorMessage = error.safeAiMessage())
+        }
+    }
+
+    fun cancelBarcodeAmount() {
+        mutableBarcodeAmountState.value = null
+        dismissLoggingDraft()
+    }
+
+    private fun updateBarcodeAmountState(state: BarcodeAmountUiState) {
+        mutableBarcodeAmountState.value = state
+        lastLoggingText = BarcodeAmountSupport.description(state.amount, state.unit, state.sourceItem.name)
+        mutableLoggingState.value = FoodLoggingUiState.Input(lastLoggingText, state.mealCategory)
+    }
+
+    fun confirmLogging() {
+        val current = mutableLoggingState.value
+        viewModelScope.launch {
+            runCatching {
+                when (current) {
+                    is FoodLoggingUiState.Preview -> {
+                        val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
+                        val logs = validated.items.map { item ->
+                            item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
+                        }
+                        repository.addLogs(logs)
+                    }
+                    is FoodLoggingUiState.Manual -> {
+                        require(current.draft.isValid)
+                        val log = current.draft.toLog()
+                        repository.addLog(log.copy(foodId = cacheLogFood(log)))
+                    }
+                    else -> return@launch
+                }
+            }.onSuccess {
+                lastLoggingText = ""
+                dismissPortionEdit()
+                mutableBarcodeAmountState.value = null
+                mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
+                mutableEvents.emit(AppEvent.FoodSaved)
+            }.onFailure { error ->
+                mutableEvents.emit(AppEvent.Message(error.safeAiMessage()))
+            }
+        }
+    }
+
+    fun favoriteFoodLog(id: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val log = requireNotNull(repository.foodLog(id))
+                val foodId = requireNotNull(log.foodId) { "This entry has no reusable food" }
+                val now = System.currentTimeMillis()
+                repository.favorite(
+                    FavoriteFoodEntity(
+                        foodId = foodId,
+                        typicalAmount = log.amount,
+                        typicalUnit = log.unit,
+                        typicalGrams = log.grams,
+                        createdAtEpochMillis = now,
+                        lastUsedAtEpochMillis = now,
+                    ),
+                )
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message("Save this food again before favoriting it"))
+            }
+        }
+    }
+
+    fun deleteFoodLog(id: Long) {
+        viewModelScope.launch {
+            runCatching { repository.deleteLog(id) }
+                .onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't delete that food.")) }
+        }
+    }
+
+    /** Starts the Today-row delete while retaining an exact database snapshot for inline Undo. */
+    fun deleteFoodLogForUndo(id: Long) {
+        if (id <= 0 || pendingDeletedLogs.peek(id) != null) return
+        viewModelScope.launch {
+            runCatching {
+                repository.deleteLogForUndo(id)
+                    ?: error("That food is no longer available")
+            }.onSuccess { snapshot ->
+                if (earlyDiscardDeleteRequests.remove(id)) {
+                    earlyUndoDeleteRequests.remove(id)
+                    return@onSuccess
+                }
+                pendingDeletedLogs.remember(snapshot)
+                if (earlyUndoDeleteRequests.remove(id)) restoreDeletedFoodLog(id)
+            }.onFailure { error ->
+                earlyUndoDeleteRequests.remove(id)
+                earlyDiscardDeleteRequests.remove(id)
+                mutableEvents.emit(AppEvent.Message(error.message ?: "Nomi couldn't delete that food."))
+            }
+        }
+    }
+
+    /** Handles both normal Undo and the tiny race where Undo is tapped before Room returns. */
+    fun undoDeletedFoodLog(id: Long) {
+        if (pendingDeletedLogs.peek(id) == null) {
+            if (id > 0 && id !in earlyDiscardDeleteRequests) earlyUndoDeleteRequests += id
+            return
+        }
+        restoreDeletedFoodLog(id)
+    }
+
+    /** Closes the short Undo window without showing a transient confirmation banner. */
+    fun discardDeletedFoodLog(id: Long) {
+        earlyUndoDeleteRequests.remove(id)
+        if (pendingDeletedLogs.peek(id) == null) earlyDiscardDeleteRequests += id
+        else pendingDeletedLogs.discard(id)
+    }
+
+    private fun restoreDeletedFoodLog(id: Long) {
+        val snapshot = pendingDeletedLogs.take(id) ?: return
+        viewModelScope.launch {
+            runCatching {
+                check(repository.restoreDeletedLog(snapshot)) { "The deleted food could not be restored" }
+            }.onFailure { error ->
+                pendingDeletedLogs.remember(snapshot)
+                mutableEvents.emit(AppEvent.Message(error.message ?: "Nomi couldn't restore that food."))
+            }
+        }
+    }
+    fun saveHistoryDayAsMeal(day: HistoryDay, name: String) {
+        if (name.isBlank() || day.entries.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                repository.saveLoggedMeal(
+                    SaveLoggedMealRequest(
+                        name = name.trim(),
+                        normalizedName = name.trim().lowercase(Locale.ROOT),
+                        logIds = day.entries.map { it.id },
+                        defaultMealCategory = day.entries.first().mealCategory.name,
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message("Nomi couldn't save that meal"))
+            }
+        }
+    }
+
+
+    fun duplicateFoodLog(id: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val source = requireNotNull(repository.foodLog(id))
+                val now = System.currentTimeMillis()
+                repository.addLog(source.copy(id = 0, loggedAtEpochMillis = now, createdAtEpochMillis = now, updatedAtEpochMillis = now))
+            }.onFailure { mutableEvents.emit(AppEvent.Message("That food is no longer available")) }
+        }
+    }
+
+    fun copyDayToToday(source: LocalDate) {
+        viewModelScope.launch {
+            runCatching {
+                repository.copyDay(source.toString(), today.toString(), System.currentTimeMillis(), zoneId.id)
+            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't copy that day.")) }
+        }
+    }
+
+    fun addWeight(kilograms: Double, note: String?) {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            runCatching {
+                repository.addWeight(
+                    WeightEntryEntity(
+                        weightKg = kilograms,
+                        localDate = today.toString(),
+                        measuredAtEpochMillis = now,
+                        zoneId = zoneId.id,
+                        note = note?.trim()?.takeIf(String::isNotBlank),
+                        createdAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                    ),
+                )
+            }.onFailure { mutableEvents.emit(AppEvent.Message("Enter a valid weight.")) }
+        }
+    }
+
+    fun addLibraryItem(item: LibraryItem) {
+        viewModelScope.launch {
+            runCatching {
+                when (item.kind) {
+                    LibraryItemKind.RECENT -> recentFoodsSnapshot.first { it.id == item.id }
+                        .let { repository.addLog(it.toLog()) }
+                    LibraryItemKind.FAVORITE -> favoriteSnapshot.first { it.food.id == item.id }
+                        .let { repository.addLog(it.toLog()) }
+                    LibraryItemKind.SAVED_MEAL -> repository.addSavedMealToLog(
+                        AddSavedMealToLogRequest(
+                            savedMealId = item.id,
+                            mealCategory = defaultMealCategory().name,
+                            localDate = selectedDate.value.toString(),
+                            startEpochMillis = System.currentTimeMillis(),
+                            zoneId = zoneId.id,
+                        ),
+                    )
+                }
+            }.onSuccess {
+                mutableEvents.emit(AppEvent.FoodSaved)
+            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't add that item.")) }
+        }
+    }
+
+    fun saveNutritionTargets(calories: Int, protein: Int, carbs: Int, fat: Int) {
+        val plan = currentPlan.value ?: return
+        if (calories !in 800..10_000 || protein !in 0..600 || carbs !in 0..900 || fat !in 0..300) {
+            mutableEvents.tryEmit(AppEvent.Message("Check the nutrition target values."))
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                repository.saveNewPlan(
+                    plan.copy(
+                        id = 0,
+                        version = 0,
+                        effectiveFromLocalDate = today.toString(),
+                        calorieTargetKcal = calories.toDouble(),
+                        proteinTargetGrams = protein.toDouble(),
+                        carbohydrateTargetGrams = carbs.toDouble(),
+                        fatTargetGrams = fat.toDouble(),
+                        calorieTargetCustom = true,
+                        proteinTargetCustom = true,
+                        carbohydrateTargetCustom = true,
+                        fatTargetCustom = true,
+                        changeReason = "targets_edited",
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't save those targets.")) }
+        }
+    }
+
+    fun saveProfile(edit: ProfileEdit) {
+        val existingProfile = profile.value ?: return
+        val existingPlan = currentPlan.value ?: return
+        val calculationWeight = latestWeight.value?.weightKg ?: existingProfile.startingWeightKg
+        viewModelScope.launch {
+            runCatching {
+                val goal = com.nomi.app.domain.GoalType.valueOf(edit.goalType)
+                val energySex = com.nomi.app.domain.EnergySex.valueOf(edit.energyCalculationSex)
+                val updatedProfile = existingProfile.copy(
+                    dateOfBirth = edit.dateOfBirth,
+                    energyCalculationSex = energySex.name,
+                    heightCm = edit.heightCm,
+                    goalType = goal.name,
+                    targetWeightKg = edit.targetWeightKg.takeIf { goal != com.nomi.app.domain.GoalType.MAINTAIN },
+                    activityLevel = edit.activityLevel,
+                    progressionRate = edit.progressionRate.takeIf { goal != com.nomi.app.domain.GoalType.MAINTAIN },
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                )
+                val nextPlan = if (energySex == com.nomi.app.domain.EnergySex.MANUAL) {
+                    existingPlan.copy(
+                        id = 0,
+                        version = 0,
+                        effectiveFromLocalDate = today.toString(),
+                        changeReason = "profile_edited_keep_custom",
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                    )
+                } else {
+                    val draft = OnboardingDraft(
+                        dateOfBirth = LocalDate.parse(edit.dateOfBirth),
+                        energySex = energySex,
+                        heightCm = edit.heightCm,
+                        currentWeightKg = calculationWeight,
+                        goalType = goal,
+                        targetWeightKg = updatedProfile.targetWeightKg,
+                        activityLevel = com.nomi.app.domain.ActivityLevel.valueOf(edit.activityLevel),
+                        progressRate = edit.progressionRate?.let(com.nomi.app.domain.ProgressRate::valueOf),
+                    )
+                    val recommendation = com.nomi.app.domain.EnergyCalculator.calculate(draft, today)
+                    val effective = if (edit.keepCustomTargets && (
+                            existingPlan.calorieTargetCustom || existingPlan.proteinTargetCustom ||
+                                existingPlan.carbohydrateTargetCustom || existingPlan.fatTargetCustom
+                        )
+                    ) {
+                        recommendation.withOverrides(
+                            caloriesKcal = existingPlan.calorieTargetKcal.roundToInt(),
+                            proteinGrams = existingPlan.proteinTargetGrams.roundToInt(),
+                            carbsGrams = existingPlan.carbohydrateTargetGrams.roundToInt(),
+                            fatGrams = existingPlan.fatTargetGrams.roundToInt(),
+                        )
+                    } else recommendation
+                    effective.toEntity(today, System.currentTimeMillis(), changeReason = "profile_edited")
+                }
+                check(repository.updateProfile(updatedProfile)) { "Profile update failed" }
+                repository.saveNewPlan(nextPlan)
+            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't recalculate that profile.")) }
+        }
+    }
+    fun setTheme(mode: ThemeMode) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setAppearance(mode.toPreference(), preferences.value.dynamicColorEnabled)
+        }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setAppearance(preferences.value.theme, enabled)
+        }
+    }
+
+    fun setGermanTranslationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setGermanTranslationEnabled(enabled)
+        }
+    }
+
+    fun setUnits(system: UnitSystem) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setUnits(
+                weight = if (system == UnitSystem.METRIC) WeightUnitPreference.KILOGRAMS else WeightUnitPreference.POUNDS,
+                height = if (system == UnitSystem.METRIC) HeightUnitPreference.CENTIMETERS else HeightUnitPreference.FEET_AND_INCHES,
+            )
+        }
+    }
+
+    fun setActivityAdjustment(enabled: Boolean) {
+        viewModelScope.launch { repository.appPreferencesStore.setAdjustTargetFromActivity(enabled) }
+    }
+
+    fun toggleReminder(index: Int, enabled: Boolean) {
+        viewModelScope.launch {
+            val current = preferences.value.reminders
+            val updated = when (index) {
+                0 -> current.copy(breakfast = current.breakfast.copy(enabled = enabled))
+                1 -> current.copy(lunch = current.lunch.copy(enabled = enabled))
+                2 -> current.copy(dinner = current.dinner.copy(enabled = enabled))
+                3 -> current.copy(dailySummary = current.dailySummary.copy(enabled = enabled))
+                4 -> current.copy(weight = current.weight.copy(enabled = enabled))
+                else -> return@launch
+            }
+            repository.appPreferencesStore.setReminders(updated)
+            container.reminderScheduler.reconcile(updated)
+        }
+    }
+
+    fun setAiDebugEnabled(enabled: Boolean) {
+        viewModelScope.launch { repository.appPreferencesStore.setAiDebugEnabled(enabled) }
+    }
+
+    fun providerEditorState(index: Int): AiProviderEditorState {
+        val settings = settingsState.value.aiProviders.getOrNull(index)
+            ?: settingsState.value.aiProviders.firstOrNull()
+            ?: AiProviderSetting("Food research", AiProviderKind.PERPLEXITY, "sonar", "https://api.perplexity.ai", false)
+        return AiProviderEditorState(
+            purpose = settings.purpose,
+            provider = settings.provider,
+            model = settings.model,
+            endpoint = settings.endpoint,
+            hasStoredApiKey = settings.hasApiKey,
+        )
+    }
+
+    fun saveProvider(
+        index: Int,
+        state: AiProviderEditorState,
+        onResult: (success: Boolean, message: String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
+                val draft = state.toProviderSelection()
+                val config = draft.toRuntimeConfig()
+                val selection = draft.copy(endpoint = config.endpoint)
+                repository.appPreferencesStore.setProvider(pipeline, selection)
+                if (state.apiKeyInput.isNotBlank()) {
+                    val chars = state.apiKeyInput.toCharArray()
+                    try {
+                        container.secretStore.put(secretId(pipeline, selection), chars)
+                    } finally {
+                        chars.fill('\u0000')
+                    }
+                }
+            }.onSuccess {
+                recentFoodAnalysisCache.clear()
+                refreshProviderAndHealthStatus()
+                onResult(true, "Provider saved")
+            }.onFailure { error ->
+                onResult(false, error.safeProviderSettingsMessage())
+            }
+        }
+    }
+
+    fun removeProviderKey(
+        index: Int,
+        state: AiProviderEditorState,
+        onResult: (success: Boolean, message: String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
+                val selection = state.toProviderSelection()
+                container.secretStore.delete(secretId(pipeline, selection))
+            }.onSuccess { removed ->
+                recentFoodAnalysisCache.clear()
+                refreshProviderAndHealthStatus()
+                onResult(
+                    true,
+                    if (removed) "Stored API key removed" else "No stored API key was found",
+                )
+            }.onFailure { error ->
+                onResult(false, error.safeProviderSettingsMessage())
+            }
+        }
+    }
+
+    fun testProvider(index: Int, state: AiProviderEditorState, onResult: (String) -> Unit) {
+        viewModelScope.launch {
+            val result = runCatching {
+                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
+                val draft = state.toProviderSelection()
+                val config = draft.toRuntimeConfig()
+                val selection = draft.copy(endpoint = config.endpoint)
+                suspend fun testWith(credential: AiRuntimeCredential) {
+                    val content = container.openAiClient.completeJson(
+                        config = config,
+                        credential = credential,
+                        systemPrompt = "Return one JSON object and nothing else.",
+                        userPrompt = "Reply with {\"ok\":true} to confirm this connection.",
+                    )
+                    require(content.isNotBlank()) { "The provider returned an empty response." }
+                }
+
+                if (state.apiKeyInput.isNotBlank()) {
+                    val chars = state.apiKeyInput.toCharArray()
+                    try {
+                        testWith(AiRuntimeCredential.from(chars.concatToString()))
+                    } finally {
+                        chars.fill('\u0000')
+                    }
+                } else {
+                    container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
+                        testWith(AiRuntimeCredential.from(chars.concatToString()))
+                    } ?: error("Enter an API key before testing this provider.")
+                }
+                "Connection successful"
+            }.getOrElse {
+                "Connection failed. Check the API key, HTTPS endpoint, model, and network connection."
+            }
+            onResult(result)
+        }
+    }
+
+    fun refreshProviderAndHealthStatus() {
+        viewModelScope.launch {
+            val prefs = preferences.value
+            keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
+                val selection = prefs.selectionFor(pipeline)
+                runCatching { container.secretStore.contains(secretId(pipeline, selection)) }.getOrDefault(false)
+            }
+            healthConnected.value = runCatching {
+                container.healthConnect.hasPermissions(HealthFeatures(readWeight = true, writeWeight = true))
+            }.getOrDefault(false)
+        }
+    }
+
+    private suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
+        withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
+            providerFor(config, key).researchNutrition(intent)
+        }
+
+    private fun currentResearchProviderWebsite(): String? {
+        val selection = preferences.value.foodResearchProvider
+        return when (selection.providerId.lowercase(Locale.ROOT)) {
+            "perplexity" -> "https://www.perplexity.ai"
+            "openrouter" -> "https://openrouter.ai"
+            "openai" -> "https://openai.com"
+            else -> selection.endpoint
+        }
+    }
+
+    private fun foodAnalysisCacheKey(text: String): FoodAnalysisCacheKey {
+        val prefs = preferences.value
+        return FoodAnalysisCacheKey.create(
+            input = text,
+            localeCountry = Locale.getDefault().country,
+            interpretationProviderIdentity = prefs.foodInterpretationProvider.cacheIdentity(),
+            researchProviderIdentity = prefs.foodResearchProvider.cacheIdentity(),
+        )
+    }
+
+    private suspend fun <T> withConfiguredProvider(
+        pipeline: ProviderPipeline,
+        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
+    ): T {
+        val selection = preferences.value.selectionFor(pipeline)
+        require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
+        return container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
+            val credential = AiRuntimeCredential.from(chars.concatToString())
+            block(selection.toRuntimeConfig(), credential)
+        } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
+    }
+
+    private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =
+        OpenAiCompatibleProviders(
+            client = container.openAiClient,
+            parsingConfig = config,
+            parsingCredential = { credential },
+            nutritionConfig = config,
+            nutritionCredential = { credential },
+            portionConfig = config,
+            portionCredential = { credential },
+            visionConfig = config,
+            visionCredential = { credential },
+        )
+
+    private fun mapToday(
+        date: LocalDate,
+        logs: List<FoodLogEntity>,
+        plan: NutritionPlanEntity?,
+    ): TodayUiState {
+        val totals = logs.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
+        return TodayUiState(
+            date = date,
+            caloriesConsumed = totals.caloriesKcal,
+            calorieTarget = plan?.calorieTargetKcal ?: 2_000.0,
+            protein = MacroProgress(totals.proteinGrams, plan?.proteinTargetGrams ?: 130.0),
+            carbohydrates = MacroProgress(totals.carbohydrateGrams, plan?.carbohydrateTargetGrams ?: 240.0),
+            fat = MacroProgress(totals.fatGrams, plan?.fatTargetGrams ?: 65.0),
+            entries = logs.map { it.toTodayEntry() },
+        )
+    }
+
+    private fun mapHistory(
+        logs: List<FoodLogEntity>,
+        query: String,
+        selected: LocalDate,
+        plan: NutritionPlanEntity?,
+    ): HistoryUiState {
+        val filtered = query.trim().lowercase(Locale.ROOT).let { normalized ->
+            if (normalized.isBlank()) logs else logs.filter {
+                it.displayNameSnapshot.lowercase(Locale.ROOT).contains(normalized) ||
+                    it.brandSnapshot?.lowercase(Locale.ROOT)?.contains(normalized) == true
+            }
+        }
+        val days = filtered.groupBy { LocalDate.parse(it.localDate) }
+            .toSortedMap(compareByDescending { it })
+            .map { (date, entries) ->
+                val nutrition = entries.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
+                HistoryDay(
+                    date = date,
+                    calories = nutrition.caloriesKcal,
+                    calorieTarget = plan?.calorieTargetKcal ?: 2_000.0,
+                    proteinGrams = nutrition.proteinGrams,
+                    carbohydrateGrams = nutrition.carbohydrateGrams,
+                    fatGrams = nutrition.fatGrams,
+                    entries = entries.map { it.toTodayEntry() },
+                )
+            }
+        return HistoryUiState(query, selected, days, isSearching = false)
+    }
+
+    private fun mapSettings(
+        prefs: AppPreferences,
+        plan: NutritionPlanEntity?,
+        keys: Map<ProviderPipeline, Boolean>,
+        connected: Boolean,
+    ): SettingsUiState {
+        val providers = ProviderPipeline.entries.map { pipeline ->
+            val selected = prefs.selectionFor(pipeline)
+            AiProviderSetting(
+                purpose = pipeline.displayName(),
+                provider = selected.providerId.toProviderKind(),
+                model = selected.model,
+                endpoint = runCatching { selected.toRuntimeConfig().endpoint }
+                    .getOrElse { selected.endpoint.orEmpty() },
+                hasApiKey = keys[pipeline] == true,
+            )
+        }
+        val reminders = prefs.reminders
+        return SettingsUiState(
+            themeMode = prefs.theme.toThemeMode(),
+            dynamicColor = prefs.dynamicColorEnabled,
+            germanTranslationEnabled = prefs.germanTranslationEnabled,
+            unitSystem = if (prefs.weightUnit == WeightUnitPreference.KILOGRAMS) UnitSystem.METRIC else UnitSystem.IMPERIAL,
+            activityTargetAdjustment = prefs.adjustTargetFromActivity,
+            healthConnectAvailable = container.healthConnect.availability == HealthConnectAvailability.AVAILABLE,
+            healthConnectEnabled = connected,
+            nutritionTargets = NutritionTargetSetting(
+                calories = plan?.calorieTargetKcal?.roundToInt() ?: 2_000,
+                proteinGrams = plan?.proteinTargetGrams?.roundToInt() ?: 130,
+                carbohydrateGrams = plan?.carbohydrateTargetGrams?.roundToInt() ?: 240,
+                fatGrams = plan?.fatTargetGrams?.roundToInt() ?: 65,
+                isCustom = plan?.let {
+                    it.calorieTargetCustom || it.proteinTargetCustom ||
+                        it.carbohydrateTargetCustom || it.fatTargetCustom
+                } ?: false,
+            ),
+            aiProviders = providers,
+            reminders = listOf(
+                com.nomi.app.ui.settings.ReminderSetting("Breakfast", reminders.breakfast.enabled, reminders.breakfast.localTime),
+                com.nomi.app.ui.settings.ReminderSetting("Lunch", reminders.lunch.enabled, reminders.lunch.localTime),
+                com.nomi.app.ui.settings.ReminderSetting("Dinner", reminders.dinner.enabled, reminders.dinner.localTime),
+                com.nomi.app.ui.settings.ReminderSetting("Daily summary", reminders.dailySummary.enabled, reminders.dailySummary.localTime),
+                com.nomi.app.ui.settings.ReminderSetting("Weight", reminders.weight.enabled, reminders.weight.localTime),
+            ),
+            appVersion = BuildConfig.VERSION_NAME,
+        )
+    }
+
+    private fun FoodLogEntity.toTodayEntry(): TodayFoodEntry = TodayFoodEntry(
+        id = id,
+        name = displayNameSnapshot,
+        brand = brandSnapshot,
+        amountText = "${amount.cleanNumber()} $unit",
+        calories = nutritionSnapshot.caloriesKcal,
+        proteinGrams = nutritionSnapshot.proteinGrams,
+        carbohydrateGrams = nutritionSnapshot.carbohydrateGrams,
+        fatGrams = nutritionSnapshot.fatGrams,
+        mealCategory = mealCategory.toMealCategory(),
+        time = Instant.ofEpochMilli(loggedAtEpochMillis).atZone(runCatching { ZoneId.of(zoneId) }.getOrDefault(this@AppViewModel.zoneId)).toLocalTime(),
+        isEstimated = isEstimated,
+        foodId = foodId,
+        amount = amount,
+        unit = unit,
+        grams = grams,
+        sourceName = sourceSnapshot.displayName,
+        sourceUrl = sourceSnapshot.url,
+    )
+
+    private fun AnalyzedFoodItem.toLog(category: MealCategory, inputMethod: String): FoodLogEntity {
+        val now = System.currentTimeMillis()
+        return FoodLogEntity(
+            mealCategory = category.name,
+            displayNameSnapshot = name.trim(),
+            brandSnapshot = brand,
+            amount = quantity,
+            unit = unit,
+            grams = gramsEquivalent,
+            nutritionSnapshot = NutritionValues(calories, proteinGrams, carbohydrateGrams, fatGrams, fiberGrams),
+            sourceSnapshot = NutritionSourceSnapshot(
+                kind = if (isEstimate) "ai_estimate" else "database",
+                providerName = sourceName,
+                displayName = sourceName,
+                url = sourceUrl,
+                retrievedAtEpochMillis = now,
+            ),
+            isEstimated = isEstimate,
+            inputMethod = inputMethod,
+            localDate = selectedDate.value.toString(),
+            loggedAtEpochMillis = now,
+            zoneId = zoneId.id,
+            createdAtEpochMillis = now,
+            updatedAtEpochMillis = now,
+        )
+    }
+
+    private fun ManualFoodDraft.toLog(): FoodLogEntity = AnalyzedFoodItem(
+        name = name.trim(),
+        quantity = requireNotNull(amount.toDoubleOrNull()),
+        unit = unit.trim(),
+        calories = requireNotNull(calories.toDoubleOrNull()),
+        proteinGrams = requireNotNull(protein.toDoubleOrNull()),
+        carbohydrateGrams = requireNotNull(carbohydrates.toDoubleOrNull()),
+        fatGrams = requireNotNull(fat.toDoubleOrNull()),
+        isEstimate = false,
+        sourceName = "Manual entry",
+    ).toLog(mealCategory, "manual")
+
+    private fun FoodEntity.toLog(): FoodLogEntity = AnalyzedFoodItem(
+        name = canonicalName,
+        brand = brand,
+        quantity = 100.0,
+        unit = "g",
+        gramsEquivalent = 100.0,
+        calories = nutritionPer100g.caloriesKcal,
+        proteinGrams = nutritionPer100g.proteinGrams,
+        carbohydrateGrams = nutritionPer100g.carbohydrateGrams,
+        fatGrams = nutritionPer100g.fatGrams,
+        fiberGrams = nutritionPer100g.fiberGrams,
+        sourceName = "Nomi food library",
+        isEstimate = isEstimated,
+    ).toLog(defaultMealCategory(), "recent").copy(foodId = id)
+
+    private fun FavoriteFoodWithCatalog.toLog(): FoodLogEntity {
+        val grams = favorite.typicalGrams ?: favorite.typicalAmount.takeIf { favorite.typicalUnit.equals("g", true) } ?: 100.0
+        val factor = grams / 100.0
+        val values = food.nutritionPer100g
+        return AnalyzedFoodItem(
+            name = food.canonicalName,
+            brand = food.brand,
+            quantity = favorite.typicalAmount,
+            unit = favorite.typicalUnit,
+            gramsEquivalent = grams,
+            calories = values.caloriesKcal * factor,
+            proteinGrams = values.proteinGrams * factor,
+            carbohydrateGrams = values.carbohydrateGrams * factor,
+            fatGrams = values.fatGrams * factor,
+            fiberGrams = values.fiberGrams?.times(factor),
+            sourceName = "Nomi favorite",
+            isEstimate = food.isEstimated,
+        ).toLog(defaultMealCategory(), "favorite").copy(foodId = food.id)
+    }
+
+    private fun FoodEntity.toLibraryItem(kind: LibraryItemKind, amountText: String = "100 g") = LibraryItem(
+        id = id,
+        kind = kind,
+        title = canonicalName,
+        subtitle = listOfNotNull(brand, amountText).joinToString(" · "),
+        calories = nutritionPer100g.caloriesKcal,
+    )
+
+    private fun BarcodeProduct.toAnalyzedItemOrNull(): AnalyzedFoodItem? {
+        val calories = caloriesPer100g?.takeIf { it.isFinite() && it in 0.0..1_500.0 } ?: return null
+        val protein = proteinPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
+        val carbohydrates = carbohydratesPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
+        val fat = fatPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
+        val basisUnit = nutritionBasisUnit.takeIf { it == "ml" } ?: "g"
+        return AnalyzedFoodItem(
+            name = name.take(300),
+            brand = brand?.take(200),
+            quantity = 100.0,
+            unit = basisUnit,
+            gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+            calories = calories,
+            proteinGrams = protein,
+            carbohydrateGrams = carbohydrates,
+            fatGrams = fat,
+            fiberGrams = fiberPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
+            sourceName = sourceName,
+            sourceUrl = sourceUrl,
+            sourceServingQuantity = 100.0,
+            sourceServingUnit = basisUnit,
+            sourceServingGramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+            isEstimate = false,
+        )
+    }
+
+    private fun FoodEntity.toAnalyzedItem(source: String) = AnalyzedFoodItem(
+        name = canonicalName,
+        brand = brand,
+        quantity = 100.0,
+        unit = "g",
+        gramsEquivalent = 100.0,
+        calories = nutritionPer100g.caloriesKcal,
+        proteinGrams = nutritionPer100g.proteinGrams,
+        carbohydrateGrams = nutritionPer100g.carbohydrateGrams,
+        fatGrams = nutritionPer100g.fatGrams,
+        fiberGrams = nutritionPer100g.fiberGrams,
+        sourceName = source,
+        sourceServingQuantity = 100.0,
+        sourceServingUnit = "g",
+        sourceServingGramsEquivalent = 100.0,
+        isEstimate = isEstimated,
+    )
+
+    private fun AnalyzedFoodItem.asBarcodeSourceServing(): AnalyzedFoodItem = copy(
+        sourceServingQuantity = quantity,
+        sourceServingUnit = unit,
+        sourceServingGramsEquivalent = gramsEquivalent,
+        servingValidation = null,
+        requiresServingValidation = false,
+    )
+
+    private suspend fun cacheLogFood(log: FoodLogEntity): Long? = cacheAnalyzedFood(
+        AnalyzedFoodItem(
+            name = log.displayNameSnapshot,
+            brand = log.brandSnapshot,
+            quantity = log.amount,
+            unit = log.unit,
+            gramsEquivalent = log.grams ?: log.amount.takeIf { log.unit.equals("g", true) },
+            calories = log.nutritionSnapshot.caloriesKcal,
+            proteinGrams = log.nutritionSnapshot.proteinGrams,
+            carbohydrateGrams = log.nutritionSnapshot.carbohydrateGrams,
+            fatGrams = log.nutritionSnapshot.fatGrams,
+            fiberGrams = log.nutritionSnapshot.fiberGrams,
+            sourceName = log.sourceSnapshot.displayName,
+            sourceUrl = log.sourceSnapshot.url,
+            isEstimate = log.isEstimated,
+        ),
+    )
+
+    private suspend fun cacheAnalyzedFood(item: AnalyzedFoodItem, barcode: String? = null): Long? {
+        val grams = item.gramsEquivalent ?: item.quantity.takeIf { item.unit.equals("g", true) } ?: return null
+        if (!grams.isFinite() || grams <= 0.0) return null
+        val normalized = item.name.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
+        val normalizedBrand = item.brand?.trim()?.lowercase(Locale.ROOT)
+        val existing = barcode?.let { repository.foodByBarcode(it) }
+            ?: recentFoodsSnapshot.firstOrNull {
+                it.normalizedName == normalized &&
+                    it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
+            }
+            ?: repository.foodByIdentity(normalized, normalizedBrand)
+        if (existing != null) return existing.id
+        val factor = 100.0 / grams
+        val now = System.currentTimeMillis()
+        return repository.addFood(
+            FoodEntity(
+                canonicalName = item.name.trim().take(300),
+                normalizedName = normalized.take(300),
+                brand = item.brand?.trim()?.take(200),
+                barcode = barcode,
+                nutritionPer100g = NutritionValues(
+                    caloriesKcal = item.calories * factor,
+                    proteinGrams = item.proteinGrams * factor,
+                    carbohydrateGrams = item.carbohydrateGrams * factor,
+                    fatGrams = item.fatGrams * factor,
+                    fiberGrams = item.fiberGrams?.times(factor),
+                ),
+                isUserCreated = item.sourceName == "Manual entry",
+                isEstimated = item.isEstimate,
+                lastVerifiedAtEpochMillis = now.takeUnless { item.isEstimate },
+                createdAtEpochMillis = now,
+                updatedAtEpochMillis = now,
+            ),
+        )
+    }
+
+    private fun defaultMealCategory(): MealCategory = when (LocalTime.now(zoneId).hour) {
+        in 4..10 -> MealCategory.BREAKFAST
+        in 11..15 -> MealCategory.LUNCH
+        in 16..21 -> MealCategory.DINNER
+        else -> MealCategory.SNACKS
+    }
+
+    private fun ProgressRange.dayCount(): Int = when (this) {
+        ProgressRange.SEVEN_DAYS -> 7
+        ProgressRange.THIRTY_DAYS -> 30
+        ProgressRange.THREE_MONTHS -> 90
+        ProgressRange.SIX_MONTHS -> 180
+        ProgressRange.ONE_YEAR -> 365
+        ProgressRange.ALL -> 3_650
+    }
+}
+
+private operator fun NutritionValues.plus(other: NutritionValues) = NutritionValues(
+    caloriesKcal + other.caloriesKcal,
+    proteinGrams + other.proteinGrams,
+    carbohydrateGrams + other.carbohydrateGrams,
+    fatGrams + other.fatGrams,
+    (fiberGrams ?: 0.0) + (other.fiberGrams ?: 0.0),
+)
+
+private fun String.toMealCategory(): MealCategory = runCatching {
+    MealCategory.valueOf(trim().uppercase(Locale.ROOT))
+}.getOrDefault(MealCategory.SNACKS)
+
+private fun Double.cleanNumber(): String = if (this == toLong().toDouble()) toLong().toString()
+else String.format(Locale.US, "%.1f", this)
+
+private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSelection = when (pipeline) {
+    ProviderPipeline.FOOD_RESEARCH -> foodResearchProvider
+    ProviderPipeline.FOOD_INTERPRETATION -> foodInterpretationProvider
+    ProviderPipeline.PORTION_CHANGE -> portionChangeProvider
+    ProviderPipeline.VISION -> visionProvider
+}
+
+private fun AiProviderEditorState.toProviderSelection(): ProviderSelection = ProviderSelection(
+    providerId = provider.toProviderId(),
+    model = model.trim(),
+    endpoint = endpoint.trim(),
+)
+
+private fun ProviderSelection.resolvedEndpoint(): String {
+    val resolved = when (providerId.toProviderKind()) {
+        AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
+        AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
+        AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
+        AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint?.trim()?.takeIf(String::isNotBlank)
+            ?: error("Enter a provider endpoint in Settings.")
+    }.trimEnd('/')
+    val uri = runCatching { URI(resolved) }.getOrNull()
+    require(uri?.scheme.equals("https", ignoreCase = true) && !uri?.host.isNullOrBlank()) {
+        "AI endpoints must use a valid HTTPS URL."
+    }
+    return resolved
+}
+
+private fun ProviderSelection.toRuntimeConfig(): AiProviderConfig {
+    val kind = providerId.toProviderKind()
+    require(model.isNotBlank()) { "Choose a model in Settings." }
+    return AiProviderConfig(kind, resolvedEndpoint(), model.trim())
+}
+
+private fun ProviderSelection.cacheIdentity(): String = listOf(
+    providerId.trim().lowercase(Locale.ROOT),
+    model.trim(),
+    runCatching { resolvedEndpoint() }.getOrElse { endpoint.orEmpty().trim() },
+    advancedParametersJson.orEmpty().trim(),
+).joinToString(separator = "\u001f")
+
+private fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.ROOT)) {
+    "perplexity" -> AiProviderKind.PERPLEXITY
+    "openrouter" -> AiProviderKind.OPEN_ROUTER
+    "openai" -> AiProviderKind.OPEN_AI
+    else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
+}
+
+private fun AiProviderKind.toProviderId(): String = when (this) {
+    AiProviderKind.PERPLEXITY -> "perplexity"
+    AiProviderKind.OPEN_ROUTER -> "openrouter"
+    AiProviderKind.OPEN_AI -> "openai"
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
+}
+
+private fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)) {
+    "perplexity" -> "Perplexity"
+    "openrouter" -> "OpenRouter"
+    "openai" -> "OpenAI"
+    else -> "custom provider"
+}
+
+private fun ProviderPipeline.displayName(): String = when (this) {
+    ProviderPipeline.FOOD_RESEARCH -> "Food research"
+    ProviderPipeline.FOOD_INTERPRETATION -> "Food interpretation"
+    ProviderPipeline.PORTION_CHANGE -> "Portion changes"
+    ProviderPipeline.VISION -> "Photo recognition"
+}
+
+private fun ThemePreference.toThemeMode(): ThemeMode = when (this) {
+    ThemePreference.SYSTEM -> ThemeMode.SYSTEM
+    ThemePreference.LIGHT -> ThemeMode.LIGHT
+    ThemePreference.DARK -> ThemeMode.DARK
+}
+
+private fun ThemeMode.toPreference(): ThemePreference = when (this) {
+    ThemeMode.SYSTEM -> ThemePreference.SYSTEM
+    ThemeMode.LIGHT -> ThemePreference.LIGHT
+    ThemeMode.DARK -> ThemePreference.DARK
+}
+
+private fun secretId(pipeline: ProviderPipeline, selection: ProviderSelection): String {
+    val endpoint = selection.resolvedEndpoint().lowercase(Locale.ROOT)
+    val material = "${pipeline.name}|${selection.providerId.lowercase(Locale.ROOT)}|$endpoint"
+    val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
+    val token = digest.take(16).joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+    return "provider:$token"
+}
+
+private fun Throwable.safeProviderSettingsMessage(): String = when {
+    message?.contains("endpoint", ignoreCase = true) == true ->
+        "Enter a valid HTTPS API endpoint."
+    message?.contains("model", ignoreCase = true) == true ->
+        "Enter a model name."
+    else -> "Nomi couldn't update this provider. Try again."
+}
+
+private fun Throwable.safeAiMessage(): String = when {
+    this is AiValidationException -> message ?: "The serving amount could not be validated."
+    message?.contains("API key", ignoreCase = true) == true ||
+        message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()
+    message?.contains("401") == true -> "The provider rejected that API key. Check it in Settings."
+    message?.contains("timeout", ignoreCase = true) == true -> "The provider took too long. Try again."
+    else -> "Nomi couldn't finish that analysis. Try again or enter the food manually."
+}
+
+private fun FoodAnalysis.researchSourceUrls(): List<String> =
+    items
+        .mapNotNull(AnalyzedFoodItem::sourceUrl)
+        .filter(String::isNotBlank)
+        .distinct()
+        .take(3)
