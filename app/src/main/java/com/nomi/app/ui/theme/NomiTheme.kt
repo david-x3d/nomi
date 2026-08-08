@@ -2,6 +2,7 @@ package com.nomi.app.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
@@ -9,7 +10,10 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 
 private val NomiLightColors = lightColorScheme(
@@ -74,6 +78,53 @@ private val NomiDarkColors = darkColorScheme(
     scrim = Color(0xFF000000),
 )
 
+/**
+ * Brightest channel a canvas may have and still count as a true-black OLED theme.
+ *
+ * Luminance is unusable here: every dark theme sits near zero, and Nomi's own dark canvas
+ * (#130D0B) measures under 0.005. Only a canvas whose channels are all essentially off is
+ * the pitch-black case this adaptation targets.
+ */
+private const val PITCH_BLACK_MAX_CHANNEL = 0.05f
+
+/** How much of a container's own tone survives on a pitch-black canvas. */
+private const val PITCH_BLACK_TONE_RETENTION = 0.55f
+
+/**
+ * True while the app paints on a true-black canvas, so components can replace tonal
+ * separation with a hairline outline.
+ */
+val LocalPitchBlackSurfaces = staticCompositionLocalOf { false }
+
+internal fun isPitchBlackCanvas(canvas: Color): Boolean =
+    maxOf(canvas.red, canvas.green, canvas.blue) <= PITCH_BLACK_MAX_CHANNEL
+
+internal fun flattenTowardCanvas(canvas: Color, color: Color): Color =
+    lerp(canvas, color, PITCH_BLACK_TONE_RETENTION)
+
+/**
+ * Pulls container tones down toward a true-black canvas.
+ *
+ * OLED themes (for example ColorBlendr's pitch-black presets) drive the lowest surface roles
+ * to pure black while leaving the higher container roles mid-grey. Left alone that paints grey
+ * slabs — the composer bar, its input field, and the summary pill — onto an otherwise black
+ * screen. Neutralizing the elevation tint keeps those surfaces from drifting toward the accent
+ * hue as well.
+ */
+private fun ColorScheme.flattenedOnto(canvas: Color): ColorScheme {
+    fun flatten(color: Color): Color = flattenTowardCanvas(canvas, color)
+    return copy(
+        surfaceVariant = flatten(surfaceVariant),
+        surfaceBright = flatten(surfaceBright),
+        surfaceDim = flatten(surfaceDim),
+        surfaceContainerLow = flatten(surfaceContainerLow),
+        surfaceContainer = flatten(surfaceContainer),
+        surfaceContainerHigh = flatten(surfaceContainerHigh),
+        surfaceContainerHighest = flatten(surfaceContainerHighest),
+        surfaceTint = canvas,
+    )
+}
+
 @Composable
 fun NomiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -93,15 +144,19 @@ fun NomiTheme(
     }
     // Every destination starts on the same tonal canvas as Today. Accent and
     // container roles remain dynamic when the user enables wallpaper colors.
-    val colorScheme = baseColorScheme.copy(
-        background = baseColorScheme.surfaceContainerLowest,
-        surface = baseColorScheme.surfaceContainerLowest,
+    val canvas = baseColorScheme.surfaceContainerLowest
+    val pitchBlack = isPitchBlackCanvas(canvas)
+    val adaptedScheme = if (pitchBlack) baseColorScheme.flattenedOnto(canvas) else baseColorScheme
+    val colorScheme = adaptedScheme.copy(
+        background = canvas,
+        surface = canvas,
     )
 
-
-    MaterialExpressiveTheme(
-        colorScheme = colorScheme,
-        motionScheme = MotionScheme.expressive(),
-        content = content,
-    )
+    CompositionLocalProvider(LocalPitchBlackSurfaces provides pitchBlack) {
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            content = content,
+        )
+    }
 }

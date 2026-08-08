@@ -24,6 +24,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -123,6 +124,7 @@ import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
+import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
 import kotlinx.coroutines.delay
 import java.time.LocalDate
@@ -1216,6 +1218,17 @@ private fun NotesComposerBar(
     }
 }
 
+/**
+ * On true-black themes the surface tones are flattened toward the canvas, so a hairline
+ * outline carries the separation that tonal contrast normally provides.
+ */
+@Composable
+private fun hairlineOnPitchBlack(): BorderStroke? = when {
+    LocalPitchBlackSurfaces.current ->
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    else -> null
+}
+
 @Composable
 private fun ComposerTextField(
     value: String,
@@ -1227,6 +1240,8 @@ private fun ComposerTextField(
     modifier: Modifier = Modifier,
 ) {
     var editingValue by rememberSaveable(value, editable) { mutableStateOf(value) }
+    val composerShape = RoundedCornerShape(28.dp)
+    val hairline = hairlineOnPitchBlack()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val analysisProgressDescription = nomiString(
         "Meal analysis in progress",
@@ -1237,10 +1252,14 @@ private fun ComposerTextField(
         onValueChange = { if (editable) editingValue = it },
         readOnly = !editable,
         enabled = !processing,
-        modifier = modifier.heightIn(min = 56.dp),
+        modifier = modifier
+            .heightIn(min = 56.dp)
+            .then(
+                hairline?.let { Modifier.border(it, composerShape) } ?: Modifier,
+            ),
         placeholder = { Text(nomiString("Tell Nomi what you ate", "Sag Nomi, was du gegessen hast")) },
         maxLines = 4,
-        shape = RoundedCornerShape(28.dp),
+        shape = composerShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(
             onSend = {
@@ -1333,6 +1352,7 @@ private fun NutritionSummaryPill(state: TodayUiState, onClick: () -> Unit) {
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
+        border = hairlineOnPitchBlack(),
     ) {
         Row(
             modifier = Modifier
