@@ -110,6 +110,9 @@ class AiPromptsTest {
             localeCountry = "DE",
         )
 
+        assertTrue(prompt.contains("GENERIC FOODS ARE DIFFERENT AND MUST STILL BE ANSWERED"))
+        assertTrue(prompt.contains("THE ERROR IS A LAST RESORT, NOT A DEFAULT"))
+        assertTrue(prompt.contains("error for a common generic food is wrong."))
         assertTrue(prompt.contains("CRITICAL SERVING-BASIS RULE"))
         assertTrue(prompt.contains("MUST NEVER describe the user's"))
         assertTrue(prompt.contains("pre-scale them to the consumed amount"))

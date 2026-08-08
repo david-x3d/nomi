@@ -57,17 +57,29 @@ object AiPrompts {
         provider-returned web-search evidence. Nomi attaches provider citation metadata outside the
         JSON. Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
         If two relevant cited websites cannot be found, fail instead of guessing.
-        FAILING MEANS RETURNING AN ERROR, NEVER FAKE DATA: when live search cannot find reliable
-        nutrition data for an item, return exactly {"error": "<short reason>"} as the entire
-        response. NEVER return zero calories and zero macros as a substitute for missing data,
-        and NEVER write failure text such as "no evidence found" into name, sourceName,
-        sourceProductName, or any other data field.
+        FAILING MEANS RETURNING AN ERROR, NEVER FAKE DATA: when live search finds no usable
+        nutrition data of any kind for an item, return exactly {"error": "<short reason>"} as
+        the entire response. NEVER return zero calories and zero macros as a substitute for
+        missing data, and NEVER write failure text such as "no evidence found" into name,
+        sourceName, sourceProductName, or any other data field.
+        THE ERROR IS A LAST RESORT, NOT A DEFAULT. Do NOT return an error merely because a food
+        is generic, because its exact variety or cut is unspecified, because no branded product
+        matches, or because the search results were thin. Common foods always have reputable
+        reference data; answer them from it.
         Never pretend that two pages on the same website are independent confirmation.
         IDENTIFY THE EXACT PRODUCT FIRST: brand, product name, variant/flavour, market, and
         package size when relevant. Never silently substitute a similar product. "iglo Chicken
         Nuggets im Backteig" must not be answered with another iglo nugget product, a restaurant
         chain's nuggets, or generic chicken nuggets. If only a similar product can be found,
         set isEstimate=true and name the substitution in assumptions.
+        GENERIC FOODS ARE DIFFERENT AND MUST STILL BE ANSWERED: an unbranded everyday food such
+        as "Steak", "Apfel", "Reis", or "Haferflocken" has no exact product to match, so an
+        exact branded match is NOT required for it. Research it from reputable nutrition
+        reference databases, official food-composition tables, or public-health sources. When
+        the variety, cut, or preparation is unspecified, choose the most common one for the
+        user's market, set isEstimate=true, and state that choice in assumptions - for example
+        "Steak" without a cut may use a typical beef steak, grilled, and say so. Returning an
+        error for a common generic food is wrong.
         SOURCE AND DATA MUST MATCH: `sourceProductName` MUST be the product title exactly as the
         cited page prints it, and `sourceDomain` MUST be the hostname of the page the nutrition
         values were actually read from. Never attribute one site's values to another site and

@@ -155,7 +155,8 @@ internal fun throwIfResearchRefusal(json: Json, content: String) {
     val refusal = runCatching { json.decodeFromString<ResearchRefusal>(content) }.getOrNull()
     val reason = refusal?.error?.trim()?.takeIf(String::isNotEmpty) ?: return
     throw AiValidationException(
-        "Live web research could not verify nutrition data: ${reason.take(200)}",
+        "Live web research could not verify nutrition data: ${reason.take(200)}. " +
+            "Retry, or describe the food more precisely, for example a specific cut or brand.",
     )
 }
 

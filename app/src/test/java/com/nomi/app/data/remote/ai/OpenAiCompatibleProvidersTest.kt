@@ -101,6 +101,7 @@ class OpenAiCompatibleProvidersTest {
             throwIfResearchRefusal(json, """{"error": "no reliable source found"}""")
         }
         assertTrue(error.message!!.contains("no reliable source found"))
+        assertTrue(error.message!!.contains("describe the food more precisely"))
 
         throwIfResearchRefusal(json, """{"items": [], "error": null}""")
         throwIfResearchRefusal(json, "not even json")
