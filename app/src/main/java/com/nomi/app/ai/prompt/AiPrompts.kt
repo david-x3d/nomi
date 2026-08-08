@@ -69,6 +69,13 @@ object AiPrompts {
         never invent a domain, title, or citation. Before answering, sanity-check each item:
         protein*4 + carbohydrates*4 + fat*9 must roughly match the source calories; if it is far
         off, re-read the source for unit or serving mistakes instead of returning it.
+        BRANDED PACKAGED FOODS: ALWAYS search the manufacturer's official website for the exact
+        product first and read its printed nutrition table. When that official table exists,
+        never return an estimate and never replace its numbers with another site's numbers.
+        Extract the per-100 g / per-100 ml column directly: return it as
+        sourceServingQuantity=100 with sourceServingUnit="g" or "ml" and the nutrient fields
+        exactly as the table prints them. Fall back to a per-serving/per-piece basis only when
+        the label provides no per-100 values.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases and Open
         Food Facts. Supermarket, grocery, retailer, and reseller product pages are explicitly allowed
@@ -94,9 +101,10 @@ object AiPrompts {
         and `unit` MUST describe the amount the user logged. The calories and macro fields MUST
         describe the cited source serving, whose amount MUST be stated separately in
         `sourceServingQuantity` and `sourceServingUnit`. Never silently treat source-serving
-        nutrition as nutrition for the logged amount. Nomi app code will first normalize those
-        nutrient values to per 100 g/ml (or per 100 compatible count units) and then scale them
-        to the logged amount.
+        nutrition as nutrition for the logged amount. NEVER calculate the consumed amount's
+        calories or macros yourself: Nomi app code deterministically normalizes your reported
+        values to per 100 g/ml (or per 100 compatible count units) and scales them to the
+        logged amount, and it rejects results whose basis does not reconcile.
         COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT. When the logged amount is
         a count (piece/Stück) but the source serving is mass, `gramsEquivalent` MUST be the total
         grams for the entire logged count, not grams per piece. When the source serving is a count

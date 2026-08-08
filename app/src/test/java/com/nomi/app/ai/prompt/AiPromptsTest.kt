@@ -53,4 +53,28 @@ class AiPromptsTest {
         assertTrue(prompt.contains("sourceDomain"))
         assertTrue(prompt.contains("protein*4 + carbohydrates*4 + fat*9"))
     }
+
+    @Test
+    fun `nutrition research prompt demands manufacturer per-100 basis and forbids model arithmetic`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "110 g iglo Chicken Nuggets im Backteig",
+                items = listOf(
+                    ParsedFoodItem(
+                        name = "Chicken Nuggets im Backteig",
+                        brand = "iglo",
+                        quantity = 110.0,
+                        unit = "g",
+                    ),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        assertTrue(prompt.contains("ALWAYS search the manufacturer's official website"))
+        assertTrue(prompt.contains("never return an estimate"))
+        assertTrue(prompt.contains("sourceServingQuantity=100"))
+        assertTrue(prompt.contains("NEVER calculate the consumed amount's"))
+    }
 }
