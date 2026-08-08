@@ -23,11 +23,14 @@ private val NUTRITION_RESEARCH_SCHEMA: JsonObject = buildJsonObject {
     put("properties", buildJsonObject {
         put("items", buildJsonObject {
             put("type", "array")
-            put("minItems", 1)
+            // minItems 0 keeps the error escape hatch schema-legal: a model that finds no
+            // reliable data returns items: [] plus error instead of fabricated zeros.
+            put("minItems", 0)
             put("maxItems", 50)
             put("items", nutritionItemSchema())
         })
         put("overallConfidence", nullable(confidenceSchema()))
+        put("error", nullable(stringSchema()))
     })
 }
 
@@ -61,6 +64,8 @@ private fun nutritionItemSchema(): JsonObject = buildJsonObject {
         put("fatGrams", nonNegativeNumberSchema())
         put("fiberGrams", nullable(nonNegativeNumberSchema()))
         put("sourceName", nullable(stringSchema()))
+        put("sourceProductName", nullable(stringSchema()))
+        put("sourceDomain", nullable(stringSchema()))
         put("sourceServingQuantity", positiveNumberSchema())
         put("sourceServingUnit", stringSchema())
         put("sourceServingGramsEquivalent", nullable(positiveNumberSchema()))

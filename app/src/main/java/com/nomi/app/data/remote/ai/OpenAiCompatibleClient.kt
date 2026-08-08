@@ -246,6 +246,14 @@ internal fun chatCompletionRequest(
         "Configure Food research with Perplexity, OpenRouter, or OpenAI in Settings; " +
             "custom endpoints cannot guarantee live web search."
     }
+    // OpenAI accepts web_search_options only on its search models and 400s otherwise.
+    require(
+        !requireWebSearch || config.kind != AiProviderKind.OPEN_AI ||
+            config.model.contains("search", ignoreCase = true),
+    ) {
+        "Configure Food research with an OpenAI web-search model such as " +
+            "gpt-4o-search-preview, or use Perplexity/OpenRouter."
+    }
 }
 
 private fun ChatCompletionResponse.webSearchCompletion(): WebSearchCompletion {

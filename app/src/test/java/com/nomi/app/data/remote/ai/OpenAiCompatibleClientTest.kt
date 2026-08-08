@@ -96,7 +96,7 @@ class OpenAiCompatibleClientTest {
     fun `openai food research explicitly enables web search options`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_AI, "gpt-4.1-mini"),
+                config(AiProviderKind.OPEN_AI, "gpt-4o-search-preview"),
                 listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
                 requireWebSearch = true,
             ),
@@ -104,6 +104,35 @@ class OpenAiCompatibleClientTest {
 
         assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"high\"}"))
         assertFalse(encoded.contains("\"plugins\""))
+    }
+
+    @Test
+    fun `openai food research rejects models without web search support upfront`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_AI, "gpt-4.1-mini"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("gpt-4o-search-preview"))
+    }
+
+    @Test
+    fun `nutrition research schema allows integrity fields and the error escape hatch`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.PERPLEXITY, "sonar"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"sourceProductName\""))
+        assertTrue(encoded.contains("\"sourceDomain\""))
+        assertTrue(encoded.contains("\"error\""))
+        assertTrue(encoded.contains("\"minItems\":0"))
     }
 
     @Test

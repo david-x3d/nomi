@@ -2026,11 +2026,15 @@ private fun Throwable.safeProviderFailureMessage(): String? {
         val status = responseError.response.status.value
         return when (status) {
             401 -> "The provider rejected that API key. Check it in Settings."
+            402 -> "The provider account is out of credit. Top it up or switch the provider in Settings."
             403 -> "The provider denied access. Check the API key and model access in Settings."
             404 -> "The provider endpoint or model was not found. Check Settings."
             408 -> "The provider took too long. Try again."
             429 -> "The provider rate limit was reached. Wait a moment and try again."
-            in 400..499 -> "The provider rejected the request (HTTP $status). Check Settings."
+            in 400..499 ->
+                "The provider rejected the request (HTTP $status). The selected model may not " +
+                    "support live web search. For OpenAI pick a search model such as " +
+                    "gpt-4o-search-preview, or use Perplexity/OpenRouter for Food research."
             else -> "The provider is temporarily unavailable (HTTP $status). Try again."
         }
     }
