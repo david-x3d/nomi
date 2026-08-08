@@ -2,6 +2,7 @@ package com.nomi.app.data.remote.ai
 
 import android.util.Base64
 import com.nomi.app.ai.model.AiProviderConfig
+import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
@@ -20,7 +21,9 @@ import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
 import java.net.URI
 import java.util.Locale
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 class OpenAiCompatibleProviders(
     private val client: OpenAiCompatibleClient,
@@ -65,11 +68,12 @@ class OpenAiCompatibleProviders(
                 "source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
             userPrompt = AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
         )
+        throwIfResearchRefusal(client.json, completion.content)
         val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
         val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
         val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
         val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
-        return SourceIntegrityVerifier.resolve(normalized)
+        return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
 
     override suspend fun interpretAdjustment(
@@ -142,3 +146,50 @@ internal fun groundWithWebSearchEvidence(
 private fun canonicalResearchSite(url: String): String? = runCatching {
     URI(url).host?.lowercase(Locale.ROOT)?.removePrefix("www.")
 }.getOrNull()?.takeIf(String::isNotBlank)
+
+@Serializable
+private data class ResearchRefusal(val error: String? = null)
+
+/** Turns the prompt's {"error": ...} escape hatch into a retryable failure. */
+internal fun throwIfResearchRefusal(json: Json, content: String) {
+    val refusal = runCatching { json.decodeFromString<ResearchRefusal>(content) }.getOrNull()
+    val reason = refusal?.error?.trim()?.takeIf(String::isNotEmpty) ?: return
+    throw AiValidationException(
+        "Live web research could not verify nutrition data: ${reason.take(200)}",
+    )
+}
+
+/**
+ * A researched food with zero calories and zero macros is a placeholder for "nothing found",
+ * not data, unless the item is plausibly calorie-free. Failing here sends the request to the
+ * fallback provider for a fresh web search instead of saving a fabricated 0 kcal entry.
+ */
+internal fun rejectPlaceholderNutrition(analysis: FoodAnalysis): FoodAnalysis {
+    analysis.items.forEach { item ->
+        val allZero = item.calories == 0.0 && item.proteinGrams == 0.0 &&
+            item.carbohydrateGrams == 0.0 && item.fatGrams == 0.0
+        if (allZero && !isPlausiblyCalorieFree(item)) {
+            throw AiValidationException(
+                "Live web research returned no usable nutrition data for '${item.name}'. " +
+                    "Try again or rephrase the food.",
+            )
+        }
+    }
+    return analysis
+}
+
+private val CALORIE_FREE_HINTS = listOf(
+    "wasser", "water", "mineral", "sprudel", "kaffee", "coffee", "espresso", "tee", "tea",
+    "zero", "light", "diet", "diat",
+)
+
+private fun isPlausiblyCalorieFree(item: AnalyzedFoodItem): Boolean {
+    val normalized = listOfNotNull(item.name, item.brand, item.sourceProductName)
+        .joinToString(" ")
+        .lowercase(Locale.ROOT)
+        .replace('ä', 'a')
+        .replace('ö', 'o')
+        .replace('ü', 'u')
+        .replace("ß", "ss")
+    return CALORIE_FREE_HINTS.any(normalized::contains)
+}

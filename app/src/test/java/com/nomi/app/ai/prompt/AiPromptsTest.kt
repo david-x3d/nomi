@@ -76,5 +76,7 @@ class AiPromptsTest {
         assertTrue(prompt.contains("never return an estimate"))
         assertTrue(prompt.contains("sourceServingQuantity=100"))
         assertTrue(prompt.contains("NEVER calculate the consumed amount's"))
+        assertTrue(prompt.contains("""{"error": "<short reason>"}"""))
+        assertTrue(prompt.contains("NEVER return zero calories and zero macros"))
     }
 }

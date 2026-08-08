@@ -122,6 +122,9 @@ object AiResponseValidator {
         validateText(item.brand, "brand", maxChars = MAX_BRAND_CHARS)
         validateText(item.unit, "food unit", required = true, maxChars = MAX_UNIT_CHARS)
         validateText(item.sourceName, "source name", maxChars = MAX_SOURCE_NAME_CHARS)
+        rejectFailureMessage(item.name, "food name")
+        rejectFailureMessage(item.sourceName, "source name")
+        rejectFailureMessage(item.sourceProductName, "source product name")
         validateText(item.sourceUrl, "source URL", maxChars = MAX_SOURCE_URL_CHARS)
         if (item.supportingSourceUrls.size > MAX_SUPPORTING_SOURCE_URLS) {
             throw AiValidationException("Too many supporting source URLs were returned")
@@ -233,6 +236,22 @@ object AiResponseValidator {
         }
         if (value?.contains('\u0000') == true) {
             throw AiValidationException("$field contains an invalid character")
+        }
+    }
+
+    private val FAILURE_MESSAGE_PHRASES = listOf(
+        "no sufficient", "insufficient", "no evidence", "evidence found", "not found",
+        "no data", "no source", "could not", "cannot find", "unable to",
+        "keine daten", "keine quelle", "nicht gefunden",
+    )
+
+    /** A provider must fail with an error, never smuggle failure text into data fields. */
+    private fun rejectFailureMessage(value: String?, field: String) {
+        val normalized = value?.lowercase(java.util.Locale.ROOT) ?: return
+        if (FAILURE_MESSAGE_PHRASES.any(normalized::contains)) {
+            throw AiValidationException(
+                "The $field contains a research failure message instead of product data",
+            )
         }
     }
 

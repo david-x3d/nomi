@@ -57,6 +57,11 @@ object AiPrompts {
         provider-returned web-search evidence. Nomi attaches provider citation metadata outside the
         JSON. Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
         If two relevant cited websites cannot be found, fail instead of guessing.
+        FAILING MEANS RETURNING AN ERROR, NEVER FAKE DATA: when live search cannot find reliable
+        nutrition data for an item, return exactly {"error": "<short reason>"} as the entire
+        response. NEVER return zero calories and zero macros as a substitute for missing data,
+        and NEVER write failure text such as "no evidence found" into name, sourceName,
+        sourceProductName, or any other data field.
         Never pretend that two pages on the same website are independent confirmation.
         IDENTIFY THE EXACT PRODUCT FIRST: brand, product name, variant/flavour, market, and
         package size when relevant. Never silently substitute a similar product. "iglo Chicken

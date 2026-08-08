@@ -6,6 +6,7 @@ import com.nomi.app.ai.validation.AiValidationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OpenAiCompatibleProvidersTest {
@@ -91,6 +92,52 @@ class OpenAiCompatibleProvidersTest {
                 "configure Perplexity, OpenRouter, or OpenAI for Food research.",
             error.message,
         )
+    }
+
+    @Test
+    fun `research refusal envelope becomes a validation error`() {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val error = assertThrows(AiValidationException::class.java) {
+            throwIfResearchRefusal(json, """{"error": "no reliable source found"}""")
+        }
+        assertTrue(error.message!!.contains("no reliable source found"))
+
+        throwIfResearchRefusal(json, """{"items": [], "error": null}""")
+        throwIfResearchRefusal(json, "not even json")
+    }
+
+    @Test
+    fun `all-zero nutrition for a branded food is rejected as a placeholder`() {
+        val placeholder = analyzedItem(sourceName = "iglo.at").copy(
+            name = "MAGGI Ravioli pikant",
+            brand = "MAGGI",
+            calories = 0.0,
+            proteinGrams = 0.0,
+            carbohydrateGrams = 0.0,
+            fatGrams = 0.0,
+        )
+
+        val error = assertThrows(AiValidationException::class.java) {
+            rejectPlaceholderNutrition(FoodAnalysis(items = listOf(placeholder)))
+        }
+
+        assertTrue(error.message!!.contains("MAGGI Ravioli pikant"))
+    }
+
+    @Test
+    fun `all-zero nutrition is allowed for plausibly calorie-free foods`() {
+        val water = analyzedItem(sourceName = "Manufacturer").copy(
+            name = "Mineralwasser still",
+            brand = null,
+            calories = 0.0,
+            proteinGrams = 0.0,
+            carbohydrateGrams = 0.0,
+            fatGrams = 0.0,
+        )
+
+        val resolved = rejectPlaceholderNutrition(FoodAnalysis(items = listOf(water)))
+
+        assertEquals("Mineralwasser still", resolved.items.single().name)
     }
 
     private fun analysis(
