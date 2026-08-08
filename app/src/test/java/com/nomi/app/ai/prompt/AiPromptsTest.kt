@@ -21,8 +21,10 @@ class AiPromptsTest {
         )
 
         assertTrue(prompt.contains("MUST perform a live web search"))
+        assertTrue(prompt.contains("at least two independent websites"))
+        assertTrue(prompt.contains("Supermarket, grocery, retailer, and reseller"))
         assertTrue(prompt.contains("never return a model-only guess"))
-        assertTrue(prompt.contains("sourceUrl` MUST exactly copy"))
+        assertTrue(prompt.contains("supportingSourceUrls"))
         assertTrue(prompt.contains("fail instead of guessing"))
     }
 }

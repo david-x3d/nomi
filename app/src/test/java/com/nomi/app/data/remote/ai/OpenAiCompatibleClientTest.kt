@@ -70,7 +70,8 @@ class OpenAiCompatibleClientTest {
             ),
         )
 
-        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\"}]"))
+        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"max_results\":8"))
+        assertTrue(encoded.contains("Compare several independent websites"))
         assertFalse(encoded.contains("web_search_options"))
     }
 
@@ -84,7 +85,7 @@ class OpenAiCompatibleClientTest {
             ),
         )
 
-        assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"medium\"}"))
+        assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"high\"}"))
         assertFalse(encoded.contains("\"plugins\""))
     }
 

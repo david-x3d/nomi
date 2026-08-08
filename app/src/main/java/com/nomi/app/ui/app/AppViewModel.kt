@@ -1870,7 +1870,7 @@ private fun Throwable.safeAiMessage(): String = when {
 
 private fun FoodAnalysis.researchSourceUrls(): List<String> =
     items
-        .mapNotNull(AnalyzedFoodItem::sourceUrl)
+        .flatMap { item -> listOfNotNull(item.sourceUrl) + item.supportingSourceUrls }
         .filter(String::isNotBlank)
         .distinct()
         .take(3)

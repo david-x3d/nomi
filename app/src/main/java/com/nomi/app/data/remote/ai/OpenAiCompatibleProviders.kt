@@ -17,6 +17,7 @@ import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.UserQuantityResolver
+import java.net.URI
 import java.util.Locale
 import kotlinx.serialization.decodeFromString
 
@@ -59,7 +60,8 @@ class OpenAiCompatibleProviders(
         val completion = client.completeWebSearchJson(
             config = nutritionConfig,
             credential = nutritionCredential(),
-            systemPrompt = "You report web-cited source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
+            systemPrompt = "You compare multiple independent websites and report web-cited " +
+                "source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
             userPrompt = AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
         )
         val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
@@ -111,16 +113,31 @@ internal fun validateWebSearchEvidence(
         )
     }
     analysis.items.forEachIndexed { index, item ->
-        val sourceUrl = canonicalWebUrlOrNull(item.sourceUrl)
-            ?: throw AiValidationException(
-                "Food research result " + (index + 1) + " is missing a valid cited source URL.",
-            )
-        if (sourceUrl !in canonicalEvidenceUrls) {
+        val itemNumber = index + 1
+        val rawItemUrls = listOfNotNull(item.sourceUrl) + item.supportingSourceUrls
+        val canonicalItemUrls = rawItemUrls.map { rawUrl ->
+            canonicalWebUrlOrNull(rawUrl)
+                ?: throw AiValidationException(
+                    "Food research result $itemNumber contains an invalid cited source URL.",
+                )
+        }.distinct()
+        if (canonicalItemUrls.any { it !in canonicalEvidenceUrls }) {
             throw AiValidationException(
-                "Food research result " + (index + 1) +
-                    " is not backed by a provider web-search citation.",
+                "Food research result $itemNumber is not fully backed by provider web-search citations.",
+            )
+        }
+        val independentSites = canonicalItemUrls
+            .mapNotNull(::canonicalResearchSite)
+            .distinct()
+        if (independentSites.size < 2) {
+            throw AiValidationException(
+                "Food research result $itemNumber needs citations from at least two independent websites.",
             )
         }
     }
     return analysis
 }
+
+private fun canonicalResearchSite(url: String): String? = runCatching {
+    URI(url).host?.lowercase(Locale.ROOT)?.removePrefix("www.")
+}.getOrNull()?.takeIf(String::isNotBlank)

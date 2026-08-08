@@ -29,6 +29,7 @@ object AiResponseValidator {
     private const val MAX_DETAIL_CHARS = 1_000
     private const val MAX_SOURCE_NAME_CHARS = 500
     private const val MAX_SOURCE_URL_CHARS = 2_048
+    private const val MAX_SUPPORTING_SOURCE_URLS = 5
     private const val MAX_COUNTRY_CHARS = 8
 
     fun validate(intent: ParsedFoodIntent): ParsedFoodIntent {
@@ -121,6 +122,12 @@ object AiResponseValidator {
         validateText(item.unit, "food unit", required = true, maxChars = MAX_UNIT_CHARS)
         validateText(item.sourceName, "source name", maxChars = MAX_SOURCE_NAME_CHARS)
         validateText(item.sourceUrl, "source URL", maxChars = MAX_SOURCE_URL_CHARS)
+        if (item.supportingSourceUrls.size > MAX_SUPPORTING_SOURCE_URLS) {
+            throw AiValidationException("Too many supporting source URLs were returned")
+        }
+        item.supportingSourceUrls.forEach { url ->
+            validateText(url, "supporting source URL", required = true, maxChars = MAX_SOURCE_URL_CHARS)
+        }
         validateText(item.sourceServingUnit, "source serving unit", maxChars = MAX_UNIT_CHARS)
         validateText(item.sourcePackageUnit, "source package unit", maxChars = MAX_UNIT_CHARS)
         validateText(item.sourceCountry, "source country", maxChars = MAX_COUNTRY_CHARS)

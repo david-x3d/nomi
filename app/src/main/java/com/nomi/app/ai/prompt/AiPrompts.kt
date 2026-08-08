@@ -51,19 +51,25 @@ object AiPrompts {
         json: Json,
         localeCountry: String? = null,
     ): String = """
-        You MUST perform a live web search for every structured input item. Never answer from model
-        memory and never return a model-only guess. Every result, including an estimate, MUST be
-        grounded in provider-returned web-search evidence. `sourceUrl` MUST exactly copy one absolute
-        URL from the provider's citation or search-result metadata; do not invent or rewrite URLs.
-        If no relevant cited web source is found, fail instead of guessing.
+        You MUST perform a live web search for every structured input item and compare at least two independent websites
+        with different hostnames for EACH item. Never answer from model memory
+        and never return a model-only guess. Every result, including an estimate, MUST be grounded in
+        provider-returned web-search evidence. `sourceUrl` and every `supportingSourceUrls` entry MUST
+        exactly copy absolute URLs from the provider's citation or search-result metadata; do not
+        invent or rewrite URLs. If two relevant cited websites cannot be found, fail instead of guessing.
+        Never pretend that two pages on the same website are independent confirmation.
         Research nutrition for the structured meal below. For branded and restaurant foods,
-        prefer official manufacturer or restaurant sources, then reliable food databases,
-        then Open Food Facts. For generic food, use reputable reference values. Label every
-        uncertain portion or nutrient estimate. Do not include prose outside JSON.
+        prefer official manufacturer or restaurant sources, then reliable food databases and Open
+        Food Facts. Supermarket, grocery, retailer, and reseller product pages are explicitly allowed
+        when they identify the exact product and show its nutrition label. Use them to cross-check the
+        manufacturer or as the best available product source. For generic food, compare reputable
+        reference databases or public-health sources. Label every uncertain portion or nutrient
+        estimate. If sources disagree, prefer the current official product label for the user's market
+        and record the conflict in assumptions. Do not include prose outside JSON.
         For users in Germany, apply this exact source order:
         1. official German manufacturer or restaurant product page;
         2. official EU/German product data;
-        3. major German retailer product page;
+        3. major German retailer, reseller, supermarket, or grocery product page;
         4. reliable nutrition database;
         5. international/US source;
         6. a clearly labeled estimate only after live search found no reliable product-specific data.
@@ -135,6 +141,7 @@ object AiPrompts {
             "fiberGrams": non-negative number|null,
             "sourceName": non-empty string,
             "sourceUrl": absolute URL copied exactly from provider citation metadata,
+            "supportingSourceUrls": [at least one additional absolute URL from a different cited website],
             "sourceServingQuantity": positive number,
             "sourceServingUnit": string,
             "sourceServingGramsEquivalent": positive number|null,

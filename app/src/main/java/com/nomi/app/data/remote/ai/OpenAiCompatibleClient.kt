@@ -151,11 +151,17 @@ internal data class ResponseFormat(val type: String = "json_object")
 
 @Serializable
 internal data class WebSearchOptions(
-    @SerialName("search_context_size") val searchContextSize: String = "medium",
+    @SerialName("search_context_size") val searchContextSize: String = "high",
 )
 
 @Serializable
-internal data class ProviderPlugin(val id: String = "web")
+internal data class ProviderPlugin(
+    val id: String = "web",
+    @SerialName("max_results") val maxResults: Int = 8,
+    @SerialName("search_prompt") val searchPrompt: String =
+        "Compare several independent websites. Manufacturer, supermarket, retailer, reseller, " +
+            "and reliable nutrition pages are valid sources.",
+)
 
 internal data class WebSearchCompletion(
     val content: String,

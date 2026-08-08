@@ -76,6 +76,8 @@ data class AnalyzedFoodItem(
     val fiberGrams: Double? = null,
     val sourceName: String? = null,
     val sourceUrl: String? = null,
+    /** Additional provider-cited pages used to cross-check this item's nutrition. */
+    val supportingSourceUrls: List<String> = emptyList(),
     /** The amount whose nutrition is reported by the cited source, before app-side scaling. */
     val sourceServingQuantity: Double? = null,
     val sourceServingUnit: String? = null,

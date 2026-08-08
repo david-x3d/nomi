@@ -10,11 +10,17 @@ import org.junit.Test
 class OpenAiCompatibleProvidersTest {
     @Test
     fun `matching provider citation grounds nutrition result`() {
-        val analysis = analysis("https://EXAMPLE.com/product/#nutrition")
+        val analysis = analysis(
+            "https://manufacturer.example/product/#nutrition",
+            listOf("https://supermarket.example/product"),
+        )
 
         val validated = validateWebSearchEvidence(
             analysis,
-            evidenceUrls = setOf("https://example.com/product/"),
+            evidenceUrls = setOf(
+                "https://manufacturer.example/product/",
+                "https://supermarket.example/product",
+            ),
         )
 
         assertSame(analysis, validated)
@@ -23,20 +29,48 @@ class OpenAiCompatibleProvidersTest {
     @Test
     fun `missing mismatched or empty search evidence is rejected`() {
         assertThrows(AiValidationException::class.java) {
-            validateWebSearchEvidence(analysis(null), setOf("https://example.com/product"))
-        }
-        assertThrows(AiValidationException::class.java) {
             validateWebSearchEvidence(
-                analysis("https://invented.example/product"),
-                setOf("https://example.com/product"),
+                analysis(null, listOf("https://retailer.example/product")),
+                setOf("https://example.com/product", "https://retailer.example/product"),
             )
         }
         assertThrows(AiValidationException::class.java) {
-            validateWebSearchEvidence(analysis("https://example.com/product"), emptySet())
+            validateWebSearchEvidence(
+                analysis(
+                    "https://invented.example/product",
+                    listOf("https://retailer.example/product"),
+                ),
+                setOf("https://example.com/product", "https://retailer.example/product"),
+            )
+        }
+        assertThrows(AiValidationException::class.java) {
+            validateWebSearchEvidence(
+                analysis("https://example.com/product", listOf("https://retailer.example/product")),
+                emptySet(),
+            )
         }
     }
 
-    private fun analysis(sourceUrl: String?): FoodAnalysis = FoodAnalysis(
+    @Test
+    fun `two pages from one website are not independent evidence`() {
+        assertThrows(AiValidationException::class.java) {
+            validateWebSearchEvidence(
+                analysis(
+                    "https://shop.example.com/product",
+                    listOf("https://shop.example.com/nutrition"),
+                ),
+                setOf(
+                    "https://shop.example.com/product",
+                    "https://shop.example.com/nutrition",
+                ),
+            )
+        }
+    }
+
+    private fun analysis(
+        sourceUrl: String?,
+        supportingSourceUrls: List<String>,
+    ): FoodAnalysis = FoodAnalysis(
         items = listOf(
             AnalyzedFoodItem(
                 name = "Raspberry jam",
@@ -49,6 +83,7 @@ class OpenAiCompatibleProvidersTest {
                 fatGrams = 0.2,
                 sourceName = "Manufacturer",
                 sourceUrl = sourceUrl,
+                supportingSourceUrls = supportingSourceUrls,
                 sourceServingQuantity = 100.0,
                 sourceServingUnit = "g",
                 sourceServingGramsEquivalent = 100.0,
