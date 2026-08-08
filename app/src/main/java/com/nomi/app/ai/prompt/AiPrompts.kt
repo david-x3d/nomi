@@ -81,6 +81,11 @@ object AiPrompts {
         sourceServingQuantity=100 with sourceServingUnit="g" or "ml" and the nutrient fields
         exactly as the table prints them. Fall back to a per-serving/per-piece basis only when
         the label provides no per-100 values.
+        VERIFIED VALUES ARE EXACT: when reliable nutrition data is available, report the
+        source's printed values digit for digit. Never round, smooth, average, or otherwise
+        modify a verified value. Only when no exact value can be confirmed and an estimate is
+        unavoidable, set isEstimate=true and choose the slightly higher plausible calorie and
+        macro values rather than underestimating, so tracking errs against under-counting.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases and Open
         Food Facts. Supermarket, grocery, retailer, and reseller product pages are explicitly allowed

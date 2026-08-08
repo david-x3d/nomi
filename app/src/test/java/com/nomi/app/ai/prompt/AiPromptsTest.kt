@@ -79,4 +79,23 @@ class AiPromptsTest {
         assertTrue(prompt.contains("""{"error": "<short reason>"}"""))
         assertTrue(prompt.contains("NEVER return zero calories and zero macros"))
     }
+
+    @Test
+    fun `nutrition research prompt keeps verified values exact and biases estimates high`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "100 g raspberry jam",
+                items = listOf(
+                    ParsedFoodItem(name = "raspberry jam", quantity = 100.0, unit = "g"),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        assertTrue(prompt.contains("VERIFIED VALUES ARE EXACT"))
+        assertTrue(prompt.contains("digit for digit"))
+        assertTrue(prompt.contains("slightly higher plausible calorie"))
+        assertTrue(prompt.contains("rather than underestimating"))
+    }
 }
