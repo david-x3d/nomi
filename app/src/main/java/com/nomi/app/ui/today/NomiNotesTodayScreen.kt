@@ -26,6 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +63,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
@@ -98,6 +101,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -112,6 +117,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -162,6 +168,7 @@ fun NomiNotesTodayScreen(
 ) {
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
+    var composerOpen by rememberSaveable { mutableStateOf(false) }
     val loggingDescription = when (loggingState) {
         is FoodLoggingUiState.Input -> loggingState.text
         is FoodLoggingUiState.Processing -> loggingState.originalText
@@ -212,6 +219,8 @@ fun NomiNotesTodayScreen(
                 state = state,
                 loggingState = loggingState,
                 rememberedDescription = loggingDescription,
+                composerOpen = composerOpen,
+                onOpenComposer = { composerOpen = true },
                 onTextChanged = onTextChanged,
                 onAnalyze = onAnalyze,
                 onEditText = onEditText,
@@ -224,7 +233,14 @@ fun NomiNotesTodayScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(contentPadding),
+                .padding(contentPadding)
+                // The page itself is the writing surface: tapping the empty area below the
+                // notes starts a new entry, the way tapping into a note does.
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { composerOpen = true },
+                ),
             contentAlignment = Alignment.TopCenter,
         ) {
             LazyColumn(
@@ -304,7 +320,6 @@ fun NomiNotesTodayScreen(
                                 },
                             )
                         }
-                        NotesDivider()
                     }
                 }
 
@@ -716,14 +731,6 @@ private fun NotesFoodRow(entry: TodayFoodEntry, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NotesDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-    )
-}
-
-@Composable
 private fun InlineLoggingState(
     state: FoodLoggingUiState,
     rememberedDescription: String,
@@ -844,7 +851,6 @@ private fun ProcessingNote(
             TextButton(onClick = onEditText) { Text(nomiString("Edit text", "Text bearbeiten")) }
             TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
         }
-        NotesDivider()
     }
 }
 
@@ -1131,6 +1137,8 @@ private fun NotesComposerBar(
     state: TodayUiState,
     loggingState: FoodLoggingUiState,
     rememberedDescription: String,
+    composerOpen: Boolean,
+    onOpenComposer: () -> Unit,
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
     onEditText: () -> Unit,
@@ -1142,78 +1150,183 @@ private fun NotesComposerBar(
     val text = input?.text ?: rememberedDescription
     val processing = loggingState is FoodLoggingUiState.Processing
     val largeFonts = LocalDensity.current.fontScale >= 1.3f
+    // Writing takes over the bar only while there is something to write; otherwise the page
+    // stays a clean sheet with a single floating row over it.
+    val writing = composerOpen || processing || text.isNotBlank()
 
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 2.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 760.dp)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                NutritionSummaryPill(state = state, onClick = onGoals)
+        if (!writing) {
+            NotesFloatingActionRow(
+                state = state,
+                onGoals = onGoals,
+                onVoice = onVoice,
+                onMore = onMore,
+                onWrite = onOpenComposer,
+            )
+            return@Box
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 760.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NutritionSummaryPill(state = state, onClick = onGoals)
 
-                if (largeFonts) {
+            if (largeFonts) {
+                ComposerTextField(
+                    value = text,
+                    editable = input != null,
+                    processing = processing,
+                    autoFocus = composerOpen,
+                    onValueChange = onTextChanged,
+                    onAnalyze = onAnalyze,
+                    onEditText = onEditText,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    FilledTonalIconButton(onClick = onVoice, enabled = !processing) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
+                        )
+                    }
+                    FilledTonalIconButton(onClick = onMore, enabled = !processing) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    FilledTonalIconButton(onClick = onVoice, enabled = !processing) {
+                        Icon(
+                            Icons.Default.Mic,
+                            contentDescription = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
+                        )
+                    }
                     ComposerTextField(
                         value = text,
                         editable = input != null,
                         processing = processing,
+                        autoFocus = composerOpen,
                         onValueChange = onTextChanged,
                         onAnalyze = onAnalyze,
                         onEditText = onEditText,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        FilledTonalIconButton(onClick = onVoice, enabled = !processing) {
-                            Icon(
-                                Icons.Default.Mic,
-                                contentDescription = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
-                            )
-                        }
-                        FilledTonalIconButton(onClick = onMore, enabled = !processing) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
-                            )
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        FilledTonalIconButton(onClick = onVoice, enabled = !processing) {
-                            Icon(
-                                Icons.Default.Mic,
-                                contentDescription = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
-                            )
-                        }
-                        ComposerTextField(
-                            value = text,
-                            editable = input != null,
-                            processing = processing,
-                            onValueChange = onTextChanged,
-                            onAnalyze = onAnalyze,
-                            onEditText = onEditText,
-                            modifier = Modifier.weight(1f),
+                    FilledTonalIconButton(onClick = onMore, enabled = !processing) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
                         )
-                        FilledTonalIconButton(onClick = onMore, enabled = !processing) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
-                            )
-                        }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The resting state of the page: one floating row holding the remaining calories and the ways
+ * to add food. Nothing else competes with the writing surface above it.
+ */
+@Composable
+private fun NotesFloatingActionRow(
+    state: TodayUiState,
+    onGoals: () -> Unit,
+    onVoice: () -> Unit,
+    onMore: () -> Unit,
+    onWrite: () -> Unit,
+) {
+    val locale = nomiLocale()
+    val difference = state.caloriesDifference.roundToInt()
+    val calorieText = if (difference >= 0) {
+        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
+    } else {
+        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
+    }
+    Row(
+        modifier = Modifier
+            .widthIn(max = 760.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = onGoals,
+            modifier = Modifier.weight(1f),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = hairlineOnPitchBlack(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocalFireDepartment,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = calorieText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        NotesCircleAction(
+            icon = Icons.Default.Mic,
+            description = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
+            onClick = onVoice,
+        )
+        NotesCircleAction(
+            icon = Icons.Default.Add,
+            description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
+            onClick = onMore,
+        )
+        NotesCircleAction(
+            icon = Icons.Default.Keyboard,
+            description = nomiString("Write what you ate", "Schreiben, was du gegessen hast"),
+            onClick = onWrite,
+        )
+    }
+}
+
+@Composable
+private fun NotesCircleAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Icon(imageVector = icon, contentDescription = description)
         }
     }
 }
@@ -1234,6 +1347,7 @@ private fun ComposerTextField(
     value: String,
     editable: Boolean,
     processing: Boolean,
+    autoFocus: Boolean,
     onValueChange: (String) -> Unit,
     onAnalyze: () -> Unit,
     onEditText: () -> Unit,
@@ -1242,6 +1356,11 @@ private fun ComposerTextField(
     var editingValue by rememberSaveable(value, editable) { mutableStateOf(value) }
     val composerShape = RoundedCornerShape(28.dp)
     val hairline = hairlineOnPitchBlack()
+    val focusRequester = remember { FocusRequester() }
+    // Opening the composer should land the caret in it, the way tapping into a note does.
+    LaunchedEffect(autoFocus, editable) {
+        if (autoFocus && editable) runCatching { focusRequester.requestFocus() }
+    }
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val analysisProgressDescription = nomiString(
         "Meal analysis in progress",
@@ -1254,6 +1373,7 @@ private fun ComposerTextField(
         enabled = !processing,
         modifier = modifier
             .heightIn(min = 56.dp)
+            .focusRequester(focusRequester)
             .then(
                 hairline?.let { Modifier.border(it, composerShape) } ?: Modifier,
             ),
