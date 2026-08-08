@@ -16,6 +16,7 @@ import com.nomi.app.data.local.entity.SavedMealEntity
 import com.nomi.app.data.local.entity.SavedMealItemEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
+import com.nomi.app.data.local.entity.scaledBy
 import com.nomi.app.data.local.model.DailyNutritionTotals
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
 import com.nomi.app.data.local.model.MealNutritionTotals
@@ -24,6 +25,7 @@ import com.nomi.app.data.local.model.SavedMealWithItems
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.AppPreferencesStore
 import com.nomi.app.data.preferences.DataStoreAppPreferencesStore
+import com.nomi.app.domain.PortionChangeValidator
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.ZoneId
@@ -288,6 +290,42 @@ class NomiRepository(
 
     suspend fun deleteLog(log: FoodLogEntity): Boolean = logDao.deleteLog(log) == 1
     suspend fun foodLog(id: Long): FoodLogEntity? = logDao.log(id)
+
+    /**
+     * Corrects how much of an already logged food was actually eaten.
+     *
+     * Nutrition is linear in the amount, so the stored snapshot is rescaled deterministically
+     * here rather than researched again: the verified per-amount values and the recorded source
+     * stay exactly as they were. [newUnit] may differ from the logged unit as long as the two
+     * are dimensionally compatible, so 0.3 kg can correct 300 g.
+     */
+    suspend fun updateLoggedAmount(
+        id: Long,
+        newAmount: Double,
+        newUnit: String? = null,
+        updatedAtEpochMillis: Long,
+    ): Boolean = database.withTransaction {
+        require(id > 0) { "Only a persisted food log can be edited" }
+        val log = logDao.log(id) ?: return@withTransaction false
+        val unit = newUnit?.takeIf(String::isNotBlank)?.trim() ?: log.unit
+        val factor = PortionChangeValidator.calculateMultiplier(
+            originalQuantity = log.amount,
+            originalUnit = log.unit,
+            newQuantity = newAmount,
+            newUnit = unit,
+        ) ?: throw IllegalArgumentException(
+            "A ${log.unit} portion cannot be corrected with $unit",
+        )
+        val updated = log.copy(
+            amount = newAmount,
+            unit = unit,
+            grams = log.grams?.times(factor),
+            nutritionSnapshot = log.nutritionSnapshot.scaledBy(factor),
+            updatedAtEpochMillis = updatedAtEpochMillis,
+        )
+        validateLog(updated)
+        logDao.updateLog(updated) == 1
+    }
 
     /**
      * Deletes one persisted log while returning the exact immutable row needed for inline Undo.

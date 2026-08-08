@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
@@ -90,6 +91,7 @@ fun NomiFoodDetailScreen(
     onFavorite: (Long) -> Unit,
     onDuplicate: (Long) -> Unit,
     onDelete: (Long) -> Unit,
+    onEditAmount: (TodayFoodEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -115,6 +117,18 @@ fun NomiFoodDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { entry?.let(onEditAmount) },
+                        enabled = entry != null,
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = nomiString(
+                                "Correct the eaten amount",
+                                "Gegessene Menge korrigieren",
+                            ),
+                        )
+                    }
                     Box {
                         IconButton(
                             onClick = { menuExpanded = true },
@@ -190,6 +204,10 @@ fun NomiFoodDetailScreen(
         FoodEntryActionsSheet(
             entry = entry,
             onDismiss = { menuExpanded = false },
+            onEditAmount = {
+                menuExpanded = false
+                onEditAmount(entry)
+            },
             onFavorite = {
                 menuExpanded = false
                 onFavorite(entry.id)
@@ -212,6 +230,7 @@ fun NomiFoodDetailScreen(
 private fun FoodEntryActionsSheet(
     entry: TodayFoodEntry,
     onDismiss: () -> Unit,
+    onEditAmount: () -> Unit,
     onFavorite: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
@@ -252,6 +271,15 @@ private fun FoodEntryActionsSheet(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(bottom = 12.dp),
+                )
+                FoodEntryActionRow(
+                    icon = Icons.Default.Edit,
+                    title = nomiString("Change amount", "Menge ändern"),
+                    description = nomiString(
+                        "Recalculate this entry if you ate more or less",
+                        "Neu berechnen, wenn du mehr oder weniger gegessen hast",
+                    ),
+                    onClick = onEditAmount,
                 )
                 FoodEntryActionRow(
                     icon = Icons.Default.Favorite,

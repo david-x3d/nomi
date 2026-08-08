@@ -18,6 +18,25 @@ data class NutritionValues(
 )
 
 /**
+ * Scales every present nutrient by [factor], which is exactly how a portion correction is
+ * applied: nutrition is linear in the eaten amount, so a changed amount never needs new
+ * research. Absent optional nutrients stay absent rather than becoming zero.
+ */
+fun NutritionValues.scaledBy(factor: Double): NutritionValues {
+    require(factor.isFinite() && factor > 0.0) { "Portion factor must be finite and positive" }
+    return NutritionValues(
+        caloriesKcal = caloriesKcal * factor,
+        proteinGrams = proteinGrams * factor,
+        carbohydrateGrams = carbohydrateGrams * factor,
+        fatGrams = fatGrams * factor,
+        fiberGrams = fiberGrams?.times(factor),
+        sugarGrams = sugarGrams?.times(factor),
+        saturatedFatGrams = saturatedFatGrams?.times(factor),
+        sodiumMilligrams = sodiumMilligrams?.times(factor),
+    )
+}
+
+/**
  * Point-in-time source metadata. This is embedded in historical rows so later cache edits
  * cannot rewrite where a logged value came from.
  */

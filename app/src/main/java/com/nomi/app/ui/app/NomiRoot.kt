@@ -84,6 +84,7 @@ import com.nomi.app.ui.settings.AiProviderEditorDialog
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.SettingsScreen
 import com.nomi.app.ui.today.AddFoodMethod
+import com.nomi.app.ui.today.LoggedAmountEditDialog
 import com.nomi.app.ui.today.NomiNotesTodayScreen
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -126,6 +127,7 @@ private fun NomiMain(
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
     val barcodeAmountState by viewModel.barcodeAmountState.collectAsStateWithLifecycle()
+    val loggedAmountEditState by viewModel.loggedAmountEditState.collectAsStateWithLifecycle()
 
     var libraryKind by remember { mutableStateOf(LibraryItemKind.RECENT) }
     var selectedProviderIndex by remember { mutableIntStateOf(-1) }
@@ -377,6 +379,7 @@ private fun NomiMain(
                     onDuplicate = viewModel::duplicateFoodLog,
                     onFavorite = viewModel::favoriteFoodLog,
                     onDelete = viewModel::deleteFoodLog,
+                    onEditAmount = viewModel::startLoggedAmountEdit,
                 )
             }
 
@@ -432,6 +435,15 @@ private fun NomiMain(
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+        )
+    }
+
+    loggedAmountEditState?.let { state ->
+        LoggedAmountEditDialog(
+            state = state,
+            onAmountChanged = viewModel::updateLoggedAmountInput,
+            onConfirm = viewModel::applyLoggedAmountEdit,
+            onDismiss = viewModel::dismissLoggedAmountEdit,
         )
     }
 

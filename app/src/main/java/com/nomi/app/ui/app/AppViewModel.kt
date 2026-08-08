@@ -77,6 +77,8 @@ import com.nomi.app.ui.settings.SettingsUiState
 import com.nomi.app.ui.settings.ThemeMode
 import com.nomi.app.ui.settings.UnitSystem
 import com.nomi.app.ui.today.AddFoodMethod
+import com.nomi.app.ui.today.LoggedAmountEditError
+import com.nomi.app.ui.today.LoggedAmountEditUiState
 import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
@@ -291,6 +293,8 @@ class AppViewModel(
     private var barcodeLookupRequestId = 0L
     private val mutablePortionEditState = MutableStateFlow<PortionEditUiState?>(null)
     val portionEditState = mutablePortionEditState.asStateFlow()
+    private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
+    val loggedAmountEditState = mutableLoggedAmountEditState.asStateFlow()
     private var portionEditIndex: Int? = null
     private val pendingDeletedLogs = PendingDeletedLogStore()
     private val earlyUndoDeleteRequests = mutableSetOf<Long>()
@@ -783,6 +787,63 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { repository.deleteLog(id) }
                 .onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't delete that food.")) }
+        }
+    }
+
+    fun startLoggedAmountEdit(entry: TodayFoodEntry) {
+        if (entry.id <= 0 || entry.amount <= 0.0) return
+        mutableLoggedAmountEditState.value = LoggedAmountEditUiState(
+            entryId = entry.id,
+            name = entry.name,
+            unit = entry.unit,
+            originalAmount = entry.amount,
+            originalCalories = entry.calories,
+            amountText = formatLoggedAmountInput(entry.amount),
+        )
+    }
+
+    fun updateLoggedAmountInput(text: String) {
+        mutableLoggedAmountEditState.value = mutableLoggedAmountEditState.value?.copy(
+            amountText = text.take(12),
+            error = null,
+        )
+    }
+
+    fun dismissLoggedAmountEdit() {
+        mutableLoggedAmountEditState.value = null
+    }
+
+    fun applyLoggedAmountEdit() {
+        val edit = mutableLoggedAmountEditState.value ?: return
+        if (edit.isSaving) return
+        val amount = edit.parsedAmount ?: run {
+            mutableLoggedAmountEditState.value =
+                edit.copy(error = LoggedAmountEditError.INVALID_AMOUNT)
+            return
+        }
+        mutableLoggedAmountEditState.value = edit.copy(isSaving = true, error = null)
+        viewModelScope.launch {
+            runCatching {
+                repository.updateLoggedAmount(
+                    id = edit.entryId,
+                    newAmount = amount,
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                )
+            }.onSuccess { updated ->
+                mutableLoggedAmountEditState.value = if (updated) {
+                    null
+                } else {
+                    mutableLoggedAmountEditState.value?.copy(
+                        isSaving = false,
+                        error = LoggedAmountEditError.ENTRY_GONE,
+                    )
+                }
+            }.onFailure {
+                mutableLoggedAmountEditState.value = mutableLoggedAmountEditState.value?.copy(
+                    isSaving = false,
+                    error = LoggedAmountEditError.SAVE_FAILED,
+                )
+            }
         }
     }
 
@@ -1939,6 +2000,10 @@ internal suspend fun <T> runWithSmartFallback(
         throw primaryError
     }
 }
+
+/** Prefills the amount field without a trailing ".0" on whole amounts. */
+internal fun formatLoggedAmountInput(amount: Double): String =
+    if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
 
 private fun ThemePreference.toThemeMode(): ThemeMode = when (this) {
     ThemePreference.SYSTEM -> ThemeMode.SYSTEM

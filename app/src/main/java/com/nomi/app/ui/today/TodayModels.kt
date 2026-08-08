@@ -28,6 +28,49 @@ data class MacroProgress(
         get() = if (targetGrams <= 0) 0f else (consumedGrams / targetGrams).toFloat().coerceIn(0f, 1f)
 }
 
+/**
+ * Correction of how much of an already logged food was really eaten.
+ *
+ * Nutrition scales linearly with the amount, so the preview and the saved result come from the
+ * logged entry's own values. No new research runs and the recorded source stays untouched.
+ */
+enum class LoggedAmountEditError { INVALID_AMOUNT, ENTRY_GONE, SAVE_FAILED }
+
+data class LoggedAmountEditUiState(
+    val entryId: Long,
+    val name: String,
+    val unit: String,
+    val originalAmount: Double,
+    val originalCalories: Double,
+    val amountText: String,
+    val error: LoggedAmountEditError? = null,
+    val isSaving: Boolean = false,
+) {
+    val parsedAmount: Double? get() = parseLoggedAmount(amountText)
+
+    val canSave: Boolean get() = !isSaving && parsedAmount != null
+
+    /** Calories the correction would store, so the dialog can show the result before saving. */
+    val previewCalories: Double?
+        get() {
+            val amount = parsedAmount ?: return null
+            if (originalAmount <= 0.0) return null
+            return originalCalories * amount / originalAmount
+        }
+}
+
+/**
+ * Reads an amount the way it is typed on a German keyboard, where the decimal separator is a
+ * comma. Blank, non-numeric, zero, negative, and absurd values are rejected as unusable.
+ */
+fun parseLoggedAmount(text: String): Double? {
+    val amount = text.trim().replace(',', '.').toDoubleOrNull() ?: return null
+    if (!amount.isFinite() || amount <= 0.0 || amount > MAX_LOGGED_AMOUNT) return null
+    return amount
+}
+
+private const val MAX_LOGGED_AMOUNT = 100_000.0
+
 data class TodayFoodEntry(
     val id: Long,
     val name: String,
