@@ -26,7 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +45,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -110,6 +111,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -118,9 +120,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -176,6 +181,8 @@ fun NomiNotesTodayScreen(
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
     var composerOpen by rememberSaveable { mutableStateOf(false) }
+    // Where the line was touched, so the caret opens in that word instead of at the end.
+    var caretInEditedEntry by rememberSaveable { mutableStateOf(0) }
     val loggingDescription = when (loggingState) {
         is FoodLoggingUiState.Input -> loggingState.text
         is FoodLoggingUiState.Processing -> loggingState.originalText
@@ -246,11 +253,15 @@ fun NomiNotesTodayScreen(
                 .fillMaxSize()
                 .padding(contentPadding)
                 // The page itself is the writing surface: tapping the empty area below the
-                // notes starts a new entry, the way tapping into a note does.
+                // notes starts a new entry, the way tapping into a note does. While a logged
+                // line is open for rewriting, that same tap puts it back instead, so leaving
+                // a line alone is as easy as touching it was.
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = { composerOpen = true },
+                    onClick = {
+                        if (editedEntryId != null) onDismissDraft() else composerOpen = true
+                    },
                 ),
             contentAlignment = Alignment.TopCenter,
         ) {
@@ -316,13 +327,17 @@ fun NomiNotesTodayScreen(
                                 text = (loggingState as FoodLoggingUiState.Input).text,
                                 autoFocus = true,
                                 fillsPage = false,
+                                initialCaret = caretInEditedEntry,
                                 onTextChanged = onTextChanged,
                                 onAnalyze = onAnalyze,
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
-                                onClick = { onFoodClick(entry.id) },
-                                onEditText = { onEditEntryText(entry) },
+                                onOpenDetails = { onFoodClick(entry.id) },
+                                onEditText = { caret ->
+                                    caretInEditedEntry = caret
+                                    onEditEntryText(entry)
+                                },
                                 onDelete = {
                                     pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
                                     onDeleteFood(entry.id)
@@ -558,12 +573,13 @@ private data class PendingDeletedFood(
 @Composable
 private fun SwipeToDeleteFoodRow(
     entry: TodayFoodEntry,
-    onClick: () -> Unit,
-    onEditText: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onEditText: (Int) -> Unit,
     onDelete: () -> Unit,
 ) {
     val deleteLabel = nomiString("Delete ${entry.name}", "${entry.name} löschen")
     val editLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
+    val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -622,7 +638,11 @@ private fun SwipeToDeleteFoodRow(
         modifier = Modifier.semantics {
             customActions = listOf(
                 CustomAccessibilityAction(label = editLabel) {
-                    onEditText()
+                    onEditText(entry.reeditableText().length)
+                    true
+                },
+                CustomAccessibilityAction(label = detailsLabel) {
+                    onOpenDetails()
                     true
                 },
                 CustomAccessibilityAction(label = deleteLabel) {
@@ -636,7 +656,7 @@ private fun SwipeToDeleteFoodRow(
         },
     ) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            NotesFoodRow(entry = entry, onClick = onClick, onEditText = onEditText)
+            NotesFoodRow(entry = entry, onOpenDetails = onOpenDetails, onEditText = onEditText)
         }
     }
 }
@@ -718,24 +738,36 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
     }
 }
 
+/**
+ * A logged entry as a line of the page.
+ *
+ * The words behave like written text: touching them puts the caret where it was touched and
+ * hands the line to the keyboard, so a wrong word is corrected where it stands. The calories
+ * stay a separate target that opens the entry's details, and holding the line does the same,
+ * because the numbers are a different subject from the sentence that produced them.
+ */
 @Composable
 private fun NotesFoodRow(
     entry: TodayFoodEntry,
-    onClick: () -> Unit,
-    onEditText: () -> Unit,
+    onOpenDetails: () -> Unit,
+    onEditText: (Int) -> Unit,
 ) {
-    val description = buildString {
-        append(entry.name)
-        entry.brand?.takeIf(String::isNotBlank)?.let { append(" · ").append(it) }
-    }
+    val description = entry.rowDescription()
     val locale = nomiLocale()
     val amountDisplay = entry.quantityDisplay(locale).withContext
+    val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
+    val writeLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Tapping opens the details; holding reopens the line as text, the way you would
-            // correct a wrong word in a note.
-            .combinedClickable(onClick = onClick, onLongClick = onEditText)
+            // Past the end of the words the line still opens for writing, with the caret at
+            // the end, the way tapping the empty part of a note's line behaves.
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = writeLabel,
+                onClick = { onEditText(entry.reeditableText().length) },
+            )
             .heightIn(min = 64.dp)
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.Top,
@@ -745,14 +777,39 @@ private fun NotesFoodRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
+            var descriptionLayout by remember(entry.id) {
+                mutableStateOf<TextLayoutResult?>(null)
+            }
             Text(
                 text = description,
+                modifier = Modifier.pointerInput(entry.id, description) {
+                    detectTapGestures(
+                        onLongPress = { onOpenDetails() },
+                        onTap = { position ->
+                            val tapped = descriptionLayout?.getOffsetForPosition(position)
+                                ?: description.length
+                            onEditText(entry.reeditableCaretForDescription(tapped))
+                        },
+                    )
+                },
+                onTextLayout = { descriptionLayout = it },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             if (entry.amountText.isNotBlank() || entry.amount > 0.0) {
+                var amountLayout by remember(entry.id) { mutableStateOf<TextLayoutResult?>(null) }
                 Text(
                     text = amountDisplay,
+                    modifier = Modifier.pointerInput(entry.id, amountDisplay) {
+                        detectTapGestures(
+                            onLongPress = { onOpenDetails() },
+                            onTap = { position ->
+                                val tapped = amountLayout?.getOffsetForPosition(position) ?: 0
+                                onEditText(entry.reeditableCaretForAmount(tapped))
+                            },
+                        )
+                    },
+                    onTextLayout = { amountLayout = it },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -763,6 +820,17 @@ private fun NotesFoodRow(
                 if (entry.isEstimated) append("≈ ")
                 append(entry.calories.roundToInt()).append(" kcal")
             },
+            // The calories are the way into the entry's details now that the words belong to
+            // the keyboard, so the figure carries a touch target rather than only its glyphs.
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = detailsLabel,
+                    onClick = onOpenDetails,
+                )
+                .heightIn(min = 44.dp)
+                .wrapContentHeight(Alignment.Top),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
@@ -840,6 +908,9 @@ private fun InlineLoggingState(
  * lines as you want - Return breaks a line instead of submitting, so several foods can be
  * written out before anything is sent. Rewriting one existing row keeps the compact form with
  * its own send action, because there it sits between other entries.
+ *
+ * [initialCaret] is where the words were touched. It only seeds the caret; from then on the
+ * caret belongs to the field, so typing in the middle of a sentence stays where it is.
  */
 @Composable
 private fun InlineComposerCanvas(
@@ -848,11 +919,19 @@ private fun InlineComposerCanvas(
     fillsPage: Boolean,
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
+    initialCaret: Int? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(autoFocus) {
         if (autoFocus) runCatching { focusRequester.requestFocus() }
     }
+    var typed by remember {
+        val caret = (initialCaret ?: text.length).coerceIn(0, text.length)
+        mutableStateOf(TextFieldValue(text, TextRange(caret)))
+    }
+    // Text can also change from outside - a draft reopened for correction, a cleared page -
+    // and then the field follows it with the caret at the end.
+    val value = if (typed.text == text) typed else TextFieldValue(text, TextRange(text.length))
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -861,8 +940,11 @@ private fun InlineComposerCanvas(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         BasicTextField(
-            value = text,
-            onValueChange = onTextChanged,
+            value = value,
+            onValueChange = { updated ->
+                typed = updated
+                if (updated.text != text) onTextChanged(updated.text)
+            },
             modifier = Modifier
                 .weight(1f)
                 .then(if (fillsPage) Modifier.heightIn(min = 320.dp) else Modifier)

@@ -98,10 +98,55 @@ data class TodayFoodEntry(
  * because the re-run research needs them to identify the same food again.
  */
 fun TodayFoodEntry.reeditableText(): String = listOfNotNull(
-    amountText.trim().takeIf(String::isNotBlank),
-    name.trim().takeIf(String::isNotBlank),
-    brand?.trim()?.takeIf(String::isNotBlank),
+    editableAmount(),
+    editableName(),
+    editableBrand(),
 ).joinToString(" ")
+
+/** Separator between a food and its brand on the row, as one string so taps can skip it. */
+const val BRAND_SEPARATOR = " · "
+
+/** The words a logged row shows on its first line. */
+fun TodayFoodEntry.rowDescription(): String = buildString {
+    append(name)
+    brand?.takeIf(String::isNotBlank)?.let { append(BRAND_SEPARATOR).append(it) }
+}
+
+/**
+ * Where the caret belongs in [reeditableText] when [rowDescription] was tapped at [offset].
+ *
+ * The row reads "food · brand" while the editable sentence reads "amount food brand", so the
+ * tapped character is located in the part it belongs to and re-anchored at that part's place
+ * in the sentence. Tapping a word therefore opens the line with the caret inside that same
+ * word instead of somewhere shifted by the amount that is only shown on the line below.
+ */
+fun TodayFoodEntry.reeditableCaretForDescription(offset: Int): Int {
+    val name = editableName()
+    val brand = editableBrand()
+    val nameStart = editableAmount()?.let { it.length + 1 } ?: 0
+    val brandStart = nameStart + (name?.let { it.length + 1 } ?: 0)
+    val displayedNameEnd = this.name.length
+    val caret = if (offset <= displayedNameEnd || brand == null) {
+        nameStart + offset.coerceIn(0, name?.length ?: 0)
+    } else {
+        brandStart + (offset - displayedNameEnd - BRAND_SEPARATOR.length).coerceIn(0, brand.length)
+    }
+    return caret.coerceIn(0, reeditableText().length)
+}
+
+/**
+ * Where the caret belongs in [reeditableText] when the row's amount line was tapped at
+ * [offset]. That line is a formatted quantity rather than the words that were typed, so the
+ * tap can only land somewhere inside the written amount at the start of the sentence.
+ */
+fun TodayFoodEntry.reeditableCaretForAmount(offset: Int): Int =
+    offset.coerceIn(0, editableAmount()?.length ?: 0)
+
+private fun TodayFoodEntry.editableAmount(): String? = amountText.trim().takeIf(String::isNotBlank)
+
+private fun TodayFoodEntry.editableName(): String? = name.trim().takeIf(String::isNotBlank)
+
+private fun TodayFoodEntry.editableBrand(): String? = brand?.trim()?.takeIf(String::isNotBlank)
 
 data class TodayUiState(
     val date: LocalDate = LocalDate.now(),
