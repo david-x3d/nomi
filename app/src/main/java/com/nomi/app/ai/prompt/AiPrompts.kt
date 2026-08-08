@@ -26,6 +26,19 @@ object AiPrompts {
         word that changes what the food is or contains, such as "Zero", "Vanille", or "vegan".
         Never invent a variant, brand, or ingredient the user did not write.
 
+        EXPECT TYPOS. This is typed quickly on a phone, so assume slips rather than new
+        products: transposed and dropped letters ("red bull junebrry" is Red Bull Juneberry,
+        "haferflcken" is Haferflocken), missing or extra spaces ("redbull", "hafer flocken"),
+        German written without umlauts or with ss for ß ("muesli" is Müsli, "kaese" is Käse,
+        "russisch brot"), and phonetic spellings. Resolve the intended product and return its
+        correct name.
+        CORRECTING A SLIP IS NOT THE SAME AS CHANGING THE PRODUCT. A variant is often one short
+        word, and swapping it logs a different food behind a confident name. Never turn one
+        edition, flavour, or variant into another because the spelling is close: "Juneberry"
+        must not become "Watermelon", "Zero" must not become "Original". When the intended
+        product genuinely cannot be resolved, keep what the user wrote rather than picking the
+        nearest famous product, and say so in assumptions.
+
         An explicit user quantity or package size is authoritative. Never replace it with a
         currently sold size found online or with a typical serving. Resolve package math to the
         consumed g/ml amount: "55% of a 320g package" is quantity=176, unit="g";

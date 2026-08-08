@@ -12,6 +12,7 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.parsing.FoodNameCorrection
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.FoodDisplayName
@@ -543,10 +544,12 @@ class AppViewModel(
         )
         val job = viewModelScope.launch {
             runCatching {
-                val intent = LocalFoodIntentParser.parseOrNull(text)
-                    ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
-                        providerFor(config, key).parseFood(text)
-                    }
+                val intent = (
+                    LocalFoodIntentParser.parseOrNull(text)
+                        ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
+                            providerFor(config, key).parseFood(text)
+                        }
+                    ).withKnownSpellings()
                 cachedNutritionAnalysis(intent)?.let { return@runCatching it }
 
                 mutableLoggingState.value = FoodLoggingUiState.Processing(
@@ -1560,6 +1563,25 @@ class AppViewModel(
         analysisRequestId += 1
         analysisJob?.cancel()
         analysisJob = null
+    }
+
+    /**
+     * Repairs a mistyped food against the ones already in the log.
+     *
+     * It runs before the cache lookup on purpose: a corrected spelling can hit the local
+     * catalog exactly, so a typo in something eaten every week costs no provider request at
+     * all. The correction is strict about variants - it will fix "junebrry" but never trade one
+     * edition for another - and it leaves anything it is not sure about untouched for research.
+     */
+    private fun ParsedFoodIntent.withKnownSpellings(): ParsedFoodIntent {
+        val known = recentFoodsSnapshot.map(FoodEntity::canonicalName)
+        if (known.isEmpty()) return this
+        return copy(
+            items = items.map { item ->
+                val corrected = FoodNameCorrection.correctedOrNull(item.name, known)
+                if (corrected == null) item else item.copy(name = corrected)
+            },
+        )
     }
 
     /** Reuses an exact local catalog match before paying for another provider request. */
