@@ -2,22 +2,19 @@ package com.nomi.app.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -28,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nomi.app.R
 import com.nomi.app.ui.localization.nomiString
+import kotlinx.coroutines.delay
 
 /**
  * How the fox is doing, which is only ever a reflection of what the app is doing.
@@ -50,26 +48,87 @@ enum class NomiFoxMood {
     CONCERNED,
 }
 
-@get:DrawableRes
-private val NomiFoxMood.drawable: Int
+/**
+ * A drawn loop: one still per frame, each held for as long as it was drawn to be held.
+ *
+ * The art arrived as animated WebP, which Compose's [painterResource] cannot decode - it hands
+ * back an AnimatedImageDrawable where a BitmapDrawable is expected, and the cast takes the app
+ * down. Android's own animated decoder would solve that but only exists from API 28, and Nomi
+ * supports 26. Playing the frames ourselves avoids both problems and keeps the timing here,
+ * where it can be read, instead of inside a decoder.
+ */
+@Immutable
+private class FoxLoop(
+    @param:DrawableRes val frames: IntArray,
+    /** How long each frame is shown, in the order it was drawn. */
+    val holdsMillis: IntArray,
+)
+
+private val restingLoop = FoxLoop(
+    frames = intArrayOf(
+        R.drawable.nomi_fox_resting_0,
+        R.drawable.nomi_fox_resting_1,
+        R.drawable.nomi_fox_resting_2,
+    ),
+    holdsMillis = intArrayOf(83, 498, 747),
+)
+
+private val curiousLoop = FoxLoop(
+    frames = intArrayOf(
+        R.drawable.nomi_fox_curious_0,
+        R.drawable.nomi_fox_curious_1,
+        R.drawable.nomi_fox_curious_2,
+        R.drawable.nomi_fox_curious_3,
+        R.drawable.nomi_fox_curious_4,
+        R.drawable.nomi_fox_curious_5,
+        R.drawable.nomi_fox_curious_6,
+        R.drawable.nomi_fox_curious_7,
+        R.drawable.nomi_fox_curious_8,
+    ),
+    holdsMillis = intArrayOf(332, 83, 83, 83, 166, 83, 83, 83, 166),
+)
+
+private val settledLoop = FoxLoop(
+    frames = intArrayOf(
+        R.drawable.nomi_fox_settled_0,
+        R.drawable.nomi_fox_settled_1,
+        R.drawable.nomi_fox_settled_2,
+        R.drawable.nomi_fox_settled_3,
+        R.drawable.nomi_fox_settled_4,
+    ),
+    holdsMillis = intArrayOf(830, 83, 83, 83, 249),
+)
+
+private val concernedLoop = FoxLoop(
+    frames = intArrayOf(
+        R.drawable.nomi_fox_concerned_0,
+        R.drawable.nomi_fox_concerned_1,
+        R.drawable.nomi_fox_concerned_2,
+        R.drawable.nomi_fox_concerned_3,
+        R.drawable.nomi_fox_concerned_4,
+    ),
+    holdsMillis = intArrayOf(166, 415, 166, 415, 166),
+)
+
+private val NomiFoxMood.loop: FoxLoop
     get() = when (this) {
-        NomiFoxMood.RESTING -> R.drawable.nomi_fox_resting
-        NomiFoxMood.CURIOUS -> R.drawable.nomi_fox_curious
-        // The settled fox is the app's own icon, so the face you know is the resting face.
-        NomiFoxMood.SETTLED -> R.drawable.nomi_icon_foreground
-        NomiFoxMood.CONCERNED -> R.drawable.nomi_fox_concerned
+        NomiFoxMood.RESTING -> restingLoop
+        NomiFoxMood.CURIOUS -> curiousLoop
+        NomiFoxMood.SETTLED -> settledLoop
+        NomiFoxMood.CONCERNED -> concernedLoop
     }
 
 /**
  * The fox in the header.
  *
- * Each mood is its own drawing, and the four are pixel-aligned, so changing expression is a
- * cross-fade in place rather than a cut: the eyes drift open, the mouth softens, and the head
- * never moves. Timing carries the rest - how deeply it breathes, how far it leans, and a single
- * shake of the head when a meal could not be read.
+ * Each mood is its own drawn loop, and all of them share the same silhouette to the pixel, so
+ * changing mood is a cross-fade in place rather than a cut: the eyes drift open, the mouth
+ * softens, and the head never moves. The drawings carry the movement now, so nothing is
+ * animated on top of them - only the slight postural difference between dozing and paying
+ * attention, which the stills cannot express.
  *
- * The restraint is the point. It is never louder than the page it sits above, so you read the
- * app's state at a glance without ever having to look at it directly.
+ * The loops stop as soon as the fox leaves the screen, because the effect that drives them
+ * leaves composition with it.
  */
 @Composable
 fun NomiFox(
@@ -78,36 +137,9 @@ fun NomiFox(
     size: Dp = 44.dp,
 ) {
     val description = nomiString("Nomi fox logo", "Nomi-Fuchslogo")
-    val breath = rememberInfiniteTransition(label = "fox breath")
-    val depth = when (mood) {
-        NomiFoxMood.RESTING -> 0.018f
-        NomiFoxMood.CURIOUS -> 0.040f
-        NomiFoxMood.SETTLED -> 0.022f
-        NomiFoxMood.CONCERNED -> 0.026f
-    }
-    val pace = when (mood) {
-        NomiFoxMood.RESTING -> 3_200
-        NomiFoxMood.CURIOUS -> 900
-        NomiFoxMood.SETTLED -> 2_200
-        NomiFoxMood.CONCERNED -> 1_400
-    }
-    val breathScale by breath.animateFloat(
-        initialValue = 1f - depth,
-        targetValue = 1f + depth,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = pace),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "fox breath scale",
-    )
-    // The drooping eyes already say "dozing", so the lean only has to agree with them.
+    // Resting leans away from the page; curiosity straightens up and lifts a little.
     val lean by animateFloatAsState(
-        targetValue = when (mood) {
-            NomiFoxMood.RESTING -> -3f
-            NomiFoxMood.CURIOUS -> 1.5f
-            NomiFoxMood.SETTLED -> 0f
-            NomiFoxMood.CONCERNED -> 0f
-        },
+        targetValue = if (mood == NomiFoxMood.RESTING) -3f else 0f,
         animationSpec = tween(durationMillis = 520),
         label = "fox lean",
     )
@@ -117,32 +149,12 @@ fun NomiFox(
         label = "fox lift",
     )
 
-    // One shake of the head when a meal could not be read, then back to breathing.
-    val shake = remember { Animatable(0f) }
-    LaunchedEffect(mood) {
-        if (mood != NomiFoxMood.CONCERNED) return@LaunchedEffect
-        shake.snapTo(0f)
-        shake.animateTo(
-            targetValue = 0f,
-            animationSpec = keyframes {
-                durationMillis = 420
-                0f at 0
-                -7f at 90
-                6f at 200
-                -3f at 310
-                0f at 420
-            },
-        )
-    }
-
     Box(
         modifier = modifier
             .size(size)
             .semantics { contentDescription = description }
             .graphicsLayer {
-                scaleX = breathScale
-                scaleY = breathScale
-                rotationZ = lean + shake.value
+                rotationZ = lean
                 translationY = lift * density
             },
     ) {
@@ -153,11 +165,27 @@ fun NomiFox(
             label = "fox mood",
         ) { shown ->
             Image(
-                painter = painterResource(shown.drawable),
+                painter = painterResource(playingFrame(shown.loop)),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
             )
         }
     }
+}
+
+/** Walks a loop's frames on their own timings, restarting whenever the loop changes. */
+@Composable
+@DrawableRes
+private fun playingFrame(loop: FoxLoop): Int {
+    var index by remember(loop) { mutableIntStateOf(0) }
+    LaunchedEffect(loop) {
+        var frame = 0
+        while (true) {
+            index = frame
+            delay(loop.holdsMillis[frame].toLong())
+            frame = (frame + 1) % loop.frames.size
+        }
+    }
+    return loop.frames[index.coerceIn(loop.frames.indices)]
 }
