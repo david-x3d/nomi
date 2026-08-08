@@ -13,6 +13,19 @@ object AiPrompts {
         preparation, and any assumptions needed. A saved-meal phrase such as "mein übliches
         Frühstück" should be returned in mealReference.
 
+        NAME EACH FOOD THE WAY A PERSON WOULD WRITE IT DOWN. `name` is what the user will read
+        in their food log, so it is the food itself, never the sentence they typed.
+        "mcdonalds cheeseburger with fries and coke" is three items: "Cheeseburger" and "Fries"
+        with brand "McDonald's", and "Coca-Cola" with brand "Coca-Cola". The brand belongs in
+        `brand`, the amount in `quantity`/`unit`, the preparation in `preparation` - none of
+        them may be repeated in `name`.
+        Correct spelling and capitalization in the user's own language, and answer in that
+        language: German input gives German names with capitalized nouns ("pommes mit majo"
+        gives "Pommes" and "Mayonnaise"), English input gives English names. Expand a
+        colloquial short form to the food's common name ("coke" gives "Coca-Cola"). Keep any
+        word that changes what the food is or contains, such as "Zero", "Vanille", or "vegan".
+        Never invent a variant, brand, or ingredient the user did not write.
+
         An explicit user quantity or package size is authoritative. Never replace it with a
         currently sold size found online or with a typical serving. Resolve package math to the
         consumed g/ml amount: "55% of a 320g package" is quantity=176, unit="g";
@@ -80,6 +93,18 @@ object AiPrompts {
         user's market, set isEstimate=true, and state that choice in assumptions - for example
         "Steak" without a cut may use a typical beef steak, grilled, and say so. Returning an
         error for a common generic food is wrong.
+        `name` IS A DISPLAY NAME, NOT A SOURCE TITLE: it is the line the user reads in their
+        food log, so keep it the short everyday name of the food - "Cheeseburger", "Pommes",
+        "Coca-Cola". Never copy the cited page's product title into it; that is exactly what
+        `sourceProductName` is for and it must still be the page's exact title. The brand
+        belongs in `brand`, the amount in `quantity`/`unit`, and the packaging and preparation
+        in `assumptions`, so none of them are repeated in `name`. Keep every word that changes
+        what the food is or contains - "Coca-Cola Zero" and "Skyr Vanille" stay whole, because
+        dropping the variant would put the wrong food in the log. Spell and capitalize the name
+        in the language of the user's input: German input gives German names with capitalized
+        nouns, English input gives English names. A shortened display name NEVER licenses
+        researching a different, less specific product: identify the exact product first as
+        required below, then name it for the log.
         SOURCE AND DATA MUST MATCH: `sourceProductName` MUST be the product title exactly as the
         cited page prints it, and `sourceDomain` MUST be the hostname of the page the nutrition
         values were actually read from. Never attribute one site's values to another site and

@@ -13,6 +13,7 @@ import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.validation.AiValidationException
+import com.nomi.app.ai.validation.FoodDisplayName
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
@@ -622,7 +623,16 @@ class AppViewModel(
                 researchNutrition(intent)
             }.onSuccess { analysis ->
                 if (requestId != analysisRequestId) return@onSuccess
-                mutableLoggingState.value = FoodLoggingUiState.Preview(analysis, category)
+                // A photo lands on the page as the same preview a typed meal produces. The
+                // foods it found become the note's words, so the entry reads as if it had
+                // been written and "change wording" starts from something.
+                val describedFoods = analysis.items.joinToString(", ", transform = AnalyzedFoodItem::name)
+                lastLoggingText = describedFoods
+                mutableLoggingState.value = FoodLoggingUiState.Preview(
+                    analysis,
+                    category,
+                    originalText = describedFoods,
+                )
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 if (requestId != analysisRequestId) return@onFailure
@@ -1499,7 +1509,15 @@ class AppViewModel(
                     providerFor(config, key).researchNutrition(intent)
                 }
             },
-        )
+        ).withCleanDisplayNames()
+
+    /**
+     * Every researched item passes through here on its way to the page, so the name that is
+     * previewed is the same one that is saved and later reopened for rewriting. The prompts
+     * ask the model for a clean short name; this only removes what a provider left behind.
+     */
+    private fun FoodAnalysis.withCleanDisplayNames(): FoodAnalysis =
+        copy(items = items.map { it.copy(name = FoodDisplayName.clean(it.name)) })
 
     private fun currentResearchProviderWebsite(): String? {
         val selection = preferences.value.foodResearchProvider

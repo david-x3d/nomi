@@ -328,14 +328,16 @@ private fun NomiMain(
                                 }
                             }.onSuccess { prepared ->
                                 viewModel.analyzePhoto(prepared.bytes, prepared.mediaType)
-                                navController.navigate(Routes.LOGGING) { popUpTo(Routes.PHOTO) { inclusive = true } }
+                                // A photo returns to the page, the way voice does, so its
+                                // result is confirmed in the same note as a typed meal
+                                // instead of in the logging form with its meal-time picker.
+                                navController.popBackStack(Routes.HOME, inclusive = false)
                             }.onFailure { showMessage(it.message ?: "Nomi couldn't read that image") }
                         }
                     },
                     onManualEntry = {
                         viewModel.beginLogging(AddFoodMethod.TYPE)
-                        viewModel.showManualLogging()
-                        navController.navigate(Routes.LOGGING) { popUpTo(Routes.PHOTO) { inclusive = true } }
+                        navController.popBackStack(Routes.HOME, inclusive = false)
                     },
                 )
             }
