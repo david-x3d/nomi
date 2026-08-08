@@ -83,6 +83,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -119,6 +120,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -228,10 +230,13 @@ fun NomiNotesTodayScreen(
             ) {
                 NotesFloatingActionRow(
                     state = state,
+                    canSend = (loggingState as? FoodLoggingUiState.Input)
+                        ?.text?.isNotBlank() == true,
                     onGoals = { showGoals = true },
                     onVoice = { onQuickMethod(AddFoodMethod.VOICE) },
                     onMore = { showQuickAdd = true },
                     onWrite = { composerOpen = true },
+                    onSend = onAnalyze,
                 )
             }
         },
@@ -307,9 +312,10 @@ fun NomiNotesTodayScreen(
                         when {
                             // The row becomes the line you write on, so a rewrite happens
                             // where the entry already sits.
-                            editingThisEntry -> InlineComposerLine(
+                            editingThisEntry -> InlineComposerCanvas(
                                 text = (loggingState as FoodLoggingUiState.Input).text,
                                 autoFocus = true,
+                                fillsPage = false,
                                 onTextChanged = onTextChanged,
                                 onAnalyze = onAnalyze,
                             )
@@ -782,9 +788,10 @@ private fun InlineLoggingState(
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         when (state) {
             is FoodLoggingUiState.Input -> if (!suppressComposer) {
-                InlineComposerLine(
+                InlineComposerCanvas(
                     text = state.text,
                     autoFocus = composerFocused,
+                    fillsPage = true,
                     onTextChanged = onTextChanged,
                     onAnalyze = onAnalyze,
                 )
@@ -825,15 +832,20 @@ private fun InlineLoggingState(
 }
 
 /**
- * The line you write on. It is deliberately not a text field in appearance: same typography,
- * padding, and alignment as a logged row, so what you type reads as the next line of the page
- * and stays in place when it turns into a real entry. The calorie slot on the right holds the
- * send action while writing, which is where the calories themselves appear afterwards.
+ * The surface you write on.
+ *
+ * It is deliberately not a text field in appearance: same typography, padding, and alignment as
+ * a logged row, so what you type reads as part of the page and stays in place when it turns
+ * into real entries. As the page composer it claims the rest of the sheet and takes as many
+ * lines as you want - Return breaks a line instead of submitting, so several foods can be
+ * written out before anything is sent. Rewriting one existing row keeps the compact form with
+ * its own send action, because there it sits between other entries.
  */
 @Composable
-private fun InlineComposerLine(
+private fun InlineComposerCanvas(
     text: String,
     autoFocus: Boolean,
+    fillsPage: Boolean,
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
 ) {
@@ -845,7 +857,7 @@ private fun InlineComposerLine(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = if (fillsPage) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         BasicTextField(
@@ -853,12 +865,16 @@ private fun InlineComposerLine(
             onValueChange = onTextChanged,
             modifier = Modifier
                 .weight(1f)
+                .then(if (fillsPage) Modifier.heightIn(min = 320.dp) else Modifier)
                 .focusRequester(focusRequester),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = if (fillsPage) ImeAction.Default else ImeAction.Send,
+            ),
             keyboardActions = KeyboardActions(
                 onSend = { if (text.isNotBlank()) onAnalyze() },
             ),
@@ -876,7 +892,8 @@ private fun InlineComposerLine(
                 innerTextField()
             },
         )
-        AnimatedVisibility(visible = text.isNotBlank()) {
+        // The page composer sends from the floating row, so nothing hovers over the sheet.
+        AnimatedVisibility(visible = !fillsPage && text.isNotBlank()) {
             IconButton(
                 onClick = onAnalyze,
                 modifier = Modifier.size(40.dp),
@@ -1252,13 +1269,23 @@ private fun ManualDraftNote(
 @Composable
 private fun NotesFloatingActionRow(
     state: TodayUiState,
+    canSend: Boolean,
     onGoals: () -> Unit,
     onVoice: () -> Unit,
     onMore: () -> Unit,
     onWrite: () -> Unit,
+    onSend: () -> Unit,
 ) {
     val locale = nomiLocale()
-    val difference = state.caloriesDifference.roundToInt()
+    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    // The remaining calories settle into their new value instead of snapping when an entry
+    // is added, removed, or rescaled.
+    val animatedDifference by animateFloatAsState(
+        targetValue = state.caloriesDifference.toFloat(),
+        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
+        label = "calories left",
+    )
+    val difference = animatedDifference.roundToInt()
     val calorieText = if (difference >= 0) {
         nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
     } else {
@@ -1309,25 +1336,62 @@ private fun NotesFloatingActionRow(
             description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
             onClick = onMore,
         )
-        NotesCircleAction(
-            icon = Icons.Default.Keyboard,
-            description = nomiString("Write what you ate", "Schreiben, was du gegessen hast"),
-            onClick = onWrite,
-        )
+        // Once there is something written, the same slot becomes the way to send it, and it
+        // trades places rather than blinking.
+        AnimatedContent(
+            targetState = canSend,
+            transitionSpec = {
+                (fadeIn(animationSpec = effectsSpec) +
+                    scaleIn(animationSpec = effectsSpec, initialScale = 0.72f))
+                    .togetherWith(
+                        fadeOut(animationSpec = effectsSpec) +
+                            scaleOut(animationSpec = effectsSpec, targetScale = 0.72f),
+                    )
+            },
+            label = "composer action",
+        ) { sendable ->
+            if (sendable) {
+                NotesCircleAction(
+                    icon = Icons.AutoMirrored.Filled.Send,
+                    description = nomiString("Analyze meal", "Mahlzeit analysieren"),
+                    onClick = onSend,
+                    emphasized = true,
+                )
+            } else {
+                NotesCircleAction(
+                    icon = Icons.Default.Keyboard,
+                    description = nomiString(
+                        "Write what you ate",
+                        "Schreiben, was du gegessen hast",
+                    ),
+                    onClick = onWrite,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun NotesCircleAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     description: String,
     onClick: () -> Unit,
+    emphasized: Boolean = false,
 ) {
     Surface(
         onClick = onClick,
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = hairlineOnPitchBlack(),
+        color = if (emphasized) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        contentColor = if (emphasized) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+        border = if (emphasized) null else hairlineOnPitchBlack(),
     ) {
         Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             Icon(imageVector = icon, contentDescription = description)
@@ -1425,6 +1489,9 @@ private fun SummaryMetric(text: String, color: Color) {
 private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        // Skipping the half-open stop removes the mid-flight settle that made the sheet look
+        // like it hesitated on the way up.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
@@ -1517,6 +1584,9 @@ private fun QuickAddRow(
 private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        // Skipping the half-open stop removes the mid-flight settle that made the sheet look
+        // like it hesitated on the way up.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
