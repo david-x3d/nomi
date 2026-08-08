@@ -29,8 +29,9 @@ class AiRuntimeCredential private constructor(private val value: String) {
 
     companion object {
         fun from(value: String): AiRuntimeCredential {
-            require(value.isNotBlank()) { "An API key is required" }
-            return AiRuntimeCredential(value)
+            val normalized = value.trim()
+            require(normalized.isNotBlank()) { "An API key is required" }
+            return AiRuntimeCredential(normalized)
         }
     }
 }

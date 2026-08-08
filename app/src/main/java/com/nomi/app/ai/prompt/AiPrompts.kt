@@ -54,9 +54,9 @@ object AiPrompts {
         You MUST perform a live web search for every structured input item and compare at least two independent websites
         with different hostnames for EACH item. Never answer from model memory
         and never return a model-only guess. Every result, including an estimate, MUST be grounded in
-        provider-returned web-search evidence. `sourceUrl` and every `supportingSourceUrls` entry MUST
-        exactly copy absolute URLs from the provider's citation or search-result metadata; do not
-        invent or rewrite URLs. If two relevant cited websites cannot be found, fail instead of guessing.
+        provider-returned web-search evidence. Nomi attaches provider citation metadata outside the
+        JSON. Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
+        If two relevant cited websites cannot be found, fail instead of guessing.
         Never pretend that two pages on the same website are independent confirmation.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases and Open
@@ -140,8 +140,6 @@ object AiPrompts {
             "fatGrams": non-negative number,
             "fiberGrams": non-negative number|null,
             "sourceName": non-empty string,
-            "sourceUrl": absolute URL copied exactly from provider citation metadata,
-            "supportingSourceUrls": [at least one additional absolute URL from a different cited website],
             "sourceServingQuantity": positive number,
             "sourceServingUnit": string,
             "sourceServingGramsEquivalent": positive number|null,

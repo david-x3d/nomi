@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.ui.localization.nomiString
 import java.net.URI
 
@@ -225,7 +226,7 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
     AiProviderKind.OPEN_ROUTER -> if (purpose == "Fallback") {
         "~openai/gpt-latest"
     } else {
-        "deepseek/deepseek-v4"
+        DEFAULT_OPENROUTER_MODEL
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,

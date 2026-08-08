@@ -40,6 +40,7 @@ import com.nomi.app.data.repository.SaveLoggedMealRequest
 import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
 import com.nomi.app.data.repository.mapping.toPersistedDraft
 import com.nomi.app.data.repository.mapping.toEntity
+import com.nomi.app.data.security.SecretUnavailableException
 import com.nomi.app.di.AppContainer
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
@@ -79,6 +80,16 @@ import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import com.nomi.app.ui.today.TodayUiState
+import io.ktor.client.call.NoTransformationFoundException
+import io.ktor.client.network.sockets.ConnectTimeoutException
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import io.ktor.client.plugins.ResponseException
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import kotlinx.serialization.SerializationException
+
 import java.net.URI
 import java.time.Instant
 import java.time.LocalDate
@@ -100,6 +111,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -127,11 +139,12 @@ class AppViewModel(
     private val zoneId: ZoneId = ZoneId.systemDefault()
     private val today: LocalDate get() = LocalDate.now(zoneId)
 
-    val preferences: StateFlow<AppPreferences> = repository.preferences.stateIn(
-        viewModelScope,
-        SharingStarted.Eagerly,
-        AppPreferences(),
-    )
+    val preferences: StateFlow<AppPreferences> = repository.preferences
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Eagerly,
+            AppPreferences(),
+        )
 
     val startState: StateFlow<AppStartState> = repository.profile
         .map { profile ->
@@ -1103,15 +1116,14 @@ class AppViewModel(
                         "custom endpoints cannot guarantee live web search."
                 }
                 val selection = draft.copy(endpoint = config.endpoint)
-                repository.appPreferencesStore.setProvider(pipeline, selection)
-                if (state.apiKeyInput.isNotBlank()) {
-                    val chars = state.apiKeyInput.toCharArray()
+                state.apiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
                     try {
                         container.secretStore.put(secretId(pipeline, selection), chars)
                     } finally {
                         chars.fill('\u0000')
                     }
                 }
+                repository.appPreferencesStore.setProvider(pipeline, selection)
             }.onSuccess {
                 recentFoodAnalysisCache.clear()
                 refreshProviderAndHealthStatus()
@@ -1159,39 +1171,52 @@ class AppViewModel(
                         "custom endpoints cannot guarantee live web search."
                 }
                 val selection = draft.copy(endpoint = config.endpoint)
-                suspend fun testWith(credential: AiRuntimeCredential) {
-                    val content = container.openAiClient.completeJson(
-                        config = config,
-                        credential = credential,
-                        systemPrompt = "Return one JSON object and nothing else.",
-                        userPrompt = "Reply with {\"ok\":true} to confirm this connection.",
-                    )
-                    require(content.isNotBlank()) { "The provider returned an empty response." }
+                suspend fun testWith(
+                    targetConfig: AiProviderConfig,
+                    credential: AiRuntimeCredential,
+                ) {
+                    if (pipeline.requiresWebResearch()) {
+                        providerFor(targetConfig, credential).researchNutrition(
+                            providerConnectionTestIntent(),
+                        )
+                    } else {
+                        val content = container.openAiClient.completeJson(
+                            config = targetConfig,
+                            credential = credential,
+                            systemPrompt = "Return one JSON object and nothing else.",
+                            userPrompt = "Reply with {\"ok\":true} to confirm this connection.",
+                        )
+                        require(content.isNotBlank()) { "The provider returned an empty response." }
+                    }
                 }
 
-                if (state.apiKeyInput.isNotBlank()) {
-                    val chars = state.apiKeyInput.toCharArray()
+                val enteredKey = state.apiKeyInput.normalizedApiKeyCharsOrNull()
+                if (enteredKey != null) {
                     try {
-                        testWith(AiRuntimeCredential.from(chars.concatToString()))
+                        testWith(config, AiRuntimeCredential.from(enteredKey.concatToString()))
                     } finally {
-                        chars.fill('\u0000')
+                        enteredKey.fill('\u0000')
                     }
+                } else if (pipeline == ProviderPipeline.SMART_FALLBACK) {
+                    withSmartFallbackCredential(
+                        prefs = loadedPreferences(),
+                        selection = selection,
+                        block = ::testWith,
+                    )
                 } else {
                     container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
-                        testWith(AiRuntimeCredential.from(chars.concatToString()))
+                        testWith(config, AiRuntimeCredential.from(chars.concatToString()))
                     } ?: error("Enter an API key before testing this provider.")
                 }
                 "Connection successful"
-            }.getOrElse {
-                "Connection failed. Check the API key, HTTPS endpoint, model, and network connection."
-            }
+            }.getOrElse(Throwable::safeProviderConnectionMessage)
             onResult(result)
         }
     }
 
     fun refreshProviderAndHealthStatus() {
         viewModelScope.launch {
-            val prefs = preferences.value
+            val prefs = loadedPreferences()
             keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
                 val selection = prefs.selectionFor(pipeline)
                 val direct = runCatching {
@@ -1408,11 +1433,13 @@ class AppViewModel(
         )
     }
 
+    private suspend fun loadedPreferences(): AppPreferences = repository.preferences.first()
+
     private suspend fun <T> withConfiguredProvider(
         pipeline: ProviderPipeline,
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
     ): T {
-        val selection = preferences.value.selectionFor(pipeline)
+        val selection = loadedPreferences().selectionFor(pipeline)
         require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
         return container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
             val credential = AiRuntimeCredential.from(chars.concatToString())
@@ -1423,8 +1450,15 @@ class AppViewModel(
     private suspend fun <T : Any> withConfiguredSmartFallback(
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
     ): T {
-        val prefs = preferences.value
-        val selection = prefs.smartFallbackProvider
+        val prefs = loadedPreferences()
+        return withSmartFallbackCredential(prefs, prefs.smartFallbackProvider, block)
+    }
+
+    private suspend fun <T : Any> withSmartFallbackCredential(
+        prefs: AppPreferences,
+        selection: ProviderSelection,
+        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
+    ): T {
         require(selection.providerId.isNotBlank()) {
             "Configure Fallback in Settings first."
         }
@@ -1432,10 +1466,8 @@ class AppViewModel(
         suspend fun use(secret: String): T? = container.secretStore.useSecret(secret) { chars ->
             block(config, AiRuntimeCredential.from(chars.concatToString()))
         }
-        use(secretId(ProviderPipeline.SMART_FALLBACK, selection))?.let { return it }
-        val primary = prefs.foodResearchProvider
-        if (selection.sharesCredentialWith(primary)) {
-            use(secretId(ProviderPipeline.FOOD_RESEARCH, primary))?.let { return it }
+        smartFallbackCredentialIds(selection, prefs.foodResearchProvider).forEach { secret ->
+            use(secret)?.let { return it }
         }
         error(
             "Configure Fallback in Settings with an API key, or select the same provider " +
@@ -1866,13 +1898,23 @@ private fun ProviderPipeline.displayName(): String = when (this) {
     ProviderPipeline.SMART_FALLBACK -> "Fallback"
 }
 
-private fun ProviderPipeline.requiresWebResearch(): Boolean =
+internal fun ProviderPipeline.requiresWebResearch(): Boolean =
     this == ProviderPipeline.FOOD_RESEARCH || this == ProviderPipeline.SMART_FALLBACK
 
 private fun ProviderSelection.sharesCredentialWith(other: ProviderSelection): Boolean =
     providerId.equals(other.providerId, ignoreCase = true) &&
         runCatching { resolvedEndpoint() }.getOrNull()
             ?.equals(runCatching { other.resolvedEndpoint() }.getOrNull(), ignoreCase = true) == true
+
+internal fun smartFallbackCredentialIds(
+    selection: ProviderSelection,
+    primary: ProviderSelection,
+): List<String> = buildList {
+    add(secretId(ProviderPipeline.SMART_FALLBACK, selection))
+    if (selection.sharesCredentialWith(primary)) {
+        add(secretId(ProviderPipeline.FOOD_RESEARCH, primary))
+    }
+}.distinct()
 
 internal suspend fun <T> runWithSmartFallback(
     primary: suspend () -> T,
@@ -1912,6 +1954,21 @@ private fun secretId(pipeline: ProviderPipeline, selection: ProviderSelection): 
     return "provider:$token"
 }
 
+internal fun String.normalizedApiKeyCharsOrNull(): CharArray? =
+    trim().takeIf(String::isNotEmpty)?.toCharArray()
+
+private fun providerConnectionTestIntent(): ParsedFoodIntent = ParsedFoodIntent(
+    originalText = "100 g apple",
+    items = listOf(
+        ParsedFoodItem(
+            name = "apple",
+            quantity = 100.0,
+            unit = "g",
+            gramsEquivalent = 100.0,
+        ),
+    ),
+)
+
 private fun String.isSpoonLoggingUnit(): Boolean = trim()
     .lowercase(Locale.ROOT)
     .replace('ö', 'o')
@@ -1921,6 +1978,8 @@ private fun String.isSpoonLoggingUnit(): Boolean = trim()
     "loffel", "spoon", "spoons",
 )
 private fun Throwable.safeProviderSettingsMessage(): String = when {
+    causeChain().any { it is SecretUnavailableException } ->
+        "Nomi couldn't access secure API-key storage. Re-enter the key and try again."
     message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()
     message?.contains("endpoint", ignoreCase = true) == true ->
         "Enter a valid HTTPS API endpoint."
@@ -1929,16 +1988,86 @@ private fun Throwable.safeProviderSettingsMessage(): String = when {
     else -> "Nomi couldn't update this provider. Try again."
 }
 
-private fun Throwable.safeAiMessage(): String = when {
-    this is AiValidationException && message?.contains("not compatible", ignoreCase = true) == true ->
-        "Nomi couldn't match that source serving to your amount. Try g, ml, EL, or TL."
-    this is AiValidationException -> message ?: "The serving amount could not be validated."
-    message?.contains("API key", ignoreCase = true) == true ||
-        message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()
-    message?.contains("401") == true -> "The provider rejected that API key. Check it in Settings."
-    message?.contains("timeout", ignoreCase = true) == true -> "The provider took too long. Try again."
-    else -> "Nomi couldn't finish that analysis. Try again or enter the food manually."
+internal fun Throwable.safeAiMessage(): String {
+    if (this is AiValidationException && message?.contains("not compatible", ignoreCase = true) == true) {
+        return "Nomi couldn't match that source serving to your amount. Try g, ml, EL, or TL."
+    }
+    if (this is AiValidationException) {
+        return message ?: "The serving amount could not be validated."
+    }
+    if (message?.contains("API key", ignoreCase = true) == true ||
+        message?.contains("Configure", ignoreCase = true) == true
+    ) {
+        return message.orEmpty()
+    }
+    return safeProviderFailureMessage()
+        ?: "Nomi couldn't finish that analysis. Try again or enter the food manually."
 }
+
+internal fun Throwable.safeProviderConnectionMessage(): String =
+    safeProviderFailureMessage()
+        ?: message?.takeIf {
+            it.contains("API key", ignoreCase = true) ||
+                it.contains("Configure", ignoreCase = true)
+        }
+        ?: "Connection failed. Check the API key, HTTPS endpoint, model, and network connection."
+
+private fun Throwable.safeProviderFailureMessage(): String? {
+    val causes = causeChain()
+    if (causes.any { it is SecretUnavailableException }) {
+        return "Nomi couldn't read the stored API key. Remove it in Settings and enter it again."
+    }
+    val responseError = causes.filterIsInstance<ResponseException>().firstOrNull()
+    if (responseError != null) {
+        val status = responseError.response.status.value
+        return when (status) {
+            401 -> "The provider rejected that API key. Check it in Settings."
+            403 -> "The provider denied access. Check the API key and model access in Settings."
+            404 -> "The provider endpoint or model was not found. Check Settings."
+            408 -> "The provider took too long. Try again."
+            429 -> "The provider rate limit was reached. Wait a moment and try again."
+            in 400..499 -> "The provider rejected the request (HTTP $status). Check Settings."
+            else -> "The provider is temporarily unavailable (HTTP $status). Try again."
+        }
+    }
+    if (causes.any {
+            it is HttpRequestTimeoutException || it is ConnectTimeoutException ||
+                it is SocketTimeoutException
+        }
+    ) {
+        return "The provider took too long. Try again."
+    }
+    if (causes.any { it is SerializationException || it is NoTransformationFoundException } ||
+        causeMessageContains("JSON", "serialize", "deserialize", "structured content")
+    ) {
+        return "The provider returned a response Nomi couldn't read. Check the selected model in Settings."
+    }
+    if (causes.any {
+            it is UnknownHostException || it is ConnectException || it is IOException
+        }
+    ) {
+        return "Nomi couldn't reach the provider. Check the internet connection and endpoint."
+    }
+    return when {
+        causeMessageContains("401") -> "The provider rejected that API key. Check it in Settings."
+        causeMessageContains("403") ->
+            "The provider denied access. Check the API key and model access in Settings."
+        causeMessageContains("404") ->
+            "The provider endpoint or model was not found. Check Settings."
+        causeMessageContains("429", "rate limit") ->
+            "The provider rate limit was reached. Wait a moment and try again."
+        causeMessageContains("timeout", "timed out") -> "The provider took too long. Try again."
+        else -> null
+    }
+}
+
+private fun Throwable.causeChain(): List<Throwable> =
+    generateSequence(this) { it.cause }.take(8).toList()
+
+private fun Throwable.causeMessageContains(vararg values: String): Boolean =
+    causeChain().any { error ->
+        values.any { value -> error.message?.contains(value, ignoreCase = true) == true }
+    }
 
 private fun FoodAnalysis.researchSourceUrls(): List<String> =
     items

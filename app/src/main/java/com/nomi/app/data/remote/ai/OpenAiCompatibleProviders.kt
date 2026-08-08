@@ -65,7 +65,7 @@ class OpenAiCompatibleProviders(
             userPrompt = AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
         )
         val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
-        val groundedAnalysis = validateWebSearchEvidence(analysis, completion.evidenceUrls)
+        val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
         val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
         return ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
     }
@@ -99,43 +99,42 @@ class OpenAiCompatibleProviders(
     }
 }
 
-internal fun validateWebSearchEvidence(
+internal fun groundWithWebSearchEvidence(
     analysis: FoodAnalysis,
     evidenceUrls: Set<String>,
 ): FoodAnalysis {
-    val canonicalEvidenceUrls = evidenceUrls
-        .mapNotNull { canonicalWebUrlOrNull(it) }
-        .toSet()
-    if (canonicalEvidenceUrls.isEmpty()) {
+    val citationsBySite = linkedMapOf<String, String>()
+    evidenceUrls.forEach { rawUrl ->
+        val url = canonicalWebUrlOrNull(rawUrl) ?: return@forEach
+        val site = canonicalResearchSite(url) ?: return@forEach
+        citationsBySite.putIfAbsent(site, url)
+    }
+    if (citationsBySite.isEmpty()) {
         throw AiValidationException(
             "The food research provider returned no web-search citations. Try again or " +
                 "configure Perplexity, OpenRouter, or OpenAI for Food research.",
         )
     }
-    analysis.items.forEachIndexed { index, item ->
-        val itemNumber = index + 1
-        val rawItemUrls = listOfNotNull(item.sourceUrl) + item.supportingSourceUrls
-        val canonicalItemUrls = rawItemUrls.map { rawUrl ->
-            canonicalWebUrlOrNull(rawUrl)
-                ?: throw AiValidationException(
-                    "Food research result $itemNumber contains an invalid cited source URL.",
-                )
-        }.distinct()
-        if (canonicalItemUrls.any { it !in canonicalEvidenceUrls }) {
-            throw AiValidationException(
-                "Food research result $itemNumber is not fully backed by provider web-search citations.",
-            )
-        }
-        val independentSites = canonicalItemUrls
-            .mapNotNull(::canonicalResearchSite)
-            .distinct()
-        if (independentSites.size < 2) {
-            throw AiValidationException(
-                "Food research result $itemNumber needs citations from at least two independent websites.",
-            )
-        }
+    if (citationsBySite.size < 2) {
+        throw AiValidationException(
+            "Food research needs citations from at least two independent websites.",
+        )
     }
-    return analysis
+    val attachedUrls = citationsBySite.values.take(6)
+    val primaryUrl = attachedUrls.first()
+    val supportingUrls = attachedUrls.drop(1).take(5)
+    val primarySourceName = runCatching {
+        URI(primaryUrl).host?.removePrefix("www.")
+    }.getOrNull()?.takeIf(String::isNotBlank)
+    return analysis.copy(
+        items = analysis.items.map { item ->
+            item.copy(
+                sourceName = item.sourceName?.takeIf(String::isNotBlank) ?: primarySourceName,
+                sourceUrl = primaryUrl,
+                supportingSourceUrls = supportingUrls,
+            )
+        },
+    )
 }
 
 private fun canonicalResearchSite(url: String): String? = runCatching {

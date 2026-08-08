@@ -147,7 +147,16 @@ internal data class ChatMessage(
 )
 
 @Serializable
-internal data class ResponseFormat(val type: String = "json_object")
+internal data class ResponseFormat(
+    val type: String = "json_object",
+    @SerialName("json_schema") val jsonSchema: JsonSchemaDefinition? = null,
+)
+
+@Serializable
+internal data class JsonSchemaDefinition(
+    val name: String,
+    val schema: JsonObject,
+)
 
 @Serializable
 internal data class WebSearchOptions(
@@ -171,8 +180,8 @@ internal data class WebSearchCompletion(
 @Serializable
 private data class ChatCompletionResponse(
     val choices: List<ChatChoice> = emptyList(),
-    val citations: List<String> = emptyList(),
-    @SerialName("search_results") val searchResults: List<SearchResult> = emptyList(),
+    val citations: List<String>? = null,
+    @SerialName("search_results") val searchResults: List<SearchResult>? = null,
 )
 
 @Serializable
@@ -181,7 +190,7 @@ private data class ChatChoice(val message: AssistantMessage)
 @Serializable
 private data class AssistantMessage(
     val content: JsonPrimitive? = null,
-    val annotations: List<MessageAnnotation> = emptyList(),
+    val annotations: List<MessageAnnotation>? = null,
 )
 
 @Serializable
@@ -218,7 +227,14 @@ internal fun chatCompletionRequest(
     model = config.model,
     messages = messages,
     temperature = config.temperature,
-    responseFormat = ResponseFormat().takeIf { config.supportsJsonObjectResponseFormat() },
+    responseFormat = when {
+        requireWebSearch && (config.kind == AiProviderKind.PERPLEXITY ||
+            config.kind == AiProviderKind.OPEN_ROUTER &&
+            config.model.trim().startsWith("perplexity/", ignoreCase = true)) ->
+            nutritionResearchResponseFormat()
+        config.supportsJsonObjectResponseFormat() -> ResponseFormat()
+        else -> null
+    },
     webSearchOptions = WebSearchOptions().takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
@@ -234,12 +250,12 @@ internal fun chatCompletionRequest(
 
 private fun ChatCompletionResponse.webSearchCompletion(): WebSearchCompletion {
     val evidenceUrls = buildSet {
-        citations.forEach { addValidWebUrl(it) }
-        searchResults.forEach { result ->
+        citations.orEmpty().forEach { addValidWebUrl(it) }
+        searchResults.orEmpty().forEach { result ->
             result.url?.let { addValidWebUrl(it) }
         }
         choices.forEach { choice ->
-            choice.message.annotations.forEach { annotation ->
+            choice.message.annotations.orEmpty().forEach { annotation ->
                 if (annotation.type == null || annotation.type == "url_citation") {
                     annotation.urlCitation?.url?.let { addValidWebUrl(it) }
                 }

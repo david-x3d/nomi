@@ -47,8 +47,25 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `direct perplexity food research uses strict nutrition json schema`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.PERPLEXITY, "sonar"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"response_format\":{\"type\":\"json_schema\""))
+        assertTrue(encoded.contains("\"name\":\"nomi_nutrition_research\""))
+        assertTrue(encoded.contains("\"sourceServingQuantity\""))
+        assertFalse(encoded.contains("\"sourceUrl\""))
+        assertFalse(encoded.contains("\"supportingSourceUrls\""))
+    }
+
+    @Test
     fun `openrouter model supporting json object retains response format`() {
-        val config = config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4")
+        val config = config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash")
         val encoded = json.encodeToString(
             chatCompletionRequest(
                 config,
@@ -64,7 +81,7 @@ class OpenAiCompatibleClientTest {
     fun `openrouter food research explicitly enables web plugin`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4"),
+                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash"),
                 listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
                 requireWebSearch = true,
             ),
@@ -128,6 +145,28 @@ class OpenAiCompatibleClientTest {
         assertEquals(expected, completion.content)
         assertEquals(setOf("https://example.com"), completion.evidenceUrls)
         assertEquals(expected, decodeChatCompletionPayload(json, fixture))
+    }
+
+    @Test
+    fun `explicit null provider metadata decodes before reporting missing citations`() {
+        val fixture = """
+            {
+              "choices": [{
+                "message": {
+                  "content": "{\"ok\":true}",
+                  "annotations": null
+                }
+              }],
+              "citations": null,
+              "search_results": null
+            }
+        """.trimIndent()
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            decodeWebSearchCompletionPayload(json, fixture)
+        }
+
+        assertTrue(error.message.orEmpty().contains("citations"))
     }
 
     @Test

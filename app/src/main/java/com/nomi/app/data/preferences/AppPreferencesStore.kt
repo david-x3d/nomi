@@ -128,23 +128,23 @@ class DataStoreAppPreferencesStore(
             foodResearchProvider = decode(
                 values[Keys.FOOD_RESEARCH_PROVIDER],
                 defaults.foodResearchProvider,
-            ),
+            ).withSupportedModel(),
             foodInterpretationProvider = decode(
                 values[Keys.FOOD_INTERPRETATION_PROVIDER],
                 defaults.foodInterpretationProvider,
-            ),
+            ).withSupportedModel(),
             portionChangeProvider = decode(
                 values[Keys.PORTION_CHANGE_PROVIDER],
                 defaults.portionChangeProvider,
-            ),
+            ).withSupportedModel(),
             visionProvider = decode(
                 values[Keys.VISION_PROVIDER],
                 defaults.visionProvider,
-            ),
+            ).withSupportedModel(),
             smartFallbackProvider = decode(
                 values[Keys.SMART_FALLBACK_PROVIDER],
                 defaults.smartFallbackProvider,
-            ),
+            ).withSupportedModel(),
             reminders = decode(values[Keys.REMINDERS], defaults.reminders),
             onboardingDraft = decodeOrNull(values[Keys.ONBOARDING_DRAFT]),
             onboardingCompleted = values[Keys.ONBOARDING_COMPLETED] ?: false,

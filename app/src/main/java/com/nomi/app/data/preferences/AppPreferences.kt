@@ -92,11 +92,11 @@ data class AppPreferences(
     ),
     val foodInterpretationProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
-        model = "deepseek/deepseek-v4",
+        model = DEFAULT_OPENROUTER_MODEL,
     ),
     val portionChangeProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
-        model = "deepseek/deepseek-v4",
+        model = DEFAULT_OPENROUTER_MODEL,
     ),
     val visionProvider: ProviderSelection = ProviderSelection(),
     val smartFallbackProvider: ProviderSelection = ProviderSelection(
@@ -109,6 +109,19 @@ data class AppPreferences(
     val aiDebugEnabled: Boolean = false,
     val adjustTargetFromActivity: Boolean = false,
 )
+
+internal const val DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
+internal const val RETIRED_OPENROUTER_MODEL = "deepseek/deepseek-v4"
+
+/** Keeps existing provider keys usable while replacing Nomi's retired model default. */
+internal fun ProviderSelection.withSupportedModel(): ProviderSelection =
+    if (providerId.equals("openrouter", ignoreCase = true) &&
+        model.equals(RETIRED_OPENROUTER_MODEL, ignoreCase = true)
+    ) {
+        copy(model = DEFAULT_OPENROUTER_MODEL)
+    } else {
+        this
+    }
 
 fun AppPreferences.providerSelection(pipeline: ProviderPipeline): ProviderSelection =
     when (pipeline) {
