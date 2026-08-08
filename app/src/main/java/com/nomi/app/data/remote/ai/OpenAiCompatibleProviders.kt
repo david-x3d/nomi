@@ -14,6 +14,7 @@ import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.provider.PortionAdjustmentProvider
 import com.nomi.app.ai.provider.VisionFoodProvider
 import com.nomi.app.ai.validation.AiResponseValidator
+import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.UserQuantityResolver
 import java.util.Locale
@@ -55,14 +56,15 @@ class OpenAiCompatibleProviders(
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        val raw = client.completeJson(
+        val completion = client.completeWebSearchJson(
             config = nutritionConfig,
             credential = nutritionCredential(),
-            systemPrompt = "You report cited source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
+            systemPrompt = "You report web-cited source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
             userPrompt = AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
         )
-        val analysis: FoodAnalysis = client.json.decodeFromString(raw)
-        val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, analysis)
+        val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
+        val groundedAnalysis = validateWebSearchEvidence(analysis, completion.evidenceUrls)
+        val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
         return ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
     }
 
@@ -93,4 +95,32 @@ class OpenAiCompatibleProviders(
         val visionResult: VisionFoodResult = client.json.decodeFromString(raw)
         return AiResponseValidator.validate(visionResult)
     }
+}
+
+internal fun validateWebSearchEvidence(
+    analysis: FoodAnalysis,
+    evidenceUrls: Set<String>,
+): FoodAnalysis {
+    val canonicalEvidenceUrls = evidenceUrls
+        .mapNotNull { canonicalWebUrlOrNull(it) }
+        .toSet()
+    if (canonicalEvidenceUrls.isEmpty()) {
+        throw AiValidationException(
+            "The food research provider returned no web-search citations. Try again or " +
+                "configure Perplexity, OpenRouter, or OpenAI for Food research.",
+        )
+    }
+    analysis.items.forEachIndexed { index, item ->
+        val sourceUrl = canonicalWebUrlOrNull(item.sourceUrl)
+            ?: throw AiValidationException(
+                "Food research result " + (index + 1) + " is missing a valid cited source URL.",
+            )
+        if (sourceUrl !in canonicalEvidenceUrls) {
+            throw AiValidationException(
+                "Food research result " + (index + 1) +
+                    " is not backed by a provider web-search citation.",
+            )
+        }
+    }
+    return analysis
 }

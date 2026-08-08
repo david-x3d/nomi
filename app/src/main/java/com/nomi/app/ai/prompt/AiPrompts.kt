@@ -51,6 +51,11 @@ object AiPrompts {
         json: Json,
         localeCountry: String? = null,
     ): String = """
+        You MUST perform a live web search for every structured input item. Never answer from model
+        memory and never return a model-only guess. Every result, including an estimate, MUST be
+        grounded in provider-returned web-search evidence. `sourceUrl` MUST exactly copy one absolute
+        URL from the provider's citation or search-result metadata; do not invent or rewrite URLs.
+        If no relevant cited web source is found, fail instead of guessing.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases,
         then Open Food Facts. For generic food, use reputable reference values. Label every
@@ -61,7 +66,7 @@ object AiPrompts {
         3. major German retailer product page;
         4. reliable nutrition database;
         5. international/US source;
-        6. AI estimate only when reliable product data cannot be found.
+        6. a clearly labeled estimate only after live search found no reliable product-specific data.
         A lower-priority source is a fallback, not permission to replace a German quantity.
         The user's locale country is ${localeCountry?.takeIf { it.isNotBlank() } ?: "unknown"}.
         If it is DE, prefer the official German manufacturer/restaurant product page and German
@@ -128,8 +133,8 @@ object AiPrompts {
             "carbohydrateGrams": non-negative number,
             "fatGrams": non-negative number,
             "fiberGrams": non-negative number|null,
-            "sourceName": string|null,
-            "sourceUrl": string|null,
+            "sourceName": non-empty string,
+            "sourceUrl": absolute URL copied exactly from provider citation metadata,
             "sourceServingQuantity": positive number,
             "sourceServingUnit": string,
             "sourceServingGramsEquivalent": positive number|null,

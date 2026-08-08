@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.net.URI
 import java.util.Locale
 
 class OpenAiCompatibleClient(
@@ -56,6 +57,25 @@ class OpenAiCompatibleClient(
             ChatMessage("user", JsonPrimitive(userPrompt)),
         ),
     )
+
+    /**
+     * Completes nutrition research only through a provider path with explicit live search.
+     * Citation URLs come from provider metadata rather than model-authored JSON.
+     */
+    internal suspend fun completeWebSearchJson(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+    ): WebSearchCompletion = completeResponse(
+        config = config,
+        credential = credential,
+        messages = listOf(
+            ChatMessage("system", JsonPrimitive(systemPrompt)),
+            ChatMessage("user", JsonPrimitive(userPrompt)),
+        ),
+        requireWebSearch = true,
+    ).webSearchCompletion()
 
     suspend fun completeVisionJson(
         config: AiProviderConfig,
@@ -87,17 +107,22 @@ class OpenAiCompatibleClient(
         config: AiProviderConfig,
         credential: AiRuntimeCredential,
         messages: List<ChatMessage>,
-    ): String {
+    ): String = completeResponse(config, credential, messages).structuredContent()
+
+    private suspend fun completeResponse(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        messages: List<ChatMessage>,
+        requireWebSearch: Boolean = false,
+    ): ChatCompletionResponse {
         val endpoint = config.endpoint.trimEnd('/') + "/chat/completions"
-        val response = httpClient.post(endpoint) {
+        return httpClient.post(endpoint) {
             contentType(ContentType.Application.Json)
             bearerAuth(credential.revealForRequest())
             config.extraHeaders.forEach { (name, value) -> header(name, value) }
-            setBody(chatCompletionRequest(config, messages))
+            setBody(chatCompletionRequest(config, messages, requireWebSearch))
             timeout { requestTimeoutMillis = config.timeoutMillis }
         }.body<ChatCompletionResponse>()
-
-        return response.structuredContent()
     }
 
     override fun close() {
@@ -111,6 +136,8 @@ internal data class ChatCompletionRequest(
     val messages: List<ChatMessage>,
     val temperature: Double,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
+    @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
+    val plugins: List<ProviderPlugin>? = null,
 )
 
 @Serializable
@@ -123,13 +150,45 @@ internal data class ChatMessage(
 internal data class ResponseFormat(val type: String = "json_object")
 
 @Serializable
-private data class ChatCompletionResponse(val choices: List<ChatChoice> = emptyList())
+internal data class WebSearchOptions(
+    @SerialName("search_context_size") val searchContextSize: String = "medium",
+)
+
+@Serializable
+internal data class ProviderPlugin(val id: String = "web")
+
+internal data class WebSearchCompletion(
+    val content: String,
+    val evidenceUrls: Set<String>,
+)
+
+@Serializable
+private data class ChatCompletionResponse(
+    val choices: List<ChatChoice> = emptyList(),
+    val citations: List<String> = emptyList(),
+    @SerialName("search_results") val searchResults: List<SearchResult> = emptyList(),
+)
 
 @Serializable
 private data class ChatChoice(val message: AssistantMessage)
 
 @Serializable
-private data class AssistantMessage(val content: JsonPrimitive? = null)
+private data class AssistantMessage(
+    val content: JsonPrimitive? = null,
+    val annotations: List<MessageAnnotation> = emptyList(),
+)
+
+@Serializable
+private data class MessageAnnotation(
+    val type: String? = null,
+    @SerialName("url_citation") val urlCitation: UrlCitation? = null,
+)
+
+@Serializable
+private data class UrlCitation(val url: String? = null)
+
+@Serializable
+private data class SearchResult(val url: String? = null)
 
 /**
  * Perplexity's Sonar API accepts text or JSON-schema response formats, but not OpenAI's
@@ -148,12 +207,69 @@ internal fun AiProviderConfig.supportsJsonObjectResponseFormat(): Boolean {
 internal fun chatCompletionRequest(
     config: AiProviderConfig,
     messages: List<ChatMessage>,
+    requireWebSearch: Boolean = false,
 ): ChatCompletionRequest = ChatCompletionRequest(
     model = config.model,
     messages = messages,
     temperature = config.temperature,
     responseFormat = ResponseFormat().takeIf { config.supportsJsonObjectResponseFormat() },
-)
+    webSearchOptions = WebSearchOptions().takeIf {
+        requireWebSearch && config.kind == AiProviderKind.OPEN_AI
+    },
+    plugins = listOf(ProviderPlugin()).takeIf {
+        requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
+    },
+).also {
+    require(!requireWebSearch || config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE) {
+        "Configure Food research with Perplexity, OpenRouter, or OpenAI in Settings; " +
+            "custom endpoints cannot guarantee live web search."
+    }
+}
+
+private fun ChatCompletionResponse.webSearchCompletion(): WebSearchCompletion {
+    val evidenceUrls = buildSet {
+        citations.forEach { addValidWebUrl(it) }
+        searchResults.forEach { result ->
+            result.url?.let { addValidWebUrl(it) }
+        }
+        choices.forEach { choice ->
+            choice.message.annotations.forEach { annotation ->
+                if (annotation.type == null || annotation.type == "url_citation") {
+                    annotation.urlCitation?.url?.let { addValidWebUrl(it) }
+                }
+            }
+        }
+    }
+    check(evidenceUrls.isNotEmpty()) {
+        "Configure Food research with a provider that returns live web-search citations; " +
+            "this response contained none."
+    }
+    return WebSearchCompletion(
+        content = structuredContent(),
+        evidenceUrls = evidenceUrls,
+    )
+}
+
+private fun MutableSet<String>.addValidWebUrl(value: String) {
+    canonicalWebUrlOrNull(value)?.let { add(it) }
+}
+
+internal fun canonicalWebUrlOrNull(value: String?): String? {
+    val uri = runCatching { URI(value?.trim().orEmpty()) }.getOrNull() ?: return null
+    val scheme = uri.scheme?.lowercase(Locale.ROOT)
+    val host = uri.host?.lowercase(Locale.ROOT)
+    if (scheme !in setOf("http", "https") || host.isNullOrBlank()) return null
+    val path = uri.path?.takeIf(String::isNotBlank) ?: "/"
+    return runCatching {
+        URI(scheme, uri.userInfo, host, uri.port, path, uri.query, null)
+            .toASCIIString()
+            .removeSuffix("/")
+    }.getOrNull()
+}
+
+/** Decodes a search-backed response envelope for provider fixture tests. */
+internal fun decodeWebSearchCompletionPayload(json: Json, payload: String): WebSearchCompletion =
+    json.decodeFromString<ChatCompletionResponse>(payload).webSearchCompletion()
 
 private fun ChatCompletionResponse.structuredContent(): String {
     val raw = choices.firstOrNull()?.message?.content?.content

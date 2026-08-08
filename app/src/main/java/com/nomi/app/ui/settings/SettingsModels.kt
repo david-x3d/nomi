@@ -1,6 +1,7 @@
 package com.nomi.app.ui.settings
 
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.integration.health.HealthConnectPermissionStatus
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class UnitSystem { METRIC, IMPERIAL }
@@ -28,6 +29,16 @@ data class ReminderSetting(
     val timeText: String,
 )
 
+data class HealthConnectUiState(
+    val status: HealthConnectPermissionStatus = HealthConnectPermissionStatus.UNAVAILABLE,
+    val isSyncing: Boolean = false,
+    val todaySteps: Long? = null,
+    val todayActiveCaloriesKcal: Double? = null,
+    val lastSyncEpochMillis: Long? = null,
+    val importedWeightCount: Int = 0,
+    val message: String? = null,
+)
+
 data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,
@@ -36,6 +47,7 @@ data class SettingsUiState(
     val activityTargetAdjustment: Boolean = false,
     val healthConnectAvailable: Boolean = false,
     val healthConnectEnabled: Boolean = false,
+    val healthConnect: HealthConnectUiState = HealthConnectUiState(),
     val nutritionTargets: NutritionTargetSetting = NutritionTargetSetting(2_000, 130, 240, 65, false),
     val aiProviders: List<AiProviderSetting> = emptyList(),
     val reminders: List<ReminderSetting> = listOf(

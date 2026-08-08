@@ -15,6 +15,9 @@ interface WeightDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entry: WeightEntryEntity): Long
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAll(entries: List<WeightEntryEntity>): List<Long>
+
     @Upsert
     suspend fun upsert(entries: List<WeightEntryEntity>): List<Long>
 
@@ -29,6 +32,23 @@ interface WeightDao {
 
     @Query("SELECT * FROM weight_entries WHERE id = :id LIMIT 1")
     suspend fun entry(id: Long): WeightEntryEntity?
+
+    @Query(
+        """
+        SELECT external_id FROM weight_entries
+        WHERE source = :source AND external_id IN (:externalIds)
+        """,
+    )
+    suspend fun existingExternalIds(source: String, externalIds: List<String>): List<String>
+
+    @Query(
+        """
+        UPDATE weight_entries
+        SET external_id = :externalId, updated_at_epoch_millis = :updatedAtEpochMillis
+        WHERE id = :id
+        """,
+    )
+    suspend fun setExternalId(id: Long, externalId: String, updatedAtEpochMillis: Long): Int
 
     @Query(
         """

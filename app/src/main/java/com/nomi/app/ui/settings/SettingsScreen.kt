@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -159,12 +160,17 @@ fun SettingsScreen(
                 SettingsLink(
                     icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null) },
                     title = "Health Connect",
-                    supporting = when {
-                        !state.healthConnectAvailable -> nomiString("Not available on this device", "Auf diesem Gerät nicht verfügbar")
-                        state.healthConnectEnabled -> nomiString("Connected", "Verbunden")
-                        else -> nomiString("Optional", "Optional")
+                    supporting = when (state.healthConnect.status) {
+                        HealthConnectPermissionStatus.UNAVAILABLE ->
+                            nomiString("Not available on this device", "Auf diesem Gerät nicht verfügbar")
+                        HealthConnectPermissionStatus.UPDATE_REQUIRED ->
+                            nomiString("Update required", "Aktualisierung erforderlich")
+                        HealthConnectPermissionStatus.PARTIAL ->
+                            nomiString("Permissions missing", "Berechtigungen fehlen")
+                        HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected", "Verbunden")
+                        HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Optional", "Optional")
                     },
-                    enabled = state.healthConnectAvailable,
+                    enabled = state.healthConnect.status != HealthConnectPermissionStatus.UNAVAILABLE,
                     onClick = onHealthConnect,
                 )
             }

@@ -7,6 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -60,6 +61,47 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `openrouter food research explicitly enables web plugin`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\"}]"))
+        assertFalse(encoded.contains("web_search_options"))
+    }
+
+    @Test
+    fun `openai food research explicitly enables web search options`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_AI, "gpt-4.1-mini"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"medium\"}"))
+        assertFalse(encoded.contains("\"plugins\""))
+    }
+
+    @Test
+    fun `custom food research provider is rejected before request`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            chatCompletionRequest(
+                config(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE, "custom-model"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("Configure Food research"))
+    }
+
+    @Test
     fun `sonar openrouter fixture extracts food json before citations`() {
         val fixture = """
             {
@@ -80,10 +122,11 @@ class OpenAiCompatibleClientTest {
             }
         """.trimIndent()
 
-        assertEquals(
-            "{\"items\":[{\"name\":\"Salami pizza\",\"calories\":960}]}",
-            decodeChatCompletionPayload(json, fixture),
-        )
+        val completion = decodeWebSearchCompletionPayload(json, fixture)
+        val expected = "{\"items\":[{\"name\":\"Salami pizza\",\"calories\":960}]}"
+        assertEquals(expected, completion.content)
+        assertEquals(setOf("https://example.com"), completion.evidenceUrls)
+        assertEquals(expected, decodeChatCompletionPayload(json, fixture))
     }
 
     @Test

@@ -33,6 +33,8 @@ data class HealthWeight(
     val kilograms: Double,
     val time: Instant,
     val zoneOffset: ZoneOffset?,
+    val originPackageName: String,
+    val clientRecordId: String?,
 )
 
 data class HealthActivitySummary(
@@ -40,7 +42,46 @@ data class HealthActivitySummary(
     val activeCaloriesKcal: Double,
 )
 
+enum class HealthConnectPermissionStatus {
+    UNAVAILABLE,
+    UPDATE_REQUIRED,
+    DISCONNECTED,
+    PARTIAL,
+    CONNECTED,
+}
+
+val NomiHealthFeatures = HealthFeatures(
+    readWeight = true,
+    writeWeight = true,
+    readSteps = true,
+    readActiveCalories = true,
+)
+
+internal fun resolveHealthConnectPermissionStatus(
+    availability: HealthConnectAvailability,
+    requiredPermissions: Set<String>,
+    grantedPermissions: Set<String>,
+): HealthConnectPermissionStatus = when (availability) {
+    HealthConnectAvailability.UNAVAILABLE -> HealthConnectPermissionStatus.UNAVAILABLE
+    HealthConnectAvailability.UPDATE_REQUIRED -> HealthConnectPermissionStatus.UPDATE_REQUIRED
+    HealthConnectAvailability.AVAILABLE -> when {
+        grantedPermissions.containsAll(requiredPermissions) -> HealthConnectPermissionStatus.CONNECTED
+        grantedPermissions.intersect(requiredPermissions).isNotEmpty() -> HealthConnectPermissionStatus.PARTIAL
+        else -> HealthConnectPermissionStatus.DISCONNECTED
+    }
+}
+
+internal fun importableHealthWeights(
+    weights: List<HealthWeight>,
+    ownPackageName: String,
+): List<HealthWeight> = weights.asSequence()
+    .filter { it.id.isNotBlank() && it.originPackageName != ownPackageName }
+    .distinctBy(HealthWeight::id)
+    .toList()
+
 class HealthConnectManager(private val context: Context) {
+    val applicationPackageName: String get() = context.packageName
+
     val availability: HealthConnectAvailability
         get() = when (HealthConnectClient.getSdkStatus(context)) {
             HealthConnectClient.SDK_AVAILABLE -> HealthConnectAvailability.AVAILABLE
@@ -90,6 +131,8 @@ class HealthConnectManager(private val context: Context) {
                 kilograms = record.weight.inKilograms,
                 time = record.time,
                 zoneOffset = record.zoneOffset,
+                originPackageName = record.metadata.dataOrigin.packageName,
+                clientRecordId = record.metadata.clientRecordId,
             )
         }
     }
@@ -97,14 +140,16 @@ class HealthConnectManager(private val context: Context) {
     suspend fun writeWeight(
         kilograms: Double,
         time: Instant,
+        clientRecordId: String,
         zoneId: ZoneId = ZoneId.systemDefault(),
     ): String {
         require(kilograms in 20.0..500.0) { "Weight is outside the supported range" }
+        require(clientRecordId.isNotBlank()) { "A client record ID is required" }
         val record = WeightRecord(
             time = time,
             zoneOffset = zoneId.rules.getOffset(time),
             weight = Mass.kilograms(kilograms),
-            metadata = Metadata.manualEntry(),
+            metadata = Metadata.manualEntry(clientRecordId = clientRecordId),
         )
         return client.insertRecords(listOf(record)).recordIdsList.single()
     }

@@ -35,6 +35,7 @@ import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
+import com.nomi.app.data.repository.HEALTH_CONNECT_WEIGHT_SOURCE
 import com.nomi.app.data.repository.SaveLoggedMealRequest
 import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
 import com.nomi.app.data.repository.mapping.toPersistedDraft
@@ -44,9 +45,13 @@ import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
 import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
+import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.ui.profile.ProfileEdit
-import com.nomi.app.integration.health.HealthConnectAvailability
+import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
+import com.nomi.app.integration.health.NomiHealthFeatures
+import com.nomi.app.integration.health.importableHealthWeights
+import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
 import com.nomi.app.ui.history.HistoryDay
 import com.nomi.app.ui.history.HistoryUiState
 import com.nomi.app.ui.capture.BarcodeAmountSupport
@@ -64,6 +69,7 @@ import com.nomi.app.ui.progress.ProgressUiState
 import com.nomi.app.ui.progress.WeightPoint
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.AiProviderSetting
+import com.nomi.app.ui.settings.HealthConnectUiState
 import com.nomi.app.ui.settings.NutritionTargetSetting
 import com.nomi.app.ui.settings.SettingsUiState
 import com.nomi.app.ui.settings.ThemeMode
@@ -78,7 +84,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.util.Locale
+import java.util.UUID
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -96,6 +104,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlin.math.roundToInt
 
 sealed interface AppStartState {
@@ -215,13 +224,14 @@ class AppViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
     private val keyPresence = MutableStateFlow<Map<ProviderPipeline, Boolean>>(emptyMap())
-    private val healthConnected = MutableStateFlow(false)
+    private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
+    private val healthSyncMutex = Mutex()
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
         repository.currentPlan,
         keyPresence,
-        healthConnected,
-    ) { prefs, plan, keys, connected -> mapSettings(prefs, plan, keys, connected) }
+        healthConnectUiState,
+    ) { prefs, plan, keys, health -> mapSettings(prefs, plan, keys, health) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     private var recentFoodsSnapshot: List<FoodEntity> = emptyList()
@@ -852,7 +862,7 @@ class AppViewModel(
     fun addWeight(kilograms: Double, note: String?) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            runCatching {
+            val localId = runCatching {
                 repository.addWeight(
                     WeightEntryEntity(
                         weightKg = kilograms,
@@ -864,7 +874,40 @@ class AppViewModel(
                         updatedAtEpochMillis = now,
                     ),
                 )
-            }.onFailure { mutableEvents.emit(AppEvent.Message("Enter a valid weight.")) }
+            }.getOrElse {
+                mutableEvents.emit(AppEvent.Message("Enter a valid weight."))
+                return@launch
+            }
+
+            val canWriteWeight = runCatching {
+                container.healthConnect.hasPermissions(HealthFeatures(writeWeight = true))
+            }.getOrDefault(false)
+            if (!canWriteWeight) return@launch
+
+            runCatching {
+                container.healthConnect.writeWeight(
+                    kilograms = kilograms,
+                    time = Instant.ofEpochMilli(now),
+                    clientRecordId = "nomi-weight-${UUID.randomUUID()}",
+                    zoneId = zoneId,
+                )
+            }.onSuccess { healthConnectId ->
+                runCatching {
+                    repository.markWeightHealthConnectSynced(
+                        id = localId,
+                        externalId = healthConnectId,
+                        updatedAtEpochMillis = System.currentTimeMillis(),
+                    )
+                }.onFailure {
+                    mutableEvents.emit(
+                        AppEvent.Message("Weight was saved in Nomi and Health Connect, but sync status couldn't be updated."),
+                    )
+                }
+            }.onFailure {
+                mutableEvents.emit(
+                    AppEvent.Message("Weight was saved in Nomi, but Health Connect sync failed."),
+                )
+            }
         }
     }
 
@@ -1052,6 +1095,13 @@ class AppViewModel(
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
+                require(
+                    pipeline != ProviderPipeline.FOOD_RESEARCH ||
+                        config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
+                ) {
+                    "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
+                        "custom endpoints cannot guarantee live web search."
+                }
                 val selection = draft.copy(endpoint = config.endpoint)
                 repository.appPreferencesStore.setProvider(pipeline, selection)
                 if (state.apiKeyInput.isNotBlank()) {
@@ -1101,6 +1151,13 @@ class AppViewModel(
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
+                require(
+                    pipeline != ProviderPipeline.FOOD_RESEARCH ||
+                        config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
+                ) {
+                    "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
+                        "custom endpoints cannot guarantee live web search."
+                }
                 val selection = draft.copy(endpoint = config.endpoint)
                 suspend fun testWith(credential: AiRuntimeCredential) {
                     val content = container.openAiClient.completeJson(
@@ -1139,9 +1196,133 @@ class AppViewModel(
                 val selection = prefs.selectionFor(pipeline)
                 runCatching { container.secretStore.contains(secretId(pipeline, selection)) }.getOrDefault(false)
             }
-            healthConnected.value = runCatching {
-                container.healthConnect.hasPermissions(HealthFeatures(readWeight = true, writeWeight = true))
-            }.getOrDefault(false)
+        }
+        viewModelScope.launch { refreshHealthConnectAndSync() }
+    }
+
+    fun syncHealthConnect() {
+        viewModelScope.launch { refreshHealthConnectAndSync(userInitiated = true) }
+    }
+
+    private suspend fun refreshHealthConnectAndSync(userInitiated: Boolean = false) {
+        if (!healthSyncMutex.tryLock()) return
+        try {
+            val healthConnect = container.healthConnect
+            val availability = healthConnect.availability
+            val requiredPermissions = healthConnect.permissionsFor(NomiHealthFeatures)
+            val grantedPermissions = runCatching { healthConnect.grantedPermissions() }
+                .getOrElse { error ->
+                    if (error is CancellationException) throw error
+                    emptySet()
+                }
+            val status = resolveHealthConnectPermissionStatus(
+                availability = availability,
+                requiredPermissions = requiredPermissions,
+                grantedPermissions = grantedPermissions,
+            )
+            if (status != HealthConnectPermissionStatus.CONNECTED) {
+                healthConnectUiState.value = HealthConnectUiState(
+                    status = status,
+                    message = when (status) {
+                        HealthConnectPermissionStatus.UPDATE_REQUIRED ->
+                            "Update Health Connect to enable syncing."
+                        HealthConnectPermissionStatus.PARTIAL ->
+                            "Grant all requested categories to finish connecting."
+                        else -> null
+                    },
+                )
+                return
+            }
+
+            val previous = healthConnectUiState.value
+            healthConnectUiState.value = previous.copy(
+                status = HealthConnectPermissionStatus.CONNECTED,
+                isSyncing = true,
+                message = if (userInitiated) "Syncing Health Connect..." else previous.message,
+            )
+
+            val now = Instant.now()
+            val syncEpochMillis = now.toEpochMilli()
+            val failures = mutableListOf<String>()
+            var importedWeightCount = 0
+            var weightsSynced = false
+            var activitySynced = false
+            var todaySteps: Long? = null
+            var todayActiveCaloriesKcal: Double? = null
+
+            runCatching {
+                val weights = healthConnect.readWeights(
+                    start = now.minus(30, ChronoUnit.DAYS),
+                    end = now,
+                )
+                val entries = importableHealthWeights(
+                    weights = weights,
+                    ownPackageName = healthConnect.applicationPackageName,
+                ).map { weight ->
+                    val measuredDate = weight.zoneOffset
+                        ?.let { offset -> weight.time.atOffset(offset).toLocalDate() }
+                        ?: weight.time.atZone(zoneId).toLocalDate()
+                    WeightEntryEntity(
+                        weightKg = weight.kilograms,
+                        localDate = measuredDate.toString(),
+                        measuredAtEpochMillis = weight.time.toEpochMilli(),
+                        zoneId = weight.zoneOffset?.id ?: zoneId.id,
+                        source = HEALTH_CONNECT_WEIGHT_SOURCE,
+                        externalId = weight.id,
+                        createdAtEpochMillis = syncEpochMillis,
+                        updatedAtEpochMillis = syncEpochMillis,
+                    )
+                }
+                repository.importHealthConnectWeights(entries)
+            }.onSuccess { imported ->
+                weightsSynced = true
+                importedWeightCount = imported
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                failures += "weight"
+            }
+
+            runCatching {
+                healthConnect.readActivity(
+                    start = today.atStartOfDay(zoneId).toInstant(),
+                    end = now,
+                )
+            }.onSuccess { activity ->
+                activitySynced = true
+                todaySteps = activity.steps
+                todayActiveCaloriesKcal = activity.activeCaloriesKcal
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                failures += "activity"
+            }
+
+            healthConnectUiState.value = HealthConnectUiState(
+                status = HealthConnectPermissionStatus.CONNECTED,
+                isSyncing = false,
+                todaySteps = if (activitySynced) todaySteps else null,
+                todayActiveCaloriesKcal = if (activitySynced) todayActiveCaloriesKcal else null,
+                lastSyncEpochMillis = if (weightsSynced && activitySynced) {
+                    syncEpochMillis
+                } else {
+                    previous.lastSyncEpochMillis
+                },
+                importedWeightCount = importedWeightCount,
+                message = when {
+                    failures.isNotEmpty() -> "Some Health Connect data couldn't be synced. Try again."
+                    importedWeightCount == 1 -> "Health Connect synced. Imported 1 new weight."
+                    importedWeightCount > 1 -> "Health Connect synced. Imported $importedWeightCount new weights."
+                    else -> "Health Connect is up to date."
+                },
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            healthConnectUiState.value = healthConnectUiState.value.copy(
+                isSyncing = false,
+                message = "Health Connect couldn't be synced. Try again.",
+            )
+        } finally {
+            healthSyncMutex.unlock()
         }
     }
 
@@ -1168,6 +1349,7 @@ class AppViewModel(
                 it.normalizedName == normalizedName &&
                     it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
             } ?: repository.foodByIdentity(normalizedName, normalizedBrand) ?: return null
+            if (!food.isTrustedForNutritionReuse()) return null
             val scaled = runCatching {
                 ServingNutritionNormalizer.normalizeSourceServingTo(
                     sourceServingItem = food.toAnalyzedItem("Nomi local food cache"),
@@ -1280,7 +1462,7 @@ class AppViewModel(
         prefs: AppPreferences,
         plan: NutritionPlanEntity?,
         keys: Map<ProviderPipeline, Boolean>,
-        connected: Boolean,
+        health: HealthConnectUiState,
     ): SettingsUiState {
         val providers = ProviderPipeline.entries.map { pipeline ->
             val selected = prefs.selectionFor(pipeline)
@@ -1300,8 +1482,9 @@ class AppViewModel(
             germanTranslationEnabled = prefs.germanTranslationEnabled,
             unitSystem = if (prefs.weightUnit == WeightUnitPreference.KILOGRAMS) UnitSystem.METRIC else UnitSystem.IMPERIAL,
             activityTargetAdjustment = prefs.adjustTargetFromActivity,
-            healthConnectAvailable = container.healthConnect.availability == HealthConnectAvailability.AVAILABLE,
-            healthConnectEnabled = connected,
+            healthConnectAvailable = health.status != HealthConnectPermissionStatus.UNAVAILABLE,
+            healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED,
+            healthConnect = health,
             nutritionTargets = NutritionTargetSetting(
                 calories = plan?.calorieTargetKcal?.roundToInt() ?: 2_000,
                 proteinGrams = plan?.proteinTargetGrams?.roundToInt() ?: 130,
@@ -1666,6 +1849,7 @@ private fun String.isSpoonLoggingUnit(): Boolean = trim()
     "loffel", "spoon", "spoons",
 )
 private fun Throwable.safeProviderSettingsMessage(): String = when {
+    message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()
     message?.contains("endpoint", ignoreCase = true) == true ->
         "Enter a valid HTTPS API endpoint."
     message?.contains("model", ignoreCase = true) == true ->

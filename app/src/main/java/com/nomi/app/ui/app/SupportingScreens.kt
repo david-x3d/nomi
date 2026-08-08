@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -42,7 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.AiDebugEventEntity
+import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.settings.HealthConnectUiState
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import kotlin.math.roundToInt
@@ -209,6 +212,14 @@ fun HealthConnectScreen(
     connected: Boolean,
     onBack: () -> Unit,
     onConnect: () -> Unit,
+    health: HealthConnectUiState = HealthConnectUiState(
+        status = when {
+            connected -> HealthConnectPermissionStatus.CONNECTED
+            available -> HealthConnectPermissionStatus.DISCONNECTED
+            else -> HealthConnectPermissionStatus.UNAVAILABLE
+        },
+    ),
+    onSyncNow: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -230,25 +241,106 @@ fun HealthConnectScreen(
             horizontalAlignment = Alignment.Start,
         ) {
             Icon(Icons.Default.HealthAndSafety, contentDescription = null)
-            Text(nomiString("Optional health sync", "Optionale Gesundheitssynchronisierung"), style = MaterialTheme.typography.headlineMedium)
             Text(
-                nomiString("Nomi can read and write weight and read steps and active calories. Your nutrition log stays local to Nomi.", "Nomi kann Gewicht lesen und schreiben sowie Schritte und aktive Kalorien lesen. Dein Ernährungstagebuch bleibt lokal in Nomi."),
+                nomiString("Optional health sync", "Optionale Gesundheitssynchronisierung"),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            Text(
+                nomiString(
+                    "Nomi reads weight from the last 30 days, reads today's steps and active calories, and writes only weights you enter in Nomi. Your nutrition log stays local.",
+                    "Nomi liest Gewichte der letzten 30 Tage, heutige Schritte und aktive Kalorien und schreibt nur Gewichte, die du in Nomi einträgst. Dein Ernährungstagebuch bleibt lokal.",
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                when {
-                    !available -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.", "Health Connect ist auf diesem Gerät nicht verfügbar. Nomi funktioniert auch ohne Health Connect vollständig.")
-                    connected -> nomiString("Connected. You can change access at any time in Health Connect.", "Verbunden. Du kannst den Zugriff jederzeit in Health Connect ändern.")
-                    else -> nomiString("Nothing is shared until you approve the requested categories.", "Es werden keine Daten geteilt, bevor du die angeforderten Kategorien freigibst.")
+                when (health.status) {
+                    HealthConnectPermissionStatus.UNAVAILABLE -> nomiString(
+                        "Health Connect isn't available on this device. Nomi works fully without it.",
+                        "Health Connect ist auf diesem Gerät nicht verfügbar. Nomi funktioniert auch ohne Health Connect vollständig.",
+                    )
+                    HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString(
+                        "Health Connect must be installed or updated before Nomi can connect.",
+                        "Health Connect muss installiert oder aktualisiert werden, bevor Nomi eine Verbindung herstellen kann.",
+                    )
+                    HealthConnectPermissionStatus.DISCONNECTED -> nomiString(
+                        "Nothing is shared until you approve all requested categories.",
+                        "Es werden keine Daten geteilt, bevor du alle angeforderten Kategorien freigibst.",
+                    )
+                    HealthConnectPermissionStatus.PARTIAL -> nomiString(
+                        "Some permissions are missing. Approve all four categories to finish connecting.",
+                        "Einige Berechtigungen fehlen. Gib alle vier Kategorien frei, um die Verbindung abzuschließen.",
+                    )
+                    HealthConnectPermissionStatus.CONNECTED -> nomiString(
+                        "Connected. You can change access at any time in Health Connect.",
+                        "Verbunden. Du kannst den Zugriff jederzeit in Health Connect ändern.",
+                    )
                 },
             )
-            Button(onClick = onConnect, enabled = available && !connected) {
-                Text(if (connected) nomiString("Connected", "Verbunden") else nomiString("Choose permissions", "Berechtigungen auswählen"))
+
+            if (health.isSyncing) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator()
+                    Text(nomiString("Syncing health data...", "Gesundheitsdaten werden synchronisiert..."))
+                }
             }
+
+            if (health.status == HealthConnectPermissionStatus.CONNECTED) {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(nomiString("Today's activity", "Heutige Aktivität"), style = MaterialTheme.typography.titleLarge)
+                        NutritionLine(
+                            nomiString("Steps", "Schritte"),
+                            health.todaySteps?.toString() ?: nomiString("Not synced yet", "Noch nicht synchronisiert"),
+                        )
+                        NutritionLine(
+                            nomiString("Active calories", "Aktive Kalorien"),
+                            health.todayActiveCaloriesKcal?.let { "${it.roundToInt()} kcal" }
+                                ?: nomiString("Not synced yet", "Noch nicht synchronisiert"),
+                        )
+                    }
+                }
+                Button(onClick = onSyncNow, enabled = !health.isSyncing) {
+                    Text(nomiString("Sync now", "Jetzt synchronisieren"))
+                }
+            } else if (
+                health.status == HealthConnectPermissionStatus.DISCONNECTED ||
+                health.status == HealthConnectPermissionStatus.PARTIAL
+            ) {
+                Button(onClick = onConnect, enabled = available && !health.isSyncing) {
+                    Text(
+                        if (health.status == HealthConnectPermissionStatus.PARTIAL) {
+                            nomiString("Complete permissions", "Berechtigungen vervollständigen")
+                        } else {
+                            nomiString("Choose permissions", "Berechtigungen auswählen")
+                        },
+                    )
+                }
+            }
+
+            health.message?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                nomiString(
+                    "Health data is used only for your local Nomi experience and is never sold.",
+                    "Gesundheitsdaten werden nur für deine lokale Nomi-Nutzung verwendet und niemals verkauft.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeveloperScreen(

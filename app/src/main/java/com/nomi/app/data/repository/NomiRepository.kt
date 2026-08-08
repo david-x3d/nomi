@@ -57,6 +57,17 @@ data class SaveLoggedMealRequest(
     val createdAtEpochMillis: Long,
 )
 
+const val HEALTH_CONNECT_WEIGHT_SOURCE = "health_connect"
+
+internal fun newExternalWeightEntries(
+    entries: List<WeightEntryEntity>,
+    existingExternalIds: Set<String>,
+): List<WeightEntryEntity> = entries.asSequence()
+    .filter { !it.externalId.isNullOrBlank() }
+    .distinctBy { it.externalId }
+    .filterNot { it.externalId in existingExternalIds }
+    .toList()
+
 /**
  * Cohesive local-first boundary. It deliberately returns persistence models; domain adapters can
  * live in separate mapping files without making Room depend on UI or calculation packages.
@@ -427,6 +438,42 @@ class NomiRepository(
     suspend fun addWeight(entry: WeightEntryEntity): Long {
         validateWeight(entry)
         return weightDao.insert(entry.copy(id = 0))
+    }
+
+    suspend fun importHealthConnectWeights(entries: List<WeightEntryEntity>): Int {
+        if (entries.isEmpty()) return 0
+        entries.forEach { entry ->
+            validateWeight(entry)
+            require(entry.source == HEALTH_CONNECT_WEIGHT_SOURCE) {
+                "Imported Health Connect weights must use the Health Connect source"
+            }
+            require(!entry.externalId.isNullOrBlank()) {
+                "Imported Health Connect weights require an external ID"
+            }
+        }
+        return database.withTransaction {
+            val unique = entries.distinctBy { it.externalId }
+            val externalIds = unique.mapNotNull(WeightEntryEntity::externalId)
+            val existing = weightDao.existingExternalIds(
+                source = HEALTH_CONNECT_WEIGHT_SOURCE,
+                externalIds = externalIds,
+            ).toSet()
+            val additions = newExternalWeightEntries(unique, existing)
+            if (additions.isNotEmpty()) {
+                weightDao.insertAll(additions.map { it.copy(id = 0) })
+            }
+            additions.size
+        }
+    }
+
+    suspend fun markWeightHealthConnectSynced(
+        id: Long,
+        externalId: String,
+        updatedAtEpochMillis: Long,
+    ): Boolean {
+        require(id > 0) { "A persisted weight ID is required" }
+        require(externalId.isNotBlank()) { "A Health Connect record ID is required" }
+        return weightDao.setExternalId(id, externalId, updatedAtEpochMillis) == 1
     }
 
     suspend fun updateWeight(entry: WeightEntryEntity): Boolean {

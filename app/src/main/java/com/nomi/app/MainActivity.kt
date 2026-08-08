@@ -12,15 +12,22 @@ import com.nomi.app.ui.app.AppStartState
 import com.nomi.app.ui.app.AppViewModel
 
 class MainActivity : ComponentActivity() {
+    private lateinit var viewModel: AppViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val container = (application as NomiApplication).container
-        val viewModel = ViewModelProvider(this, NomiViewModelFactory(container))[AppViewModel::class.java]
+        viewModel = ViewModelProvider(this, NomiViewModelFactory(container))[AppViewModel::class.java]
         splashScreen.setKeepOnScreenCondition { viewModel.startState.value == AppStartState.Loading }
         setContent {
             NomiApp(container = container, viewModel = viewModel)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        viewModel.refreshProviderAndHealthStatus()
     }
 }

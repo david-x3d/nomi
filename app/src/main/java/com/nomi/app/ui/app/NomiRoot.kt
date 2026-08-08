@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Today
@@ -30,7 +29,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -72,7 +70,6 @@ import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.BarcodeAmountSheet
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.VoiceCaptureScreen
-import com.nomi.app.ui.history.HistoryScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.logging.FoodLoggingScreen
@@ -134,10 +131,7 @@ private fun NomiMain(
     var selectedProviderIndex by remember { mutableIntStateOf(-1) }
     var providerEditor by remember { mutableStateOf<AiProviderEditorState?>(null) }
     var editedItemIndex by remember { mutableStateOf<Int?>(null) }
-    var saveMealCandidate by remember { mutableStateOf<com.nomi.app.ui.history.HistoryDay?>(null) }
-    var savedMealName by remember { mutableStateOf("") }
     var showWeightDialog by remember { mutableStateOf(false) }
-    var copyCandidate by remember { mutableStateOf<LocalDate?>(null) }
     var backupInspection by remember { mutableStateOf<BackupInspection?>(null) }
     var pendingReminderIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -256,13 +250,6 @@ private fun NomiMain(
                     onEditLoggingText = viewModel::editLoggingText,
                     onDismissLoggingDraft = viewModel::dismissLoggingDraft,
                     onEditLoggingPreview = { navController.navigate(Routes.LOGGING) },
-                    onHistoryQuery = viewModel::setHistoryQuery,
-                    onHistoryDate = viewModel::setHistoryDate,
-                    onSaveMeal = { day ->
-                        saveMealCandidate = day
-                        savedMealName = "Meal ${day.date}"
-                    },
-                    onCopyDay = { copyCandidate = it.date },
                     onProgressRange = viewModel::setProgressRange,
                     onAddWeight = { showWeightDialog = true },
                     onTheme = viewModel::setTheme,
@@ -423,8 +410,10 @@ private fun NomiMain(
                 HealthConnectScreen(
                     available = settingsState.healthConnectAvailable,
                     connected = settingsState.healthConnectEnabled,
+                    health = settingsState.healthConnect,
                     onBack = { navController.popBackStack() },
                     onConnect = { healthPermissionLauncher.launch(healthPermissions) },
+                    onSyncNow = viewModel::syncHealthConnect,
                 )
             }
 
@@ -516,40 +505,6 @@ private fun NomiMain(
         )
     }
 
-    copyCandidate?.let { source ->
-        AlertDialog(
-            onDismissRequest = { copyCandidate = null },
-            title = { Text("Copy this day to today?") },
-            text = { Text("You'll get new editable entries for every food logged on $source. Nothing in the original day changes.") },
-            confirmButton = {
-                Button(onClick = { viewModel.copyDayToToday(source); copyCandidate = null }) { Text("Copy foods") }
-            },
-            dismissButton = { TextButton(onClick = { copyCandidate = null }) { Text("Cancel") } },
-        )
-    saveMealCandidate?.let { day ->
-        AlertDialog(
-            onDismissRequest = { saveMealCandidate = null },
-            title = { Text("Save this day as a meal") },
-            text = {
-                OutlinedTextField(
-                    value = savedMealName,
-                    onValueChange = { savedMealName = it.take(120) },
-                    label = { Text("Meal name") },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                Button(onClick = {
-                    viewModel.saveHistoryDayAsMeal(day, savedMealName)
-                    saveMealCandidate = null
-                }, enabled = savedMealName.isNotBlank()) { Text("Save meal") }
-            },
-            dismissButton = { TextButton(onClick = { saveMealCandidate = null }) { Text("Cancel") } },
-        )
-    }
-
-    }
-
     backupInspection?.let { inspection ->
         val summary = inspection.summary
         AlertDialog(
@@ -627,7 +582,6 @@ private fun MainNavigationSuite(
     onUndoDeleteFood: (Long) -> Unit,
     onDiscardDeletedFood: (Long) -> Unit,
     onAddFood: (AddFoodMethod) -> Unit,
-    onHistoryQuery: (String) -> Unit,
     onLoggingTextChanged: (String) -> Unit,
     onAnalyzeLogging: () -> Unit,
     onConfirmLogging: () -> Unit,
@@ -635,10 +589,7 @@ private fun MainNavigationSuite(
     onEditLoggingText: () -> Unit,
     onDismissLoggingDraft: () -> Unit,
     onEditLoggingPreview: () -> Unit,
-    onHistoryDate: (LocalDate) -> Unit,
-    onCopyDay: (com.nomi.app.ui.history.HistoryDay) -> Unit,
     onProgressRange: (com.nomi.app.ui.progress.ProgressRange) -> Unit,
-    onSaveMeal: (com.nomi.app.ui.history.HistoryDay) -> Unit,
     onAddWeight: () -> Unit,
     onTheme: (com.nomi.app.ui.settings.ThemeMode) -> Unit,
     onDynamicColor: (Boolean) -> Unit,
@@ -742,18 +693,6 @@ private fun MainNavigationSuite(
                     onQuickMethod = onAddFood,
                 )
             }
-            MainDestination.HISTORY -> {
-                val historyState by viewModel.historyState.collectAsStateWithLifecycle()
-                HistoryScreen(
-                    state = historyState,
-                    onQueryChanged = onHistoryQuery,
-                    onDateSelected = onHistoryDate,
-                    onFoodClick = onFoodClick,
-                    onCopyMeal = onCopyDay,
-                    onCopyDay = onCopyDay,
-                    onSaveMeal = onSaveMeal,
-                )
-            }
             MainDestination.PROGRESS -> {
                 val progressState by viewModel.progressState.collectAsStateWithLifecycle()
                 ProgressScreen(
@@ -796,7 +735,6 @@ private enum class MainDestination(
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
     TODAY(Icons.Default.Today),
-    HISTORY(Icons.Default.History),
     PROGRESS(Icons.Default.Insights),
     SETTINGS(Icons.Default.Settings),
 }
@@ -804,7 +742,6 @@ private enum class MainDestination(
 @Composable
 private fun MainDestination.localizedLabel(): String = when (this) {
     MainDestination.TODAY -> nomiString("Today", "Heute")
-    MainDestination.HISTORY -> nomiString("History", "Verlauf")
     MainDestination.PROGRESS -> nomiString("Progress", "Fortschritt")
     MainDestination.SETTINGS -> nomiString("Settings", "Einstellungen")
 }

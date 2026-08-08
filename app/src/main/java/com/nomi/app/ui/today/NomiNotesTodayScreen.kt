@@ -1226,14 +1226,15 @@ private fun ComposerTextField(
     onEditText: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var editingValue by rememberSaveable(value, editable) { mutableStateOf(value) }
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val analysisProgressDescription = nomiString(
         "Meal analysis in progress",
         "Mahlzeitanalyse läuft",
     )
     TextField(
-        value = value,
-        onValueChange = { if (editable) onValueChange(it) },
+        value = if (editable) editingValue else value,
+        onValueChange = { if (editable) editingValue = it },
         readOnly = !editable,
         enabled = !processing,
         modifier = modifier.heightIn(min = 56.dp),
@@ -1242,7 +1243,12 @@ private fun ComposerTextField(
         shape = RoundedCornerShape(28.dp),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
         keyboardActions = KeyboardActions(
-            onSend = { if (editable && value.isNotBlank()) onAnalyze() },
+            onSend = {
+                if (editable && editingValue.isNotBlank()) {
+                    onValueChange(editingValue)
+                    onAnalyze()
+                }
+            },
         ),
         trailingIcon = {
             AnimatedContent(
@@ -1259,8 +1265,11 @@ private fun ComposerTextField(
                 val (isEditable, isProcessing) = action
                 when {
                     isEditable -> IconButton(
-                        onClick = onAnalyze,
-                        enabled = value.isNotBlank(),
+                        onClick = {
+                            onValueChange(editingValue)
+                            onAnalyze()
+                        },
+                        enabled = editingValue.isNotBlank(),
                         modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
                     ) {
                         Icon(
