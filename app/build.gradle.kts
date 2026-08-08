@@ -13,21 +13,39 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.0.16"
+        versionCode = 18
+        versionName = "1.0.17"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        /**
+         * Release builds reuse the local debug key on purpose: the published APKs have always
+         * carried that signature, so keeping it lets an optimized build install straight over an
+         * existing Nomi without uninstalling and losing the food log.
+         */
+        create("localRelease") {
+            storeFile = File(System.getProperty("user.home"), ".android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Debuggable builds skip ART's ahead-of-time optimization and keep Compose's
+            // debug instrumentation, which is what made animations stutter.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.findByName("localRelease")
+                ?.takeIf { it.storeFile?.exists() == true }
         }
     }
 

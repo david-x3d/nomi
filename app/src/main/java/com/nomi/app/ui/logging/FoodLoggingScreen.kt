@@ -276,7 +276,10 @@ private fun PreviewContent(
                 MealCategorySelector(mealCategory, onMealCategoryChanged)
             }
         }
-        itemsIndexed(analysis.items) { index, item ->
+        itemsIndexed(
+            items = analysis.items,
+            key = { index, item -> "${index}-${item.name}" },
+        ) { index, item ->
             val quantityDisplay = item.quantityDisplay(locale)
             ListItem(
                 headlineContent = { Text(item.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
