@@ -82,6 +82,7 @@ import com.nomi.app.ui.today.LoggedAmountEditUiState
 import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
+import com.nomi.app.ui.today.reeditableText
 import com.nomi.app.ui.today.TodayUiState
 import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.network.sockets.ConnectTimeoutException
@@ -295,6 +296,9 @@ class AppViewModel(
     val portionEditState = mutablePortionEditState.asStateFlow()
     private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
     val loggedAmountEditState = mutableLoggedAmountEditState.asStateFlow()
+    /** The logged entry currently being rewritten as text on the page, if any. */
+    private val mutableEditedEntryId = MutableStateFlow<Long?>(null)
+    val editedEntryId = mutableEditedEntryId.asStateFlow()
     private var portionEditIndex: Int? = null
     private val pendingDeletedLogs = PendingDeletedLogStore()
     private val earlyUndoDeleteRequests = mutableSetOf<Long>()
@@ -375,7 +379,25 @@ class AppViewModel(
         mutableBarcodeAmountState.value = null
         lastLoggingText = ""
         dismissPortionEdit()
+        mutableEditedEntryId.value = null
         mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
+    }
+
+    /**
+     * Reopens a logged entry as text on the page.
+     *
+     * The old entry is kept until the rewritten one is confirmed, so a failed or abandoned
+     * re-research can never leave the day short of a meal. Rewriting the text always re-runs
+     * research: keeping the previous calories under different words is exactly the mismatch
+     * between text and numbers this app exists to prevent.
+     */
+    fun editEntryTextInline(entry: TodayFoodEntry) {
+        if (entry.id <= 0) return
+        cancelAnalysis()
+        val text = entry.reeditableText()
+        lastLoggingText = text
+        mutableEditedEntryId.value = entry.id
+        mutableLoggingState.value = FoodLoggingUiState.Input(text, defaultMealCategory())
     }
 
     fun updateLoggingMealCategory(category: MealCategory) {
@@ -748,6 +770,11 @@ class AppViewModel(
                         else -> error("Unsupported logging state")
                     }
                 }.onSuccess {
+                    // The rewritten entry exists now, so the one it replaces can go.
+                    mutableEditedEntryId.value?.let { replaced ->
+                        mutableEditedEntryId.value = null
+                        runCatching { repository.deleteLog(replaced) }
+                    }
                     lastLoggingText = ""
                     dismissPortionEdit()
                     mutableBarcodeAmountState.value = null

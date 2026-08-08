@@ -92,6 +92,17 @@ data class TodayFoodEntry(
     val sourceUrl: String? = null,
 )
 
+/**
+ * Rebuilds the sentence a logged entry came from, so editing it on the page starts from what
+ * was written rather than from a stripped-down display name. Amount and brand are included
+ * because the re-run research needs them to identify the same food again.
+ */
+fun TodayFoodEntry.reeditableText(): String = listOfNotNull(
+    amountText.trim().takeIf(String::isNotBlank),
+    name.trim().takeIf(String::isNotBlank),
+    brand?.trim()?.takeIf(String::isNotBlank),
+).joinToString(" ")
+
 data class TodayUiState(
     val date: LocalDate = LocalDate.now(),
     val caloriesConsumed: Double = 0.0,

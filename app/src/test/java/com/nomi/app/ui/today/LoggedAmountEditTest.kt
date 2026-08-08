@@ -88,6 +88,35 @@ class LoggedAmountEditTest {
         }
     }
 
+    @Test
+    fun `rewriting an entry starts from amount, food, and brand`() {
+        val entry = TodayFoodEntry(
+            id = 3L,
+            name = "Marmelade himbeere",
+            brand = "Glück",
+            amountText = "1.5 tbsp",
+            calories = 75.0,
+            mealCategory = MealCategory.BREAKFAST,
+            time = java.time.LocalTime.of(9, 30),
+        )
+
+        assertEquals("1.5 tbsp Marmelade himbeere Glück", entry.reeditableText())
+    }
+
+    @Test
+    fun `rewriting an entry without an amount or brand uses just the food`() {
+        val entry = TodayFoodEntry(
+            id = 4L,
+            name = "Apfel",
+            amountText = "  ",
+            calories = 95.0,
+            mealCategory = MealCategory.SNACKS,
+            time = java.time.LocalTime.of(15, 0),
+        )
+
+        assertEquals("Apfel", entry.reeditableText())
+    }
+
     private fun editState(
         originalAmount: Double,
         originalCalories: Double,

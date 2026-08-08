@@ -685,6 +685,7 @@ private fun MainNavigationSuite(
             MainDestination.TODAY -> {
                 val todayState by viewModel.todayState.collectAsStateWithLifecycle()
                 val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
+                val editedEntryId by viewModel.editedEntryId.collectAsStateWithLifecycle()
                 NomiNotesTodayScreen(
                     state = todayState,
                     loggingState = loggingState,
@@ -695,6 +696,8 @@ private fun MainNavigationSuite(
                     onDeleteFood = onDeleteFood,
                     onUndoDeleteFood = onUndoDeleteFood,
                     onDiscardDeletedFood = onDiscardDeletedFood,
+                    editedEntryId = editedEntryId,
+                    onEditEntryText = viewModel::editEntryTextInline,
                     onTextChanged = onLoggingTextChanged,
                     onAnalyze = onAnalyzeLogging,
                     onConfirm = onConfirmLogging,

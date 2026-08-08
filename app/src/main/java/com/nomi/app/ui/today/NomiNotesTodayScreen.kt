@@ -1,4 +1,4 @@
-﻿package com.nomi.app.ui.today
+package com.nomi.app.ui.today
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -26,6 +26,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -158,6 +159,8 @@ fun NomiNotesTodayScreen(
     onDeleteFood: (Long) -> Unit = {},
     onUndoDeleteFood: (Long) -> Unit = {},
     onDiscardDeletedFood: (Long) -> Unit = {},
+    editedEntryId: Long? = null,
+    onEditEntryText: (TodayFoodEntry) -> Unit = {},
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
     onConfirm: () -> Unit,
@@ -299,10 +302,21 @@ fun NomiNotesTodayScreen(
                         ),
                     ) {
                         val pending = pendingDeletedFoods[entry.id]
+                        val editingThisEntry = entry.id == editedEntryId &&
+                            loggingState is FoodLoggingUiState.Input
                         when {
+                            // The row becomes the line you write on, so a rewrite happens
+                            // where the entry already sits.
+                            editingThisEntry -> InlineComposerLine(
+                                text = (loggingState as FoodLoggingUiState.Input).text,
+                                autoFocus = true,
+                                onTextChanged = onTextChanged,
+                                onAnalyze = onAnalyze,
+                            )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
                                 onClick = { onFoodClick(entry.id) },
+                                onEditText = { onEditEntryText(entry) },
                                 onDelete = {
                                     pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
                                     onDeleteFood(entry.id)
@@ -337,6 +351,9 @@ fun NomiNotesTodayScreen(
                         InlineLoggingState(
                             state = loggingState,
                             rememberedDescription = loggingDescription,
+                            // While a logged row is being rewritten it owns the caret, so the
+                            // page must not offer a second empty line at the bottom.
+                            suppressComposer = editedEntryId != null,
                             composerFocused = composerOpen,
                             onTextChanged = onTextChanged,
                             onAnalyze = onAnalyze,
@@ -500,7 +517,7 @@ private fun NotesHeader(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = nomiString("Next day", "NÃ¤chster Tag"),
+                            contentDescription = nomiString("Next day", "Nächster Tag"),
                         )
                     }
                 }
@@ -536,9 +553,11 @@ private data class PendingDeletedFood(
 private fun SwipeToDeleteFoodRow(
     entry: TodayFoodEntry,
     onClick: () -> Unit,
+    onEditText: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val deleteLabel = nomiString("Delete ${entry.name}", "${entry.name} lÃ¶schen")
+    val deleteLabel = nomiString("Delete ${entry.name}", "${entry.name} löschen")
+    val editLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -581,7 +600,7 @@ private fun SwipeToDeleteFoodRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = nomiString("Delete", "LÃ¶schen"),
+                        text = nomiString("Delete", "Löschen"),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -596,6 +615,10 @@ private fun SwipeToDeleteFoodRow(
         },
         modifier = Modifier.semantics {
             customActions = listOf(
+                CustomAccessibilityAction(label = editLabel) {
+                    onEditText()
+                    true
+                },
                 CustomAccessibilityAction(label = deleteLabel) {
                     if (!deleteRequested) {
                         deleteRequested = true
@@ -607,7 +630,7 @@ private fun SwipeToDeleteFoodRow(
         },
     ) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            NotesFoodRow(entry = entry, onClick = onClick)
+            NotesFoodRow(entry = entry, onClick = onClick, onEditText = onEditText)
         }
     }
 }
@@ -651,7 +674,7 @@ private fun InlineDeletedFoodRow(
             )
             TextButton(onClick = onUndo) {
                 Text(
-                    text = nomiString("Undo", "RÃ¼ckgÃ¤ngig"),
+                    text = nomiString("Undo", "Rückgängig"),
                     maxLines = 1,
                     softWrap = false,
                     fontWeight = FontWeight.Bold,
@@ -690,17 +713,23 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
 }
 
 @Composable
-private fun NotesFoodRow(entry: TodayFoodEntry, onClick: () -> Unit) {
+private fun NotesFoodRow(
+    entry: TodayFoodEntry,
+    onClick: () -> Unit,
+    onEditText: () -> Unit,
+) {
     val description = buildString {
         append(entry.name)
-        entry.brand?.takeIf(String::isNotBlank)?.let { append(" Â· ").append(it) }
+        entry.brand?.takeIf(String::isNotBlank)?.let { append(" · ").append(it) }
     }
     val locale = nomiLocale()
     val amountDisplay = entry.quantityDisplay(locale).withContext
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Tapping opens the details; holding reopens the line as text, the way you would
+            // correct a wrong word in a note.
+            .combinedClickable(onClick = onClick, onLongClick = onEditText)
             .heightIn(min = 64.dp)
             .padding(horizontal = 24.dp, vertical = 14.dp),
         verticalAlignment = Alignment.Top,
@@ -725,7 +754,7 @@ private fun NotesFoodRow(entry: TodayFoodEntry, onClick: () -> Unit) {
         }
         Text(
             text = buildString {
-                if (entry.isEstimated) append("â‰ˆ ")
+                if (entry.isEstimated) append("≈ ")
                 append(entry.calories.roundToInt()).append(" kcal")
             },
             style = MaterialTheme.typography.bodyLarge,
@@ -740,6 +769,7 @@ private fun NotesFoodRow(entry: TodayFoodEntry, onClick: () -> Unit) {
 private fun InlineLoggingState(
     state: FoodLoggingUiState,
     rememberedDescription: String,
+    suppressComposer: Boolean,
     composerFocused: Boolean,
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
@@ -751,12 +781,14 @@ private fun InlineLoggingState(
 ) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         when (state) {
-            is FoodLoggingUiState.Input -> InlineComposerLine(
-                text = state.text,
-                autoFocus = composerFocused,
-                onTextChanged = onTextChanged,
-                onAnalyze = onAnalyze,
-            )
+            is FoodLoggingUiState.Input -> if (!suppressComposer) {
+                InlineComposerLine(
+                    text = state.text,
+                    autoFocus = composerFocused,
+                    onTextChanged = onTextChanged,
+                    onAnalyze = onAnalyze,
+                )
+            }
             is FoodLoggingUiState.Processing -> ProcessingNote(
                 description = rememberedDescription,
                 sourceUrls = state.sourceUrls,
@@ -917,7 +949,7 @@ private fun ProcessingNote(
                             trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         )
                         Text(
-                            text = nomiString("Thinkingâ€¦", "Wird analysiertâ€¦"),
+                            text = nomiString("Thinking…", "Wird analysiert…"),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
@@ -949,7 +981,7 @@ private fun PreviewNote(
     val totalCarbohydrates = analysis.items.sumOf(AnalyzedFoodItem::carbohydrateGrams)
     val totalFat = analysis.items.sumOf(AnalyzedFoodItem::fatGrams)
     val locale = nomiLocale()
-    val estimatedSuffix = nomiString(" Â· estimated", " Â· geschÃ¤tzt")
+    val estimatedSuffix = nomiString(" · estimated", " · geschätzt")
 
     Surface(
         modifier = Modifier
@@ -986,7 +1018,7 @@ private fun PreviewNote(
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(Modifier.size(6.dp))
-                        Text(nomiString("Change wording", "Formulierung Ã¤ndern"))
+                        Text(nomiString("Change wording", "Formulierung ändern"))
                     }
                 }
                 Text(
@@ -1037,8 +1069,8 @@ private fun PreviewNote(
             ) {
                 Text(
                     text = nomiString(
-                        "C ${totalCarbohydrates.roundToInt()} g  Â·  P ${totalProtein.roundToInt()} g  Â·  F ${totalFat.roundToInt()} g",
-                        "K ${totalCarbohydrates.roundToInt()} g  Â·  E ${totalProtein.roundToInt()} g  Â·  F ${totalFat.roundToInt()} g",
+                        "C ${totalCarbohydrates.roundToInt()} g  ·  P ${totalProtein.roundToInt()} g  ·  F ${totalFat.roundToInt()} g",
+                        "K ${totalCarbohydrates.roundToInt()} g  ·  E ${totalProtein.roundToInt()} g  ·  F ${totalFat.roundToInt()} g",
                     ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1065,7 +1097,7 @@ private fun PreviewNote(
                 Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text(nomiString("Add", "HinzufÃ¼gen"), maxLines = 1)
+                    Text(nomiString("Add", "Hinzufügen"), maxLines = 1)
                 }
             }
         }
@@ -1101,7 +1133,7 @@ private fun ErrorNote(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = description.ifBlank {
-                            nomiString("Couldnâ€™t understand this meal", "Diese Mahlzeit wurde nicht erkannt")
+                            nomiString("Couldn’t understand this meal", "Diese Mahlzeit wurde nicht erkannt")
                         },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -1206,7 +1238,7 @@ private fun ManualDraftNote(
                 TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
                 FilledTonalButton(onClick = onEdit) { Text(nomiString("Edit", "Bearbeiten")) }
                 Button(onClick = onAdd, enabled = draft.isValid) {
-                    Text(nomiString("Add", "HinzufÃ¼gen"))
+                    Text(nomiString("Add", "Hinzufügen"))
                 }
             }
         }
@@ -1228,9 +1260,9 @@ private fun NotesFloatingActionRow(
     val locale = nomiLocale()
     val difference = state.caloriesDifference.roundToInt()
     val calorieText = if (difference >= 0) {
-        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} Ã¼brig")
+        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
     } else {
-        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darÃ¼ber")
+        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
     }
     Row(
         modifier = Modifier
@@ -1274,7 +1306,7 @@ private fun NotesFloatingActionRow(
         )
         NotesCircleAction(
             icon = Icons.Default.Add,
-            description = nomiString("More ways to add food", "Weitere MÃ¶glichkeiten zum HinzufÃ¼gen"),
+            description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
             onClick = onMore,
         )
         NotesCircleAction(
@@ -1320,11 +1352,11 @@ private fun NutritionSummaryPill(state: TodayUiState, onClick: () -> Unit) {
     val difference = state.caloriesDifference.roundToInt()
     val locale = nomiLocale()
     val calorieText = if (difference >= 0) {
-        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} Ã¼brig")
+        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
     } else {
-        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darÃ¼ber")
+        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
     }
-    val openGoalsDescription = nomiString("Open nutrition goals", "ErnÃ¤hrungsziele Ã¶ffnen")
+    val openGoalsDescription = nomiString("Open nutrition goals", "Ernährungsziele öffnen")
     Surface(
         onClick = onClick,
         modifier = Modifier
@@ -1342,7 +1374,7 @@ private fun NutritionSummaryPill(state: TodayUiState, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SummaryMetric("$calorieText Â·", MaterialTheme.colorScheme.primary)
+            SummaryMetric("$calorieText ·", MaterialTheme.colorScheme.primary)
             SummaryMetric(
                 nomiString(
                     "C ${state.carbohydrates.consumedGrams.roundToInt()}",
@@ -1352,12 +1384,12 @@ private fun NutritionSummaryPill(state: TodayUiState, onClick: () -> Unit) {
             )
             SummaryMetric(
                 nomiString(
-                    "Â· P ${state.protein.consumedGrams.roundToInt()}",
-                    "Â· E ${state.protein.consumedGrams.roundToInt()}",
+                    "· P ${state.protein.consumedGrams.roundToInt()}",
+                    "· E ${state.protein.consumedGrams.roundToInt()}",
                 ),
                 MaterialTheme.colorScheme.tertiary,
             )
-            SummaryMetric("Â· F ${state.fat.consumedGrams.roundToInt()}", MaterialTheme.colorScheme.secondary)
+            SummaryMetric("· F ${state.fat.consumedGrams.roundToInt()}", MaterialTheme.colorScheme.secondary)
         }
     }
 }
@@ -1402,7 +1434,7 @@ private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Un
                 .padding(bottom = 12.dp),
         ) {
             Text(
-                text = nomiString("Add food another way", "Essen anders hinzufÃ¼gen"),
+                text = nomiString("Add food another way", "Essen anders hinzufügen"),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
@@ -1430,13 +1462,13 @@ private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Un
             QuickAddRow(
                 icon = Icons.Default.FavoriteBorder,
                 title = nomiString("Favorites", "Favoriten"),
-                description = nomiString("Choose one of your starred foods", "Ein favorisiertes Lebensmittel auswÃ¤hlen"),
+                description = nomiString("Choose one of your starred foods", "Ein favorisiertes Lebensmittel auswählen"),
                 onClick = { onSelect(AddFoodMethod.FAVORITES) },
             )
             QuickAddRow(
                 icon = Icons.Default.RestaurantMenu,
                 title = nomiString("Saved meals", "Gespeicherte Mahlzeiten"),
-                description = nomiString("Reuse a complete meal", "Eine vollstÃ¤ndige Mahlzeit erneut verwenden"),
+                description = nomiString("Reuse a complete meal", "Eine vollständige Mahlzeit erneut verwenden"),
                 onClick = { onSelect(AddFoodMethod.SAVED_MEALS) },
             )
         }
@@ -1526,7 +1558,7 @@ private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
                         color = MaterialTheme.colorScheme.error,
                     )
                     GoalProgressRow(
-                        label = nomiString("Protein", "EiweiÃŸ"),
+                        label = nomiString("Protein", "Eiweiß"),
                         consumed = state.protein.consumedGrams,
                         target = state.protein.targetGrams,
                         unit = "g",
@@ -1543,7 +1575,7 @@ private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
             }
             NutritionSummaryPill(state = state, onClick = onDismiss)
             Text(
-                text = nomiString("Tap the summary to close", "Zum SchlieÃŸen auf die Ãœbersicht tippen"),
+                text = nomiString("Tap the summary to close", "Zum Schließen auf die Übersicht tippen"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -1661,7 +1693,7 @@ private fun sampleAnalysis() = FoodAnalysis(
     items = listOf(
         AnalyzedFoodItem(
             name = "Salami pizza",
-            brand = "Dominoâ€™s",
+            brand = "Domino’s",
             quantity = 1.0,
             unit = "pizza",
             calories = 785.0,
@@ -1673,13 +1705,13 @@ private fun sampleAnalysis() = FoodAnalysis(
     ),
 )
 
-@Preview(name = "Nomi notes â€” light", showBackground = true, widthDp = 412, heightDp = 915)
+@Preview(name = "Nomi notes — light", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
 private fun NomiNotesLightPreview() {
     NomiTheme(darkTheme = false, dynamicColor = false) {
         NomiNotesTodayScreen(
             state = sampleTodayState(),
-            loggingState = FoodLoggingUiState.Input("one salami pizza by Dominoâ€™s"),
+            loggingState = FoodLoggingUiState.Input("one salami pizza by Domino’s"),
             onPreviousDay = {},
             onNextDay = {},
             onToday = {},
@@ -1696,7 +1728,7 @@ private fun NomiNotesLightPreview() {
     }
 }
 
-@Preview(name = "Nomi notes â€” dark preview", showBackground = true, widthDp = 412, heightDp = 915)
+@Preview(name = "Nomi notes — dark preview", showBackground = true, widthDp = 412, heightDp = 915)
 @Composable
 private fun NomiNotesDarkPreview() {
     NomiTheme(darkTheme = true, dynamicColor = false) {
