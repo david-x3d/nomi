@@ -16,6 +16,7 @@ import com.nomi.app.ai.provider.VisionFoodProvider
 import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
+import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
 import java.net.URI
 import java.util.Locale
@@ -67,7 +68,8 @@ class OpenAiCompatibleProviders(
         val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
         val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
         val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
-        return ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
+        val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
+        return SourceIntegrityVerifier.resolve(normalized)
     }
 
     override suspend fun interpretAdjustment(

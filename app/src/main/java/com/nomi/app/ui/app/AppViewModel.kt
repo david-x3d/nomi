@@ -14,6 +14,7 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
+import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
@@ -1695,23 +1696,26 @@ class AppViewModel(
         val carbohydrates = carbohydratesPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
         val fat = fatPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
         val basisUnit = nutritionBasisUnit.takeIf { it == "ml" } ?: "g"
-        return AnalyzedFoodItem(
-            name = name.take(300),
-            brand = brand?.take(200),
-            quantity = 100.0,
-            unit = basisUnit,
-            gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
-            calories = calories,
-            proteinGrams = protein,
-            carbohydrateGrams = carbohydrates,
-            fatGrams = fat,
-            fiberGrams = fiberPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
-            sourceName = sourceName,
-            sourceUrl = sourceUrl,
-            sourceServingQuantity = 100.0,
-            sourceServingUnit = basisUnit,
-            sourceServingGramsEquivalent = 100.0.takeIf { basisUnit == "g" },
-            isEstimate = false,
+        return SourceIntegrityVerifier.resolveItem(
+            AnalyzedFoodItem(
+                name = name.take(300),
+                brand = brand?.take(200),
+                quantity = 100.0,
+                unit = basisUnit,
+                gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+                calories = calories,
+                proteinGrams = protein,
+                carbohydrateGrams = carbohydrates,
+                fatGrams = fat,
+                fiberGrams = fiberPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
+                sourceName = sourceName,
+                sourceUrl = sourceUrl,
+                sourceProductName = name.take(300),
+                sourceServingQuantity = 100.0,
+                sourceServingUnit = basisUnit,
+                sourceServingGramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+                isEstimate = false,
+            ),
         )
     }
 

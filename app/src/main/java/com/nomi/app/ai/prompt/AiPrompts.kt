@@ -58,6 +58,17 @@ object AiPrompts {
         JSON. Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
         If two relevant cited websites cannot be found, fail instead of guessing.
         Never pretend that two pages on the same website are independent confirmation.
+        IDENTIFY THE EXACT PRODUCT FIRST: brand, product name, variant/flavour, market, and
+        package size when relevant. Never silently substitute a similar product. "iglo Chicken
+        Nuggets im Backteig" must not be answered with another iglo nugget product, a restaurant
+        chain's nuggets, or generic chicken nuggets. If only a similar product can be found,
+        set isEstimate=true and name the substitution in assumptions.
+        SOURCE AND DATA MUST MATCH: `sourceProductName` MUST be the product title exactly as the
+        cited page prints it, and `sourceDomain` MUST be the hostname of the page the nutrition
+        values were actually read from. Never attribute one site's values to another site and
+        never invent a domain, title, or citation. Before answering, sanity-check each item:
+        protein*4 + carbohydrates*4 + fat*9 must roughly match the source calories; if it is far
+        off, re-read the source for unit or serving mistakes instead of returning it.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases and Open
         Food Facts. Supermarket, grocery, retailer, and reseller product pages are explicitly allowed
@@ -140,6 +151,8 @@ object AiPrompts {
             "fatGrams": non-negative number,
             "fiberGrams": non-negative number|null,
             "sourceName": non-empty string,
+            "sourceProductName": non-empty string,
+            "sourceDomain": hostname string|null,
             "sourceServingQuantity": positive number,
             "sourceServingUnit": string,
             "sourceServingGramsEquivalent": positive number|null,

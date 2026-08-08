@@ -64,6 +64,13 @@ data class FoodAnalysis(
 )
 
 @Serializable
+enum class NutritionVerificationStatus {
+    VERIFIED,
+    ESTIMATED,
+    UNKNOWN,
+}
+
+@Serializable
 data class AnalyzedFoodItem(
     val name: String,
     val brand: String? = null,
@@ -83,6 +90,12 @@ data class AnalyzedFoodItem(
     val sourceServingQuantity: Double? = null,
     val sourceServingUnit: String? = null,
     val sourceServingGramsEquivalent: Double? = null,
+    /** Exact product text returned by the cited source, never a guessed substitute. */
+    val sourceProductName: String? = null,
+    /** Cited host reported by the provider; Nomi verifies it against [sourceUrl]. */
+    val sourceDomain: String? = null,
+    /** VERIFIED is allowed only after Nomi's product/source integrity checks pass. */
+    val verificationStatus: NutritionVerificationStatus = NutritionVerificationStatus.UNKNOWN,
     val sourceCountry: String? = null,
     val isEstimate: Boolean,
     /** Optional retail pack declared by the source; never used as the logged amount. */

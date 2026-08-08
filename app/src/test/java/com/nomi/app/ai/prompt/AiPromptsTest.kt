@@ -27,4 +27,30 @@ class AiPromptsTest {
         assertTrue(prompt.contains("supportingSourceUrls"))
         assertTrue(prompt.contains("fail instead of guessing"))
     }
+
+    @Test
+    fun `nutrition research prompt demands exact product and source integrity`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "110 g iglo Chicken Nuggets im Backteig",
+                items = listOf(
+                    ParsedFoodItem(
+                        name = "Chicken Nuggets im Backteig",
+                        brand = "iglo",
+                        quantity = 110.0,
+                        unit = "g",
+                    ),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        assertTrue(prompt.contains("IDENTIFY THE EXACT PRODUCT FIRST"))
+        assertTrue(prompt.contains("Never silently substitute a similar product"))
+        assertTrue(prompt.contains("SOURCE AND DATA MUST MATCH"))
+        assertTrue(prompt.contains("sourceProductName"))
+        assertTrue(prompt.contains("sourceDomain"))
+        assertTrue(prompt.contains("protein*4 + carbohydrates*4 + fat*9"))
+    }
 }
