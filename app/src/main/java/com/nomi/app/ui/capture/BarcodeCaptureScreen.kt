@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.integration.barcode.BarcodeAnalyzer
 import java.util.concurrent.ExecutorService
@@ -103,6 +104,9 @@ fun BarcodeCaptureScreen(
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var analysisUseCase by remember { mutableStateOf<ImageAnalysis?>(null) }
     val currentOnBarcodeDetected = rememberUpdatedState(onBarcodeDetected)
+    // The code is read while the phone is still pointed at the package, so the confirmation
+    // has to be felt rather than seen.
+    val haptics = rememberNomiHaptics()
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
     val noUsableCameraError = nomiString("No usable camera was found.", "Keine verwendbare Kamera wurde gefunden.")
     val barcodeCameraStartError = nomiString("The barcode camera couldn't be started.", "Die Barcode-Kamera konnte nicht gestartet werden.")
@@ -115,6 +119,7 @@ fun BarcodeCaptureScreen(
                 val value = rawValue.trim()
                 if (value.isNotBlank() && deliveredValue == null) {
                     deliveredValue = value
+                    haptics.confirmed()
                     currentOnBarcodeDetected.value(value)
                 }
             }

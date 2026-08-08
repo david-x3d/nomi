@@ -22,7 +22,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -112,9 +111,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -132,10 +129,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.nomi.app.R
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
+import com.nomi.app.ui.components.NomiFox
+import com.nomi.app.ui.components.NomiFoxMood
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
@@ -178,6 +177,7 @@ fun NomiNotesTodayScreen(
     onQuickMethod: (AddFoodMethod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = rememberNomiHaptics()
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
     var composerOpen by rememberSaveable { mutableStateOf(false) }
@@ -208,6 +208,20 @@ fun NomiNotesTodayScreen(
             }
         }
     }
+    // The fox reads the app's state, never the user's day: there is no mood for eating too
+    // much or too little, because a mascot with an opinion about a number is one you stop
+    // opening the app to avoid.
+    val foxMood = when {
+        loggingState is FoodLoggingUiState.Error -> NomiFoxMood.CONCERNED
+        loggingState is FoodLoggingUiState.Processing || state.isLoading -> NomiFoxMood.CURIOUS
+        state.entries.isEmpty() -> NomiFoxMood.RESTING
+        else -> NomiFoxMood.SETTLED
+    }
+    // A failed meal is worth one buzz, not one per recomposition.
+    LaunchedEffect(loggingState is FoodLoggingUiState.Error) {
+        if (loggingState is FoodLoggingUiState.Error) haptics.failed()
+    }
+
     val pendingEntries = pendingDeletedFoods.values.map(PendingDeletedFood::entry)
     val displayedEntries = remember(state.entries, pendingEntries) {
         (state.entries + pendingEntries)
@@ -223,6 +237,7 @@ fun NomiNotesTodayScreen(
         topBar = {
             NotesHeader(
                 date = state.date,
+                foxMood = foxMood,
                 onPreviousDay = onPreviousDay,
                 onNextDay = onNextDay,
                 onToday = onToday,
@@ -243,7 +258,7 @@ fun NomiNotesTodayScreen(
                     onVoice = { onQuickMethod(AddFoodMethod.VOICE) },
                     onMore = { showQuickAdd = true },
                     onWrite = { composerOpen = true },
-                    onSend = onAnalyze,
+                    onSend = { haptics.sent(); onAnalyze() },
                 )
             }
         },
@@ -324,12 +339,12 @@ fun NomiNotesTodayScreen(
                             // The row becomes the line you write on, so a rewrite happens
                             // where the entry already sits.
                             editingThisEntry -> InlineComposerCanvas(
-                                text = (loggingState as FoodLoggingUiState.Input).text,
+                                text = loggingState.text,
                                 autoFocus = true,
                                 fillsPage = false,
                                 initialCaret = caretInEditedEntry,
                                 onTextChanged = onTextChanged,
-                                onAnalyze = onAnalyze,
+                                onAnalyze = { haptics.sent(); onAnalyze() },
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
@@ -339,6 +354,7 @@ fun NomiNotesTodayScreen(
                                     onEditEntryText(entry)
                                 },
                                 onDelete = {
+                                    haptics.removed()
                                     pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
                                     onDeleteFood(entry.id)
                                 },
@@ -347,6 +363,7 @@ fun NomiNotesTodayScreen(
                             else -> InlineDeletedFoodRow(
                                 entry = entry,
                                 onUndo = {
+                                    haptics.confirmed()
                                     pendingDeletedFoods[entry.id] = pending.copy(undoRequested = true)
                                     onUndoDeleteFood(entry.id)
                                 },
@@ -377,8 +394,8 @@ fun NomiNotesTodayScreen(
                             suppressComposer = editedEntryId != null,
                             composerFocused = composerOpen,
                             onTextChanged = onTextChanged,
-                            onAnalyze = onAnalyze,
-                            onConfirm = onConfirm,
+                            onAnalyze = { haptics.sent(); onAnalyze() },
+                            onConfirm = { haptics.confirmed(); onConfirm() },
                             onRetry = onRetry,
                             onEditText = onEditText,
                             onEditPreview = onEditPreview,
@@ -408,6 +425,7 @@ fun NomiNotesTodayScreen(
 @Composable
 private fun NotesHeader(
     date: LocalDate,
+    foxMood: NomiFoxMood,
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
@@ -439,12 +457,7 @@ private fun NotesHeader(
                         modifier = Modifier.align(Alignment.CenterStart),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Image(
-                            painter = painterResource(R.drawable.nomi_icon_foreground),
-                            contentDescription = nomiString("Nomi fox logo", "Nomi-Fuchslogo"),
-                            modifier = Modifier.size(44.dp),
-                            contentScale = ContentScale.Fit,
-                        )
+                        NomiFox(mood = foxMood)
                         Text(
                             text = "Nomi",
                             style = MaterialTheme.typography.titleMedium,
@@ -580,6 +593,7 @@ private fun SwipeToDeleteFoodRow(
     val deleteLabel = nomiString("Delete ${entry.name}", "${entry.name} löschen")
     val editLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
     val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
+    val haptics = rememberNomiHaptics()
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -593,11 +607,17 @@ private fun SwipeToDeleteFoodRow(
         },
         positionalThreshold = { distance -> distance * 0.32f },
     )
+    val armed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
     val revealScale by animateFloatAsState(
-        targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) 1f else 0.82f,
+        targetValue = if (armed) 1f else 0.82f,
         animationSpec = tween(durationMillis = 180),
         label = "Delete reveal",
     )
+    // The moment letting go would delete the row is felt, so the swipe has a point of no
+    // return you can find without watching it.
+    LaunchedEffect(armed) {
+        if (armed) haptics.deleteArmed()
+    }
 
     SwipeToDismissBox(
         state = dismissState,
