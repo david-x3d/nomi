@@ -1933,8 +1933,10 @@ internal suspend fun <T> runWithSmartFallback(
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (fallbackError: Throwable) {
-        fallbackError.addSuppressed(primaryError)
-        throw fallbackError
+        // The configured primary provider's error is the actionable one; a misconfigured
+        // fallback must not mask it.
+        primaryError.addSuppressed(fallbackError)
+        throw primaryError
     }
 }
 

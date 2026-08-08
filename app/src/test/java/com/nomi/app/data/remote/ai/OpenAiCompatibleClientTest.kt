@@ -78,6 +78,31 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `gpt-5 family models never receive a custom temperature`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-luna"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertFalse(encoded.contains("temperature"))
+    }
+
+    @Test
+    fun `standard models keep the configured temperature`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash"),
+                listOf(ChatMessage("user", JsonPrimitive("Reply with JSON"))),
+            ),
+        )
+
+        assertTrue(encoded.contains("\"temperature\":0.1"))
+    }
+
+    @Test
     fun `openrouter sonar food research omits response format entirely`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(

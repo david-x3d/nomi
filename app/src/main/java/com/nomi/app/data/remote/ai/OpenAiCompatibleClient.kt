@@ -134,7 +134,7 @@ class OpenAiCompatibleClient(
 internal data class ChatCompletionRequest(
     val model: String,
     val messages: List<ChatMessage>,
-    val temperature: Double,
+    val temperature: Double? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
     val plugins: List<ProviderPlugin>? = null,
@@ -219,6 +219,16 @@ internal fun AiProviderConfig.supportsJsonObjectResponseFormat(): Boolean {
     }
 }
 
+/**
+ * OpenAI's gpt-5 and o-series reasoning models accept only their default temperature and
+ * reject requests carrying any other value with HTTP 400, directly and through OpenRouter.
+ */
+internal fun AiProviderConfig.supportsCustomTemperature(): Boolean {
+    val normalized = model.trim().lowercase(Locale.ROOT).removePrefix("openai/")
+    return !(normalized.startsWith("gpt-5") || normalized.startsWith("o1") ||
+        normalized.startsWith("o3") || normalized.startsWith("o4"))
+}
+
 internal fun chatCompletionRequest(
     config: AiProviderConfig,
     messages: List<ChatMessage>,
@@ -226,7 +236,7 @@ internal fun chatCompletionRequest(
 ): ChatCompletionRequest = ChatCompletionRequest(
     model = config.model,
     messages = messages,
-    temperature = config.temperature,
+    temperature = config.temperature.takeIf { config.supportsCustomTemperature() },
     responseFormat = when {
         // Only Perplexity's own API reliably accepts the strict schema. OpenRouter forwards
         // response_format to Perplexity for perplexity/* models and the request is rejected

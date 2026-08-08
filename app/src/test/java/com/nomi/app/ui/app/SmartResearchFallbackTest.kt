@@ -55,11 +55,11 @@ class SmartResearchFallbackTest {
     }
 
     @Test
-    fun `fallback failure retains primary failure for diagnostics`() {
+    fun `primary failure is reported and retains fallback failure for diagnostics`() {
         val primaryError = IllegalStateException("primary failed")
         val fallbackError = IllegalArgumentException("fallback failed")
 
-        val thrown = assertThrows(IllegalArgumentException::class.java) {
+        val thrown = assertThrows(IllegalStateException::class.java) {
             runBlocking {
                 runWithSmartFallback(
                     primary = { throw primaryError },
@@ -67,7 +67,7 @@ class SmartResearchFallbackTest {
                 )
             }
         }
-        assertSame(fallbackError, thrown)
-        assertTrue(thrown.suppressed.contains(primaryError))
+        assertSame(primaryError, thrown)
+        assertTrue(thrown.suppressed.contains(fallbackError))
     }
 }
