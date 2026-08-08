@@ -17,9 +17,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -35,7 +33,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -76,12 +73,16 @@ import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -133,6 +134,7 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
+import com.nomi.app.ui.components.hairlineOnPitchBlack
 import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.feedback.rememberNomiHaptics
@@ -847,10 +849,7 @@ private fun NotesFoodRow(
             }
         }
         Text(
-            text = buildString {
-                if (entry.isEstimated) append("≈ ")
-                append(entry.calories.roundToInt()).append(" kcal")
-            },
+            text = "${entry.calories.roundToInt()} kcal",
             // The calories are the way into the entry's details now that the words belong to
             // the keyboard, so the figure carries a touch target rather than only its glyphs.
             modifier = Modifier
@@ -1512,90 +1511,7 @@ private fun NotesCircleAction(
     }
 }
 
-/**
- * On true-black themes the surface tones are flattened toward the canvas, so a hairline
- * outline carries the separation that tonal contrast normally provides.
- */
-@Composable
-private fun hairlineOnPitchBlack(): BorderStroke? = when {
-    LocalPitchBlackSurfaces.current ->
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-    else -> null
-}
 
-
-@Composable
-private fun NutritionSummaryPill(state: TodayUiState, onClick: () -> Unit) {
-    val difference = state.caloriesDifference.roundToInt()
-    val locale = nomiLocale()
-    val calorieText = if (difference >= 0) {
-        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
-    } else {
-        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
-    }
-    val openGoalsDescription = nomiString("Open nutrition goals", "Ernährungsziele öffnen")
-    Surface(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentDescription = openGoalsDescription },
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp,
-        border = hairlineOnPitchBlack(),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 11.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SummaryMetric("$calorieText ·", MaterialTheme.colorScheme.primary)
-            SummaryMetric(
-                nomiString(
-                    "C ${state.carbohydrates.consumedGrams.roundToInt()}",
-                    "K ${state.carbohydrates.consumedGrams.roundToInt()}",
-                ),
-                MaterialTheme.colorScheme.error,
-            )
-            SummaryMetric(
-                nomiString(
-                    "· P ${state.protein.consumedGrams.roundToInt()}",
-                    "· E ${state.protein.consumedGrams.roundToInt()}",
-                ),
-                MaterialTheme.colorScheme.tertiary,
-            )
-            SummaryMetric("· F ${state.fat.consumedGrams.roundToInt()}", MaterialTheme.colorScheme.secondary)
-        }
-    }
-}
-
-@Composable
-private fun SummaryMetric(text: String, color: Color) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    AnimatedContent(
-        targetState = text,
-        modifier = Modifier.padding(horizontal = 3.dp),
-        transitionSpec = {
-            (slideInVertically(animationSpec = spatialSpec) { height -> height / 2 } +
-                fadeIn(animationSpec = effectsSpec)).togetherWith(
-                slideOutVertically(animationSpec = spatialSpec) { height -> -height / 2 } +
-                    fadeOut(animationSpec = effectsSpec),
-            )
-        },
-        label = "nutrition summary value",
-    ) { displayedText ->
-        Text(
-            text = displayedText,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            maxLines = 1,
-        )
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1671,36 +1587,39 @@ private fun QuickAddRow(
     description: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .heightIn(min = 72.dp)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+    // A real ListItem rather than a hand-built row, so it inherits Material's own heights,
+    // spacing and text colours and stays right when the theme or the font scale changes.
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        leadingContent = {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                }
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+        },
+        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        supportingContent = { Text(description) },
+        trailingContent = {
+            Icon(Icons.Default.ChevronRight, contentDescription = null)
+        },
+    )
 }
 
+/**
+ * The day's goals.
+ *
+ * Calories carry the headline because they are what the day is actually about; the macros sit
+ * below as three equals. The old sheet gave all four the same weight and then repeated the
+ * whole thing in a summary pill you had to tap to close - a workaround for an affordance a
+ * bottom sheet already has. Swiping it down is the way out now, so nothing has to explain
+ * itself.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
@@ -1716,121 +1635,142 @@ private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text = nomiString("Goals", "Ziele"),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.semantics { heading() },
-            )
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 1.dp,
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                ) {
-                    GoalProgressRow(
-                        label = nomiString("Calories", "Kalorien"),
-                        consumed = state.caloriesConsumed,
-                        target = state.calorieTarget,
-                        unit = "",
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    GoalProgressRow(
-                        label = nomiString("Carbs", "Kohlenhydrate"),
-                        consumed = state.carbohydrates.consumedGrams,
-                        target = state.carbohydrates.targetGrams,
-                        unit = "g",
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    GoalProgressRow(
-                        label = nomiString("Protein", "Eiweiß"),
-                        consumed = state.protein.consumedGrams,
-                        target = state.protein.targetGrams,
-                        unit = "g",
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                    GoalProgressRow(
-                        label = nomiString("Fat", "Fett"),
-                        consumed = state.fat.consumedGrams,
-                        target = state.fat.targetGrams,
-                        unit = "g",
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-            }
-            NutritionSummaryPill(state = state, onClick = onDismiss)
-            Text(
-                text = nomiString("Tap the summary to close", "Zum Schließen auf die Übersicht tippen"),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
+                    .padding(bottom = 4.dp)
+                    .semantics { heading() },
+            )
+            CalorieGoalCard(state)
+            MacroGoalCard(state)
+        }
+    }
+}
+
+@Composable
+private fun CalorieGoalCard(state: TodayUiState) {
+    val locale = nomiLocale()
+    val difference = state.caloriesDifference.roundToInt()
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = abs(difference).formatted(locale),
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    // Over the target is stated, never coloured as a warning. Nomi keeps the
+                    // log and has no opinion about the number in it.
+                    text = if (difference >= 0) {
+                        nomiString("kcal left today", "kcal heute übrig")
+                    } else {
+                        nomiString("kcal over today", "kcal heute darüber")
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            GoalWave(fraction = state.calorieFraction, color = MaterialTheme.colorScheme.primary)
+            Text(
+                text = "${state.caloriesConsumed.roundToInt().formatted(locale)} / " +
+                    "${state.calorieTarget.roundToInt().formatted(locale)} kcal",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
 }
 
 @Composable
-private fun GoalProgressRow(
-    label: String,
-    consumed: Double,
-    target: Double,
-    unit: String,
-    color: Color,
-) {
-    val fraction = if (target <= 0.0) 0f else (consumed / target).toFloat().coerceIn(0f, 1f)
-    val animatedFraction = remember { Animatable(0f) }
-    val progressSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
-    val locale = nomiLocale()
-    LaunchedEffect(fraction) {
-        animatedFraction.animateTo(
-            targetValue = fraction,
-            animationSpec = progressSpec,
-        )
+private fun MacroGoalCard(state: TodayUiState) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            MacroGoalRow(
+                label = nomiString("Carbs", "Kohlenhydrate"),
+                progress = state.carbohydrates,
+                color = MaterialTheme.colorScheme.error,
+            )
+            MacroGoalRow(
+                label = nomiString("Protein", "Eiweiß"),
+                progress = state.protein,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            MacroGoalRow(
+                label = nomiString("Fat", "Fett"),
+                progress = state.fat,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+}
+
+@Composable
+private fun MacroGoalRow(label: String, progress: MacroProgress, color: Color) {
+    val locale = nomiLocale()
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Surface(
-                modifier = Modifier.size(12.dp),
-                shape = CircleShape,
-                color = color,
-            ) {}
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = "${consumed.roundToInt().formatted(locale)} / ${target.roundToInt().formatted(locale)}$unit",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.End,
+                text = "${progress.consumedGrams.roundToInt().formatted(locale)} / " +
+                    "${progress.targetGrams.roundToInt().formatted(locale)} g",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        LinearProgressIndicator(
-            progress = { animatedFraction.value },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(CircleShape),
-            color = color,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        )
+        GoalWave(fraction = progress.fraction, color = color)
     }
+}
+
+/**
+ * Material 3's wavy indicator, filling from empty every time the sheet opens rather than
+ * appearing already full, so the day is something you watch arrive at its number.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun GoalWave(fraction: Float, color: Color) {
+    val filled = remember { Animatable(0f) }
+    val progressSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    LaunchedEffect(fraction) {
+        filled.animateTo(targetValue = fraction, animationSpec = progressSpec)
+    }
+    LinearWavyProgressIndicator(
+        progress = { filled.value },
+        modifier = Modifier.fillMaxWidth(),
+        color = color,
+        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    )
 }
 
 private fun cleanAmount(value: Double, locale: Locale): String =

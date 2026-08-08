@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -36,18 +37,20 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.localization.nomiString
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     state: SettingsUiState,
@@ -67,9 +70,19 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var picker by remember { mutableStateOf<SettingPicker?>(null) }
+    // The title collapses into the bar as the list scrolls, the same way it does on Progress
+    // and History, so the three top-level screens behave alike.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text(nomiString("Settings", "Einstellungen")) }) },
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeFlexibleTopAppBar(
+                title = { Text(nomiString("Settings", "Einstellungen")) },
+                scrollBehavior = scrollBehavior,
+            )
+        },
     ) { innerPadding ->
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
             item { SectionTitle(nomiString("You", "Du")) }
@@ -307,7 +320,7 @@ private fun ToggleSetting(
     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ChoiceSheet(
     title: String,

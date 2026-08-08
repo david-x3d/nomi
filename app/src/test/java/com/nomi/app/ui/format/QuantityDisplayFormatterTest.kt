@@ -47,8 +47,8 @@ class QuantityDisplayFormatterTest {
             english,
         )
 
-        assertEquals("≈133 g", display.primary)
-        assertEquals("⅔ bag · ≈133 g", display.withContext)
+        assertEquals("133 g", display.primary)
+        assertEquals("⅔ bag · 133 g", display.withContext)
         assertFalse(display.withContext.contains("0.7 bag"))
     }
 
@@ -163,9 +163,9 @@ class QuantityDisplayFormatterTest {
             german,
         )
 
-        assertEquals("≈30 g", display.primary)
+        assertEquals("30 g", display.primary)
         assertEquals("1,5 EL", display.context)
-        assertEquals("1,5 EL · ≈30 g", display.withContext)
+        assertEquals("1,5 EL · 30 g", display.withContext)
     }
     @Test
     fun `canonical spoon entry keeps entered EL and shows estimated grams`() {
@@ -183,9 +183,9 @@ class QuantityDisplayFormatterTest {
             german,
         )
 
-        assertEquals("≈30 g", display.primary)
+        assertEquals("30 g", display.primary)
         assertEquals("1,5 EL", display.context)
-        assertEquals("1,5 EL · ≈30 g", display.withContext)
+        assertEquals("1,5 EL · 30 g", display.withContext)
     }
 
     @Test

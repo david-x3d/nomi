@@ -17,6 +17,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -24,37 +25,44 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiCard
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import java.util.Locale
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProgressScreen(
     state: ProgressUiState,
@@ -62,9 +70,19 @@ fun ProgressScreen(
     onAddWeight: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The title collapses into the bar as you read down, which is what gives a Material screen
+    // its sense of depth without adding a single element to it.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = { TopAppBar(title = { Text(nomiString("Progress", "Fortschritt")) }) },
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeFlexibleTopAppBar(
+                title = { Text(nomiString("Progress", "Fortschritt")) },
+                scrollBehavior = scrollBehavior,
+            )
+        },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -73,32 +91,14 @@ fun ProgressScreen(
         ) {
             item {
                 LazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(ProgressRange.entries) { range ->
                         FilterChip(
                             selected = range == state.range,
                             onClick = { onRangeChanged(range) },
-                            label = {
-                                Text(
-                                    when (range) {
-                                        ProgressRange.SEVEN_DAYS -> nomiString("7 days", "7 Tage")
-                                        ProgressRange.THIRTY_DAYS -> nomiString("30 days", "30 Tage")
-                                        ProgressRange.THREE_MONTHS -> nomiString("3 months", "3 Monate")
-                                        ProgressRange.SIX_MONTHS -> nomiString("6 months", "6 Monate")
-                                        ProgressRange.ONE_YEAR -> nomiString("1 year", "1 Jahr")
-                                        ProgressRange.ALL -> nomiString("All", "Alle")
-                                    },
-                                )
-                            },
-                            leadingIcon = if (range == state.range) {
-                                {
-                                    Icon(Icons.Default.Check, contentDescription = null)
-                                }
-                            } else {
-                                null
-                            },
+                            label = { Text(range.label()) },
                         )
                     }
                 }
@@ -146,71 +146,143 @@ fun ProgressScreen(
 }
 
 @Composable
+private fun ProgressRange.label(): String = when (this) {
+    ProgressRange.SEVEN_DAYS -> nomiString("7 days", "7 Tage")
+    ProgressRange.THIRTY_DAYS -> nomiString("30 days", "30 Tage")
+    ProgressRange.THREE_MONTHS -> nomiString("3 months", "3 Monate")
+    ProgressRange.SIX_MONTHS -> nomiString("6 months", "6 Monate")
+    ProgressRange.ONE_YEAR -> nomiString("1 year", "1 Jahr")
+    ProgressRange.ALL -> nomiString("All", "Alle")
+}
+
+@Composable
 private fun WeightSection(
     state: ProgressUiState,
     onAddWeight: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val locale = nomiLocale()
-    ElevatedCard(
-        modifier = modifier
-            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-            .fillMaxWidth(),
+    NomiCard(
+        modifier = modifier.animateContentSize(
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        ),
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top,
         ) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(nomiString("Weight", "Gewicht"), style = MaterialTheme.typography.titleLarge)
-                    AnimatedContent(
-                        targetState = state.weights.lastOrNull()?.kilograms,
-                        transitionSpec = {
-                            (fadeIn(tween(220)) + slideInVertically(tween(280)) { it / 3 })
-                                .togetherWith(fadeOut(tween(140)) + slideOutVertically(tween(220)) { -it / 3 })
-                        },
-                        label = "Current weight",
-                    ) { kilograms ->
-                        kilograms?.let {
-                            Text(
-                                "${formatWeight(it, locale)} kg",
-                                style = MaterialTheme.typography.headlineMedium,
-                            )
-                        }
-                    }
-                }
-                Button(onClick = onAddWeight) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text(nomiString("Add", "Hinzufügen"))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = nomiString("Weight", "Gewicht"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AnimatedContent(
+                    targetState = state.weights.lastOrNull()?.kilograms,
+                    transitionSpec = {
+                        (fadeIn(tween(220)) + slideInVertically(tween(280)) { it / 3 })
+                            .togetherWith(fadeOut(tween(140)) + slideOutVertically(tween(220)) { -it / 3 })
+                    },
+                    label = "Current weight",
+                ) { kilograms ->
+                    Text(
+                        text = kilograms?.let { "${formatWeight(it, locale)} kg" } ?: "—",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
-            if (state.weights.size >= 2) {
-                WeightChart(
-                    points = state.weights,
-                    targetKg = state.targetWeightKg,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(2f),
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    state.startingWeightKg?.let {
-                        Text("${nomiString("Starting", "Start")}\n${formatWeight(it, locale)} kg")
-                    }
-                    state.weights.lastOrNull()?.let {
-                        Text("${nomiString("Current", "Aktuell")}\n${formatWeight(it.kilograms, locale)} kg")
-                    }
-                    state.targetWeightKg?.let {
-                        Text("${nomiString("Goal", "Ziel")}\n${formatWeight(it, locale)} kg")
-                    }
-                }
-            } else {
+            FilledTonalButton(onClick = onAddWeight) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(
-                    nomiString(
-                        "Log a little more to see your weight trend.",
-                        "Trage noch etwas mehr ein, um deinen Gewichtsverlauf zu sehen.",
-                    ),
+                    text = nomiString("Add", "Hinzufügen"),
+                    modifier = Modifier.padding(start = 6.dp),
+                    maxLines = 1,
                 )
             }
         }
+        if (state.weights.size >= 2) {
+            WeightChart(
+                points = state.weights,
+                targetKg = state.targetWeightKg,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                state.startingWeightKg?.let {
+                    WeightMilestone(
+                        label = nomiString("Starting", "Start"),
+                        value = "${formatWeight(it, locale)} kg",
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                state.weights.lastOrNull()?.let {
+                    WeightMilestone(
+                        label = nomiString("Current", "Aktuell"),
+                        value = "${formatWeight(it.kilograms, locale)} kg",
+                        modifier = Modifier.weight(1f),
+                        emphasized = true,
+                    )
+                }
+                state.targetWeightKg?.let {
+                    WeightMilestone(
+                        label = nomiString("Goal", "Ziel"),
+                        value = "${formatWeight(it, locale)} kg",
+                        modifier = Modifier.weight(1f),
+                        alignment = TextAlign.End,
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = nomiString(
+                    "Log a little more to see your weight trend.",
+                    "Trage noch etwas mehr ein, um deinen Gewichtsverlauf zu sehen.",
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Label above value, both typographically ranked. The three used to be single strings with a
+ * newline in them, which left the numbers unaligned and unreadable at a glance.
+ */
+@Composable
+private fun WeightMilestone(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+    alignment: TextAlign = TextAlign.Start,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = alignment,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (emphasized) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            textAlign = alignment,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -253,6 +325,7 @@ private fun WeightChart(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modifier) {
     val fraction = if (state.totalDays == 0) 0f else state.loggingDays.toFloat() / state.totalDays
@@ -264,51 +337,107 @@ private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modi
         ),
         label = "Logging consistency",
     )
-    Card(
-        modifier = modifier
-            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-            .fillMaxWidth(),
+    NomiCard(
+        modifier = modifier.animateContentSize(
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        ),
+        spacing = 14.dp,
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(nomiString("Consistency", "Regelmäßigkeit"), style = MaterialTheme.typography.titleLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = nomiString("Consistency", "Regelmäßigkeit"),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = nomiString(
+                        "${state.loggingDays} of ${state.totalDays} days logged",
+                        "An ${state.loggingDays} von ${state.totalDays} Tagen eingetragen",
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
-                nomiString(
-                    "Logged ${state.loggingDays} of ${state.totalDays} days",
-                    "An ${state.loggingDays} von ${state.totalDays} Tagen eingetragen",
-                ),
+                text = "${(animatedFraction * 100).roundToInt()} %",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
             )
-            LinearProgressIndicator(progress = { animatedFraction }, modifier = Modifier.fillMaxWidth())
         }
+        LinearWavyProgressIndicator(
+            progress = { animatedFraction },
+            modifier = Modifier.fillMaxWidth(),
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        )
     }
 }
 
 @Composable
 private fun NutritionAverages(state: ProgressUiState, modifier: Modifier = Modifier) {
     val days = state.nutrition.size.coerceAtLeast(1)
-    Card(
-        modifier = modifier
-            .animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
-            .fillMaxWidth(),
+    NomiCard(
+        modifier = modifier.animateContentSize(
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        ),
+        spacing = 12.dp,
     ) {
-        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(nomiString("Daily averages", "Tagesdurchschnitt"), style = MaterialTheme.typography.titleLarge)
-            Text(
-                nomiString("Calories", "Kalorien") +
-                    " ${state.nutrition.sumOf { it.calories }.div(days).roundToInt()} kcal",
-            )
-            Text(
-                nomiString("Protein", "Eiweiß") +
-                    " ${state.nutrition.sumOf { it.protein }.div(days).roundToInt()} g",
-            )
-            Text(
-                nomiString("Carbs", "Kohlenhydrate") +
-                    " ${state.nutrition.sumOf { it.carbohydrates }.div(days).roundToInt()} g",
-            )
-            Text(
-                nomiString("Fat", "Fett") +
-                    " ${state.nutrition.sumOf { it.fat }.div(days).roundToInt()} g",
-            )
-        }
+        Text(
+            text = nomiString("Daily averages", "Tagesdurchschnitt"),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        AverageRow(
+            label = nomiString("Calories", "Kalorien"),
+            value = "${state.nutrition.sumOf { it.calories }.div(days).roundToInt()} kcal",
+            emphasized = true,
+        )
+        AverageRow(
+            label = nomiString("Protein", "Eiweiß"),
+            value = "${state.nutrition.sumOf { it.protein }.div(days).roundToInt()} g",
+        )
+        AverageRow(
+            label = nomiString("Carbs", "Kohlenhydrate"),
+            value = "${state.nutrition.sumOf { it.carbohydrates }.div(days).roundToInt()} g",
+        )
+        AverageRow(
+            label = nomiString("Fat", "Fett"),
+            value = "${state.nutrition.sumOf { it.fat }.div(days).roundToInt()} g",
+        )
+    }
+}
+
+/**
+ * Label left, number right. These were one concatenated string per line, so the values sat
+ * wherever the label happened to end and could not be compared down the column.
+ */
+@Composable
+private fun AverageRow(label: String, value: String, emphasized: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = if (emphasized) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            textAlign = TextAlign.End,
+        )
     }
 }
 

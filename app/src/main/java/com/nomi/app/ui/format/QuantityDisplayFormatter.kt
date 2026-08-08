@@ -195,11 +195,11 @@ object QuantityDisplayFormatter {
             isNearlyWhole(amount) -> 0
             else -> 2
         }
+        // An approximate amount is still rounded more coarsely, but it is not marked with a
+        // symbol: the page reads as written numbers, and a "≈" in front of every converted
+        // spoon or package fraction turned that into arithmetic notation.
         val value = formatNumber(amount, locale, maxDigits)
-        return buildString {
-            if (approximate) append('≈')
-            append(value).append(' ').append(unit)
-        }
+        return "$value $unit"
     }
 
     private fun conflictNote(request: QuantityDisplayRequest, locale: Locale): String? {
