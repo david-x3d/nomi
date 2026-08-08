@@ -59,6 +59,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
@@ -576,6 +577,16 @@ private fun NotesEmptyState() {
     }
 }
 
+/**
+ * How long a deleted row stays on the page offering to come back.
+ *
+ * The row still occupies its place while it waits, so the page does not settle until it goes:
+ * a long window reads as the list being stuck rather than as a generous offer. Three seconds
+ * is enough to catch a swipe you did not mean, and short enough that deleting on purpose feels
+ * finished. A deletion is recoverable anyway - the entry can simply be written again.
+ */
+private const val UNDO_WINDOW_MILLIS = 3_000L
+
 private data class PendingDeletedFood(
     val entry: TodayFoodEntry,
     val undoRequested: Boolean = false,
@@ -688,7 +699,7 @@ private fun InlineDeletedFoodRow(
     onTimeout: () -> Unit,
 ) {
     LaunchedEffect(entry.id) {
-        delay(6_000)
+        delay(UNDO_WINDOW_MILLIS)
         onTimeout()
     }
     Surface(
@@ -1621,6 +1632,15 @@ private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Un
                 title = nomiString("Barcode", "Barcode"),
                 description = nomiString("Scan a packaged food", "Verpacktes Lebensmittel scannen"),
                 onClick = { onSelect(AddFoodMethod.BARCODE) },
+            )
+            QuickAddRow(
+                icon = Icons.Default.Article,
+                title = nomiString("Nutrition label", "Nährwerttabelle"),
+                description = nomiString(
+                    "Read the printed values, no research",
+                    "Gedruckte Werte ablesen, ohne Recherche",
+                ),
+                onClick = { onSelect(AddFoodMethod.LABEL) },
             )
             QuickAddRow(
                 icon = Icons.Default.History,

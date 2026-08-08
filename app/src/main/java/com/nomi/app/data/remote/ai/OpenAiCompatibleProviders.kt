@@ -5,12 +5,14 @@ import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
 import com.nomi.app.ai.model.VisionFoodResult
 import com.nomi.app.ai.prompt.AiPrompts
 import com.nomi.app.ai.provider.FoodParsingProvider
+import com.nomi.app.ai.provider.NutritionLabelProvider
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.provider.PortionAdjustmentProvider
 import com.nomi.app.ai.provider.VisionFoodProvider
@@ -39,6 +41,7 @@ class OpenAiCompatibleProviders(
 ) : FoodParsingProvider,
     NutritionResearchProvider,
     PortionAdjustmentProvider,
+    NutritionLabelProvider,
     VisionFoodProvider {
 
     override suspend fun parseFood(text: String): ParsedFoodIntent {
@@ -89,6 +92,23 @@ class OpenAiCompatibleProviders(
         )
         val adjustment: PortionAdjustment = client.json.decodeFromString(raw)
         return AiResponseValidator.validate(current, adjustment)
+    }
+
+    override suspend fun readNutritionLabel(
+        imageBytes: ByteArray,
+        mediaType: String,
+    ): NutritionLabelReading {
+        require(imageBytes.isNotEmpty()) { "The selected image is empty" }
+        val raw = client.completeVisionJson(
+            config = visionConfig,
+            credential = visionCredential(),
+            prompt = AiPrompts.readNutritionLabel(),
+            base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
+            mediaType = mediaType,
+        )
+        throwIfLabelUnreadable(client.json, raw)
+        val reading: NutritionLabelReading = client.json.decodeFromString(raw)
+        return AiResponseValidator.validate(reading)
     }
 
     override suspend fun identifyFood(imageBytes: ByteArray, mediaType: String): VisionFoodResult {
@@ -149,6 +169,19 @@ private fun canonicalResearchSite(url: String): String? = runCatching {
 
 @Serializable
 private data class ResearchRefusal(val error: String? = null)
+
+/**
+ * An unreadable label is the correct answer for a bad photo, so it is reported as such instead
+ * of being retried against a second provider: another model cannot read a blurred table either.
+ */
+internal fun throwIfLabelUnreadable(json: Json, content: String) {
+    val refusal = runCatching { json.decodeFromString<ResearchRefusal>(content) }.getOrNull()
+    val reason = refusal?.error?.trim()?.takeIf(String::isNotEmpty) ?: return
+    throw AiValidationException(
+        "The nutrition table couldn't be read: ${reason.take(200)}. " +
+            "Photograph the table straight on, filling the frame, with the values in focus.",
+    )
+}
 
 /** Turns the prompt's {"error": ...} escape hatch into a retryable failure. */
 internal fun throwIfResearchRefusal(json: Json, content: String) {

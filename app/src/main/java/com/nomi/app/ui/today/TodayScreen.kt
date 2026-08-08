@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -389,6 +390,7 @@ private fun AddFoodSheet(
                             AddFoodMethod.VOICE -> "Say what you ate"
                             AddFoodMethod.PHOTO -> "Take or choose a meal photo"
                             AddFoodMethod.BARCODE -> "Scan packaged food"
+                            AddFoodMethod.LABEL -> "Read a printed nutrition table"
                             AddFoodMethod.RECENT -> "Log something again"
                             AddFoodMethod.FAVORITES -> "Your saved foods"
                             AddFoodMethod.SAVED_MEALS -> "Add a whole saved meal"
@@ -410,6 +412,7 @@ private fun AddFoodMethod.icon(): ImageVector = when (this) {
     AddFoodMethod.VOICE -> Icons.Default.Mic
     AddFoodMethod.PHOTO -> Icons.Default.CameraAlt
     AddFoodMethod.BARCODE -> Icons.Default.QrCodeScanner
+    AddFoodMethod.LABEL -> Icons.Default.Article
     AddFoodMethod.RECENT -> Icons.Default.History
     AddFoodMethod.FAVORITES -> Icons.Default.Favorite
     AddFoodMethod.SAVED_MEALS -> Icons.Default.RestaurantMenu

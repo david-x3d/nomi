@@ -174,6 +174,34 @@ data class VisionFoodResult(
     val notes: List<String> = emptyList(),
 )
 
+/**
+ * A nutrition table read straight off a package.
+ *
+ * This is the one path where nothing is researched and nothing is estimated: the values are
+ * printed on the thing the user is holding. [basisQuantity] and [basisUnit] name the column
+ * they were read from, so Nomi's normalizer scales them the same way it scales any source
+ * serving. A label that cannot be read fully returns null fields rather than guesses.
+ */
+@Serializable
+data class NutritionLabelReading(
+    val productName: String? = null,
+    val brand: String? = null,
+    val basisQuantity: Double,
+    val basisUnit: String,
+    val calories: Double,
+    val proteinGrams: Double,
+    val carbohydrateGrams: Double,
+    val fatGrams: Double,
+    val fiberGrams: Double? = null,
+    /** Net content printed on the package, informational only. */
+    val packageQuantity: Double? = null,
+    val packageUnit: String? = null,
+    /** Serving size as the label words it, used to pre-fill the amount. */
+    val servingLabel: String? = null,
+    val confidence: Double? = null,
+    val notes: List<String> = emptyList(),
+)
+
 @Serializable
 data class VisionFoodItem(
     val name: String,

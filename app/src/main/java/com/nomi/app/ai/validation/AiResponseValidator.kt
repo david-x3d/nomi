@@ -2,6 +2,7 @@ package com.nomi.app.ai.validation
 
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
@@ -33,6 +34,14 @@ object AiResponseValidator {
     private const val MAX_COUNTRY_CHARS = 8
     private const val MAX_DOMAIN_CHARS = 253
 
+    /**
+     * How far a label's macros may sit from its printed energy before the reading is refused.
+     * Real tables drift a little: rounding, sugar alcohols, and fibre that some markets count
+     * toward energy and others do not.
+     */
+    private const val LABEL_ENERGY_TOLERANCE = 0.25
+    private const val LABEL_ENERGY_TOLERANCE_KCAL = 30.0
+
     fun validate(intent: ParsedFoodIntent): ParsedFoodIntent {
         validateText(intent.originalText, "original text", required = true, maxChars = MAX_INPUT_TEXT_CHARS)
         validateText(intent.language, "language", maxChars = MAX_LANGUAGE_CHARS)
@@ -62,6 +71,50 @@ object AiResponseValidator {
         analysis.items.forEach(::validateItem)
         analysis.overallConfidence?.let(::requireConfidence)
         return analysis
+    }
+
+    /**
+     * A label reading claims to be transcription, not research, so it is held to what a real
+     * printed table can say. The macro cross-check is the important one: grams that cannot
+     * add up to the printed energy mean a column was misread, and a misread column is worse
+     * than no reading at all, because nothing downstream would ever question it.
+     */
+    fun validate(reading: NutritionLabelReading): NutritionLabelReading {
+        validateText(reading.productName, "product name", maxChars = MAX_NAME_CHARS)
+        validateText(reading.brand, "brand", maxChars = MAX_BRAND_CHARS)
+        validateText(reading.basisUnit, "label basis unit", required = true, maxChars = MAX_UNIT_CHARS)
+        validateText(reading.packageUnit, "package unit", maxChars = MAX_UNIT_CHARS)
+        validateText(reading.servingLabel, "serving label", maxChars = MAX_DETAIL_CHARS)
+        validateTextList(reading.notes, "label notes")
+        requireFinitePositive(reading.basisQuantity, "label basis amount", MAX_QUANTITY)
+        reading.packageQuantity?.let { requireFinitePositive(it, "package amount", MAX_QUANTITY) }
+        reading.confidence?.let(::requireConfidence)
+        requireFiniteNonNegative(reading.calories, "label calories", MAX_ITEM_CALORIES)
+        requireFiniteNonNegative(reading.proteinGrams, "label protein", MAX_MACRO_GRAMS)
+        requireFiniteNonNegative(reading.carbohydrateGrams, "label carbohydrates", MAX_MACRO_GRAMS)
+        requireFiniteNonNegative(reading.fatGrams, "label fat", MAX_MACRO_GRAMS)
+        reading.fiberGrams?.let { requireFiniteNonNegative(it, "label fibre", MAX_MACRO_GRAMS) }
+
+        // Per 100 g/ml no food can contain more than 100 g of anything.
+        if (reading.basisQuantity == 100.0 && reading.basisUnit.trim().lowercase() in setOf("g", "ml")) {
+            val macros = reading.proteinGrams + reading.carbohydrateGrams + reading.fatGrams
+            if (macros > 100.0) {
+                throw AiValidationException(
+                    "The values read from the label add up to more than 100 g per 100 g. " +
+                        "Photograph the table again, straight on and in focus.",
+                )
+            }
+        }
+        val impliedCalories = reading.proteinGrams * 4 + reading.carbohydrateGrams * 4 +
+            reading.fatGrams * 9
+        val tolerance = maxOf(LABEL_ENERGY_TOLERANCE_KCAL, reading.calories * LABEL_ENERGY_TOLERANCE)
+        if (reading.calories > 0.0 && abs(impliedCalories - reading.calories) > tolerance) {
+            throw AiValidationException(
+                "The macros read from the label don't match its energy value, so a column was " +
+                    "probably misread. Photograph the table again, straight on and in focus.",
+            )
+        }
+        return reading
     }
 
     fun validate(vision: VisionFoodResult): VisionFoodResult {

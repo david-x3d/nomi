@@ -62,6 +62,13 @@ import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.integration.camera.CameraCaptureController
 import kotlinx.coroutines.launch
 
+/**
+ * What the camera is pointed at. The two subjects need opposite advice: a meal wants the whole
+ * plate and forgiving light, a nutrition table wants to fill the frame and be sharp, because
+ * nothing downstream will second-guess a misread digit.
+ */
+enum class PhotoCaptureSubject { MEAL, NUTRITION_LABEL }
+
 /** Captures a camera image or chooses one through the system picker, returning its URI and MIME type. */
 @Composable
 fun PhotoCaptureScreen(
@@ -69,6 +76,7 @@ fun PhotoCaptureScreen(
     onPhotoSelected: (uri: Uri, mimeType: String) -> Unit,
     onManualEntry: () -> Unit,
     modifier: Modifier = Modifier,
+    subject: PhotoCaptureSubject = PhotoCaptureSubject.MEAL,
     controllerFactory: (Context) -> CameraCaptureController = ::CameraCaptureController,
 ) {
     val context = LocalContext.current
@@ -163,8 +171,33 @@ fun PhotoCaptureScreen(
         )
     }
 
+    val screenTitle = when (subject) {
+        PhotoCaptureSubject.MEAL ->
+            nomiString("Photograph your meal", "Fotografiere deine Mahlzeit")
+        PhotoCaptureSubject.NUTRITION_LABEL ->
+            nomiString("Photograph the label", "Fotografiere das Etikett")
+    }
+    val guidanceHeadline = when (subject) {
+        PhotoCaptureSubject.MEAL ->
+            nomiString("Keep the whole meal in frame", "Halte die ganze Mahlzeit im Bild")
+        PhotoCaptureSubject.NUTRITION_LABEL ->
+            nomiString("Fill the frame with the table", "Die Tabelle formatfüllend aufnehmen")
+    }
+    val guidanceDetail = when (subject) {
+        PhotoCaptureSubject.MEAL -> nomiString(
+            "Good light and a clear view of portions help Nomi make a better estimate.",
+            "Gutes Licht und klar erkennbare Portionen helfen Nomi bei einer besseren Schätzung.",
+        )
+        // Nothing is researched or estimated here, so the only thing that decides whether the
+        // numbers are right is whether they can be read.
+        PhotoCaptureSubject.NUTRITION_LABEL -> nomiString(
+            "Straight on and in focus. Nomi reads the printed values and researches nothing.",
+            "Frontal und scharf. Nomi liest die gedruckten Werte ab und recherchiert nichts.",
+        )
+    }
+
     CaptureScaffold(
-        title = nomiString("Photograph your meal", "Fotografiere deine Mahlzeit"),
+        title = screenTitle,
         onBack = onBack,
         modifier = modifier,
     ) { innerPadding ->
@@ -177,13 +210,13 @@ fun PhotoCaptureScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = nomiString("Keep the whole meal in frame", "Halte die ganze Mahlzeit im Bild"),
+                text = guidanceHeadline,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = nomiString("Good light and a clear view of portions help Nomi make a better estimate.", "Gutes Licht und klar erkennbare Portionen helfen Nomi bei einer besseren Schätzung."),
+                text = guidanceDetail,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -69,6 +69,7 @@ import com.nomi.app.integration.health.HealthFeatures
 import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.BarcodeAmountSheet
 import com.nomi.app.ui.capture.PhotoCaptureScreen
+import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.capture.VoiceCaptureScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
@@ -231,6 +232,7 @@ private fun NomiMain(
                             }
                             AddFoodMethod.VOICE -> navController.navigate(Routes.VOICE)
                             AddFoodMethod.PHOTO -> navController.navigate(Routes.PHOTO)
+                            AddFoodMethod.LABEL -> navController.navigate(Routes.LABEL)
                             AddFoodMethod.BARCODE -> navController.navigate(Routes.BARCODE)
                             AddFoodMethod.RECENT,
                             AddFoodMethod.FAVORITES,
@@ -331,6 +333,36 @@ private fun NomiMain(
                                 // A photo returns to the page, the way voice does, so its
                                 // result is confirmed in the same note as a typed meal
                                 // instead of in the logging form with its meal-time picker.
+                                navController.popBackStack(Routes.HOME, inclusive = false)
+                            }.onFailure { showMessage(it.message ?: "Nomi couldn't read that image") }
+                        }
+                    },
+                    onManualEntry = {
+                        viewModel.beginLogging(AddFoodMethod.TYPE)
+                        navController.popBackStack(Routes.HOME, inclusive = false)
+                    },
+                )
+            }
+
+            composable(Routes.LABEL) {
+                PhotoCaptureScreen(
+                    subject = PhotoCaptureSubject.NUTRITION_LABEL,
+                    onBack = { navController.popBackStack() },
+                    onPhotoSelected = { uri, _ ->
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        resolver.openInputStream(uri)?.use(MealImagePreprocessor::prepare)
+                                            ?: error("The selected image could not be opened")
+                                    } finally {
+                                        deleteOwnedCameraCapture(context.applicationContext, uri)
+                                    }
+                                }
+                            }.onSuccess { prepared ->
+                                viewModel.analyzeNutritionLabel(prepared.bytes, prepared.mediaType)
+                                // A label ends where a scanned barcode ends: in the amount
+                                // sheet, because a printed table never says how much was eaten.
                                 navController.popBackStack(Routes.HOME, inclusive = false)
                             }.onFailure { showMessage(it.message ?: "Nomi couldn't read that image") }
                         }
@@ -768,6 +800,7 @@ private object Routes {
     const val LOGGING = "logging"
     const val VOICE = "voice"
     const val PHOTO = "photo"
+    const val LABEL = "label"
     const val BARCODE = "barcode"
     const val LIBRARY = "library"
     const val FOOD = "food/{id}"

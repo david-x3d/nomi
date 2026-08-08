@@ -266,6 +266,56 @@ object AiPrompts {
         }
     """.trimIndent()
 
+    /**
+     * Reading a printed nutrition table. Nothing here is researched or estimated - the numbers
+     * are on the package in the user's hand, so the only failure mode worth allowing is
+     * admitting the photo is unreadable.
+     */
+    fun readNutritionLabel(): String = """
+        Read the nutrition table printed on the packaging in this image. Report ONLY what the
+        label actually prints. Never research, never estimate, never fill a value from memory
+        or from what the product usually contains.
+
+        If the table is unreadable, cut off, blurred, or not present in the image, return
+        exactly {"error": "<short reason>"} as the entire response. That is the correct answer
+        for a bad photo. NEVER invent numbers to avoid returning an error, and never write
+        failure text into a data field.
+
+        Read one single column and say which one it is. Prefer the per-100 g or per-100 ml
+        column when the label has one: then basisQuantity=100 and basisUnit is "g" or "ml".
+        Only if the label has no per-100 column, read the per-serving/per-piece column and set
+        basisQuantity and basisUnit to exactly that serving. Never mix values from two columns
+        and never convert between columns yourself - Nomi scales the values it is given.
+
+        Energy: report kilocalories in `calories`. If the label prints only kJ, convert with
+        1 kcal = 4.184 kJ and say so in notes. Report grams for the macro fields exactly as
+        printed, including decimals; "<0,5 g" is 0. German labels use a comma as the decimal
+        separator, so "1,5 g" is 1.5.
+
+        `productName` and `brand` come from the front of the package if they are visible in the
+        image; leave them null rather than guessing. `packageQuantity`/`packageUnit` are the net
+        content ("500 g", "0,33 l") and are informational only. `servingLabel` is the serving
+        size as the label words it ("1 Portion (30 g)"), if it prints one.
+
+        Return only this JSON shape:
+        {
+          "productName": string|null,
+          "brand": string|null,
+          "basisQuantity": positive number,
+          "basisUnit": string,
+          "calories": non-negative number,
+          "proteinGrams": non-negative number,
+          "carbohydrateGrams": non-negative number,
+          "fatGrams": non-negative number,
+          "fiberGrams": non-negative number|null,
+          "packageQuantity": positive number|null,
+          "packageUnit": string|null,
+          "servingLabel": string|null,
+          "confidence": number|null,
+          "notes": [string]
+        }
+    """.trimIndent()
+
     fun identifyFoodFromPhoto(): String = """
         Identify visible foods and estimate portions from this image. Do not claim exact calories.
         Return only strict JSON in this shape:

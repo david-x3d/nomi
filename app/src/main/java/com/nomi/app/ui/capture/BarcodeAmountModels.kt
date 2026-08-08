@@ -5,7 +5,8 @@ import com.nomi.app.ui.today.MealCategory
 import java.util.Locale
 
 data class BarcodeAmountUiState(
-    val barcode: String,
+    /** Null when the product came from a photographed label rather than a scanned code. */
+    val barcode: String? = null,
     val sourceItem: AnalyzedFoodItem,
     val amount: String,
     val unit: String,

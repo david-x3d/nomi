@@ -9,6 +9,7 @@ import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
@@ -592,6 +593,100 @@ class AppViewModel(
     fun retryAnalysis() {
         editLoggingText()
         analyzeText()
+    }
+
+    /**
+     * Reads a photographed nutrition table.
+     *
+     * This is the only logging path that never researches anything: the values are printed on
+     * the package in the user's hand, so there is nothing to look up, cross-check, or estimate.
+     * That also makes it the answer for the products the web knows badly - regional, store,
+     * and foreign brands - where research is slowest and least certain.
+     *
+     * A label gives nutrition per 100 g/ml or per serving, never the amount eaten, so it ends
+     * where a scanned barcode ends: in the amount sheet, which then scales it exactly as it
+     * scales any other source serving.
+     */
+    fun analyzeNutritionLabel(bytes: ByteArray, mediaType: String) {
+        cancelAnalysis()
+        val requestId = ++barcodeLookupRequestId
+        val category = defaultMealCategory()
+        mutableBarcodeAmountState.value = null
+        viewModelScope.launch {
+            mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.FINDING_NUTRITION)
+            runCatching {
+                val reading = withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
+                    providerFor(config, key).readNutritionLabel(bytes, mediaType)
+                }
+                val sourceItem = reading.toAnalyzedItem()
+                cacheAnalyzedFood(sourceItem)
+                BarcodeAmountUiState(
+                    sourceItem = sourceItem,
+                    amount = BarcodeAmountSupport.initialSuggestion(
+                        reading.servingLabel,
+                        sourceItem.unit,
+                    ).amount,
+                    unit = BarcodeAmountSupport.initialSuggestion(
+                        reading.servingLabel,
+                        sourceItem.unit,
+                    ).unit,
+                    compatibleUnits = BarcodeAmountSupport.compatibleUnits(sourceItem.unit),
+                    mealCategory = category,
+                    servingLabel = reading.servingLabel,
+                )
+            }.onSuccess { amountState ->
+                if (requestId != barcodeLookupRequestId) return@onSuccess
+                mutableLoggingState.value = FoodLoggingUiState.Input("", category)
+                updateBarcodeAmountState(amountState)
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (requestId != barcodeLookupRequestId) return@onFailure
+                mutableLoggingState.value = FoodLoggingUiState.Error(
+                    error.safeAiMessage(),
+                    canRetry = false,
+                )
+            }
+        }
+    }
+
+    /**
+     * A printed table is a source serving like any other, so it enters the pipeline the same
+     * way an Open Food Facts product does. It is never an estimate: these numbers were read,
+     * not guessed.
+     */
+    private fun NutritionLabelReading.toAnalyzedItem(): AnalyzedFoodItem {
+        val unit = basisUnit.trim().ifBlank { "g" }
+        val grams = basisQuantity.takeIf { unit.equals("g", ignoreCase = true) }
+        return AnalyzedFoodItem(
+            name = FoodDisplayName.clean(
+                productName?.takeIf(String::isNotBlank) ?: inUserLanguage(
+                    english = "Photographed label",
+                    german = "Fotografiertes Etikett",
+                ),
+            ),
+            brand = brand?.takeIf(String::isNotBlank)?.take(200),
+            quantity = basisQuantity,
+            unit = unit,
+            gramsEquivalent = grams,
+            calories = calories,
+            proteinGrams = proteinGrams,
+            carbohydrateGrams = carbohydrateGrams,
+            fatGrams = fatGrams,
+            fiberGrams = fiberGrams,
+            sourceName = inUserLanguage(
+                english = "Nutrition label photo",
+                german = "Foto der Nährwerttabelle",
+            ),
+            sourceProductName = productName?.takeIf(String::isNotBlank),
+            sourceServingQuantity = basisQuantity,
+            sourceServingUnit = unit,
+            sourceServingGramsEquivalent = grams,
+            sourcePackageQuantity = packageQuantity,
+            sourcePackageUnit = packageUnit?.takeIf(String::isNotBlank),
+            confidence = confidence,
+            assumptions = notes,
+            isEstimate = false,
+        )
     }
 
     fun analyzePhoto(bytes: ByteArray, mediaType: String) {
@@ -1904,6 +1999,13 @@ class AppViewModel(
             ),
         )
     }
+
+    /**
+     * The composable [nomiString] needs a composition, but a few strings are written into saved
+     * data from here. They follow the same switch so a German log does not sprout English rows.
+     */
+    private fun inUserLanguage(english: String, german: String): String =
+        if (preferences.value.germanTranslationEnabled) german else english
 
     private fun defaultMealCategory(): MealCategory = when (LocalTime.now(zoneId).hour) {
         in 4..10 -> MealCategory.BREAKFAST
