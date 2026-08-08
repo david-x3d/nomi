@@ -7,6 +7,7 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.ServingSizeValidation
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.round
 
 /**
  * Converts source-serving nutrition into the exact amount the user logged.
@@ -20,6 +21,13 @@ object ServingNutritionNormalizer {
     private const val OUNCE_GRAMS = 28.349523125
     private const val MATCH_TOLERANCE = 1e-6
     private const val NUTRIENT_TOLERANCE = 1e-7
+
+    /** Rounding headroom over the 100 g physical ceiling for label values. */
+    private const val MAX_MACRO_GRAMS_PER_100 = 102.0
+    /** Pure fat is 884 kcal per 100 g; the margin covers polyol and rounding edge cases. */
+    private const val MAX_CALORIES_PER_100 = 950.0
+    /** 100 ml of honey weighs about 142 g, the densest common food. */
+    private const val MAX_PLAUSIBLE_DENSITY = 1.5
 
     private const val MEDIUM_APPLE_GRAMS_PER_PIECE = 182.0
     private const val MEDIUM_APPLE_MASS_ASSUMPTION =
@@ -310,6 +318,7 @@ object ServingNutritionNormalizer {
             fatGramsPer100 = item.fatGrams * per100Factor,
             fiberGramsPer100 = item.fiberGrams?.times(per100Factor),
         )
+        requirePhysicallyPossiblePer100(validation, sourceMeasure.dimension)
         return item.copy(
             quantity = loggedQuantity,
             unit = loggedUnit,
@@ -432,6 +441,42 @@ object ServingNutritionNormalizer {
         .replace(Regex("[^\\p{L}]+"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
+
+    /**
+     * Rejects per-100 values that no real food can have, which is the strongest deterministic
+     * signal that reported nutrition did not describe the declared source serving — typically
+     * values already scaled to the logged portion, or a mg/g unit mix-up.
+     *
+     * 100 g of food cannot contain more than 100 g of macronutrients, and pure fat (884 kcal
+     * per 100 g) bounds the energy. Volume bases allow for dense liquids such as honey, whose
+     * 100 ml weighs about 142 g.
+     */
+    private fun requirePhysicallyPossiblePer100(
+        validation: ServingSizeValidation,
+        dimension: Dimension,
+    ) {
+        val densityAllowance = when (dimension) {
+            Dimension.Mass -> 1.0
+            Dimension.Volume -> MAX_PLAUSIBLE_DENSITY
+            else -> return
+        }
+        val macroGrams = validation.proteinGramsPer100 + validation.carbohydrateGramsPer100 +
+            validation.fatGramsPer100 + (validation.fiberGramsPer100 ?: 0.0)
+        if (macroGrams > MAX_MACRO_GRAMS_PER_100 * densityAllowance) {
+            throw AiValidationException(
+                "The researched nutrition is not possible per 100 ${dimension.per100Label}: " +
+                    "${clean(round(macroGrams))} g of macronutrients. The source values may " +
+                    "already be scaled to the logged amount.",
+            )
+        }
+        if (validation.caloriesPer100 > MAX_CALORIES_PER_100 * densityAllowance) {
+            throw AiValidationException(
+                "The researched nutrition is not possible per 100 ${dimension.per100Label}: " +
+                    "${clean(round(validation.caloriesPer100))} kcal. The source values may " +
+                    "already be scaled to the logged amount.",
+            )
+        }
+    }
 
     private fun requireEquivalentUnits(
         firstQuantity: Double,
@@ -587,9 +632,16 @@ object ServingNutritionNormalizer {
 
     private sealed interface Dimension {
         val storageName: String
+        val per100Label: String get() = "units"
 
-        data object Mass : Dimension { override val storageName = "mass_g" }
-        data object Volume : Dimension { override val storageName = "volume_ml" }
+        data object Mass : Dimension {
+            override val storageName = "mass_g"
+            override val per100Label = "g"
+        }
+        data object Volume : Dimension {
+            override val storageName = "volume_ml"
+            override val per100Label = "ml"
+        }
         data object Piece : Dimension { override val storageName = "piece" }
         data class Custom(val unit: String) : Dimension { override val storageName = "custom:$unit" }
     }

@@ -41,6 +41,93 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
+    fun `per-100-g steak source scales to the logged 329 g exactly once`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 329.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+                calories = 172.0,
+                protein = 21.0,
+                carbs = 0.0,
+                fat = 9.5,
+            ),
+            requestedQuantity = 329.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(172.0 * 3.29, normalized.calories, 1e-9)
+        assertEquals(21.0 * 3.29, normalized.proteinGrams, 1e-9)
+        assertEquals(9.5 * 3.29, normalized.fatGrams, 1e-9)
+        assertEquals(172.0, normalized.servingValidation!!.caloriesPer100, 1e-9)
+    }
+
+    @Test
+    fun `pre-scaled per-100-g values are rejected as physically impossible`() {
+        val error = assertThrows(AiValidationException::class.java) {
+            normalize(
+                raw = sourceItem(
+                    loggedQuantity = 329.0,
+                    loggedUnit = "g",
+                    sourceQuantity = 100.0,
+                    sourceUnit = "g",
+                    // Values already scaled to 329 g: 105.6 g of macros per 100 g.
+                    calories = 566.0,
+                    protein = 69.0,
+                    carbs = 5.3,
+                    fat = 31.3,
+                ),
+                requestedQuantity = 329.0,
+                requestedUnit = "g",
+            )
+        }
+
+        assertTrue(error.message!!.contains("not possible per 100 g"))
+        assertTrue(error.message!!.contains("already be scaled"))
+    }
+
+    @Test
+    fun `pure oil per 100 g stays within the physical calorie ceiling`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 15.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+                calories = 884.0,
+                protein = 0.0,
+                carbs = 0.0,
+                fat = 100.0,
+            ),
+            requestedQuantity = 15.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(884.0 * 0.15, normalized.calories, 1e-9)
+    }
+
+    @Test
+    fun `dense honey per 100 ml is accepted despite exceeding 100 grams of macros`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 20.0,
+                loggedUnit = "ml",
+                sourceQuantity = 100.0,
+                sourceUnit = "ml",
+                calories = 434.0,
+                protein = 0.4,
+                carbs = 121.0,
+                fat = 0.0,
+            ),
+            requestedQuantity = 20.0,
+            requestedUnit = "ml",
+        )
+
+        assertEquals(434.0 * 0.2, normalized.calories, 1e-9)
+    }
+
+    @Test
     fun `US fluid ounces are volume and scale exactly to milliliters`() {
         val normalized = normalize(
             raw = sourceItem(
@@ -84,24 +171,51 @@ class ServingNutritionNormalizerTest {
     @Test
     fun `milligrams use the gram mass basis`() {
         val normalized = normalize(
-            raw = sourceItem(500.0, "mg", 1.0, "g"),
+            raw = sourceItem(
+                loggedQuantity = 500.0,
+                loggedUnit = "mg",
+                sourceQuantity = 1.0,
+                sourceUnit = "g",
+                calories = 1.0,
+                protein = 0.1,
+                carbs = 0.1,
+                fat = 0.02,
+            ),
             requestedQuantity = 500.0,
             requestedUnit = "mg",
         )
 
-        assertEquals(50.0, normalized.calories, 1e-12)
+        assertEquals(0.5, normalized.calories, 1e-12)
         assertEquals(0.5, normalized.servingValidation!!.loggedBaseAmount, 1e-12)
     }
 
     @Test
     fun `English and German spoons use exact milliliter factors`() {
         val tablespoon = normalize(
-            raw = sourceItem(1.0, "EL", 15.0, "ml"),
+            raw = sourceItem(
+                loggedQuantity = 1.0,
+                loggedUnit = "EL",
+                sourceQuantity = 15.0,
+                sourceUnit = "ml",
+                calories = 15.0,
+                protein = 1.5,
+                carbs = 1.5,
+                fat = 0.3,
+            ),
             requestedQuantity = 1.0,
             requestedUnit = "Essl\u00f6ffel",
         )
         val teaspoons = normalize(
-            raw = sourceItem(2.0, "TL", 10.0, "ml"),
+            raw = sourceItem(
+                loggedQuantity = 2.0,
+                loggedUnit = "TL",
+                sourceQuantity = 10.0,
+                sourceUnit = "ml",
+                calories = 10.0,
+                protein = 1.0,
+                carbs = 1.0,
+                fat = 0.2,
+            ),
             requestedQuantity = 2.0,
             requestedUnit = "teaspoons",
         )
@@ -167,8 +281,16 @@ class ServingNutritionNormalizerTest {
     @Test
     fun `mass log can use spoon source only with source total grams equivalent`() {
         val normalized = normalize(
-            raw = sourceItem(15.0, "g", 1.0, "tbsp", calories = 30.0)
-                .copy(sourceServingGramsEquivalent = 20.0),
+            raw = sourceItem(
+                loggedQuantity = 15.0,
+                loggedUnit = "g",
+                sourceQuantity = 1.0,
+                sourceUnit = "tbsp",
+                calories = 30.0,
+                protein = 2.0,
+                carbs = 2.0,
+                fat = 0.4,
+            ).copy(sourceServingGramsEquivalent = 20.0),
             requestedQuantity = 15.0,
             requestedUnit = "g",
         )

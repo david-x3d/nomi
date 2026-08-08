@@ -115,6 +115,23 @@ object AiPrompts {
         calories or macros yourself: Nomi app code deterministically normalizes your reported
         values to per 100 g/ml (or per 100 compatible count units) and scales them to the
         logged amount, and it rejects results whose basis does not reconcile.
+
+        CRITICAL SERVING-BASIS RULE: `calories`, `proteinGrams`, `carbohydrateGrams`,
+        `fatGrams`, and `fiberGrams` MUST describe EXACTLY the amount given by
+        `sourceServingQuantity` and `sourceServingUnit`. They MUST NEVER describe the user's
+        logged quantity unless the cited source itself explicitly publishes nutrition for
+        exactly that serving. Whenever reliable per-100-g or per-100-ml nutrition exists,
+        ALWAYS return sourceServingQuantity=100 with the nutrient values PER 100 g/ml. Do NOT
+        pre-scale them to the consumed amount; Nomi performs all portion scaling itself.
+        Example: the user logged 329 g steak and the source publishes per 100 g
+        172 kcal, 21 g protein, 0 g carbohydrates, 9.5 g fat.
+        CORRECT: quantity=329, unit="g", sourceServingQuantity=100, sourceServingUnit="g",
+        calories=172, proteinGrams=21, carbohydrateGrams=0, fatGrams=9.5.
+        WRONG: calories=566, proteinGrams=69, fatGrams=31.3 - those are already scaled to
+        329 g, so Nomi would scale them a second time. Never do this.
+        Before returning JSON, verify for every item: if sourceServingQuantity=100 and
+        sourceServingUnit is "g" or "ml", then every nutrient field is the PER-100 value from
+        the cited source, regardless of `quantity`.
         COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT. When the logged amount is
         a count (piece/Stück) but the source serving is mass, `gramsEquivalent` MUST be the total
         grams for the entire logged count, not grams per piece. When the source serving is a count

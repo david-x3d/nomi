@@ -98,4 +98,23 @@ class AiPromptsTest {
         assertTrue(prompt.contains("slightly higher plausible calorie"))
         assertTrue(prompt.contains("rather than underestimating"))
     }
+
+    @Test
+    fun `nutrition research prompt forbids pre-scaling the source serving basis`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "329 g Steak",
+                items = listOf(ParsedFoodItem(name = "Steak", quantity = 329.0, unit = "g")),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        assertTrue(prompt.contains("CRITICAL SERVING-BASIS RULE"))
+        assertTrue(prompt.contains("MUST NEVER describe the user's"))
+        assertTrue(prompt.contains("pre-scale them to the consumed amount"))
+        assertTrue(prompt.contains("calories=172"))
+        assertTrue(prompt.contains("WRONG: calories=566"))
+        assertTrue(prompt.contains("scale them a second time"))
+    }
 }
