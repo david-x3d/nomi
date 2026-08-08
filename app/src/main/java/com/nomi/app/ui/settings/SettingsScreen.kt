@@ -363,6 +363,7 @@ private fun String.localizedPurpose(): String = when (this) {
     "Food interpretation" -> nomiString("Food interpretation", "Lebensmittelinterpretation")
     "Portion changes" -> nomiString("Portion changes", "Portionsänderungen")
     "Photo recognition" -> nomiString("Photo recognition", "Fotoerkennung")
+    "Fallback" -> nomiString("Fallback", "Intelligenter Fallback")
     else -> this
 }
 

@@ -1096,7 +1096,7 @@ class AppViewModel(
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
                 require(
-                    pipeline != ProviderPipeline.FOOD_RESEARCH ||
+                    !pipeline.requiresWebResearch() ||
                         config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
                 ) {
                     "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
@@ -1152,7 +1152,7 @@ class AppViewModel(
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
                 require(
-                    pipeline != ProviderPipeline.FOOD_RESEARCH ||
+                    !pipeline.requiresWebResearch() ||
                         config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
                 ) {
                     "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
@@ -1194,7 +1194,18 @@ class AppViewModel(
             val prefs = preferences.value
             keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
                 val selection = prefs.selectionFor(pipeline)
-                runCatching { container.secretStore.contains(secretId(pipeline, selection)) }.getOrDefault(false)
+                val direct = runCatching {
+                    container.secretStore.contains(secretId(pipeline, selection))
+                }.getOrDefault(false)
+                direct || if (pipeline == ProviderPipeline.SMART_FALLBACK &&
+                    selection.sharesCredentialWith(prefs.foodResearchProvider)
+                ) {
+                    runCatching {
+                        container.secretStore.contains(
+                            secretId(ProviderPipeline.FOOD_RESEARCH, prefs.foodResearchProvider),
+                        )
+                    }.getOrDefault(false)
+                } else false
             }
         }
         viewModelScope.launch { refreshHealthConnectAndSync() }
@@ -1363,9 +1374,18 @@ class AppViewModel(
         return FoodAnalysis(items = analyzed, overallConfidence = 1.0)
     }
     private suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
-        withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
-            providerFor(config, key).researchNutrition(intent)
-        }
+        runWithSmartFallback(
+            primary = {
+                withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
+                    providerFor(config, key).researchNutrition(intent)
+                }
+            },
+            fallback = {
+                withConfiguredSmartFallback { config, key ->
+                    providerFor(config, key).researchNutrition(intent)
+                }
+            },
+        )
 
     private fun currentResearchProviderWebsite(): String? {
         val selection = preferences.value.foodResearchProvider
@@ -1383,7 +1403,8 @@ class AppViewModel(
             input = text,
             localeCountry = Locale.getDefault().country,
             interpretationProviderIdentity = prefs.foodInterpretationProvider.cacheIdentity(),
-            researchProviderIdentity = prefs.foodResearchProvider.cacheIdentity(),
+            researchProviderIdentity = prefs.foodResearchProvider.cacheIdentity() + "\u001e" +
+                prefs.smartFallbackProvider.cacheIdentity(),
         )
     }
 
@@ -1397,6 +1418,29 @@ class AppViewModel(
             val credential = AiRuntimeCredential.from(chars.concatToString())
             block(selection.toRuntimeConfig(), credential)
         } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
+    }
+
+    private suspend fun <T : Any> withConfiguredSmartFallback(
+        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
+    ): T {
+        val prefs = preferences.value
+        val selection = prefs.smartFallbackProvider
+        require(selection.providerId.isNotBlank()) {
+            "Configure Fallback in Settings first."
+        }
+        val config = selection.toRuntimeConfig()
+        suspend fun use(secret: String): T? = container.secretStore.useSecret(secret) { chars ->
+            block(config, AiRuntimeCredential.from(chars.concatToString()))
+        }
+        use(secretId(ProviderPipeline.SMART_FALLBACK, selection))?.let { return it }
+        val primary = prefs.foodResearchProvider
+        if (selection.sharesCredentialWith(primary)) {
+            use(secretId(ProviderPipeline.FOOD_RESEARCH, primary))?.let { return it }
+        }
+        error(
+            "Configure Fallback in Settings with an API key, or select the same provider " +
+                "as Food research to reuse its key.",
+        )
     }
 
     private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =
@@ -1756,6 +1800,7 @@ private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSel
     ProviderPipeline.FOOD_INTERPRETATION -> foodInterpretationProvider
     ProviderPipeline.PORTION_CHANGE -> portionChangeProvider
     ProviderPipeline.VISION -> visionProvider
+    ProviderPipeline.SMART_FALLBACK -> smartFallbackProvider
 }
 
 private fun AiProviderEditorState.toProviderSelection(): ProviderSelection = ProviderSelection(
@@ -1818,6 +1863,33 @@ private fun ProviderPipeline.displayName(): String = when (this) {
     ProviderPipeline.FOOD_INTERPRETATION -> "Food interpretation"
     ProviderPipeline.PORTION_CHANGE -> "Portion changes"
     ProviderPipeline.VISION -> "Photo recognition"
+    ProviderPipeline.SMART_FALLBACK -> "Fallback"
+}
+
+private fun ProviderPipeline.requiresWebResearch(): Boolean =
+    this == ProviderPipeline.FOOD_RESEARCH || this == ProviderPipeline.SMART_FALLBACK
+
+private fun ProviderSelection.sharesCredentialWith(other: ProviderSelection): Boolean =
+    providerId.equals(other.providerId, ignoreCase = true) &&
+        runCatching { resolvedEndpoint() }.getOrNull()
+            ?.equals(runCatching { other.resolvedEndpoint() }.getOrNull(), ignoreCase = true) == true
+
+internal suspend fun <T> runWithSmartFallback(
+    primary: suspend () -> T,
+    fallback: suspend () -> T,
+): T = try {
+    primary()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (primaryError: Throwable) {
+    try {
+        fallback()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (fallbackError: Throwable) {
+        fallbackError.addSuppressed(primaryError)
+        throw fallbackError
+    }
 }
 
 private fun ThemePreference.toThemeMode(): ThemeMode = when (this) {

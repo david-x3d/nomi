@@ -192,6 +192,7 @@ class NomiBackupService(
         )
         preferencesStore.setProvider(ProviderPipeline.PORTION_CHANGE, value.portionChangeProvider)
         preferencesStore.setProvider(ProviderPipeline.VISION, value.visionProvider)
+        preferencesStore.setProvider(ProviderPipeline.SMART_FALLBACK, value.smartFallbackProvider)
         preferencesStore.setReminders(value.reminders)
         preferencesStore.setAdjustTargetFromActivity(value.adjustTargetFromActivity)
         preferencesStore.setAiDebugEnabled(value.aiDebugEnabled)

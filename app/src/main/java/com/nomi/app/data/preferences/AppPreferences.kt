@@ -27,6 +27,7 @@ enum class ProviderPipeline {
     FOOD_INTERPRETATION,
     PORTION_CHANGE,
     VISION,
+    SMART_FALLBACK,
 }
 
 /** Provider configuration deliberately excludes credentials, which belong in SecureSecretStore. */
@@ -98,6 +99,10 @@ data class AppPreferences(
         model = "deepseek/deepseek-v4",
     ),
     val visionProvider: ProviderSelection = ProviderSelection(),
+    val smartFallbackProvider: ProviderSelection = ProviderSelection(
+        providerId = "perplexity",
+        model = "sonar-pro",
+    ),
     val reminders: ReminderPreferences = ReminderPreferences(),
     val onboardingDraft: PersistedOnboardingDraft? = null,
     val onboardingCompleted: Boolean = false,
@@ -111,4 +116,5 @@ fun AppPreferences.providerSelection(pipeline: ProviderPipeline): ProviderSelect
         ProviderPipeline.FOOD_INTERPRETATION -> foodInterpretationProvider
         ProviderPipeline.PORTION_CHANGE -> portionChangeProvider
         ProviderPipeline.VISION -> visionProvider
+        ProviderPipeline.SMART_FALLBACK -> smartFallbackProvider
     }

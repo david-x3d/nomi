@@ -65,6 +65,7 @@ private fun FoodAnalysis.immutableCopy(): FoodAnalysis = copy(
     items = items.map { item ->
         item.copy(
             assumptions = item.assumptions.toList(),
+            supportingSourceUrls = item.supportingSourceUrls.toList(),
             servingValidation = item.servingValidation?.copy(),
             quantityResolution = item.quantityResolution?.copy(),
         )

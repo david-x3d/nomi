@@ -206,7 +206,7 @@ private fun AiProviderEditorState.configurationError(
 private fun AiProviderEditorState.switchTo(provider: AiProviderKind): AiProviderEditorState = copy(
     provider = provider,
     endpoint = provider.canonicalEndpoint().orEmpty(),
-    model = provider.suggestedModel(),
+    model = provider.suggestedModel(purpose),
     apiKeyInput = "",
     hasStoredApiKey = false,
     testResult = null,
@@ -220,10 +220,14 @@ private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
 
-private fun AiProviderKind.suggestedModel(): String = when (this) {
-    AiProviderKind.PERPLEXITY -> "sonar"
-    AiProviderKind.OPEN_ROUTER -> "deepseek/deepseek-v4"
-    AiProviderKind.OPEN_AI,
+private fun AiProviderKind.suggestedModel(purpose: String): String = when (this) {
+    AiProviderKind.PERPLEXITY -> if (purpose == "Fallback") "sonar-pro" else "sonar"
+    AiProviderKind.OPEN_ROUTER -> if (purpose == "Fallback") {
+        "~openai/gpt-latest"
+    } else {
+        "deepseek/deepseek-v4"
+    }
+    AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
     -> ""
 }
@@ -242,6 +246,7 @@ private fun String.localizedPurpose(): String = when (this) {
     "Food interpretation" -> nomiString("Food interpretation", "Lebensmittelinterpretation")
     "Portion changes" -> nomiString("Portion changes", "Portionsänderungen")
     "Photo recognition" -> nomiString("Photo recognition", "Fotoerkennung")
+    "Fallback" -> nomiString("Fallback", "Intelligenter Fallback")
     else -> this
 }
 

@@ -141,6 +141,10 @@ class DataStoreAppPreferencesStore(
                 values[Keys.VISION_PROVIDER],
                 defaults.visionProvider,
             ),
+            smartFallbackProvider = decode(
+                values[Keys.SMART_FALLBACK_PROVIDER],
+                defaults.smartFallbackProvider,
+            ),
             reminders = decode(values[Keys.REMINDERS], defaults.reminders),
             onboardingDraft = decodeOrNull(values[Keys.ONBOARDING_DRAFT]),
             onboardingCompleted = values[Keys.ONBOARDING_COMPLETED] ?: false,
@@ -165,6 +169,7 @@ class DataStoreAppPreferencesStore(
         val FOOD_INTERPRETATION_PROVIDER = stringPreferencesKey("providers.food_interpretation")
         val PORTION_CHANGE_PROVIDER = stringPreferencesKey("providers.portion_change")
         val VISION_PROVIDER = stringPreferencesKey("providers.vision")
+        val SMART_FALLBACK_PROVIDER = stringPreferencesKey("providers.smart_fallback")
         val REMINDERS = stringPreferencesKey("reminders")
         val ONBOARDING_DRAFT = stringPreferencesKey("onboarding.draft")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding.completed")
@@ -176,6 +181,7 @@ class DataStoreAppPreferencesStore(
             ProviderPipeline.FOOD_INTERPRETATION -> FOOD_INTERPRETATION_PROVIDER
             ProviderPipeline.PORTION_CHANGE -> PORTION_CHANGE_PROVIDER
             ProviderPipeline.VISION -> VISION_PROVIDER
+            ProviderPipeline.SMART_FALLBACK -> SMART_FALLBACK_PROVIDER
         }
     }
 }
