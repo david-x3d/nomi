@@ -228,9 +228,10 @@ internal fun chatCompletionRequest(
     messages = messages,
     temperature = config.temperature,
     responseFormat = when {
-        requireWebSearch && (config.kind == AiProviderKind.PERPLEXITY ||
-            config.kind == AiProviderKind.OPEN_ROUTER &&
-            config.model.trim().startsWith("perplexity/", ignoreCase = true)) ->
+        // Only Perplexity's own API reliably accepts the strict schema. OpenRouter forwards
+        // response_format to Perplexity for perplexity/* models and the request is rejected
+        // with HTTP 400, so those rely on the JSON-only prompt plus Nomi's app-side validation.
+        requireWebSearch && config.kind == AiProviderKind.PERPLEXITY ->
             nutritionResearchResponseFormat()
         config.supportsJsonObjectResponseFormat() -> ResponseFormat()
         else -> null

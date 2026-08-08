@@ -78,6 +78,20 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `openrouter sonar food research omits response format entirely`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "perplexity/sonar"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertFalse(encoded.contains("response_format"))
+        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"max_results\":8"))
+    }
+
+    @Test
     fun `openrouter food research explicitly enables web plugin`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
