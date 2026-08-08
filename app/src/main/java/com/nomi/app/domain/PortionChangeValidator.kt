@@ -162,6 +162,8 @@ object PortionChangeValidator {
                 CanonicalQuantity(quantity * 5.0, "volume")
             "tbsp", "tbs", "tablespoon", "tablespoons", "el", "essloffel", "essloeffel" ->
                 CanonicalQuantity(quantity * 15.0, "volume")
+            "loffel", "loeffel", "spoon", "spoons" ->
+                CanonicalQuantity(quantity * 15.0, "volume")
             "cup", "cups" -> CanonicalQuantity(quantity * 236.5882365, "volume")
             "piece", "pieces", "pc", "pcs" -> CanonicalQuantity(quantity, "count:piece")
             "slice", "slices" -> CanonicalQuantity(quantity, "count:slice")

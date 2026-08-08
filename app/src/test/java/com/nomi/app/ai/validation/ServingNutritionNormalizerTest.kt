@@ -4,6 +4,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.prompt.AiPrompts
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -111,15 +112,16 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `spoon to mass requires exact total grams equivalent`() {
-        val withoutMass = assertThrows(AiValidationException::class.java) {
-            normalize(
-                raw = sourceItem(1.0, "EL", 100.0, "g"),
-                requestedQuantity = 1.0,
-                requestedUnit = "EL",
-            )
-        }
-        assertTrue(withoutMass.message!!.contains("not compatible"))
+    fun `spoon to mass falls back visibly when no density is available`() {
+        val estimated = normalize(
+            raw = sourceItem(1.0, "EL", 100.0, "g"),
+            requestedQuantity = 1.0,
+            requestedUnit = "EL",
+        )
+        assertEquals(15.0, estimated.gramsEquivalent!!, 0.0)
+        assertEquals(15.0, estimated.calories, 1e-12)
+        assertTrue(estimated.isEstimate)
+        assertTrue(estimated.assumptions.any { it.contains("1 g per ml") })
 
         val withMass = normalize(
             raw = sourceItem(1.0, "EL", 100.0, "g").copy(gramsEquivalent = 12.0),
@@ -128,6 +130,38 @@ class ServingNutritionNormalizerTest {
         )
         assertEquals(12.0, withMass.calories, 1e-12)
         assertEquals(12.0, withMass.servingValidation!!.loggedBaseAmount, 0.0)
+    }
+
+    @Test
+    fun `German jam spoon uses labeled food specific mass estimate`() {
+        val normalized = normalize(
+            raw = sourceItem(1.5, "Löffel", 100.0, "g")
+                .copy(name = "Himbeer Marmelade"),
+            requestedQuantity = 1.5,
+            requestedUnit = "Löffel",
+            requestedName = "Himbeer Marmelade",
+        )
+
+        assertEquals(30.0, normalized.gramsEquivalent!!, 1e-12)
+        assertEquals(30.0, normalized.calories, 1e-12)
+        assertTrue(normalized.isEstimate)
+        assertTrue(normalized.assumptions.any { it.contains("20 g per German tablespoon") })
+        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
+    }
+
+    @Test
+    fun `provider supplied jam spoon mass wins over fallback`() {
+        val normalized = normalize(
+            raw = sourceItem(1.5, "EL", 100.0, "g")
+                .copy(name = "Himbeer Marmelade", gramsEquivalent = 27.0),
+            requestedQuantity = 1.5,
+            requestedUnit = "EL",
+            requestedName = "Himbeer Marmelade",
+        )
+
+        assertEquals(27.0, normalized.gramsEquivalent!!, 0.0)
+        assertEquals(27.0, normalized.calories, 1e-12)
+        assertFalse(normalized.assumptions.any { it.contains("20 g per German tablespoon") })
     }
 
     @Test
@@ -348,15 +382,18 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `mass and volume dimension mismatch is rejected`() {
-        val error = assertThrows(AiValidationException::class.java) {
-            normalize(
-                raw = sourceItem(250.0, "g", 355.0, "ml"),
-                requestedQuantity = 250.0,
-                requestedUnit = "g",
-            )
-        }
-        assertTrue(error.message!!.contains("not compatible"))
+    fun `mass and volume mismatch uses a labeled fallback instead of blocking the log`() {
+        val normalized = normalize(
+            raw = sourceItem(250.0, "g", 355.0, "ml"),
+            requestedQuantity = 250.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(355.0, normalized.sourceServingGramsEquivalent!!, 0.0)
+        assertEquals(100.0 * 250.0 / 355.0, normalized.calories, 1e-12)
+        assertTrue(normalized.isEstimate)
+        assertTrue(normalized.assumptions.any { it.contains("1 g per ml") })
+        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
     }
 
     @Test
@@ -542,6 +579,44 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
+    fun `German spoon aliases survive the complete production normalization path`() {
+        val cases = listOf(
+            Triple("Löffel", 22.5, 30.0),
+            Triple("Esslöffel", 22.5, 30.0),
+            Triple("EL", 22.5, 30.0),
+            Triple("Teelöffel", 7.5, 10.0),
+            Triple("TL", 7.5, 10.0),
+        )
+
+        cases.forEach { (unit, expectedMilliliters, expectedGrams) ->
+            val text = "1,5 $unit Himbeer Marmelade"
+            val parsed = requireNotNull(LocalFoodIntentParser.parseOrNull(text))
+            val reconciledIntent = UserQuantityResolver.reconcileIntent(parsed, "DE")
+            assertEquals(expectedMilliliters, reconciledIntent.items.single().quantity!!, 0.0)
+            assertEquals("ml", reconciledIntent.items.single().unit)
+
+            val providerResult = FoodAnalysis(
+                items = listOf(
+                    sourceItem(1.0, "serving", 100.0, "g")
+                        .copy(name = "Himbeer Marmelade"),
+                ),
+            )
+            val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(
+                reconciledIntent,
+                providerResult,
+            )
+            val normalized = ServingNutritionNormalizer.normalize(
+                reconciledIntent,
+                reconciledAnalysis,
+            ).items.single()
+
+            assertEquals(expectedGrams, normalized.gramsEquivalent!!, 1e-12)
+            assertEquals(expectedGrams, normalized.calories, 1e-12)
+            assertTrue(normalized.isEstimate)
+            ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
+        }
+    }
+    @Test
     fun `German locale prompt prioritizes official German product source and amount semantics`() {
         val prompt = AiPrompts.researchNutrition(
             intent = intent(250.0, "ml"),
@@ -556,6 +631,8 @@ class ServingNutritionNormalizerTest {
         assertTrue(prompt.contains("COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT"))
         assertTrue(prompt.contains("gramsEquivalent=364"))
         assertTrue(prompt.contains("1 EL/Essloeffel/tbsp/tablespoon = 15 ml"))
+        assertTrue(prompt.contains("unqualified German Löffel/Loeffel means EL"))
+        assertTrue(prompt.contains("1.5 EL jam may use gramsEquivalent=30"))
     }
 
     private fun normalize(

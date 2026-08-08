@@ -104,6 +104,13 @@ class PortionChangeValidatorTest {
     }
 
     @Test
+    fun `generic German spoon matches one tablespoon`() {
+        val multiplier = PortionChangeValidator.calculateMultiplier(1.0, "Löffel", 3.0, "TL")
+
+        assertEquals(1.0, multiplier!!, 1e-12)
+    }
+
+    @Test
     fun `spoon volume never assumes a mass density`() {
         assertNull(PortionChangeValidator.calculateMultiplier(1.0, "EL", 15.0, "g"))
     }

@@ -18,6 +18,27 @@ import org.junit.Test
 
 class UserQuantityResolverTest {
     @Test
+    fun `unqualified German spoon defaults to tablespoon volume`() {
+        val item = resolve("1,5 Löffel Himbeer Marmelade", name = "Himbeer Marmelade")
+
+        assertEquals(22.5, item.quantity!!, 0.0)
+        assertEquals("ml", item.unit)
+        assertEquals(1.5, item.quantityResolution!!.enteredQuantity!!, 0.0)
+        assertEquals("Löffel", item.quantityResolution!!.enteredUnit)
+        assertTrue(item.quantityResolution!!.isApproximate)
+    }
+
+    @Test
+    fun `German tablespoon and teaspoon aliases use metric volume`() {
+        val tablespoon = resolve("1,5 EL Marmelade", name = "Marmelade")
+        val teaspoon = resolve("1,5 Teelöffel Marmelade", name = "Marmelade")
+
+        assertEquals(22.5, tablespoon.quantity!!, 0.0)
+        assertEquals("ml", tablespoon.unit)
+        assertEquals(7.5, teaspoon.quantity!!, 0.0)
+        assertEquals("ml", teaspoon.unit)
+    }
+    @Test
     fun `55 percent of explicitly stated 320 g package is exactly 176 g`() {
         val item = resolve("55% of a 320g package of Iglo Schlemmer-Filet")
 

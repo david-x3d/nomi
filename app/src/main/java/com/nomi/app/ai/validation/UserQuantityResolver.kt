@@ -26,6 +26,7 @@ object UserQuantityResolver {
         "(mg|milligrams?|milligramm|kg|kilograms?|kilogramm|g|grams?|gramm|" +
             "(?:essl(?:\\u00f6|oe|o)ffel|el|tbsp|tbs|tablespoons?)|" +
             "(?:teel(?:\\u00f6|oe|o)ffel|tl|tsp|teaspoons?)|" +
+            "(?:l(?:ö|oe|o)ffel|spoons?)|" +
             "ml|cl|l|liter|litre|(?:us\\s*)?fl\\.?\\s*oz|oz)"
     private val decimal = "(\\d+(?:[.,]\\d+)?)"
 
@@ -176,7 +177,9 @@ object UserQuantityResolver {
         val directDetections = directAmountPattern.findAll(text)
             .filter { direct -> packageDetections.none { direct.range.overlaps(it.range) } }
             .map { match ->
-                val amount = canonicalMeasure(match.groupValues[1].number(), match.groupValues[2])
+                val enteredQuantity = match.groupValues[1].number()
+                val enteredUnit = match.groupValues[2]
+                val amount = canonicalMeasure(enteredQuantity, enteredUnit)
                 DetectedResolution(
                     range = match.range,
                     metadata = QuantityResolutionMetadata(
@@ -184,6 +187,10 @@ object UserQuantityResolver {
                         semantic = QuantitySemantic.DIRECT_AMOUNT,
                         canonicalQuantity = amount.quantity,
                         canonicalUnit = amount.unit,
+                        enteredQuantity = enteredQuantity,
+                        enteredUnit = enteredUnit,
+                        isApproximate = enteredUnit.normalizedUnit() in
+                            setOf("loffel", "loeffel", "spoon", "spoons"),
                     ),
                 )
             }
@@ -326,6 +333,8 @@ object UserQuantityResolver {
                 CanonicalMeasure(quantity * 15.0, "ml")
             "tsp", "teaspoon", "teaspoons", "tl", "teeloffel", "teeloeffel" ->
                 CanonicalMeasure(quantity * 5.0, "ml")
+            "loffel", "loeffel", "spoon", "spoons" ->
+                CanonicalMeasure(quantity * 15.0, "ml")
             "ml" -> CanonicalMeasure(quantity, "ml")
             "cl" -> CanonicalMeasure(quantity * 10.0, "ml")
             "l", "liter", "liters", "litre", "litres" -> CanonicalMeasure(quantity * 1_000.0, "ml")

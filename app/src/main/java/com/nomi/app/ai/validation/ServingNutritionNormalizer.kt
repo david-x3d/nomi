@@ -24,6 +24,12 @@ object ServingNutritionNormalizer {
     private const val MEDIUM_APPLE_GRAMS_PER_PIECE = 182.0
     private const val MEDIUM_APPLE_MASS_ASSUMPTION =
         "Estimated 182 g per medium apple because no exact piece weight was provided."
+    private const val JAM_GRAMS_PER_TABLESPOON = 20.0
+    private const val MILLILITERS_PER_TABLESPOON = 15.0
+    private const val JAM_VOLUME_MASS_ASSUMPTION =
+        "Estimated jam mass from 20 g per German tablespoon (15 ml); product density can vary."
+    private const val GENERIC_VOLUME_MASS_ASSUMPTION =
+        "Estimated mass from 1 g per ml because the source did not provide a food-specific density."
 
     fun normalize(intent: ParsedFoodIntent, unnormalized: FoodAnalysis): FoodAnalysis {
         val cleanRaw = unnormalized.copy(
@@ -242,11 +248,47 @@ object ServingNutritionNormalizer {
         } else {
             null
         }
-        val loggedGramsEquivalent = suppliedLoggedGramsEquivalent ?: estimatedAppleGramsEquivalent
+        val estimatedJamGramsEquivalent = if (
+            suppliedLoggedGramsEquivalent == null && estimatedAppleGramsEquivalent == null
+        ) {
+            estimateJamGramsEquivalent(
+                item = item,
+                requested = requested,
+                loggedQuantity = loggedQuantity,
+                loggedUnit = loggedUnit,
+                sourceUnit = sourceUnit,
+            )
+        } else {
+            null
+        }
+        val estimatedVolumeGramsEquivalent = if (
+            suppliedLoggedGramsEquivalent == null &&
+            estimatedAppleGramsEquivalent == null &&
+            estimatedJamGramsEquivalent == null
+        ) {
+            estimateVolumeGramsEquivalent(
+                loggedQuantity = loggedQuantity,
+                loggedUnit = loggedUnit,
+                sourceUnit = sourceUnit,
+            )
+        } else {
+            null
+        }
+        val loggedGramsEquivalent = suppliedLoggedGramsEquivalent
+            ?: estimatedAppleGramsEquivalent
+            ?: estimatedJamGramsEquivalent
+            ?: estimatedVolumeGramsEquivalent
+        val estimatedSourceGramsEquivalent = item.sourceServingGramsEquivalent ?: run {
+            val source = measure(sourceQuantity, sourceUnit)
+            val logged = measure(loggedQuantity, loggedUnit)
+            source.baseAmount.takeIf {
+                source.dimension == Dimension.Volume && logged.dimension == Dimension.Mass
+            }
+        }
         val (sourceMeasure, loggedMeasure) = reconcileServingMeasures(
             sourceQuantity = sourceQuantity,
             sourceUnit = sourceUnit,
-            sourceGramsEquivalent = item.sourceServingGramsEquivalent,
+            sourceGramsEquivalent = estimatedSourceGramsEquivalent,
             loggedQuantity = loggedQuantity,
             loggedUnit = loggedUnit,
             loggedGramsEquivalent = loggedGramsEquivalent,
@@ -272,16 +314,28 @@ object ServingNutritionNormalizer {
             quantity = loggedQuantity,
             unit = loggedUnit,
             gramsEquivalent = loggedGramsEquivalent,
+            sourceServingGramsEquivalent = estimatedSourceGramsEquivalent,
             calories = validation.caloriesPer100 * loggedFactor,
             proteinGrams = validation.proteinGramsPer100 * loggedFactor,
             carbohydrateGrams = validation.carbohydrateGramsPer100 * loggedFactor,
             fatGrams = validation.fatGramsPer100 * loggedFactor,
             fiberGrams = validation.fiberGramsPer100?.times(loggedFactor),
-            isEstimate = item.isEstimate || estimatedAppleGramsEquivalent != null,
+            isEstimate = item.isEstimate ||
+                estimatedAppleGramsEquivalent != null ||
+                estimatedJamGramsEquivalent != null ||
+                estimatedVolumeGramsEquivalent != null ||
+                (item.sourceServingGramsEquivalent == null && estimatedSourceGramsEquivalent != null),
             assumptions = (
                 item.assumptions + listOfNotNull(
                     MEDIUM_APPLE_MASS_ASSUMPTION.takeIf {
                         estimatedAppleGramsEquivalent != null
+                    },
+                    JAM_VOLUME_MASS_ASSUMPTION.takeIf {
+                        estimatedJamGramsEquivalent != null
+                    },
+                    GENERIC_VOLUME_MASS_ASSUMPTION.takeIf {
+                        estimatedVolumeGramsEquivalent != null ||
+                            (item.sourceServingGramsEquivalent == null && estimatedSourceGramsEquivalent != null)
                     },
                     "Source serving ${clean(sourceQuantity)} $sourceUnit normalized to per 100 " +
                         "and scaled to ${clean(loggedQuantity)} $loggedUnit.",
@@ -324,6 +378,61 @@ object ServingNutritionNormalizer {
         return normalized in setOf("apple", "apples", "apfel")
     }
 
+    /**
+     * A narrow, labeled fallback for jam and fruit spreads. These products are commonly published
+     * per 100 g while German users naturally log EL/TL. Other foods still require a provider- or
+     * product-supplied gram equivalent because their densities vary too widely.
+     */
+    private fun estimateJamGramsEquivalent(
+        item: AnalyzedFoodItem,
+        requested: ParsedFoodItem?,
+        loggedQuantity: Double,
+        loggedUnit: String,
+        sourceUnit: String,
+    ): Double? {
+        val logged = measure(loggedQuantity, loggedUnit)
+        val source = measure(1.0, sourceUnit)
+        if (logged.dimension != Dimension.Volume || source.dimension != Dimension.Mass) return null
+
+        val authoritativeName = listOfNotNull(requested?.name, item.name)
+            .joinToString(" ")
+            .normalizeFoodName()
+        val isJam = listOf(
+            "marmelade",
+            "konfiture",
+            "konfituere",
+            "fruchtaufstrich",
+            "jam",
+            "fruit spread",
+            "preserve",
+            "preserves",
+        ).any(authoritativeName::contains)
+        if (!isJam) return null
+
+        return logged.baseAmount * JAM_GRAMS_PER_TABLESPOON / MILLILITERS_PER_TABLESPOON
+    }
+
+    private fun estimateVolumeGramsEquivalent(
+        loggedQuantity: Double,
+        loggedUnit: String,
+        sourceUnit: String,
+    ): Double? {
+        val logged = measure(loggedQuantity, loggedUnit)
+        val source = measure(1.0, sourceUnit)
+        if (logged.dimension != Dimension.Volume || source.dimension != Dimension.Mass) return null
+        return logged.baseAmount
+    }
+
+    private fun String.normalizeFoodName(): String = trim()
+        .lowercase(Locale.ROOT)
+        .replace('\u00e4', 'a')
+        .replace('\u00f6', 'o')
+        .replace('\u00fc', 'u')
+        .replace("\u00df", "ss")
+        .replace(Regex("[^\\p{L}]+"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
     private fun requireEquivalentUnits(
         firstQuantity: Double,
         firstUnit: String,
@@ -349,9 +458,9 @@ object ServingNutritionNormalizer {
     /**
      * Places the source and logged serving on one arithmetic basis.
      *
-     * Count- or spoon-to-mass conversion is permitted only when that exact serving already carries
-     * a total gram equivalent. Spoons remain volume-compatible, and no average piece weight or
-     * mass/volume density is invented here.
+     * Cross-dimension conversion is permitted only when that exact source or logged serving
+     * already carries a total gram equivalent. Creation of density/count estimates happens in the
+     * narrow policy helpers above; this method only consumes an explicit total.
      */
     private fun reconcileServingMeasures(
         sourceQuantity: Double,
@@ -365,13 +474,13 @@ object ServingNutritionNormalizer {
         val logged = measure(loggedQuantity, loggedUnit)
         if (source.dimension == logged.dimension) return ServingMeasures(source, logged)
 
-        if (source.canBridgeToMass && logged.dimension == Dimension.Mass) {
+        if (logged.dimension == Dimension.Mass) {
             val sourceMass = sourceGramsEquivalent?.let {
                 massEquivalent(it, source.originalUnit, "source serving grams")
             }
             if (sourceMass != null) return ServingMeasures(sourceMass, logged)
         }
-        if (source.dimension == Dimension.Mass && logged.canBridgeToMass) {
+        if (source.dimension == Dimension.Mass) {
             val loggedMass = loggedGramsEquivalent?.let {
                 massEquivalent(it, logged.originalUnit, "logged serving grams")
             }
@@ -408,14 +517,6 @@ object ServingNutritionNormalizer {
         return currentGrams * updated.baseAmount / current.baseAmount
     }
 
-    private fun isSpoonUnit(unit: String): Boolean = when (unit) {
-        "tbsp", "tbs", "tablespoon", "tablespoons",
-        "el", "essloffel", "essloeffel",
-        "tsp", "teaspoon", "teaspoons",
-        "tl", "teeloffel", "teeloeffel",
-        -> true
-        else -> false
-    }
 
     private fun measure(quantity: Double, rawUnit: String): Measure {
         requireFinitePositive(quantity, "serving amount")
@@ -428,6 +529,7 @@ object ServingNutritionNormalizer {
             "oz", "ounce", "ounces" -> Dimension.Mass to OUNCE_GRAMS
             "tbsp", "tbs", "tablespoon", "tablespoons", "el", "essloffel", "essloeffel" -> Dimension.Volume to 15.0
             "tsp", "teaspoon", "teaspoons", "tl", "teeloffel", "teeloeffel" -> Dimension.Volume to 5.0
+            "loffel", "loeffel", "spoon", "spoons" -> Dimension.Volume to 15.0
             "ml", "milliliter", "milliliters", "millilitre", "millilitres" ->
                 Dimension.Volume to 1.0
             "cl", "centiliter", "centiliters", "centilitre", "centilitres" ->
@@ -443,7 +545,6 @@ object ServingNutritionNormalizer {
             dimension = dimension,
             baseAmount = quantity * factor,
             originalUnit = rawUnit,
-            canBridgeToMass = dimension == Dimension.Piece || isSpoonUnit(unit),
         )
     }
 
@@ -497,7 +598,6 @@ object ServingNutritionNormalizer {
         val dimension: Dimension,
         val baseAmount: Double,
         val originalUnit: String,
-        val canBridgeToMass: Boolean = dimension == Dimension.Piece,
     )
 
     private data class ServingMeasures(

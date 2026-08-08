@@ -21,10 +21,11 @@ object AiPrompts {
         do not introduce a US package size. Deterministic app code reconciles this after parsing,
         so provider output cannot override it.
         Recognize mg, g, kg, ml, EL/Essloeffel/tbsp/tablespoon, and
-        TL/Teeloeffel/tsp/teaspoon. Normalize mg and kg to grams. Normalize one tablespoon or EL
-        to exactly 15 ml and one teaspoon or TL to exactly 5 ml. An explicit spoon quantity is
-        authoritative. Never infer a mass from a spoon or assume density; provide gramsEquivalent
-        only when the total mass for that exact spoon amount is known.
+        TL/Teeloeffel/tsp/teaspoon. In German, an unqualified Löffel/Loeffel means one
+        Esslöffel unless the user says Teelöffel/TL; record that interpretation in assumptions.
+        Normalize mg and kg to grams. One German tablespoon/EL is exactly 15 ml and one German
+        teaspoon/TL is exactly 5 ml. An explicit spoon quantity is authoritative. Do not invent
+        nutrition values in this parsing step.
 
         Return only this JSON shape:
         {
@@ -84,10 +85,15 @@ object AiPrompts {
         never change an explicit logged count while supplying it.
         UNIT NORMALIZATION IS EXACT: 1 mg = 0.001 g, 1 kg = 1000 g,
         1 EL/Essloeffel/tbsp/tablespoon = 15 ml, and
-        1 TL/Teeloeffel/tsp/teaspoon = 5 ml. Preserve every explicit quantity before applying
-        these conversions. Spoons are volume units. A spoon-to-mass result is valid only when
-        `gramsEquivalent` (for the entire logged amount) or `sourceServingGramsEquivalent` (for
-        the entire source serving) is supplied from exact product data; never assume density.
+        1 TL/Teeloeffel/tsp/teaspoon = 5 ml. An unqualified German Löffel/Loeffel means EL
+        (15 ml), not TL. Preserve every explicit quantity before applying these conversions.
+        Spoons are volume units. If a spoon or ml amount is researched from a gram-based source,
+        `gramsEquivalent` MUST be the total mass for the entire logged amount. Prefer an official
+        product serving weight or reputable food-specific density. If neither exists, provide a
+        clearly labeled reasonable food-specific estimate, set `isEstimate=true`, and explain it
+        in assumptions. Example: 1.5 EL is exactly 22.5 ml; jam is commonly about 20 g per EL, so
+        1.5 EL jam may use gramsEquivalent=30 with an explicit density assumption. Never equate
+        milliliters and grams silently.
 
         QUANTITY PRECEDENCE IS ABSOLUTE: explicit user quantity/package math > locally appropriate
         default quantity > source serving or package. Structured `quantity` and `unit` are
@@ -144,7 +150,8 @@ object AiPrompts {
         Interpret only the requested portion change. Do not calculate new calories or macros.
         Return a mathematically consistent quantity multiplier for the app to validate and apply.
         Recognize mg/g/kg and EL/Essloeffel/tbsp/tablespoon or
-        TL/Teeloeffel/tsp/teaspoon. Use exactly 15 ml per tablespoon/EL and 5 ml per teaspoon/TL.
+        TL/Teeloeffel/tsp/teaspoon. An unqualified German Löffel/Loeffel means EL. Use exactly
+        15 ml per tablespoon/EL and 5 ml per teaspoon/TL.
         Do not convert spoon volume to mass unless an exact total gram equivalent is already
         supplied; never assume density.
         If the statement is ambiguous, set requiresConfirmation true and describe the proposed

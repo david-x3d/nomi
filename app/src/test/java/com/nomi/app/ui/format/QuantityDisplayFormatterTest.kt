@@ -152,6 +152,43 @@ class QuantityDisplayFormatterTest {
     }
 
     @Test
+    fun `saved spoon entry keeps EL context without in memory resolution metadata`() {
+        val display = QuantityDisplayFormatter.format(
+            QuantityDisplayRequest(
+                quantity = 1.5,
+                unit = "Löffel",
+                gramsEquivalent = 30.0,
+                isApproximate = true,
+            ),
+            german,
+        )
+
+        assertEquals("≈30 g", display.primary)
+        assertEquals("1,5 EL", display.context)
+        assertEquals("1,5 EL · ≈30 g", display.withContext)
+    }
+    @Test
+    fun `canonical spoon entry keeps entered EL and shows estimated grams`() {
+        val display = QuantityDisplayFormatter.format(
+            QuantityDisplayRequest(
+                quantity = 22.5,
+                unit = "ml",
+                gramsEquivalent = 30.0,
+                canonicalQuantity = 22.5,
+                canonicalUnit = "ml",
+                enteredQuantity = 1.5,
+                enteredUnit = "Löffel",
+                isApproximate = true,
+            ),
+            german,
+        )
+
+        assertEquals("≈30 g", display.primary)
+        assertEquals("1,5 EL", display.context)
+        assertEquals("1,5 EL · ≈30 g", display.withContext)
+    }
+
+    @Test
     fun `spoon aliases use short locale appropriate labels`() {
         val englishSpoon = QuantityDisplayFormatter.format(
             QuantityDisplayRequest(quantity = 1.0, unit = "tablespoon"),

@@ -160,18 +160,21 @@ fun NomiNotesTodayScreen(
 ) {
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
-    var rememberedDescription by rememberSaveable { mutableStateOf("") }
-    val currentInput = (loggingState as? FoodLoggingUiState.Input)?.text
+    val loggingDescription = when (loggingState) {
+        is FoodLoggingUiState.Input -> loggingState.text
+        is FoodLoggingUiState.Processing -> loggingState.originalText
+        is FoodLoggingUiState.Preview -> loggingState.originalText
+        is FoodLoggingUiState.Error -> loggingState.originalText
+        is FoodLoggingUiState.Manual -> loggingState.draft.name
+    }
     val itemSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val itemFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val contentSizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val pendingDeletedFoods = remember { mutableStateMapOf<Long, PendingDeletedFood>() }
 
-    LaunchedEffect(currentInput) {
-        if (!currentInput.isNullOrBlank()) rememberedDescription = currentInput
+    val liveEntryIds = remember(state.entries) {
+        state.entries.mapTo(mutableSetOf(), TodayFoodEntry::id)
     }
-
-    val liveEntryIds = state.entries.mapTo(mutableSetOf(), TodayFoodEntry::id)
     LaunchedEffect(liveEntryIds) {
         pendingDeletedFoods.keys.toList().forEach { id ->
             val pending = pendingDeletedFoods[id] ?: return@forEach
@@ -182,11 +185,12 @@ fun NomiNotesTodayScreen(
             }
         }
     }
-    val displayedEntries = (
-        state.entries + pendingDeletedFoods.values.map(PendingDeletedFood::entry)
-        )
-        .distinctBy(TodayFoodEntry::id)
-        .sortedBy(TodayFoodEntry::time)
+    val pendingEntries = pendingDeletedFoods.values.map(PendingDeletedFood::entry)
+    val displayedEntries = remember(state.entries, pendingEntries) {
+        (state.entries + pendingEntries)
+            .distinctBy(TodayFoodEntry::id)
+            .sortedBy(TodayFoodEntry::time)
+    }
 
     Scaffold(
         modifier = modifier
@@ -205,7 +209,7 @@ fun NomiNotesTodayScreen(
             NotesComposerBar(
                 state = state,
                 loggingState = loggingState,
-                rememberedDescription = rememberedDescription,
+                rememberedDescription = loggingDescription,
                 onTextChanged = onTextChanged,
                 onAnalyze = onAnalyze,
                 onEditText = onEditText,
@@ -267,13 +271,11 @@ fun NomiNotesTodayScreen(
                 }
                 items(entries, key = TodayFoodEntry::id) { entry ->
                     Column(
-                        modifier = Modifier
-                            .animateItem(
-                                fadeInSpec = itemFadeSpec,
-                                placementSpec = itemSpatialSpec,
-                                fadeOutSpec = itemFadeSpec,
-                            )
-                            .animateContentSize(animationSpec = contentSizeSpec),
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = itemFadeSpec,
+                            placementSpec = itemSpatialSpec,
+                            fadeOutSpec = itemFadeSpec,
+                        ),
                     ) {
                         val pending = pendingDeletedFoods[entry.id]
                         when {
@@ -314,7 +316,7 @@ fun NomiNotesTodayScreen(
                     ) {
                         InlineLoggingState(
                             state = loggingState,
-                            rememberedDescription = rememberedDescription,
+                            rememberedDescription = loggingDescription,
                             onConfirm = onConfirm,
                             onRetry = onRetry,
                             onEditText = onEditText,
@@ -705,11 +707,7 @@ private fun NotesFoodRow(entry: TodayFoodEntry, onClick: () -> Unit) {
             },
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = if (entry.isEstimated) {
-                MaterialTheme.colorScheme.tertiary
-            } else {
-                MaterialTheme.colorScheme.primary
-            },
+            color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.End,
         )
     }
@@ -733,39 +731,18 @@ private fun InlineLoggingState(
     onEditPreview: () -> Unit,
     onDismissDraft: () -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    AnimatedContent(
-        targetState = state,
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(),
-            ),
-        transitionSpec = {
-            (slideInVertically(animationSpec = spatialSpec) { height -> height / 6 } +
-                fadeIn(animationSpec = effectsSpec) +
-                scaleIn(animationSpec = effectsSpec, initialScale = 0.98f)).togetherWith(
-                slideOutVertically(animationSpec = spatialSpec) { height -> -height / 8 } +
-                    fadeOut(animationSpec = effectsSpec) +
-                    scaleOut(animationSpec = effectsSpec, targetScale = 0.99f),
-            )
-        },
-        contentKey = { it::class },
-        contentAlignment = Alignment.TopCenter,
-        label = "food logging state",
-    ) { displayedState ->
-        when (displayedState) {
-            is FoodLoggingUiState.Input -> Box(Modifier.fillMaxWidth())
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        when (state) {
+            is FoodLoggingUiState.Input -> Unit
             is FoodLoggingUiState.Processing -> ProcessingNote(
                 description = rememberedDescription,
-                sourceUrls = displayedState.sourceUrls,
+                sourceUrls = state.sourceUrls,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
             )
 
             is FoodLoggingUiState.Preview -> PreviewNote(
-                analysis = displayedState.analysis,
+                analysis = state.analysis,
                 description = rememberedDescription,
                 onAdd = onConfirm,
                 onEditText = onEditText,
@@ -775,15 +752,15 @@ private fun InlineLoggingState(
 
             is FoodLoggingUiState.Error -> ErrorNote(
                 description = rememberedDescription,
-                message = displayedState.message,
-                canRetry = displayedState.canRetry,
+                message = state.message,
+                canRetry = state.canRetry,
                 onRetry = onRetry,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
             )
 
             is FoodLoggingUiState.Manual -> ManualDraftNote(
-                state = displayedState,
+                state = state,
                 onAdd = onConfirm,
                 onEdit = onEditPreview,
                 onCancel = onDismissDraft,
@@ -1165,9 +1142,6 @@ private fun NotesComposerBar(
     val largeFonts = LocalDensity.current.fontScale >= 1.3f
 
     Surface(
-        modifier = Modifier.animateContentSize(
-            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>(),
-        ),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 2.dp,
     ) {
@@ -1252,7 +1226,6 @@ private fun ComposerTextField(
     onEditText: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val analysisProgressDescription = nomiString(
         "Meal analysis in progress",
@@ -1263,9 +1236,7 @@ private fun ComposerTextField(
         onValueChange = { if (editable) onValueChange(it) },
         readOnly = !editable,
         enabled = !processing,
-        modifier = modifier
-            .animateContentSize(animationSpec = spatialSpec)
-            .heightIn(min = 56.dp),
+        modifier = modifier.heightIn(min = 56.dp),
         placeholder = { Text(nomiString("Tell Nomi what you ate", "Sag Nomi, was du gegessen hast")) },
         maxLines = 4,
         shape = RoundedCornerShape(28.dp),

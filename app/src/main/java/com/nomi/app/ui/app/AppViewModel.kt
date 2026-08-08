@@ -14,6 +14,7 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
+import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodEntity
@@ -79,7 +80,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Locale
 import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -255,6 +258,9 @@ class AppViewModel(
     private val mutableLoggingState = MutableStateFlow<FoodLoggingUiState>(FoodLoggingUiState.Input())
     val loggingState = mutableLoggingState.asStateFlow()
     private val recentFoodAnalysisCache = RecentFoodAnalysisCache()
+    private var analysisJob: Job? = null
+    private var analysisRequestId = 0L
+    private var loggingSaveInProgress = false
     private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
     val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
     private var lastLoggingText = ""
@@ -307,6 +313,7 @@ class AppViewModel(
     fun setProgressRange(value: ProgressRange) { progressRange.value = value }
 
     fun beginLogging(method: AddFoodMethod, initialText: String = "") {
+        cancelAnalysis()
         barcodeLookupRequestId += 1
         mutableBarcodeAmountState.value = null
         val category = defaultMealCategory()
@@ -324,6 +331,7 @@ class AppViewModel(
     }
 
     fun editLoggingText() {
+        cancelAnalysis()
         val category = when (val current = mutableLoggingState.value) {
             is FoodLoggingUiState.Input -> current.mealCategory
             is FoodLoggingUiState.Preview -> current.mealCategory
@@ -334,6 +342,7 @@ class AppViewModel(
     }
 
     fun dismissLoggingDraft() {
+        cancelAnalysis()
         barcodeLookupRequestId += 1
         mutableBarcodeAmountState.value = null
         lastLoggingText = ""
@@ -473,17 +482,21 @@ class AppViewModel(
             return
         }
 
+        analysisJob?.cancel()
+        val requestId = ++analysisRequestId
         // Claim the input synchronously so repeated taps cannot launch duplicate provider calls.
         mutableLoggingState.value = FoodLoggingUiState.Processing(
             AiProcessingStage.UNDERSTANDING_MEAL,
             originalText = text,
         )
-        viewModelScope.launch {
+        val job = viewModelScope.launch {
             runCatching {
                 val intent = LocalFoodIntentParser.parseOrNull(text)
                     ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
                         providerFor(config, key).parseFood(text)
                     }
+                cachedNutritionAnalysis(intent)?.let { return@runCatching it }
+
                 mutableLoggingState.value = FoodLoggingUiState.Processing(
                     AiProcessingStage.FINDING_NUTRITION,
                     originalText = text,
@@ -503,6 +516,7 @@ class AppViewModel(
                 )
                 analysis
             }.onSuccess { analysis ->
+                if (requestId != analysisRequestId) return@onSuccess
                 recentFoodAnalysisCache.put(cacheKey, analysis)
                 mutableLoggingState.value = FoodLoggingUiState.Preview(
                     analysis,
@@ -510,6 +524,8 @@ class AppViewModel(
                     originalText = text,
                 )
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (requestId != analysisRequestId) return@onFailure
                 mutableLoggingState.value = FoodLoggingUiState.Error(
                     error.safeAiMessage(),
                     canRetry = true,
@@ -517,15 +533,20 @@ class AppViewModel(
                 )
             }
         }
+        analysisJob = job
+        job.invokeOnCompletion {
+            if (analysisJob === job) analysisJob = null
+        }
     }
-
     fun retryAnalysis() {
         editLoggingText()
         analyzeText()
     }
 
     fun analyzePhoto(bytes: ByteArray, mediaType: String) {
-        val analysisJob = viewModelScope.launch {
+        analysisJob?.cancel()
+        val requestId = ++analysisRequestId
+        val job = viewModelScope.launch {
             val category = defaultMealCategory()
             runCatching {
                 mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.UNDERSTANDING_MEAL)
@@ -550,15 +571,22 @@ class AppViewModel(
                 )
                 researchNutrition(intent)
             }.onSuccess { analysis ->
+                if (requestId != analysisRequestId) return@onSuccess
                 mutableLoggingState.value = FoodLoggingUiState.Preview(analysis, category)
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (requestId != analysisRequestId) return@onFailure
                 mutableLoggingState.value = FoodLoggingUiState.Error(error.safeAiMessage(), canRetry = false)
             }
         }
-        analysisJob.invokeOnCompletion { bytes.fill(0) }
+        analysisJob = job
+        job.invokeOnCompletion {
+            bytes.fill(0)
+            if (analysisJob === job) analysisJob = null
+        }
     }
-
     fun lookupBarcode(barcode: String) {
+        cancelAnalysis()
         val requestId = ++barcodeLookupRequestId
         val category = defaultMealCategory()
         mutableBarcodeAmountState.value = null
@@ -669,36 +697,42 @@ class AppViewModel(
     }
 
     fun confirmLogging() {
+        if (loggingSaveInProgress) return
         val current = mutableLoggingState.value
+        if (current !is FoodLoggingUiState.Preview && current !is FoodLoggingUiState.Manual) return
+        loggingSaveInProgress = true
         viewModelScope.launch {
-            runCatching {
-                when (current) {
-                    is FoodLoggingUiState.Preview -> {
-                        val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
-                        val logs = validated.items.map { item ->
-                            item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
+            try {
+                runCatching {
+                    when (current) {
+                        is FoodLoggingUiState.Preview -> {
+                            val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
+                            val logs = validated.items.map { item ->
+                                item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
+                            }
+                            repository.addLogs(logs)
                         }
-                        repository.addLogs(logs)
+                        is FoodLoggingUiState.Manual -> {
+                            require(current.draft.isValid)
+                            val log = current.draft.toLog()
+                            repository.addLog(log.copy(foodId = cacheLogFood(log)))
+                        }
+                        else -> error("Unsupported logging state")
                     }
-                    is FoodLoggingUiState.Manual -> {
-                        require(current.draft.isValid)
-                        val log = current.draft.toLog()
-                        repository.addLog(log.copy(foodId = cacheLogFood(log)))
-                    }
-                    else -> return@launch
+                }.onSuccess {
+                    lastLoggingText = ""
+                    dismissPortionEdit()
+                    mutableBarcodeAmountState.value = null
+                    mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
+                    mutableEvents.emit(AppEvent.FoodSaved)
+                }.onFailure { error ->
+                    mutableEvents.emit(AppEvent.Message(error.safeAiMessage()))
                 }
-            }.onSuccess {
-                lastLoggingText = ""
-                dismissPortionEdit()
-                mutableBarcodeAmountState.value = null
-                mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
-                mutableEvents.emit(AppEvent.FoodSaved)
-            }.onFailure { error ->
-                mutableEvents.emit(AppEvent.Message(error.safeAiMessage()))
+            } finally {
+                loggingSaveInProgress = false
             }
         }
     }
-
     fun favoriteFoodLog(id: Long) {
         viewModelScope.launch {
             runCatching {
@@ -1111,6 +1145,41 @@ class AppViewModel(
         }
     }
 
+    private fun cancelAnalysis() {
+        analysisRequestId += 1
+        analysisJob?.cancel()
+        analysisJob = null
+    }
+
+    /** Reuses an exact local catalog match before paying for another provider request. */
+    private suspend fun cachedNutritionAnalysis(intent: ParsedFoodIntent): FoodAnalysis? {
+        val reconciled = UserQuantityResolver.reconcileIntent(intent, Locale.getDefault().country)
+        if (reconciled.items.isEmpty()) return null
+
+        val analyzed = mutableListOf<AnalyzedFoodItem>()
+        for (requested in reconciled.items) {
+            val quantity = requested.quantity ?: return null
+            val unit = requested.unit?.takeIf(String::isNotBlank) ?: return null
+            val normalizedName = requested.name.trim()
+                .lowercase(Locale.ROOT)
+                .replace(Regex("\\s+"), " ")
+            val normalizedBrand = requested.brand?.trim()?.lowercase(Locale.ROOT)
+            val food = recentFoodsSnapshot.firstOrNull {
+                it.normalizedName == normalizedName &&
+                    it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
+            } ?: repository.foodByIdentity(normalizedName, normalizedBrand) ?: return null
+            val scaled = runCatching {
+                ServingNutritionNormalizer.normalizeSourceServingTo(
+                    sourceServingItem = food.toAnalyzedItem("Nomi local food cache"),
+                    loggedQuantity = quantity,
+                    loggedUnit = unit,
+                    loggedGramsEquivalent = requested.gramsEquivalent,
+                ).copy(quantityResolution = requested.quantityResolution)
+            }.getOrNull() ?: return null
+            analyzed += scaled
+        }
+        return FoodAnalysis(items = analyzed, overallConfidence = 1.0)
+    }
     private suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
         withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
             providerFor(config, key).researchNutrition(intent)
@@ -1277,12 +1346,16 @@ class AppViewModel(
 
     private fun AnalyzedFoodItem.toLog(category: MealCategory, inputMethod: String): FoodLogEntity {
         val now = System.currentTimeMillis()
+        val enteredSpoonUnit = quantityResolution?.enteredUnit
+            ?.takeIf { it.isSpoonLoggingUnit() }
+        val enteredSpoonQuantity = quantityResolution?.enteredQuantity
+            ?.takeIf { enteredSpoonUnit != null && it.isFinite() && it > 0.0 }
         return FoodLogEntity(
             mealCategory = category.name,
             displayNameSnapshot = name.trim(),
             brandSnapshot = brand,
-            amount = quantity,
-            unit = unit,
+            amount = enteredSpoonQuantity ?: quantity,
+            unit = enteredSpoonUnit?.takeIf { enteredSpoonQuantity != null } ?: unit,
             grams = gramsEquivalent,
             nutritionSnapshot = NutritionValues(calories, proteinGrams, carbohydrateGrams, fatGrams, fiberGrams),
             sourceSnapshot = NutritionSourceSnapshot(
@@ -1584,6 +1657,14 @@ private fun secretId(pipeline: ProviderPipeline, selection: ProviderSelection): 
     return "provider:$token"
 }
 
+private fun String.isSpoonLoggingUnit(): Boolean = trim()
+    .lowercase(Locale.ROOT)
+    .replace('ö', 'o')
+    .replace("oe", "o") in setOf(
+    "el", "essloffel", "tbsp", "tbs", "tablespoon", "tablespoons",
+    "tl", "teeloffel", "tsp", "teaspoon", "teaspoons",
+    "loffel", "spoon", "spoons",
+)
 private fun Throwable.safeProviderSettingsMessage(): String = when {
     message?.contains("endpoint", ignoreCase = true) == true ->
         "Enter a valid HTTPS API endpoint."
@@ -1593,6 +1674,8 @@ private fun Throwable.safeProviderSettingsMessage(): String = when {
 }
 
 private fun Throwable.safeAiMessage(): String = when {
+    this is AiValidationException && message?.contains("not compatible", ignoreCase = true) == true ->
+        "Nomi couldn't match that source serving to your amount. Try g, ml, EL, or TL."
     this is AiValidationException -> message ?: "The serving amount could not be validated."
     message?.contains("API key", ignoreCase = true) == true ||
         message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()

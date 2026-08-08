@@ -128,18 +128,7 @@ private fun NomiMain(
     val scope = rememberCoroutineScope()
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
-    val todayState by viewModel.todayState.collectAsStateWithLifecycle()
-    val historyState by viewModel.historyState.collectAsStateWithLifecycle()
-    val progressState by viewModel.progressState.collectAsStateWithLifecycle()
-    val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
-    val libraryState by viewModel.libraryState.collectAsStateWithLifecycle()
-    val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
     val barcodeAmountState by viewModel.barcodeAmountState.collectAsStateWithLifecycle()
-    val portionEditState by viewModel.portionEditState.collectAsStateWithLifecycle()
-    val profile by viewModel.profile.collectAsStateWithLifecycle()
-    val plan by viewModel.currentPlan.collectAsStateWithLifecycle()
-    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    val debugEvents by viewModel.aiDebugEvents.collectAsStateWithLifecycle()
 
     var libraryKind by remember { mutableStateOf(LibraryItemKind.RECENT) }
     var selectedProviderIndex by remember { mutableIntStateOf(-1) }
@@ -231,11 +220,7 @@ private fun NomiMain(
         ) {
             composable(Routes.HOME) {
                 MainNavigationSuite(
-                    todayState = todayState,
-                    historyState = historyState,
-                    progressState = progressState,
-                    settingsState = settingsState,
-                    loggingState = loggingState,
+                    viewModel = viewModel,
                     onPreviousDay = viewModel::previousDay,
                     onNextDay = viewModel::nextDay,
                     onToday = viewModel::selectToday,
@@ -307,6 +292,7 @@ private fun NomiMain(
             }
 
             composable(Routes.LOGGING) {
+                val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
                 FoodLoggingScreen(
                     state = loggingState,
                     onBack = { navController.popBackStack() },
@@ -380,6 +366,7 @@ private fun NomiMain(
             }
 
             composable(Routes.LIBRARY) {
+                val libraryState by viewModel.libraryState.collectAsStateWithLifecycle()
                 LibraryScreen(
                     state = libraryState,
                     initialKind = libraryKind,
@@ -392,6 +379,8 @@ private fun NomiMain(
                 route = Routes.FOOD,
                 arguments = listOf(navArgument("id") { type = NavType.LongType }),
             ) { entry ->
+                val todayState by viewModel.todayState.collectAsStateWithLifecycle()
+                val historyState by viewModel.historyState.collectAsStateWithLifecycle()
                 val id = entry.arguments?.getLong("id")
                 val food = (todayState.entries + historyState.visibleDays.flatMap { it.entries })
                     .firstOrNull { it.id == id }
@@ -405,6 +394,7 @@ private fun NomiMain(
             }
 
             composable(Routes.PROFILE) {
+                val profile by viewModel.profile.collectAsStateWithLifecycle()
                 profile?.let { value ->
                     ProfileSettingsScreen(
                         profile = value,
@@ -415,6 +405,7 @@ private fun NomiMain(
             }
 
             composable(Routes.PLAN) {
+                val plan by viewModel.currentPlan.collectAsStateWithLifecycle()
                 plan?.let { value ->
                     NutritionPlanSettingsScreen(
                         plan = value,
@@ -428,6 +419,7 @@ private fun NomiMain(
             }
 
             composable(Routes.HEALTH) {
+                val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
                 HealthConnectScreen(
                     available = settingsState.healthConnectAvailable,
                     connected = settingsState.healthConnectEnabled,
@@ -437,6 +429,8 @@ private fun NomiMain(
             }
 
             composable(Routes.DEVELOPER) {
+                val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+                val debugEvents by viewModel.aiDebugEvents.collectAsStateWithLifecycle()
                 DeveloperScreen(
                     debugEnabled = preferences.aiDebugEnabled,
                     events = debugEvents,
@@ -508,25 +502,11 @@ private fun NomiMain(
         )
     }
 
-    editedItemIndex?.let { index ->
-        val preview = loggingState as? FoodLoggingUiState.Preview
-        preview?.analysis?.items?.getOrNull(index)?.let { item: AnalyzedFoodItem ->
-            AnalyzedItemEditDialog(
-                item = item,
-                onDismiss = { editedItemIndex = null },
-                onSave = { viewModel.updatePreviewItem(index, it) },
-            )
-        }
-    }
-    portionEditState?.let { state ->
-        PortionEditSheet(
-            state = state,
-            onCorrectionChanged = viewModel::updatePortionCorrection,
-            onInterpret = viewModel::interpretPortionCorrection,
-            onApply = viewModel::applyPortionCorrection,
-            onDismiss = viewModel::dismissPortionEdit,
-        )
-    }
+    LoggingEditingOverlays(
+        viewModel = viewModel,
+        editedItemIndex = editedItemIndex,
+        onEditFinished = { editedItemIndex = null },
+    )
 
 
     if (showWeightDialog) {
@@ -602,15 +582,44 @@ private fun NomiMain(
     }
 }
 
+@Composable
+private fun LoggingEditingOverlays(
+    viewModel: AppViewModel,
+    editedItemIndex: Int?,
+    onEditFinished: () -> Unit,
+) {
+    val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
+    val portionEditState by viewModel.portionEditState.collectAsStateWithLifecycle()
+
+    editedItemIndex?.let { index ->
+        val preview = loggingState as? FoodLoggingUiState.Preview
+        preview?.analysis?.items?.getOrNull(index)?.let { item: AnalyzedFoodItem ->
+            AnalyzedItemEditDialog(
+                item = item,
+                onDismiss = onEditFinished,
+                onSave = {
+                    viewModel.updatePreviewItem(index, it)
+                    onEditFinished()
+                },
+            )
+        }
+    }
+    portionEditState?.let { state ->
+        PortionEditSheet(
+            state = state,
+            onCorrectionChanged = viewModel::updatePortionCorrection,
+            onInterpret = viewModel::interpretPortionCorrection,
+            onApply = viewModel::applyPortionCorrection,
+            onDismiss = viewModel::dismissPortionEdit,
+        )
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MainNavigationSuite(
-    todayState: com.nomi.app.ui.today.TodayUiState,
-    historyState: com.nomi.app.ui.history.HistoryUiState,
-    progressState: com.nomi.app.ui.progress.ProgressUiState,
-    settingsState: com.nomi.app.ui.settings.SettingsUiState,
+    viewModel: AppViewModel,
     onPreviousDay: () -> Unit,
-    loggingState: FoodLoggingUiState,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
     onFoodClick: (Long) -> Unit,
@@ -710,55 +719,68 @@ private fun MainNavigationSuite(
             label = "Main destination",
         ) { destination ->
         when (destination) {
-            MainDestination.TODAY -> NomiNotesTodayScreen(
-                state = todayState,
-                loggingState = loggingState,
-                onPreviousDay = onPreviousDay,
-                onNextDay = onNextDay,
-                onToday = onToday,
-                onFoodClick = onFoodClick,
-                onDeleteFood = onDeleteFood,
-                onUndoDeleteFood = onUndoDeleteFood,
-                onDiscardDeletedFood = onDiscardDeletedFood,
-                onTextChanged = onLoggingTextChanged,
-                onAnalyze = onAnalyzeLogging,
-                onConfirm = onConfirmLogging,
-                onRetry = onRetryLogging,
-                onEditText = onEditLoggingText,
-                onEditPreview = onEditLoggingPreview,
-                onDismissDraft = onDismissLoggingDraft,
-                onQuickMethod = onAddFood,
-            )
-            MainDestination.HISTORY -> HistoryScreen(
-                state = historyState,
-                onQueryChanged = onHistoryQuery,
-                onDateSelected = onHistoryDate,
-                onFoodClick = onFoodClick,
-                onCopyMeal = onCopyDay,
-                onCopyDay = onCopyDay,
-                onSaveMeal = onSaveMeal,
-            )
-            MainDestination.PROGRESS -> ProgressScreen(
-                state = progressState,
-                onRangeChanged = onProgressRange,
-                onAddWeight = onAddWeight,
-            )
-            MainDestination.SETTINGS -> SettingsScreen(
-                state = settingsState,
-                onThemeModeChanged = onTheme,
-                onDynamicColorChanged = onDynamicColor,
-                onGermanTranslationChanged = onGermanTranslation,
-                onUnitSystemChanged = onUnits,
-                onActivityTargetAdjustmentChanged = onActivityAdjustment,
-                onProfile = onProfile,
-                onNutrition = onNutrition,
-                onAiProvider = onAiProvider,
-                onHealthConnect = onHealth,
-                onReminderChanged = onReminder,
-                onExport = onExport,
-                onImport = onImport,
-                onDeveloper = onDeveloper,
-            )
+            MainDestination.TODAY -> {
+                val todayState by viewModel.todayState.collectAsStateWithLifecycle()
+                val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
+                NomiNotesTodayScreen(
+                    state = todayState,
+                    loggingState = loggingState,
+                    onPreviousDay = onPreviousDay,
+                    onNextDay = onNextDay,
+                    onToday = onToday,
+                    onFoodClick = onFoodClick,
+                    onDeleteFood = onDeleteFood,
+                    onUndoDeleteFood = onUndoDeleteFood,
+                    onDiscardDeletedFood = onDiscardDeletedFood,
+                    onTextChanged = onLoggingTextChanged,
+                    onAnalyze = onAnalyzeLogging,
+                    onConfirm = onConfirmLogging,
+                    onRetry = onRetryLogging,
+                    onEditText = onEditLoggingText,
+                    onEditPreview = onEditLoggingPreview,
+                    onDismissDraft = onDismissLoggingDraft,
+                    onQuickMethod = onAddFood,
+                )
+            }
+            MainDestination.HISTORY -> {
+                val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+                HistoryScreen(
+                    state = historyState,
+                    onQueryChanged = onHistoryQuery,
+                    onDateSelected = onHistoryDate,
+                    onFoodClick = onFoodClick,
+                    onCopyMeal = onCopyDay,
+                    onCopyDay = onCopyDay,
+                    onSaveMeal = onSaveMeal,
+                )
+            }
+            MainDestination.PROGRESS -> {
+                val progressState by viewModel.progressState.collectAsStateWithLifecycle()
+                ProgressScreen(
+                    state = progressState,
+                    onRangeChanged = onProgressRange,
+                    onAddWeight = onAddWeight,
+                )
+            }
+            MainDestination.SETTINGS -> {
+                val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
+                SettingsScreen(
+                    state = settingsState,
+                    onThemeModeChanged = onTheme,
+                    onDynamicColorChanged = onDynamicColor,
+                    onGermanTranslationChanged = onGermanTranslation,
+                    onUnitSystemChanged = onUnits,
+                    onActivityTargetAdjustmentChanged = onActivityAdjustment,
+                    onProfile = onProfile,
+                    onNutrition = onNutrition,
+                    onAiProvider = onAiProvider,
+                    onHealthConnect = onHealth,
+                    onReminderChanged = onReminder,
+                    onExport = onExport,
+                    onImport = onImport,
+                    onDeveloper = onDeveloper,
+                )
+            }
         }
         }
     }

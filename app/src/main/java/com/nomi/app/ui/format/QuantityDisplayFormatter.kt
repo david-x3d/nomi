@@ -17,6 +17,8 @@ data class QuantityDisplayRequest(
     val gramsEquivalent: Double? = null,
     val canonicalQuantity: Double? = null,
     val canonicalUnit: String? = null,
+    val enteredQuantity: Double? = null,
+    val enteredUnit: String? = null,
     val semantic: QuantityDisplaySemantic = QuantityDisplaySemantic.DIRECT_AMOUNT,
     /** Optional package/container word from the user's wording, e.g. bag or can. */
     val containerUnit: String? = null,
@@ -63,8 +65,17 @@ object QuantityDisplayFormatter {
                 QuantityDisplaySemantic.LOCAL_CAN_DEFAULT -> PackageKind.CAN
                 QuantityDisplaySemantic.DIRECT_AMOUNT -> null
             }
-        val canonical = canonicalAmount(request)
-        val context = semanticContext(request, packageKind, locale)
+        val spoonContext = enteredSpoonContext(request, locale)
+        val canonical = if (spoonContext != null && request.gramsEquivalent?.let(::isUsableAmount) == true) {
+            CanonicalAmount(
+                value = requireNotNull(request.gramsEquivalent),
+                unit = "g",
+                convertedApproximately = request.isApproximate,
+            )
+        } else {
+            canonicalAmount(request)
+        }
+        val context = spoonContext ?: semanticContext(request, packageKind, locale)
         val primary = canonical?.let { amount ->
             val approximate = request.isApproximate ||
                 amount.convertedApproximately ||
@@ -102,6 +113,22 @@ object QuantityDisplayFormatter {
             "fl oz", "us fl oz" -> CanonicalAmount(quantity * 29.5735295625, "ml", convertedApproximately = true)
             else -> null
         }
+    }
+
+    private fun enteredSpoonContext(request: QuantityDisplayRequest, locale: Locale): String? {
+        val metadataUnit = request.enteredUnit?.takeIf(::isSpoonUnit)
+        val unit = metadataUnit ?: request.unit.takeIf(::isSpoonUnit) ?: return null
+        val quantity = if (metadataUnit != null) request.enteredQuantity else request.quantity
+        val usableQuantity = quantity?.takeIf(::isUsableAmount) ?: return null
+        return "${formatNumber(usableQuantity, locale, 2)} ${localizedUnit(unit, usableQuantity, locale)}"
+    }
+
+    private fun isSpoonUnit(rawUnit: String): Boolean = when (normalizeUnit(rawUnit)) {
+        "tbsp", "tbs", "tablespoon", "tablespoons", "el", "esslöffel", "essloeffel", "essloffel",
+        "tsp", "teaspoon", "teaspoons", "tl", "teelöffel", "teeloeffel", "teeloffel",
+        "löffel", "loeffel", "loffel", "spoon", "spoons",
+        -> true
+        else -> false
     }
 
     private fun semanticContext(
@@ -241,7 +268,7 @@ object QuantityDisplayFormatter {
             "mg", "milligram", "milligrams", "milligramm" -> "mg"
             "g", "gram", "grams", "gramm" -> "g"
             "kg", "kilogram", "kilograms", "kilogramm" -> "kg"
-            "tbsp", "tbs", "tablespoon", "tablespoons", "el", "esslöffel", "essloeffel", "essloffel" -> if (locale.language == "de") "EL" else "tbsp"
+            "tbsp", "tbs", "tablespoon", "tablespoons", "el", "esslöffel", "essloeffel", "essloffel", "löffel", "loeffel", "loffel", "spoon", "spoons" -> if (locale.language == "de") "EL" else "tbsp"
             "tsp", "teaspoon", "teaspoons", "tl", "teelöffel", "teeloeffel", "teeloffel" -> if (locale.language == "de") "TL" else "tsp"
             "piece", "pieces", "stück", "pcs" -> if (locale.language == "de") "Stück" else if (quantity > 1.0 + EPSILON) "pieces" else "piece"
             else -> rawUnit.trim()

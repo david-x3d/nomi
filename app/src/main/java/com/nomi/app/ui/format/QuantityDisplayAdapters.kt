@@ -15,6 +15,8 @@ fun AnalyzedFoodItem.quantityDisplay(locale: Locale): QuantityDisplayText {
             gramsEquivalent = gramsEquivalent,
             canonicalQuantity = resolution?.canonicalQuantity,
             canonicalUnit = resolution?.canonicalUnit,
+            enteredQuantity = resolution?.enteredQuantity,
+            enteredUnit = resolution?.enteredUnit,
             semantic = when (resolution?.semantic) {
                 QuantitySemantic.PACKAGE_PERCENT -> QuantityDisplaySemantic.PACKAGE_PERCENT
                 QuantitySemantic.PACKAGE_FRACTION -> QuantityDisplaySemantic.PACKAGE_FRACTION
@@ -26,7 +28,8 @@ fun AnalyzedFoodItem.quantityDisplay(locale: Locale): QuantityDisplayText {
             fractionNumerator = resolution?.fractionNumerator,
             fractionDenominator = resolution?.fractionDenominator,
             percentage = resolution?.percentage,
-            isApproximate = resolution?.isApproximate == true,
+            isApproximate = resolution?.isApproximate == true ||
+                (resolution?.enteredUnit != null && gramsEquivalent != null && isEstimate),
             sourcePackageQuantity = resolution?.sourcePackageQuantity ?: sourcePackageQuantity,
             sourcePackageUnit = resolution?.sourcePackageUnit ?: sourcePackageUnit,
             sourcePackageConflict = resolution?.sourcePackageConflict == true,
@@ -45,6 +48,7 @@ fun TodayFoodEntry.quantityDisplay(locale: Locale): QuantityDisplayText {
             quantity = amount,
             unit = unit,
             gramsEquivalent = grams,
+            isApproximate = isEstimated && grams != null,
         ),
         locale = locale,
     )

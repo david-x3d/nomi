@@ -138,6 +138,9 @@ data class QuantityResolutionMetadata(
     val semantic: QuantitySemantic,
     val canonicalQuantity: Double,
     val canonicalUnit: String,
+    /** Exact amount/unit as typed, retained when canonicalization changes the display unit. */
+    val enteredQuantity: Double? = null,
+    val enteredUnit: String? = null,
     val packageQuantity: Double? = null,
     val packageUnit: String? = null,
     val fractionNumerator: Int? = null,
