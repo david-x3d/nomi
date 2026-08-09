@@ -117,7 +117,7 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `openrouter food research explicitly enables bounded server web search`() {
+    fun `openrouter GPT food research uses the minimal server web search payload`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
                 config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
@@ -127,12 +127,11 @@ class OpenAiCompatibleClientTest {
         )
 
         assertTrue(encoded.contains("\"model\":\"openai/gpt-5.6-sol\""))
-        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\""))
-        assertTrue(encoded.contains("\"max_results\":8"))
-        assertTrue(encoded.contains("\"max_uses\":1"))
-        assertTrue(encoded.contains("\"max_total_results\":8"))
-        assertTrue(encoded.contains("\"max_tool_calls\":1"))
+        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\"}]"))
+        assertFalse(encoded.contains("response_format"))
         assertFalse(encoded.contains("web_search_options"))
+        assertFalse(encoded.contains("parameters"))
+        assertFalse(encoded.contains("max_tool_calls"))
         assertFalse(encoded.contains("plugins"))
         assertFalse(encoded.contains("temperature"))
     }

@@ -138,7 +138,6 @@ internal data class ChatCompletionRequest(
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
     val tools: List<OpenRouterServerTool>? = null,
-    @SerialName("max_tool_calls") val maxToolCalls: Int? = null,
 )
 
 @Serializable
@@ -167,14 +166,6 @@ internal data class WebSearchOptions(
 @Serializable
 internal data class OpenRouterServerTool(
     val type: String = "openrouter:web_search",
-    val parameters: OpenRouterWebSearchParameters = OpenRouterWebSearchParameters(),
-)
-
-@Serializable
-internal data class OpenRouterWebSearchParameters(
-    @SerialName("max_results") val maxResults: Int = 8,
-    @SerialName("max_uses") val maxUses: Int = 1,
-    @SerialName("max_total_results") val maxTotalResults: Int = 8,
 )
 
 internal data class WebSearchCompletion(
@@ -243,11 +234,11 @@ internal fun chatCompletionRequest(
     messages = messages,
     temperature = config.temperature.takeIf { config.supportsCustomTemperature() },
     responseFormat = when {
-        // Only Perplexity's own API reliably accepts the strict schema. OpenRouter forwards
-        // response_format to Perplexity for perplexity/* models and the request is rejected
-        // with HTTP 400, so those rely on the JSON-only prompt plus Nomi's app-side validation.
+        // OpenRouter search spans providers with different structured-output constraints, so
+        // its research path relies on the JSON-only prompt plus Nomi's app-side validation.
         requireWebSearch && config.kind == AiProviderKind.PERPLEXITY ->
             nutritionResearchResponseFormat()
+        requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER -> null
         config.supportsJsonObjectResponseFormat() -> ResponseFormat()
         else -> null
     },
@@ -255,9 +246,6 @@ internal fun chatCompletionRequest(
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
     tools = listOf(OpenRouterServerTool()).takeIf {
-        requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
-    },
-    maxToolCalls = 1.takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
     },
 ).also {
