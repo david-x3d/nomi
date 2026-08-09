@@ -120,4 +120,32 @@ class AiPromptsTest {
         assertTrue(prompt.contains("WRONG: calories=566"))
         assertTrue(prompt.contains("scale them a second time"))
     }
+
+    @Test
+    fun `amount resolution retry searches exact product piece weight`() {
+        val prompt = AiPrompts.researchNutritionAmountResolution(
+            intent = ParsedFoodIntent(
+                originalText = "one milk snack",
+                items = listOf(
+                    ParsedFoodItem(
+                        name = "Milk snack",
+                        brand = "Example brand",
+                        quantity = 1.0,
+                        unit = "piece",
+                    ),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+            unresolvedItemIndexes = listOf(0),
+        )
+
+        assertTrue(prompt.contains("AMOUNT-RESOLUTION RETRY"))
+        assertTrue(prompt.contains("official manufacturer page first"))
+        assertTrue(prompt.contains("pack net grams / pack piece count"))
+        assertTrue(prompt.contains("5 x 28 g"))
+        assertTrue(prompt.contains("gramsEquivalent=28"))
+        assertTrue(prompt.contains("DO NOT replace them with 28 g"))
+        assertTrue(prompt.contains("never invent or estimate a piece weight"))
+    }
 }

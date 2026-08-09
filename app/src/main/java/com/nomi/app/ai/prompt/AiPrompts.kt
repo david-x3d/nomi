@@ -265,6 +265,40 @@ object AiPrompts {
         Structured meal: ${json.encodeToString(intent)}
     """.trimIndent()
 
+    fun researchNutritionAmountResolution(
+        intent: ParsedFoodIntent,
+        json: Json,
+        localeCountry: String? = null,
+        unresolvedItemIndexes: List<Int>,
+    ): String {
+        val targets = unresolvedItemIndexes.joinToString(", ") { index ->
+            val item = intent.items.getOrNull(index)
+            "item ${index + 1} (${item?.brand?.let { "$it " }.orEmpty()}${item?.name ?: "unknown"})"
+        }
+        return researchNutrition(intent, json, localeCountry) + "\n\n" + """
+            AMOUNT-RESOLUTION RETRY: The previous live search found nutrition, but it omitted the
+            exact conversion required to match the user's amount for: $targets.
+            Perform a fresh, targeted live web search for each listed product's individual weight.
+            For a branded packaged food, search the current official manufacturer page first, then
+            German retailer or product-catalog pages for an explicit per-piece weight or a pack
+            declaration containing both net mass and piece count. Use either the stated individual
+            weight or deterministic pack math: pack net grams / pack piece count = grams per piece;
+            logged piece count * grams per piece = `gramsEquivalent`.
+            Example evidence "5 x 28 g" with quantity=1 and unit="piece" means
+            gramsEquivalent=28. Keep quantity=1 and unit="piece"; DO NOT replace them with 28 g.
+            If the logged count is greater than one, `gramsEquivalent` is the TOTAL mass of all
+            logged pieces. Record the exact pack calculation and the market in assumptions.
+            Do not use a different flavour, size, edition, or country formulation. For a branded
+            product, never invent or estimate a piece weight: return the error envelope if no exact
+            product-specific weight or exact pack math can be verified on the live web.
+            For an unbranded generic food only, a reputable food-specific serving-weight estimate
+            is allowed when exact data does not exist; then set isEstimate=true and explain it.
+            Return the complete FoodAnalysis JSON for every input item in the original order, even
+            though only the listed items need an amount conversion. All normal source, serving,
+            citation, product-identity, and JSON-schema rules above still apply.
+        """.trimIndent()
+    }
+
     fun adjustPortion(current: PortionContext, correction: String, json: Json): String = """
         Interpret only the requested portion change. Do not calculate new calories or macros.
         Return a mathematically consistent quantity multiplier for the app to validate and apply.

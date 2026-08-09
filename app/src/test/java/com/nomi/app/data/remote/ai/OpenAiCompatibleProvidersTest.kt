@@ -141,6 +141,71 @@ class OpenAiCompatibleProvidersTest {
         assertEquals("Mineralwasser still", resolved.items.single().name)
     }
 
+    @Test
+    fun `piece logged against mass source triggers targeted amount research`() {
+        val milkSnack = analyzedItem(sourceName = "Manufacturer").copy(
+            name = "Milk snack",
+            brand = "Example brand",
+            quantity = 1.0,
+            unit = "piece",
+            gramsEquivalent = null,
+            sourceServingQuantity = 100.0,
+            sourceServingUnit = "g",
+            sourceServingGramsEquivalent = null,
+        )
+
+        assertEquals(
+            listOf(0),
+            unresolvedWebAmountItemIndexes(FoodAnalysis(items = listOf(milkSnack))),
+        )
+        assertTrue(
+            unresolvedWebAmountItemIndexes(
+                FoodAnalysis(items = listOf(milkSnack.copy(gramsEquivalent = 28.0))),
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun `amount resolution adds weight evidence without replacing nutrition`() {
+        val primaryItem = analyzedItem(
+            sourceName = "Official nutrition",
+            sourceUrl = "https://manufacturer.example/nutrition",
+            supportingSourceUrls = listOf("https://nutrition-shop.example/product"),
+        ).copy(
+            name = "Milk snack",
+            quantity = 1.0,
+            unit = "piece",
+            gramsEquivalent = null,
+            sourceServingGramsEquivalent = null,
+            calories = 420.0,
+        )
+        val resolvedItem = primaryItem.copy(
+            gramsEquivalent = 28.0,
+            calories = 999.0,
+            sourceName = "Pack listing",
+            sourceUrl = "https://manufacturer.example/pack",
+            supportingSourceUrls = listOf("https://retailer.example/pack"),
+            sourcePackageQuantity = 140.0,
+            sourcePackageUnit = "g",
+            assumptions = listOf("140 g / 5 pieces = 28 g per piece"),
+        )
+
+        val merged = mergeWebAmountResolution(
+            primary = FoodAnalysis(items = listOf(primaryItem)),
+            amountResolution = FoodAnalysis(items = listOf(resolvedItem)),
+            unresolvedItemIndexes = setOf(0),
+        ).items.single()
+
+        assertEquals(28.0, merged.gramsEquivalent!!, 0.0)
+        assertEquals(420.0, merged.calories, 0.0)
+        assertEquals("Official nutrition", merged.sourceName)
+        assertEquals("https://manufacturer.example/nutrition", merged.sourceUrl)
+        assertEquals(140.0, merged.sourcePackageQuantity!!, 0.0)
+        assertTrue(merged.supportingSourceUrls.contains("https://manufacturer.example/pack"))
+        assertTrue(merged.supportingSourceUrls.contains("https://retailer.example/pack"))
+        assertTrue(merged.assumptions.contains("140 g / 5 pieces = 28 g per piece"))
+    }
+
     private fun analysis(
         sourceName: String? = "Manufacturer",
         sourceUrl: String? = null,

@@ -64,17 +64,39 @@ class OpenAiCompatibleProviders(
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        val completion = client.completeWebSearchJson(
-            config = nutritionConfig,
-            credential = nutritionCredential(),
-            systemPrompt = "You compare multiple independent websites and report web-cited " +
-                "source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
-            userPrompt = AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
+        suspend fun research(prompt: String): FoodAnalysis {
+            val completion = client.completeWebSearchJson(
+                config = nutritionConfig,
+                credential = nutritionCredential(),
+                systemPrompt = "You compare multiple independent websites and report web-cited " +
+                    "source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
+                userPrompt = prompt,
+            )
+            throwIfResearchRefusal(client.json, completion.content)
+            val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
+            val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
+            return UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
+        }
+
+        var reconciledAnalysis = research(
+            AiPrompts.researchNutrition(reconciledIntent, client.json, localeCountry),
         )
-        throwIfResearchRefusal(client.json, completion.content)
-        val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
-        val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
-        val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
+        val unresolvedAmounts = unresolvedWebAmountItemIndexes(reconciledAnalysis)
+        if (unresolvedAmounts.isNotEmpty()) {
+            val amountResolution = research(
+                AiPrompts.researchNutritionAmountResolution(
+                    intent = reconciledIntent,
+                    json = client.json,
+                    localeCountry = localeCountry,
+                    unresolvedItemIndexes = unresolvedAmounts,
+                ),
+            )
+            reconciledAnalysis = mergeWebAmountResolution(
+                primary = reconciledAnalysis,
+                amountResolution = amountResolution,
+                unresolvedItemIndexes = unresolvedAmounts.toSet(),
+            )
+        }
         val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
         return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
@@ -123,6 +145,78 @@ class OpenAiCompatibleProviders(
         val visionResult: VisionFoodResult = client.json.decodeFromString(raw)
         return AiResponseValidator.validate(visionResult)
     }
+}
+
+/**
+ * Finds results that cannot yet bridge a source mass serving and a logged piece/portion (or the
+ * reverse). The normalizer remains strict; this only decides when a second, targeted web search
+ * can provide the missing product-specific weight.
+ */
+internal fun unresolvedWebAmountItemIndexes(analysis: FoodAnalysis): List<Int> =
+    analysis.items.mapIndexedNotNull { index, item ->
+        val sourceUnit = item.sourceServingUnit ?: return@mapIndexedNotNull null
+        val sourceIsMass = isResearchMassUnit(sourceUnit)
+        val loggedIsMass = isResearchMassUnit(item.unit)
+        val needsLoggedMass = sourceIsMass && !loggedIsMass && item.gramsEquivalent == null
+        val needsSourceMass = !sourceIsMass && loggedIsMass &&
+            item.sourceServingGramsEquivalent == null
+        index.takeIf { needsLoggedMass || needsSourceMass }
+    }
+
+/**
+ * Keeps the first pass's nutrition table and source identity, importing only missing conversion
+ * evidence from the targeted pass. This prevents a package-weight lookup from silently replacing
+ * already researched nutrient values.
+ */
+internal fun mergeWebAmountResolution(
+    primary: FoodAnalysis,
+    amountResolution: FoodAnalysis,
+    unresolvedItemIndexes: Set<Int>,
+): FoodAnalysis {
+    if (primary.items.size != amountResolution.items.size) {
+        throw AiValidationException(
+            "Amount-resolution research returned a different number of foods.",
+        )
+    }
+    return primary.copy(
+        items = primary.items.mapIndexed { index, item ->
+            if (index !in unresolvedItemIndexes) return@mapIndexed item
+            val resolved = amountResolution.items[index]
+            val addedEvidence = buildList {
+                resolved.sourceUrl?.let(::add)
+                addAll(resolved.supportingSourceUrls)
+            }
+            item.copy(
+                gramsEquivalent = item.gramsEquivalent
+                    ?: resolved.gramsEquivalent.takeIfPositive(),
+                sourceServingGramsEquivalent = item.sourceServingGramsEquivalent
+                    ?: resolved.sourceServingGramsEquivalent.takeIfPositive(),
+                sourcePackageQuantity = item.sourcePackageQuantity
+                    ?: resolved.sourcePackageQuantity.takeIfPositive(),
+                sourcePackageUnit = item.sourcePackageUnit
+                    ?: resolved.sourcePackageUnit?.takeIf(String::isNotBlank),
+                supportingSourceUrls = (item.supportingSourceUrls + addedEvidence)
+                    .filterNot { it == item.sourceUrl }
+                    .distinct()
+                    .take(5),
+                isEstimate = item.isEstimate || resolved.isEstimate,
+                confidence = listOfNotNull(item.confidence, resolved.confidence).minOrNull(),
+                assumptions = (item.assumptions + resolved.assumptions).distinct(),
+            )
+        },
+    )
+}
+
+private fun Double?.takeIfPositive(): Double? = this?.takeIf { it.isFinite() && it > 0.0 }
+
+private fun isResearchMassUnit(rawUnit: String): Boolean {
+    val unit = rawUnit.trim().lowercase(Locale.ROOT).removeSuffix(".")
+    return unit in setOf(
+        "mg", "milligram", "milligrams", "milligramm",
+        "g", "gram", "grams", "gramm",
+        "kg", "kilogram", "kilograms", "kilogramm",
+        "oz", "ounce", "ounces", "lb", "lbs", "pound", "pounds",
+    )
 }
 
 internal fun groundWithWebSearchEvidence(
