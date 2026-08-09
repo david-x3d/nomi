@@ -36,6 +36,7 @@ import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.data.preferences.WeightUnitPreference
+import com.nomi.app.data.preferences.withSupportedModel
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
@@ -2073,7 +2074,7 @@ private fun AiProviderEditorState.toProviderSelection(): ProviderSelection = Pro
     providerId = provider.toProviderId(),
     model = model.trim(),
     endpoint = endpoint.trim(),
-)
+).withSupportedModel()
 
 private fun ProviderSelection.resolvedEndpoint(): String {
     val resolved = when (providerId.toProviderKind()) {

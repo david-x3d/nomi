@@ -75,7 +75,7 @@ class DataStoreAppPreferencesStore(
         selection: ProviderSelection,
     ) {
         dataStore.edit { values ->
-            values[Keys.provider(pipeline)] = json.encodeToString(selection)
+            values[Keys.provider(pipeline)] = json.encodeToString(selection.withSupportedModel())
         }
     }
 

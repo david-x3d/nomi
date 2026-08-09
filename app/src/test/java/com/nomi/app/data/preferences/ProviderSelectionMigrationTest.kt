@@ -45,6 +45,15 @@ class ProviderSelectionMigrationTest {
     }
 
     @Test
+    fun `common GPT 5 6 Sol shorthand is normalized for OpenRouter`() {
+        listOf("gpt5.6sol", "gpt-5.6-sol", "openai/gpt5.6sol").forEach { shorthand ->
+            val selection = ProviderSelection(providerId = "openrouter", model = shorthand)
+
+            assertEquals(DEFAULT_OPENROUTER_MODEL, selection.withSupportedModel().model)
+        }
+    }
+
+    @Test
     fun `user selected model is left unchanged`() {
         val selected = ProviderSelection(providerId = "openrouter", model = "openai/gpt-5.2")
 

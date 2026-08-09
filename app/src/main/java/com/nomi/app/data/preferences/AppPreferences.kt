@@ -113,12 +113,18 @@ data class AppPreferences(
 internal const val DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-sol"
 internal const val RETIRED_OPENROUTER_MODEL = "deepseek/deepseek-v4"
 internal const val PREVIOUS_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
+private val OPENROUTER_GPT_5_6_SOL_ALIASES = setOf(
+    "gpt5.6sol",
+    "gpt-5.6-sol",
+    "openai/gpt5.6sol",
+)
 
-/** Keeps existing provider keys usable while replacing Nomi's retired model default. */
+/** Keeps existing provider keys usable while replacing retired defaults and common shorthand. */
 internal fun ProviderSelection.withSupportedModel(): ProviderSelection =
     if (providerId.equals("openrouter", ignoreCase = true) &&
         (model.equals(RETIRED_OPENROUTER_MODEL, ignoreCase = true) ||
-            model.equals(PREVIOUS_OPENROUTER_MODEL, ignoreCase = true))
+            model.equals(PREVIOUS_OPENROUTER_MODEL, ignoreCase = true) ||
+            model.trim().lowercase() in OPENROUTER_GPT_5_6_SOL_ALIASES)
     ) {
         copy(model = DEFAULT_OPENROUTER_MODEL)
     } else {

@@ -137,7 +137,7 @@ internal data class ChatCompletionRequest(
     val temperature: Double? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
-    val tools: List<OpenRouterServerTool>? = null,
+    val plugins: List<ProviderPlugin>? = null,
 )
 
 @Serializable
@@ -164,8 +164,10 @@ internal data class WebSearchOptions(
 )
 
 @Serializable
-internal data class OpenRouterServerTool(
-    val type: String = "openrouter:web_search",
+internal data class ProviderPlugin(
+    val id: String = "web",
+    val engine: String = "exa",
+    @SerialName("max_results") val maxResults: Int = 8,
 )
 
 internal data class WebSearchCompletion(
@@ -245,7 +247,7 @@ internal fun chatCompletionRequest(
     webSearchOptions = WebSearchOptions().takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
-    tools = listOf(OpenRouterServerTool()).takeIf {
+    plugins = listOf(ProviderPlugin()).takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
     },
 ).also {

@@ -113,11 +113,11 @@ class OpenAiCompatibleClientTest {
         )
 
         assertFalse(encoded.contains("response_format"))
-        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\""))
+        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"engine\":\"exa\""))
     }
 
     @Test
-    fun `openrouter GPT food research uses the minimal server web search payload`() {
+    fun `openrouter GPT food research uses Exa without provider-specific search tools`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
                 config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
@@ -127,12 +127,10 @@ class OpenAiCompatibleClientTest {
         )
 
         assertTrue(encoded.contains("\"model\":\"openai/gpt-5.6-sol\""))
-        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\"}]"))
+        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"engine\":\"exa\",\"max_results\":8}]"))
         assertFalse(encoded.contains("response_format"))
         assertFalse(encoded.contains("web_search_options"))
-        assertFalse(encoded.contains("parameters"))
-        assertFalse(encoded.contains("max_tool_calls"))
-        assertFalse(encoded.contains("plugins"))
+        assertFalse(encoded.contains("tools"))
         assertFalse(encoded.contains("temperature"))
     }
 
@@ -147,7 +145,7 @@ class OpenAiCompatibleClientTest {
         )
 
         assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"high\"}"))
-        assertFalse(encoded.contains("\"tools\""))
+        assertFalse(encoded.contains("\"plugins\""))
     }
 
     @Test
