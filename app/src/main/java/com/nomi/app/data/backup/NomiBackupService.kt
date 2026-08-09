@@ -196,6 +196,7 @@ class NomiBackupService(
         preferencesStore.setReminders(value.reminders)
         preferencesStore.setAdjustTargetFromActivity(value.adjustTargetFromActivity)
         preferencesStore.setAiDebugEnabled(value.aiDebugEnabled)
+        preferencesStore.setAiRequestTimeoutDisabled(value.aiRequestTimeoutDisabled)
         preferencesStore.setOnboardingDraft(value.onboardingDraft)
         preferencesStore.markOnboardingCompleted(value.onboardingCompleted, clearDraft = false)
     }

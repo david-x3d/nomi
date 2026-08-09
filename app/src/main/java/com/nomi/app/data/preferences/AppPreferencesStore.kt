@@ -28,6 +28,7 @@ interface AppPreferencesStore {
     suspend fun markOnboardingCompleted(completed: Boolean, clearDraft: Boolean = completed)
     suspend fun setAiDebugEnabled(enabled: Boolean)
     suspend fun setAdjustTargetFromActivity(enabled: Boolean)
+    suspend fun setAiRequestTimeoutDisabled(disabled: Boolean)
 }
 
 class DataStoreAppPreferencesStore(
@@ -110,6 +111,10 @@ class DataStoreAppPreferencesStore(
         dataStore.edit { values -> values[Keys.ADJUST_TARGET_FROM_ACTIVITY] = enabled }
     }
 
+    override suspend fun setAiRequestTimeoutDisabled(disabled: Boolean) {
+        dataStore.edit { values -> values[Keys.AI_REQUEST_TIMEOUT_DISABLED] = disabled }
+    }
+
     private fun decodePreferences(values: Preferences): AppPreferences {
         val defaults = AppPreferences()
         return AppPreferences(
@@ -150,6 +155,8 @@ class DataStoreAppPreferencesStore(
             onboardingCompleted = values[Keys.ONBOARDING_COMPLETED] ?: false,
             aiDebugEnabled = values[Keys.AI_DEBUG_ENABLED] ?: false,
             adjustTargetFromActivity = values[Keys.ADJUST_TARGET_FROM_ACTIVITY] ?: false,
+            aiRequestTimeoutDisabled = values[Keys.AI_REQUEST_TIMEOUT_DISABLED]
+                ?: defaults.aiRequestTimeoutDisabled,
         )
     }
 
@@ -175,6 +182,7 @@ class DataStoreAppPreferencesStore(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding.completed")
         val AI_DEBUG_ENABLED = booleanPreferencesKey("developer.ai_debug")
         val ADJUST_TARGET_FROM_ACTIVITY = booleanPreferencesKey("nutrition.adjust_from_activity")
+        val AI_REQUEST_TIMEOUT_DISABLED = booleanPreferencesKey("ai.request_timeout_disabled")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {
             ProviderPipeline.FOOD_RESEARCH -> FOOD_RESEARCH_PROVIDER

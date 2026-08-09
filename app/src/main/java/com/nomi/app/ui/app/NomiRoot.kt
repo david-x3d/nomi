@@ -267,6 +267,7 @@ private fun NomiMain(
                         selectedProviderIndex = index
                         providerEditor = viewModel.providerEditorState(index)
                     },
+                    onAiRequestTimeoutDisabled = viewModel::setAiRequestTimeoutDisabled,
                     onHealth = { navController.navigate(Routes.HEALTH) },
                     onReminder = { index, enabled ->
                         val needsPermission = enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -645,6 +646,7 @@ private fun MainNavigationSuite(
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
     onAiProvider: (Int) -> Unit,
+    onAiRequestTimeoutDisabled: (Boolean) -> Unit,
     onHealth: () -> Unit,
     onReminder: (Int, Boolean) -> Unit,
     onExport: () -> Unit,
@@ -762,6 +764,7 @@ private fun MainNavigationSuite(
                     onProfile = onProfile,
                     onNutrition = onNutrition,
                     onAiProvider = onAiProvider,
+                    onAiRequestTimeoutDisabledChanged = onAiRequestTimeoutDisabled,
                     onHealthConnect = onHealth,
                     onReminderChanged = onReminder,
                     onExport = onExport,

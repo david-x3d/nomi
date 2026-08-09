@@ -1283,6 +1283,12 @@ class AppViewModel(
         viewModelScope.launch { repository.appPreferencesStore.setAiDebugEnabled(enabled) }
     }
 
+    fun setAiRequestTimeoutDisabled(disabled: Boolean) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setAiRequestTimeoutDisabled(disabled)
+        }
+    }
+
     fun providerEditorState(index: Int): AiProviderEditorState {
         val settings = settingsState.value.aiProviders.getOrNull(index)
             ?: settingsState.value.aiProviders.firstOrNull()
@@ -1650,11 +1656,12 @@ class AppViewModel(
         pipeline: ProviderPipeline,
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
     ): T {
-        val selection = loadedPreferences().selectionFor(pipeline)
+        val prefs = loadedPreferences()
+        val selection = prefs.selectionFor(pipeline)
         require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
         return container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
             val credential = AiRuntimeCredential.from(chars.concatToString())
-            block(selection.toRuntimeConfig(), credential)
+            block(selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled), credential)
         } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
     }
 
@@ -1673,7 +1680,7 @@ class AppViewModel(
         require(selection.providerId.isNotBlank()) {
             "Configure Fallback in Settings first."
         }
-        val config = selection.toRuntimeConfig()
+        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
         suspend fun use(secret: String): T? = container.secretStore.useSecret(secret) { chars ->
             block(config, AiRuntimeCredential.from(chars.concatToString()))
         }
@@ -1783,6 +1790,7 @@ class AppViewModel(
                 } ?: false,
             ),
             aiProviders = providers,
+            aiRequestTimeoutDisabled = prefs.aiRequestTimeoutDisabled,
             reminders = listOf(
                 com.nomi.app.ui.settings.ReminderSetting("Breakfast", reminders.breakfast.enabled, reminders.breakfast.localTime),
                 com.nomi.app.ui.settings.ReminderSetting("Lunch", reminders.lunch.enabled, reminders.lunch.localTime),
@@ -2081,10 +2089,15 @@ private fun ProviderSelection.resolvedEndpoint(): String {
     return resolved
 }
 
-private fun ProviderSelection.toRuntimeConfig(): AiProviderConfig {
+/**
+ * [timeoutDisabled] comes from the user's "Never time out" setting: research that runs long is
+ * then waited out instead of being cut off.
+ */
+private fun ProviderSelection.toRuntimeConfig(timeoutDisabled: Boolean = false): AiProviderConfig {
     val kind = providerId.toProviderKind()
     require(model.isNotBlank()) { "Choose a model in Settings." }
-    return AiProviderConfig(kind, resolvedEndpoint(), model.trim())
+    val defaults = AiProviderConfig(kind, resolvedEndpoint(), model.trim())
+    return if (timeoutDisabled) defaults.copy(timeoutMillis = null) else defaults
 }
 
 private fun ProviderSelection.cacheIdentity(): String = listOf(

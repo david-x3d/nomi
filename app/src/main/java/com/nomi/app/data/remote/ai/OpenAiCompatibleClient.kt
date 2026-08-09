@@ -7,6 +7,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.header
@@ -131,7 +132,10 @@ class OpenAiCompatibleClient(
             bearerAuth(credential.revealForRequest())
             config.extraHeaders.forEach { (name, value) -> header(name, value) }
             setBody(chatCompletionRequest(config, messages, requireWebSearch))
-            timeout { requestTimeoutMillis = config.timeoutMillis }
+            timeout {
+                requestTimeoutMillis = config.effectiveTimeoutMillis()
+                socketTimeoutMillis = config.effectiveTimeoutMillis()
+            }
         }.body<ChatCompletionResponse>()
     }
 
@@ -149,7 +153,10 @@ class OpenAiCompatibleClient(
             setBody(
                 openRouterResponsesResearchRequest(config, systemPrompt, userPrompt),
             )
-            timeout { requestTimeoutMillis = config.timeoutMillis }
+            timeout {
+                requestTimeoutMillis = config.effectiveTimeoutMillis()
+                socketTimeoutMillis = config.effectiveTimeoutMillis()
+            }
         }.body<JsonObject>().openRouterResponsesWebCompletion()
     }
 
@@ -157,6 +164,14 @@ class OpenAiCompatibleClient(
         httpClient.close()
     }
 }
+
+/**
+ * The socket limit follows the request limit because a researching model can stay silent for
+ * minutes; without it OkHttp's own ten-second read timeout would end the call first. A `null`
+ * configured timeout means the request waits for as long as the provider takes.
+ */
+internal fun AiProviderConfig.effectiveTimeoutMillis(): Long =
+    timeoutMillis ?: HttpTimeoutConfig.INFINITE_TIMEOUT_MS
 
 @Serializable
 internal data class ChatCompletionRequest(

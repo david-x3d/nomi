@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -62,6 +63,7 @@ fun SettingsScreen(
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
     onAiProvider: (Int) -> Unit,
+    onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
     onHealthConnect: () -> Unit,
     onReminderChanged: (Int, Boolean) -> Unit,
     onExport: () -> Unit,
@@ -167,6 +169,18 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+            item {
+                ToggleSetting(
+                    icon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
+                    title = nomiString("Never time out", "Kein Zeitlimit"),
+                    supporting = nomiString(
+                        "Wait as long as the provider needs instead of giving up after 45 seconds",
+                        "So lange warten, wie der Anbieter braucht, statt nach 45 Sekunden abzubrechen",
+                    ),
+                    checked = state.aiRequestTimeoutDisabled,
+                    onCheckedChange = onAiRequestTimeoutDisabledChanged,
+                )
             }
             item { SectionTitle(nomiString("Health & activity", "Gesundheit & Aktivität")) }
             item {

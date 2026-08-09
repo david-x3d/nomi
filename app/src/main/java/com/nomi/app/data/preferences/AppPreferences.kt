@@ -108,6 +108,8 @@ data class AppPreferences(
     val onboardingCompleted: Boolean = false,
     val aiDebugEnabled: Boolean = false,
     val adjustTargetFromActivity: Boolean = false,
+    /** When on, AI requests wait for the provider instead of failing at the built-in limit. */
+    val aiRequestTimeoutDisabled: Boolean = false,
 )
 
 internal const val DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-sol"

@@ -2,6 +2,7 @@ package com.nomi.app.data.remote.ai
 
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
+import io.ktor.client.plugins.HttpTimeoutConfig
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -266,6 +267,22 @@ class OpenAiCompatibleClientTest {
             "{\"ok\":true,\"note\":\"a {brace} in a string\",\"nested\":{\"value\":1}}",
             extractJsonDocument(content),
         )
+    }
+
+    @Test
+    fun `configured timeout is used for both the request and the socket`() {
+        val config = config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol")
+
+        assertEquals(45_000L, config.timeoutMillis)
+        assertEquals(45_000L, config.effectiveTimeoutMillis())
+    }
+
+    @Test
+    fun `a disabled timeout lets a slow research call run to completion`() {
+        val config = config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol")
+            .copy(timeoutMillis = null)
+
+        assertEquals(HttpTimeoutConfig.INFINITE_TIMEOUT_MS, config.effectiveTimeoutMillis())
     }
 
     private fun config(kind: AiProviderKind, model: String) = AiProviderConfig(

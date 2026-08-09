@@ -17,7 +17,8 @@ data class AiProviderConfig(
     val endpoint: String,
     val model: String,
     val temperature: Double = 0.1,
-    val timeoutMillis: Long = 45_000,
+    /** `null` lets the request run as long as the provider needs, with no client-side limit. */
+    val timeoutMillis: Long? = 45_000,
     val extraHeaders: Map<String, String> = emptyMap(),
 )
 

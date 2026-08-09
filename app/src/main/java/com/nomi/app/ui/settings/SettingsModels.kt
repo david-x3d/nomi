@@ -50,6 +50,7 @@ data class SettingsUiState(
     val healthConnect: HealthConnectUiState = HealthConnectUiState(),
     val nutritionTargets: NutritionTargetSetting = NutritionTargetSetting(2_000, 130, 240, 65, false),
     val aiProviders: List<AiProviderSetting> = emptyList(),
+    val aiRequestTimeoutDisabled: Boolean = false,
     val reminders: List<ReminderSetting> = listOf(
         ReminderSetting("Breakfast", timeText = "08:00"),
         ReminderSetting("Lunch", timeText = "12:30"),
