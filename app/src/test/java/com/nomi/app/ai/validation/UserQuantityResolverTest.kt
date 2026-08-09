@@ -292,6 +292,9 @@ class UserQuantityResolverTest {
         assertTrue(prompt.contains("major German retailer"))
         assertTrue(prompt.contains("sourcePackageQuantity"))
         assertTrue(prompt.contains("Red Bull"))
+        assertTrue(prompt.contains("PRODUCT IDENTITY"))
+        assertTrue(prompt.contains("Ferrero chocolate-covered wafer bar"))
+        assertTrue(prompt.contains("any accessible website"))
         assertTrue(prompt.indexOf("official German manufacturer") < prompt.indexOf("international/US"))
     }
 

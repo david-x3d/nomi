@@ -7,6 +7,7 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.QuantityOrigin
 import com.nomi.app.ai.model.QuantityResolutionMetadata
 import com.nomi.app.ai.model.QuantitySemantic
+import com.nomi.app.ai.parsing.GermanProductResolver
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.round
@@ -55,11 +56,14 @@ object UserQuantityResolver {
         localeCountry: String? = null,
     ): ParsedFoodIntent {
         val cleanText = userText.trim()
+        val enrichedItems = parsed.items.map { item ->
+            GermanProductResolver.enrich(cleanText, item, parsed.items.size, localeCountry)
+        }
         val explicit = detectExplicitQuantities(cleanText)
-        val assignments = assignDetections(cleanText, parsed.items, explicit)
+        val assignments = assignDetections(cleanText, enrichedItems, explicit)
         val localeIsGermany = localeCountry.equals("DE", ignoreCase = true)
 
-        val items = parsed.items.mapIndexed { index, item ->
+        val items = enrichedItems.mapIndexed { index, item ->
             val resolution = assignments[index]
                 ?: germanRedBullDefault(cleanText, item, parsed.items.size, localeIsGermany)
             if (resolution == null) {

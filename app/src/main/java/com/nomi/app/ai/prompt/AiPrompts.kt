@@ -157,6 +157,17 @@ object AiPrompts {
         product formulation. Use another country's source only when no appropriate German source
         is available, and identify that source country.
 
+        PRODUCT IDENTITY: Treat `name`, `brand`, and product-identity assumptions in the structured
+        input as search hints for the exact product, not as generic words to translate. Search the
+        quoted product name together with its brand and Germany. A short unfamiliar token in a food
+        log may be a German-market product name: try an exact product search before declaring it
+        unknown or interpreting its ordinary meaning. For example, Duplo in a German food log is
+        the Ferrero chocolate-covered wafer bar, not a toy, building block, or duplicate. Preserve
+        stated variants such as White, Dark, XXL, vegan, or a flavour; never silently substitute
+        the classic version. Do not invent a variant when none was stated.
+        Public web search may use any accessible website that contains relevant nutrition or
+        portion evidence. Source quality and independent cross-checking still determine trust.
+
         Return exactly one result for every structured input item, in the same order. `quantity`
         and `unit` MUST describe the amount the user logged. The calories and macro fields MUST
         describe the cited source serving, whose amount MUST be stated separately in
