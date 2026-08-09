@@ -64,7 +64,7 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `openrouter model supporting json object retains response format`() {
+    fun `openrouter omits response format to keep every route eligible`() {
         val config = config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash")
         val encoded = json.encodeToString(
             chatCompletionRequest(
@@ -73,28 +73,29 @@ class OpenAiCompatibleClientTest {
             ),
         )
 
-        assertTrue(config.supportsJsonObjectResponseFormat())
-        assertTrue(encoded.contains("\"response_format\":{\"type\":\"json_object\"}"))
+        assertFalse(config.supportsJsonObjectResponseFormat())
+        assertFalse(encoded.contains("response_format"))
     }
 
     @Test
-    fun `gpt-5 family models never receive a custom temperature`() {
+    fun `openrouter free variant is preserved without optional routing constraints`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
-                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
-                requireWebSearch = true,
+                config(AiProviderKind.OPEN_ROUTER, "moonshotai/kimi-k2.6:free"),
+                listOf(ChatMessage("user", JsonPrimitive("Reply with JSON"))),
             ),
         )
 
+        assertTrue(encoded.contains("\"model\":\"moonshotai/kimi-k2.6:free\""))
+        assertFalse(encoded.contains("response_format"))
         assertFalse(encoded.contains("temperature"))
     }
 
     @Test
-    fun `standard models keep the configured temperature`() {
+    fun `custom compatible models keep the configured temperature`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash"),
+                config(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE, "custom-model"),
                 listOf(ChatMessage("user", JsonPrimitive("Reply with JSON"))),
             ),
         )

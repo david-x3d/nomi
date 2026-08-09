@@ -2265,7 +2265,9 @@ private fun Throwable.safeProviderFailureMessage(): String? {
             401 -> "The provider rejected that API key. Check it in Settings."
             402 -> "The provider account is out of credit. Top it up or switch the provider in Settings."
             403 -> "The provider denied access. Check the API key and model access in Settings."
-            404 -> "The provider endpoint or model was not found. Check Settings."
+            404 -> "The provider endpoint or model variant was not found. If the model ends " +
+                "in :free, OpenRouter may not currently offer a free endpoint for it. Check " +
+                "the exact model ID in Settings."
             408 -> "The provider took too long. Try again."
             429 -> "The provider rate limit was reached. Wait a moment and try again."
             in 400..499 ->

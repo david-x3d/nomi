@@ -204,24 +204,25 @@ private data class UrlCitation(val url: String? = null)
 private data class SearchResult(val url: String? = null)
 
 /**
- * Perplexity's Sonar API accepts text or JSON-schema response formats, but not OpenAI's
- * legacy `json_object` mode. OpenRouter forwards unsupported parameters to Perplexity and
- * rejects the request, so Sonar must rely on Nomi's explicit JSON-only prompts instead.
+ * OpenRouter variants can route to endpoints with different optional-parameter support.
+ * Omitting legacy `json_object` mode keeps `:free`, `:online`, and chained variants eligible;
+ * Nomi's JSON-only prompts and strict app-side decoding remain authoritative.
  */
 internal fun AiProviderConfig.supportsJsonObjectResponseFormat(): Boolean {
-    val normalizedModel = model.trim().lowercase(Locale.ROOT)
     return when (kind) {
-        AiProviderKind.PERPLEXITY -> false
-        AiProviderKind.OPEN_ROUTER -> !normalizedModel.startsWith("perplexity/")
+        AiProviderKind.PERPLEXITY,
+        AiProviderKind.OPEN_ROUTER,
+        -> false
         else -> true
     }
 }
 
 /**
- * OpenAI's gpt-5 and o-series reasoning models accept only their default temperature and
- * reject requests carrying any other value with HTTP 400, directly and through OpenRouter.
+ * OpenRouter variants can also differ in sampling-parameter support, so let the routed endpoint
+ * use its default. Direct OpenAI gpt-5 and o-series models likewise require their default.
  */
 internal fun AiProviderConfig.supportsCustomTemperature(): Boolean {
+    if (kind == AiProviderKind.OPEN_ROUTER) return false
     val normalized = model.trim().lowercase(Locale.ROOT).removePrefix("openai/")
     return !(normalized.startsWith("gpt-5") || normalized.startsWith("o1") ||
         normalized.startsWith("o3") || normalized.startsWith("o4"))
