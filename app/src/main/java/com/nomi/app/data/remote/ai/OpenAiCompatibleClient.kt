@@ -137,7 +137,8 @@ internal data class ChatCompletionRequest(
     val temperature: Double? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
-    val plugins: List<ProviderPlugin>? = null,
+    val tools: List<OpenRouterServerTool>? = null,
+    @SerialName("max_tool_calls") val maxToolCalls: Int? = null,
 )
 
 @Serializable
@@ -164,12 +165,16 @@ internal data class WebSearchOptions(
 )
 
 @Serializable
-internal data class ProviderPlugin(
-    val id: String = "web",
+internal data class OpenRouterServerTool(
+    val type: String = "openrouter:web_search",
+    val parameters: OpenRouterWebSearchParameters = OpenRouterWebSearchParameters(),
+)
+
+@Serializable
+internal data class OpenRouterWebSearchParameters(
     @SerialName("max_results") val maxResults: Int = 8,
-    @SerialName("search_prompt") val searchPrompt: String =
-        "Compare several independent websites. Manufacturer, supermarket, retailer, reseller, " +
-            "and reliable nutrition pages are valid sources.",
+    @SerialName("max_uses") val maxUses: Int = 1,
+    @SerialName("max_total_results") val maxTotalResults: Int = 8,
 )
 
 internal data class WebSearchCompletion(
@@ -249,7 +254,10 @@ internal fun chatCompletionRequest(
     webSearchOptions = WebSearchOptions().takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
-    plugins = listOf(ProviderPlugin()).takeIf {
+    tools = listOf(OpenRouterServerTool()).takeIf {
+        requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
+    },
+    maxToolCalls = 1.takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_ROUTER
     },
 ).also {

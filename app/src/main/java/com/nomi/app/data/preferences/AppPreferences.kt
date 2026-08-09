@@ -87,8 +87,8 @@ data class AppPreferences(
     val weightUnit: WeightUnitPreference = WeightUnitPreference.KILOGRAMS,
     val heightUnit: HeightUnitPreference = HeightUnitPreference.CENTIMETERS,
     val foodResearchProvider: ProviderSelection = ProviderSelection(
-        providerId = "perplexity",
-        model = "sonar",
+        providerId = "openrouter",
+        model = DEFAULT_OPENROUTER_MODEL,
     ),
     val foodInterpretationProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
@@ -100,8 +100,8 @@ data class AppPreferences(
     ),
     val visionProvider: ProviderSelection = ProviderSelection(),
     val smartFallbackProvider: ProviderSelection = ProviderSelection(
-        providerId = "perplexity",
-        model = "sonar-pro",
+        providerId = "openrouter",
+        model = DEFAULT_OPENROUTER_MODEL,
     ),
     val reminders: ReminderPreferences = ReminderPreferences(),
     val onboardingDraft: PersistedOnboardingDraft? = null,
@@ -110,13 +110,15 @@ data class AppPreferences(
     val adjustTargetFromActivity: Boolean = false,
 )
 
-internal const val DEFAULT_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
+internal const val DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-sol"
 internal const val RETIRED_OPENROUTER_MODEL = "deepseek/deepseek-v4"
+internal const val PREVIOUS_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
 
 /** Keeps existing provider keys usable while replacing Nomi's retired model default. */
 internal fun ProviderSelection.withSupportedModel(): ProviderSelection =
     if (providerId.equals("openrouter", ignoreCase = true) &&
-        model.equals(RETIRED_OPENROUTER_MODEL, ignoreCase = true)
+        (model.equals(RETIRED_OPENROUTER_MODEL, ignoreCase = true) ||
+            model.equals(PREVIOUS_OPENROUTER_MODEL, ignoreCase = true))
     ) {
         copy(model = DEFAULT_OPENROUTER_MODEL)
     } else {

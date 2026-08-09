@@ -81,7 +81,7 @@ class OpenAiCompatibleClientTest {
     fun `gpt-5 family models never receive a custom temperature`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-luna"),
+                config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
                 listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
                 requireWebSearch = true,
             ),
@@ -113,22 +113,28 @@ class OpenAiCompatibleClientTest {
         )
 
         assertFalse(encoded.contains("response_format"))
-        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"max_results\":8"))
+        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\""))
     }
 
     @Test
-    fun `openrouter food research explicitly enables web plugin`() {
+    fun `openrouter food research explicitly enables bounded server web search`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.OPEN_ROUTER, "deepseek/deepseek-v4-flash"),
+                config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
                 listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
                 requireWebSearch = true,
             ),
         )
 
-        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"max_results\":8"))
-        assertTrue(encoded.contains("Compare several independent websites"))
+        assertTrue(encoded.contains("\"model\":\"openai/gpt-5.6-sol\""))
+        assertTrue(encoded.contains("\"tools\":[{\"type\":\"openrouter:web_search\""))
+        assertTrue(encoded.contains("\"max_results\":8"))
+        assertTrue(encoded.contains("\"max_uses\":1"))
+        assertTrue(encoded.contains("\"max_total_results\":8"))
+        assertTrue(encoded.contains("\"max_tool_calls\":1"))
         assertFalse(encoded.contains("web_search_options"))
+        assertFalse(encoded.contains("plugins"))
+        assertFalse(encoded.contains("temperature"))
     }
 
     @Test
@@ -142,7 +148,7 @@ class OpenAiCompatibleClientTest {
         )
 
         assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"high\"}"))
-        assertFalse(encoded.contains("\"plugins\""))
+        assertFalse(encoded.contains("\"tools\""))
     }
 
     @Test

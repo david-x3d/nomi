@@ -40,7 +40,13 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
 Open **Settings → AI providers**, select a provider and model for each pipeline, enter the API key, then use **Test connection**. Credentials stay on-device and are never included in Room, DataStore backups, logs, or repository files.
 
-For OpenRouter-hosted Perplexity models, use the full model identifier, for example `perplexity/sonar`.
+Nomi defaults text and live nutrition research to OpenRouter's `openai/gpt-5.6-sol`. OpenRouter
+research uses the `openrouter:web_search` server tool and requires an OpenRouter account with
+enough credit for both model tokens and search. Model names must use their complete OpenRouter
+identifier; `gpt5.6sol` is not a valid substitute for `openai/gpt-5.6-sol`.
+
+For OpenRouter-hosted Perplexity models, use the full model identifier, for example
+`perplexity/sonar`.
 
 ## Privacy
 
