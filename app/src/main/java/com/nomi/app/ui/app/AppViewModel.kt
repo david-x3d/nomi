@@ -1306,13 +1306,6 @@ class AppViewModel(
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
-                require(
-                    !pipeline.requiresWebResearch() ||
-                        config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
-                ) {
-                    "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
-                        "custom endpoints cannot guarantee live web search."
-                }
                 val selection = draft.copy(endpoint = config.endpoint)
                 state.apiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
                     try {
@@ -1361,13 +1354,6 @@ class AppViewModel(
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
                 val draft = state.toProviderSelection()
                 val config = draft.toRuntimeConfig()
-                require(
-                    !pipeline.requiresWebResearch() ||
-                        config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
-                ) {
-                    "Configure Food research with Perplexity, OpenRouter, or OpenAI; " +
-                        "custom endpoints cannot guarantee live web search."
-                }
                 val selection = draft.copy(endpoint = config.endpoint)
                 suspend fun testWith(
                     targetConfig: AiProviderConfig,
@@ -2073,9 +2059,13 @@ private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSel
 private fun AiProviderEditorState.toProviderSelection(): ProviderSelection = ProviderSelection(
     providerId = provider.toProviderId(),
     model = model.trim(),
-    endpoint = endpoint.trim(),
+    endpoint = endpoint.asHttpsEndpoint(),
 ).withSupportedModel()
 
+
+private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
+    if ("://" in endpoint) endpoint else "https://$endpoint"
+}
 private fun ProviderSelection.resolvedEndpoint(): String {
     val resolved = when (providerId.toProviderKind()) {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"

@@ -296,10 +296,6 @@ internal fun chatCompletionRequest(
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
 ).also {
-    require(!requireWebSearch || config.kind != AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE) {
-        "Configure Food research with Perplexity, OpenRouter, or OpenAI in Settings; " +
-            "custom endpoints cannot guarantee live web search."
-    }
     // OpenAI accepts web_search_options only on its search models and 400s otherwise.
     require(
         !requireWebSearch || config.kind != AiProviderKind.OPEN_AI ||

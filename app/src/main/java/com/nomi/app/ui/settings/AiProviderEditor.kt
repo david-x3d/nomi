@@ -116,7 +116,7 @@ fun AiProviderEditorDialog(
                     supportingText = if (state.provider.canonicalEndpoint() != null) {
                         { Text(nomiString("Built-in provider endpoint managed by Nomi", "Nomi verwaltet den Endpunkt dieses integrierten Anbieters.")) }
                     } else {
-                        { Text(nomiString("HTTPS OpenAI-compatible base URL", "HTTPS-Basis-URL eines OpenAI-kompatiblen Dienstes")) }
+                        { Text(nomiString("OpenAI-compatible base URL (https:// optional)", "OpenAI-kompatible Basis-URL (https:// optional)")) }
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -252,10 +252,14 @@ private fun String.localizedPurpose(): String = when (this) {
 }
 
 private fun String.isValidHttpsEndpoint(): Boolean {
-    val uri = runCatching { URI(trim()) }.getOrNull() ?: return false
+    val uri = runCatching { URI(asHttpsEndpoint()) }.getOrNull() ?: return false
     return uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
 }
 
+
+private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
+    if ("://" in endpoint) endpoint else "https://$endpoint"
+}
 private fun String.secretEndpointKey(): String = trim().trimEnd('/').lowercase()
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

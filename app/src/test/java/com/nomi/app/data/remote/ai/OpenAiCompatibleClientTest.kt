@@ -191,18 +191,18 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `custom food research provider is rejected before request`() {
-        val error = assertThrows(IllegalArgumentException::class.java) {
+    fun `custom food research provider is allowed without provider specific search options`() {
+        val encoded = json.encodeToString(
             chatCompletionRequest(
                 config(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE, "custom-model"),
                 listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
                 requireWebSearch = true,
-            )
-        }
+            ),
+        )
 
-        assertTrue(error.message.orEmpty().contains("Configure Food research"))
+        assertTrue(encoded.contains("\"model\":\"custom-model\""))
+        assertFalse(encoded.contains("web_search_options"))
     }
-
     @Test
     fun `sonar openrouter fixture extracts food json before citations`() {
         val fixture = """
