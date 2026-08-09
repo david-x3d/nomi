@@ -41,8 +41,12 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 Open **Settings → AI providers**, select a provider and model for each pipeline, enter the API key, then use **Test connection**. Credentials stay on-device and are never included in Room, DataStore backups, logs, or repository files.
 
 Nomi defaults text and live nutrition research to OpenRouter's `openai/gpt-5.6-sol`. OpenRouter
-research uses OpenRouter's Exa-backed web plugin and requires enough credit for model tokens and
-search. The complete model identifier is preferred; Nomi also normalizes `gpt5.6sol` and
+research uses the Responses API with both the `openrouter:web_search` server tool (using Exa) and
+the `openrouter:web_fetch` server tool (using direct page extraction). Nomi validates the typed,
+completed fetch URL before accepting one official manufacturer page, so a search snippet cannot
+masquerade as the nutrition source. Research requires enough credit for model tokens and search.
+The complete model identifier is preferred;
+Nomi also normalizes `gpt5.6sol` and
 `gpt-5.6-sol` to `openai/gpt-5.6-sol`.
 OpenRouter variant suffixes such as `:free`, `:online`, and chained variants are preserved.
 They work only when OpenRouter currently advertises a matching endpoint; Nomi never removes

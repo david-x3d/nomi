@@ -20,7 +20,7 @@ class AiPromptsTest {
             localeCountry = "DE",
         )
 
-        assertTrue(prompt.contains("MUST perform a live web search"))
+        assertTrue(prompt.contains("MUST perform live web research"))
         assertTrue(prompt.contains("at least two independent websites"))
         assertTrue(prompt.contains("Supermarket, grocery, retailer, and reseller"))
         assertTrue(prompt.contains("never return a model-only guess"))
@@ -147,5 +147,39 @@ class AiPromptsTest {
         assertTrue(prompt.contains("gramsEquivalent=28"))
         assertTrue(prompt.contains("DO NOT replace them with 28 g"))
         assertTrue(prompt.contains("never invent or estimate a piece weight"))
+    }
+
+    @Test
+    fun `branded workflow treats snippets as discovery and fetches the official page`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "80 g Example Brand exact vegan mortadella",
+                items = listOf(
+                    ParsedFoodItem(
+                        name = "Exact vegan mortadella",
+                        brand = "Example Brand",
+                        quantity = 80.0,
+                        unit = "g",
+                    ),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        val exactSearch = prompt.indexOf("1. EXACT-PRODUCT SEARCH")
+        val officialFetch = prompt.indexOf("2. OFFICIAL-PAGE FETCH")
+        val alternativeQuery = prompt.indexOf("3. ALTERNATIVE QUERY")
+        val refusalGate = prompt.indexOf("4. REFUSAL GATE")
+
+        assertTrue(exactSearch >= 0)
+        assertTrue(exactSearch < officialFetch)
+        assertTrue(officialFetch < alternativeQuery)
+        assertTrue(alternativeQuery < refusalGate)
+        assertTrue(prompt.contains("snippet is discovery evidence only"))
+        assertTrue(prompt.contains("Missing kcal or macros in a snippet does NOT"))
+        assertTrue(prompt.contains("fetch attempts for all likely official product pages"))
+        assertTrue(prompt.contains("per-100 g or per-100 ml values"))
+        assertTrue(prompt.contains("nutrition table is canonical"))
     }
 }

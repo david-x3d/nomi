@@ -89,6 +89,8 @@ class OpenAiCompatibleClientTest {
         assertTrue(encoded.contains("\"model\":\"moonshotai/kimi-k2.6:free\""))
         assertFalse(encoded.contains("response_format"))
         assertFalse(encoded.contains("temperature"))
+        assertFalse(encoded.contains("\"tools\""))
+        assertFalse(encoded.contains("max_tool_calls"))
     }
 
     @Test
@@ -104,35 +106,44 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `openrouter sonar food research omits response format entirely`() {
+    fun `openrouter sonar food research enables search and fetch server tools`() {
         val encoded = json.encodeToString(
-            chatCompletionRequest(
+            openRouterResponsesResearchRequest(
                 config(AiProviderKind.OPEN_ROUTER, "perplexity/sonar"),
-                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
-                requireWebSearch = true,
+                systemPrompt = "Return validated JSON",
+                userPrompt = "Research this food",
             ),
         )
 
         assertFalse(encoded.contains("response_format"))
-        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"engine\":\"exa\""))
+        assertTrue(encoded.contains("\"type\":\"openrouter:web_search\""))
+        assertTrue(encoded.contains("\"type\":\"openrouter:web_fetch\""))
+        assertTrue(encoded.contains("\"max_tool_calls\":15"))
+        assertFalse(encoded.contains("\"plugins\""))
     }
 
     @Test
-    fun `openrouter GPT food research uses Exa without provider-specific search tools`() {
+    fun `openrouter GPT food research configures agentic search and page fetch`() {
         val encoded = json.encodeToString(
-            chatCompletionRequest(
+            openRouterResponsesResearchRequest(
                 config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol"),
-                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
-                requireWebSearch = true,
+                systemPrompt = "Return validated JSON",
+                userPrompt = "Research this food",
             ),
         )
 
         assertTrue(encoded.contains("\"model\":\"openai/gpt-5.6-sol\""))
-        assertTrue(encoded.contains("\"plugins\":[{\"id\":\"web\",\"engine\":\"exa\",\"max_results\":8}]"))
+        assertTrue(encoded.contains("\"type\":\"openrouter:web_search\""))
+        assertTrue(encoded.contains("\"max_results\":5"))
+        assertTrue(encoded.contains("\"max_total_results\":15"))
+        assertTrue(encoded.contains("\"search_context_size\":\"high\""))
+        assertTrue(encoded.contains("\"type\":\"openrouter:web_fetch\""))
+        assertTrue(encoded.contains("\"engine\":\"openrouter\""))
+        assertTrue(encoded.contains("\"max_content_tokens\":50000"))
         assertFalse(encoded.contains("response_format"))
         assertFalse(encoded.contains("web_search_options"))
-        assertFalse(encoded.contains("tools"))
         assertFalse(encoded.contains("temperature"))
+        assertFalse(encoded.contains("\"plugins\""))
     }
 
     @Test
@@ -146,7 +157,8 @@ class OpenAiCompatibleClientTest {
         )
 
         assertTrue(encoded.contains("\"web_search_options\":{\"search_context_size\":\"high\"}"))
-        assertFalse(encoded.contains("\"plugins\""))
+        assertFalse(encoded.contains("\"tools\""))
+        assertFalse(encoded.contains("max_tool_calls"))
     }
 
     @Test

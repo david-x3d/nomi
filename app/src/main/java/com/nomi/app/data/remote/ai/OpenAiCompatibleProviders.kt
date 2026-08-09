@@ -22,6 +22,7 @@ import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
 import java.net.URI
+import java.text.Normalizer
 import java.util.Locale
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -74,7 +75,12 @@ class OpenAiCompatibleProviders(
             )
             throwIfResearchRefusal(client.json, completion.content)
             val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
-            val groundedAnalysis = groundWithWebSearchEvidence(analysis, completion.evidenceUrls)
+            val groundedAnalysis = groundWithWebSearchEvidence(
+                analysis = analysis,
+                evidenceUrls = completion.evidenceUrls,
+                fetchedUrls = completion.fetchedUrls,
+                requiresFetchedBrandedSource = completion.requiresFetchedBrandedSource,
+            )
             return UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
         }
 
@@ -222,6 +228,8 @@ private fun isResearchMassUnit(rawUnit: String): Boolean {
 internal fun groundWithWebSearchEvidence(
     analysis: FoodAnalysis,
     evidenceUrls: Set<String>,
+    fetchedUrls: Set<String> = emptySet(),
+    requiresFetchedBrandedSource: Boolean = false,
 ): FoodAnalysis {
     val citationsBySite = linkedMapOf<String, String>()
     evidenceUrls.forEach { rawUrl ->
@@ -235,19 +243,43 @@ internal fun groundWithWebSearchEvidence(
                 "configure Perplexity, OpenRouter, or OpenAI for Food research.",
         )
     }
-    if (citationsBySite.size < 2) {
+    val fetchedSites = fetchedUrls.mapNotNull(::canonicalResearchSite).toSet()
+    if (requiresFetchedBrandedSource) {
+        val unfetchedBrandedItem = analysis.items.firstOrNull { item ->
+            !item.brand.isNullOrBlank() &&
+                canonicalClaimedResearchSite(item.sourceDomain) !in fetchedSites
+        }
+        if (unfetchedBrandedItem != null) {
+            throw AiValidationException(
+                "Branded food research must fetch the cited product page before using its nutrition.",
+            )
+        }
+    }
+    val fetchedOfficialSourceIsCanonical = citationsBySite.size == 1 &&
+        analysis.items.singleOrNull()?.hasFetchedOfficialBrandSource(
+            citationsBySite = citationsBySite,
+            fetchedUrls = fetchedUrls,
+        ) == true
+    if (citationsBySite.size < 2 && !fetchedOfficialSourceIsCanonical) {
         throw AiValidationException(
             "Food research needs citations from at least two independent websites.",
         )
     }
-    val attachedUrls = citationsBySite.values.take(6)
-    val primaryUrl = attachedUrls.first()
-    val supportingUrls = attachedUrls.drop(1).take(5)
-    val primarySourceName = runCatching {
-        URI(primaryUrl).host?.removePrefix("www.")
-    }.getOrNull()?.takeIf(String::isNotBlank)
     return analysis.copy(
         items = analysis.items.map { item ->
+            val claimedSite = canonicalClaimedResearchSite(item.sourceDomain)
+            val primaryEntry = citationsBySite.entries.firstOrNull { (site, _) ->
+                site == claimedSite
+            } ?: citationsBySite.entries.first()
+            val primaryUrl = primaryEntry.value
+            val supportingUrls = citationsBySite.entries.asSequence()
+                .filter { (site, _) -> site != primaryEntry.key }
+                .map { (_, url) -> url }
+                .take(5)
+                .toList()
+            val primarySourceName = runCatching {
+                URI(primaryUrl).host?.removePrefix("www.")
+            }.getOrNull()?.takeIf(String::isNotBlank)
             item.copy(
                 sourceName = item.sourceName?.takeIf(String::isNotBlank) ?: primarySourceName,
                 sourceUrl = primaryUrl,
@@ -255,6 +287,50 @@ internal fun groundWithWebSearchEvidence(
             )
         },
     )
+}
+
+private fun AnalyzedFoodItem.hasFetchedOfficialBrandSource(
+    citationsBySite: Map<String, String>,
+    fetchedUrls: Set<String>,
+): Boolean {
+    val claimedBrand = brand?.trim()?.takeIf(String::isNotBlank) ?: return false
+    val claimedSite = canonicalClaimedResearchSite(sourceDomain) ?: return false
+    val fetchedSites = fetchedUrls.mapNotNull(::canonicalResearchSite).toSet()
+    return !sourceProductName.isNullOrBlank() &&
+        !isEstimate &&
+        citationsBySite.containsKey(claimedSite) &&
+        claimedSite in fetchedSites &&
+        claimedSite.looksLikeOfficialBrandDomain(claimedBrand)
+}
+
+private fun String.looksLikeOfficialBrandDomain(brand: String): Boolean {
+    val domainKey = foldForDomainMatch(substringBeforeLast('.'))
+        .replace(Regex("[^a-z0-9]"), "")
+    val ignored = setOf("brand", "company", "group", "foods", "food", "gmbh", "ltd", "inc")
+    return Regex("[a-z0-9]+")
+        .findAll(foldForDomainMatch(brand))
+        .map { it.value }
+        .filter { it.length >= 4 && it !in ignored }
+        .any(domainKey::contains)
+}
+
+private fun foldForDomainMatch(value: String): String {
+    val germanAscii = value.lowercase(Locale.ROOT)
+        .replace("ä", "ae")
+        .replace("ö", "oe")
+        .replace("ü", "ue")
+        .replace("ß", "ss")
+    return Normalizer.normalize(germanAscii, Normalizer.Form.NFKD)
+        .replace(Regex("\\p{M}+"), "")
+}
+private fun canonicalClaimedResearchSite(value: String?): String? {
+    val host = value?.trim()?.lowercase(Locale.ROOT)?.removePrefix("www.")
+        ?.takeIf(String::isNotBlank) ?: return null
+    return runCatching { URI("https://$host").host }
+        .getOrNull()
+        ?.lowercase(Locale.ROOT)
+        ?.removePrefix("www.")
+        ?.takeIf(String::isNotBlank)
 }
 
 private fun canonicalResearchSite(url: String): String? = runCatching {

@@ -77,12 +77,14 @@ object AiPrompts {
         json: Json,
         localeCountry: String? = null,
     ): String = """
-        You MUST perform a live web search for every structured input item and compare at least two independent websites
-        with different hostnames for EACH item. Never answer from model memory
-        and never return a model-only guess. Every result, including an estimate, MUST be grounded in
-        provider-returned web-search evidence. Nomi attaches provider citation metadata outside the
-        JSON. Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
-        If two relevant cited websites cannot be found, fail instead of guessing.
+        You MUST perform live web research for every structured input item. Never answer from model
+        memory and never return a model-only guess. For generic foods and branded foods without an
+        exact fetched official manufacturer table, compare at least two independent websites with
+        different hostnames for EACH item. Every result, including an estimate, MUST be grounded in
+        provider-returned web evidence. Nomi attaches provider evidence outside the JSON.
+        Do not return `sourceUrl` or `supportingSourceUrls`, and never invent or rewrite URLs.
+        If neither an exact fetched official table nor two relevant cited websites can be found after
+        the required search-and-fetch retries, fail instead of guessing.
         FAILING MEANS RETURNING AN ERROR, NEVER FAKE DATA: when live search finds no usable
         nutrition data of any kind for an item, return exactly {"error": "<short reason>"} as
         the entire response. NEVER return zero calories and zero macros as a substitute for
@@ -124,6 +126,29 @@ object AiPrompts {
         never invent a domain, title, or citation. Before answering, sanity-check each item:
         protein*4 + carbohydrates*4 + fat*9 must roughly match the source calories; if it is far
         off, re-read the source for unit or serving mistakes instead of returning it.
+        BRANDED SEARCH-AND-FETCH WORKFLOW - FOLLOW THESE STEPS IN ORDER:
+        1. EXACT-PRODUCT SEARCH: use the available web-search tool with the quoted brand, complete
+        product name, variant/flavour, market, and a nutrition term such as Naehrwerte or nutrition.
+        Search for the exact product before trying retailers, databases, or a generic substitute.
+        2. OFFICIAL-PAGE FETCH: identify likely official manufacturer product URLs from the results,
+        preferring the manufacturer's own domain. Use the available page-fetch/open tool on those
+        URLs and read the returned page content, including accordions or extracted nutrition-table
+        text. A search-result snippet is discovery evidence only and is NEVER the final source of
+        truth for a branded food. Missing kcal or macros in a snippet does NOT mean the product page
+        lacks them and is not a reason to return an error.
+        3. ALTERNATIVE QUERY: if the exact search finds no usable official table, or a candidate page
+        cannot be fetched, perform at least one materially different query - for example a shorter
+        exact product name plus the brand, or a site-restricted manufacturer-domain query. Fetch
+        every likely official product page found by that alternative query before using a lower-
+        priority source.
+        4. REFUSAL GATE: return the error envelope only after the exact-product search, at least one
+        alternative query, and fetch attempts for all likely official product pages have failed to
+        produce usable nutrition data. Search snippets without nutrition values do not satisfy this
+        gate. If an exact fetched manufacturer page contains per-100 g or per-100 ml values, that
+        nutrition table is canonical and sufficient. Seek a second independent site to corroborate
+        product identity when available, but never replace the manufacturer's printed values with
+        retailer or database values.
+
         BRANDED PACKAGED FOODS: ALWAYS search the manufacturer's official website for the exact
         product first and read its printed nutrition table. When that official table exists,
         never return an estimate and never replace its numbers with another site's numbers.

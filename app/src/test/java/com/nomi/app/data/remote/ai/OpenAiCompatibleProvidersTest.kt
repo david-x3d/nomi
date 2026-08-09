@@ -35,6 +35,98 @@ class OpenAiCompatibleProvidersTest {
     }
 
     @Test
+    fun `grounding prefers cited url matching the declared source domain`() {
+        val branded = analyzedItem(sourceName = "Official manufacturer").copy(
+            brand = "Example Brand",
+            sourceProductName = "Exact vegan mortadella",
+            sourceDomain = "manufacturer.example",
+        )
+
+        val grounded = groundWithWebSearchEvidence(
+            FoodAnalysis(items = listOf(branded)),
+            evidenceUrls = linkedSetOf(
+                "https://retailer.example/exact-product",
+                "https://www.manufacturer.example/products/exact-product",
+            ),
+        ).items.single()
+
+        assertEquals(
+            "https://www.manufacturer.example/products/exact-product",
+            grounded.sourceUrl,
+        )
+        assertEquals(
+            listOf("https://retailer.example/exact-product"),
+            grounded.supportingSourceUrls,
+        )
+    }
+
+    @Test
+    fun `one branded snippet citation cannot bypass independent evidence`() {
+        val branded = analyzedItem(sourceName = "Official manufacturer").copy(
+            brand = "Example Brand",
+            sourceProductName = "Exact vegan mortadella",
+            sourceDomain = "manufacturer.example",
+            isEstimate = false,
+        )
+
+        val error = assertThrows(AiValidationException::class.java) {
+            groundWithWebSearchEvidence(
+                FoodAnalysis(items = listOf(branded)),
+                evidenceUrls = linkedSetOf(
+                    "https://manufacturer.example/products/exact-product",
+                ),
+            )
+        }
+
+        assertEquals("Food research needs citations from at least two independent websites.", error.message)
+    }
+    @Test
+    fun oneCompletedFetchedOfficialBrandSourceIsSufficient() {
+        val officialUrl = "https://example-brand.com/products/exact-product"
+        val branded = analyzedItem(sourceName = "Official manufacturer").copy(
+            brand = "Example Brand",
+            sourceProductName = "Exact vegan mortadella",
+            sourceDomain = "example-brand.com",
+            isEstimate = false,
+        )
+
+        val grounded = groundWithWebSearchEvidence(
+            analysis = FoodAnalysis(items = listOf(branded)),
+            evidenceUrls = setOf(officialUrl),
+            fetchedUrls = setOf(officialUrl),
+            requiresFetchedBrandedSource = true,
+        ).items.single()
+
+        assertEquals(officialUrl, grounded.sourceUrl)
+        assertTrue(grounded.supportingSourceUrls.isEmpty())
+    }
+
+    @Test
+    fun brandedSnippetCannotBorrowAnUnrelatedCompletedFetch() {
+        val branded = analyzedItem(sourceName = "Official manufacturer").copy(
+            brand = "Example Brand",
+            sourceProductName = "Exact vegan mortadella",
+            sourceDomain = "example-brand.com",
+            isEstimate = false,
+        )
+
+        val error = assertThrows(AiValidationException::class.java) {
+            groundWithWebSearchEvidence(
+                analysis = FoodAnalysis(items = listOf(branded)),
+                evidenceUrls = setOf(
+                    "https://example-brand.com/products/exact-product",
+                    "https://retailer.example/exact-product",
+                ),
+                fetchedUrls = setOf("https://retailer.example/exact-product"),
+                requiresFetchedBrandedSource = true,
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("must fetch the cited product page"))
+    }
+
+
+    @Test
     fun `two independent provider hosts are required`() {
         val error = assertThrows(AiValidationException::class.java) {
             groundWithWebSearchEvidence(
