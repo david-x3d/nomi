@@ -77,6 +77,14 @@ class OpenAiCompatibleClient(
                 userPrompt = userPrompt,
             )
         }
+        if (config.kind == AiProviderKind.CODEX_EASY) {
+            return completeOpenAiResponsesResearch(
+                config = config,
+                credential = credential,
+                systemPrompt = systemPrompt,
+                userPrompt = userPrompt,
+            )
+        }
         return completeResponse(
             config = config,
             credential = credential,
@@ -157,7 +165,37 @@ class OpenAiCompatibleClient(
                 requestTimeoutMillis = config.effectiveTimeoutMillis()
                 socketTimeoutMillis = config.effectiveTimeoutMillis()
             }
-        }.body<JsonObject>().openRouterResponsesWebCompletion()
+        }.body<JsonObject>().responsesWebCompletion(
+            providerName = "OpenRouter",
+            requiresFetchedBrandedSource = true,
+        )
+    }
+
+    /**
+     * OpenAI-dialect relays serve live search through the Responses API's `web_search` tool
+     * rather than the chat completions `web_search_options` of the `-search-preview` models.
+     */
+    private suspend fun completeOpenAiResponsesResearch(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+    ): WebSearchCompletion {
+        val endpoint = config.endpoint.trimEnd('/') + "/responses"
+        return httpClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            bearerAuth(credential.revealForRequest())
+            config.extraHeaders.forEach { (name, value) -> header(name, value) }
+            setBody(openAiResponsesResearchRequest(config, systemPrompt, userPrompt))
+            timeout {
+                requestTimeoutMillis = config.effectiveTimeoutMillis()
+                socketTimeoutMillis = config.effectiveTimeoutMillis()
+            }
+        }.body<JsonObject>().responsesWebCompletion(
+            providerName = "This provider",
+            // Only OpenRouter's server tools fetch a discovered page; this path searches only.
+            requiresFetchedBrandedSource = false,
+        )
     }
 
     override fun close() {
@@ -181,6 +219,17 @@ internal data class ChatCompletionRequest(
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
 )
+
+@Serializable
+internal data class OpenAiResponsesResearchRequest(
+    val model: String,
+    val instructions: String,
+    val input: String,
+    val tools: List<OpenAiServerTool>,
+)
+
+@Serializable
+internal data class OpenAiServerTool(val type: String)
 
 @Serializable
 internal data class OpenRouterResponsesResearchRequest(
@@ -308,13 +357,12 @@ internal fun chatCompletionRequest(
         else -> null
     },
     webSearchOptions = WebSearchOptions().takeIf {
-        requireWebSearch && config.usesOpenAiWebSearch()
+        requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
 ).also {
-    // OpenAI accepts web_search_options only on its search models and 400s otherwise. A relay
-    // of the same API inherits that rule, and researching without search returns no citations.
+    // OpenAI accepts web_search_options only on its search models and 400s otherwise.
     require(
-        !requireWebSearch || !config.usesOpenAiWebSearch() ||
+        !requireWebSearch || config.kind != AiProviderKind.OPEN_AI ||
             config.model.contains("search", ignoreCase = true),
     ) {
         "Configure Food research with an OpenAI web-search model such as " +
@@ -322,9 +370,26 @@ internal fun chatCompletionRequest(
     }
 }
 
-/** Providers that speak OpenAI's own `web_search_options` dialect on chat completions. */
-internal fun AiProviderConfig.usesOpenAiWebSearch(): Boolean =
-    kind == AiProviderKind.OPEN_AI || kind == AiProviderKind.CODEX_EASY
+/**
+ * A response made only of JSON carries no `url_citation` annotations, because annotations index
+ * into prose the model never wrote. Nomi still refuses to trust model-authored URLs, so the
+ * model is asked to name its sources in a sentence after the JSON: the citations then arrive as
+ * provider metadata, and [extractJsonDocument] takes the first complete object regardless.
+ *
+ * `max_tool_calls` is deliberately absent — relays of this API reject the field outright.
+ */
+internal fun openAiResponsesResearchRequest(
+    config: AiProviderConfig,
+    systemPrompt: String,
+    userPrompt: String,
+): OpenAiResponsesResearchRequest = OpenAiResponsesResearchRequest(
+    model = config.model,
+    instructions = systemPrompt + "\n\nSearch the web before answering. Output the JSON object " +
+        "first, then a short plain sentence beginning \"Sources:\" that links every page you " +
+        "used, so the citations travel as provider metadata instead of inside the JSON.",
+    input = userPrompt,
+    tools = listOf(OpenAiServerTool(type = "web_search")),
+)
 
 internal fun openRouterResponsesResearchRequest(
     config: AiProviderConfig,
@@ -390,9 +455,16 @@ private fun ChatCompletionResponse.webSearchCompletion(): WebSearchCompletion {
     )
 }
 
-private fun JsonObject.openRouterResponsesWebCompletion(): WebSearchCompletion {
+/**
+ * Reads an OpenAI-dialect Responses envelope. OpenRouter's server-tool items are absent from a
+ * plain `web_search` response and simply do not match, so one walk serves both providers.
+ */
+private fun JsonObject.responsesWebCompletion(
+    providerName: String,
+    requiresFetchedBrandedSource: Boolean,
+): WebSearchCompletion {
     val output = this["output"] as? JsonArray
-        ?: throw IllegalStateException("OpenRouter returned no Responses output")
+        ?: throw IllegalStateException("$providerName returned no Responses output")
     val evidenceUrls = linkedSetOf<String>()
     val fetchedUrls = linkedSetOf<String>()
     val contentParts = mutableListOf<String>()
@@ -435,15 +507,15 @@ private fun JsonObject.openRouterResponsesWebCompletion(): WebSearchCompletion {
     }
 
     check(evidenceUrls.isNotEmpty()) {
-        "OpenRouter returned no web-search or web-fetch evidence."
+        "$providerName returned no web-search citations for this food."
     }
     val raw = contentParts.joinToString("\n").takeIf(String::isNotBlank)
-        ?: throw IllegalStateException("OpenRouter returned no structured Responses content")
+        ?: throw IllegalStateException("$providerName returned no structured Responses content")
     return WebSearchCompletion(
         content = extractJsonDocument(raw),
         evidenceUrls = evidenceUrls,
         fetchedUrls = fetchedUrls,
-        requiresFetchedBrandedSource = true,
+        requiresFetchedBrandedSource = requiresFetchedBrandedSource,
     )
 }
 
@@ -470,7 +542,14 @@ internal fun decodeWebSearchCompletionPayload(json: Json, payload: String): WebS
 internal fun decodeOpenRouterResponsesResearchPayload(
     json: Json,
     payload: String,
-): WebSearchCompletion = json.decodeFromString<JsonObject>(payload).openRouterResponsesWebCompletion()
+): WebSearchCompletion = json.decodeFromString<JsonObject>(payload)
+    .responsesWebCompletion(providerName = "OpenRouter", requiresFetchedBrandedSource = true)
+
+internal fun decodeOpenAiResponsesResearchPayload(
+    json: Json,
+    payload: String,
+): WebSearchCompletion = json.decodeFromString<JsonObject>(payload)
+    .responsesWebCompletion(providerName = "This provider", requiresFetchedBrandedSource = false)
 
 private fun ChatCompletionResponse.structuredContent(): String {
     val raw = choices.firstOrNull()?.message?.content?.content

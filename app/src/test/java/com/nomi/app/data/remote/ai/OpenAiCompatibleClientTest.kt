@@ -285,29 +285,71 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `codex easy research sends openai web search options`() {
+    fun `codex easy research asks the responses api to search and to name its sources`() {
         val encoded = json.encodeToString(
-            chatCompletionRequest(
-                config(AiProviderKind.CODEX_EASY, "gpt-4o-search-preview"),
-                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
-                requireWebSearch = true,
+            openAiResponsesResearchRequest(
+                config(AiProviderKind.CODEX_EASY, "gpt-5.6-sol"),
+                "You report web-cited nutrition as JSON.",
+                "Research Barilla Penne Rigate, 100 g",
             ),
         )
 
-        assertTrue(encoded.contains("\"web_search_options\""))
+        assertTrue(encoded.contains("\"tools\":[{\"type\":\"web_search\"}]"))
+        assertTrue(encoded.contains("Sources:"))
+        // Relays of this API reject the field, and OpenRouter's bound does not apply here.
+        assertFalse(encoded.contains("max_tool_calls"))
     }
 
     @Test
-    fun `codex easy research without a search model is refused before the request`() {
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            chatCompletionRequest(
-                config(AiProviderKind.CODEX_EASY, "gpt-5.2"),
-                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
-                requireWebSearch = true,
-            )
+    fun `codex easy research reads citations from provider annotations, not the json`() {
+        val fixture = """
+            {
+              "output": [
+                {"type": "reasoning", "content": []},
+                {"type": "web_search_call", "status": "completed",
+                 "action": {"type": "search", "query": "barilla penne rigate nutrition"}},
+                {"type": "message", "content": [{
+                  "type": "output_text",
+                  "text": "{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}\nSources: Barilla product page.",
+                  "annotations": [{
+                    "type": "url_citation",
+                    "url": "https://www.barilla.com/products/pasta/penne-rigate"
+                  }]
+                }]}
+              ]
+            }
+        """.trimIndent()
+
+        val completion = decodeOpenAiResponsesResearchPayload(json, fixture)
+
+        assertEquals("{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}", completion.content)
+        assertEquals(
+            setOf("https://www.barilla.com/products/pasta/penne-rigate"),
+            completion.evidenceUrls,
+        )
+        // Only OpenRouter's server tools fetch the page, so this path cannot demand a fetch.
+        assertFalse(completion.requiresFetchedBrandedSource)
+    }
+
+    @Test
+    fun `research without provider citations is refused rather than trusted`() {
+        val fixture = """
+            {
+              "output": [
+                {"type": "message", "content": [{
+                  "type": "output_text",
+                  "text": "{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}",
+                  "annotations": []
+                }]}
+              ]
+            }
+        """.trimIndent()
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            decodeOpenAiResponsesResearchPayload(json, fixture)
         }
 
-        assertTrue(error.message.orEmpty().contains("search model"))
+        assertTrue(error.message.orEmpty().contains("citations"))
     }
 
     @Test
