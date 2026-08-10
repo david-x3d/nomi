@@ -2294,7 +2294,16 @@ private fun Throwable.safeProviderFailureMessage(): String? {
     ) {
         return "The provider took too long. Try again."
     }
-    if (causes.any { it is SerializationException || it is NoTransformationFoundException } ||
+    // A base URL missing its version segment still answers 200, but with the provider's own
+    // web page. That arrives as a content type Ktor cannot read as a completion, and blaming
+    // the model would send someone looking in the wrong place.
+    if (causes.any { it is NoTransformationFoundException } ||
+        causeMessageContains("No transformation found")
+    ) {
+        return "That endpoint answered with a web page instead of an API response. Check the " +
+            "base URL in Settings — an OpenAI-compatible endpoint usually ends in /v1."
+    }
+    if (causes.any { it is SerializationException } ||
         causeMessageContains("JSON", "serialize", "deserialize", "structured content")
     ) {
         return "The provider returned a response Nomi couldn't read. Check the selected model in Settings."

@@ -90,6 +90,21 @@ class ProviderCredentialRoutingTest {
     }
 
     @Test
+    fun `an endpoint that answers with a web page points at the base URL, not the model`() {
+        val error = IllegalStateException(
+            "No transformation found: class io.ktor.utils.io.ByteBufferChannel -> " +
+                "class ChatCompletionResponse, with response from " +
+                "https://codex-easy.ai/chat/completions, Content-Type: text/html",
+        )
+
+        assertEquals(
+            "That endpoint answered with a web page instead of an API response. Check the " +
+                "base URL in Settings — an OpenAI-compatible endpoint usually ends in /v1.",
+            error.safeAiMessage(),
+        )
+    }
+
+    @Test
     fun `common http status text gets an explicit message when no response object is available`() {
         assertEquals(
             "The provider rate limit was reached. Wait a moment and try again.",
