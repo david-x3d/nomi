@@ -1,6 +1,9 @@
 package com.nomi.app.ui.onboarding
 
 import androidx.lifecycle.ViewModel
+import com.nomi.app.data.preferences.settingFor
+import com.nomi.app.data.preferences.with
+import com.nomi.app.domain.Micronutrient
 import com.nomi.app.domain.calculator.EnergyCalculator
 import com.nomi.app.domain.model.ActivityLevel
 import com.nomi.app.domain.model.EnergySex
@@ -269,6 +272,16 @@ class OnboardingViewModel(
         }
     }
 
+    override fun toggleMicronutrient(value: Micronutrient, enabled: Boolean) {
+        update(recalculate = false) { state ->
+            val setting = state.micronutrients.settingFor(value)
+            state.copy(
+                micronutrients = state.micronutrients.with(value, setting.copy(enabled = enabled)),
+                validationMessage = null,
+            )
+        }
+    }
+
     override fun selectProgressRate(value: ProgressRate) {
         update { state ->
             state.copy(
@@ -455,6 +468,8 @@ class OnboardingViewModel(
                 "Enter a weekly change between 0.05 and 1.5 kg."
             else -> null
         }
+        // Tracking nothing extra is a valid answer, so this step never blocks the journey.
+        OnboardingStep.MICRONUTRIENTS -> null
         OnboardingStep.PLAN -> if (state.finalPlan == null) "Your plan isn't ready yet." else null
     }
 

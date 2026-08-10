@@ -3,6 +3,7 @@ package com.nomi.app.ui.logging
 import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
 import com.nomi.app.ui.today.MealCategory
@@ -18,6 +19,34 @@ sealed interface FoodLoggingUiState {
         val originalText: String = "",
         val sourceUrls: List<String> = emptyList(),
     ) : FoodLoggingUiState
+
+    /**
+     * What the photo was understood to be, before anything is looked up.
+     *
+     * Recognition and research are separate jobs, and this is the seam between them. The
+     * description is shown as ordinary editable words because that is what it is: the sentence
+     * the user would have typed. Correcting "tuna" to "chicken" here costs one word; correcting
+     * it after a full nutrition search costs the whole search.
+     *
+     * [place] is the restaurant or shop the meal came from, if the user names one. It is passed
+     * on as the brand of every item, which is what sends research to that chain's own published
+     * numbers rather than to a generic recipe.
+     */
+    data class PhotoReview(
+        val description: String,
+        /** The vision model's own wording, kept to detect whether the user changed anything. */
+        val recognizedDescription: String,
+        val place: String = "",
+        val recognizedItems: List<ParsedFoodItem> = emptyList(),
+        val mealCategory: MealCategory = MealCategory.SNACKS,
+        val notes: List<String> = emptyList(),
+    ) : FoodLoggingUiState {
+        val canContinue: Boolean
+            get() = description.isNotBlank()
+
+        val isEdited: Boolean
+            get() = description.trim() != recognizedDescription.trim()
+    }
 
     data class Preview(
         val analysis: FoodAnalysis,
@@ -55,17 +84,17 @@ data class PortionEditUiState(
     val current: PortionContext,
     val correction: String = "",
     val proposed: PortionAdjustment? = null,
+    /**
+     * The fully scaled result, computed in app code the moment the change was understood.
+     *
+     * Holding the finished item rather than recomputing it on apply means what the preview
+     * shows and what gets saved are the same object, not two calculations that could disagree.
+     */
+    val scaledItem: AnalyzedFoodItem? = null,
+    /** Set when the edit changed the food, so arithmetic cannot answer it. */
+    val needsResearch: Boolean = false,
+    val researchReason: String? = null,
     val isProcessing: Boolean = false,
     val errorMessage: String? = null,
 )
 
-fun AnalyzedFoodItem.toPortionContext(): PortionContext = PortionContext(
-    name = name,
-    currentQuantity = quantity,
-    currentUnit = unit,
-    currentGrams = gramsEquivalent,
-    calories = calories,
-    proteinGrams = proteinGrams,
-    carbohydrateGrams = carbohydrateGrams,
-    fatGrams = fatGrams,
-)

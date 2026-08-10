@@ -1,5 +1,6 @@
 package com.nomi.app.ui.onboarding
 
+import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.domain.model.NutritionPlan
 
@@ -13,6 +14,7 @@ internal enum class OnboardingStep {
     TARGET_WEIGHT,
     ACTIVITY,
     PROGRESS_RATE,
+    MICRONUTRIENTS,
     PLAN,
 }
 
@@ -39,6 +41,8 @@ internal data class OnboardingUiState(
     val currentStep: OnboardingStep = OnboardingStep.WELCOME,
     val navigationDirection: NavigationDirection = NavigationDirection.FORWARD,
     val draft: OnboardingDraft = OnboardingDraft(),
+    /** Everything starts off; the step exists to make the capability visible, not to opt anyone in. */
+    val micronutrients: MicronutrientPreferences = MicronutrientPreferences(),
     val heightSystem: MeasurementSystem = MeasurementSystem.METRIC,
     val weightSystem: MeasurementSystem = MeasurementSystem.METRIC,
     val manualCaloriesText: String = "",
@@ -75,6 +79,7 @@ internal data class OnboardingUiState(
         if (draft.goalType?.name != "MAINTAIN") add(OnboardingStep.TARGET_WEIGHT)
         add(OnboardingStep.ACTIVITY)
         if (draft.goalType?.name != "MAINTAIN") add(OnboardingStep.PROGRESS_RATE)
+        add(OnboardingStep.MICRONUTRIENTS)
         add(OnboardingStep.PLAN)
     }
 }
@@ -97,6 +102,7 @@ interface OnboardingActions {
     fun updateTargetWeightPounds(value: String)
     fun selectActivity(value: com.nomi.app.domain.model.ActivityLevel)
     fun selectProgressRate(value: com.nomi.app.domain.model.ProgressRate)
+    fun toggleMicronutrient(value: com.nomi.app.domain.Micronutrient, enabled: Boolean)
     fun updateCustomWeeklyChange(value: String)
     fun toggleCalculationBreakdown()
     fun togglePlanEditor()

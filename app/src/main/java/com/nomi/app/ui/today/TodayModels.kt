@@ -1,5 +1,6 @@
 package com.nomi.app.ui.today
 
+import com.nomi.app.domain.Micronutrient
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -27,6 +28,31 @@ data class MacroProgress(
 ) {
     val fraction: Float
         get() = if (targetGrams <= 0) 0f else (consumedGrams / targetGrams).toFloat().coerceIn(0f, 1f)
+}
+
+/**
+ * One tracked micronutrient's day so far.
+ *
+ * [consumed] is null when nothing logged today reported this nutrient at all, which the card
+ * shows as "no data" rather than as zero. A day where every source stayed silent is not a day
+ * without sugar, and saying otherwise would be the app inventing a number.
+ */
+data class MicronutrientProgress(
+    val nutrient: Micronutrient,
+    val consumed: Double?,
+    val target: Double,
+    /** True when some of today's foods reported this nutrient and others did not. */
+    val isPartial: Boolean = false,
+) {
+    val fraction: Float
+        get() {
+            val amount = consumed ?: return 0f
+            return if (target <= 0) 0f else (amount / target).toFloat().coerceIn(0f, 1f)
+        }
+
+    /** A ceiling nutrient that has gone past its target deserves to be called out. */
+    val isOverLimit: Boolean
+        get() = nutrient.isLimit && consumed != null && target > 0 && consumed > target
 }
 
 /**
@@ -156,6 +182,8 @@ data class TodayUiState(
     val protein: MacroProgress = MacroProgress(0.0, 130.0),
     val carbohydrates: MacroProgress = MacroProgress(0.0, 240.0),
     val fat: MacroProgress = MacroProgress(0.0, 65.0),
+    /** Empty until the user enables at least one micronutrient in settings. */
+    val micronutrients: List<MicronutrientProgress> = emptyList(),
     val entries: List<TodayFoodEntry> = emptyList(),
     val isLoading: Boolean = false,
 ) {

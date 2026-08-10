@@ -1,5 +1,6 @@
 package com.nomi.app.data.preferences
 
+import com.nomi.app.domain.Micronutrient
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -61,6 +62,34 @@ data class ReminderPreferences(
 )
 
 /**
+ * One tracked nutrient beyond the macros. [dailyTarget] is in the nutrient's own storage unit -
+ * grams for fiber, sugar, and saturated fat, milligrams for sodium - and keeps its value while
+ * tracking is off so turning a nutrient back on restores the number the user chose.
+ */
+@Serializable
+data class MicronutrientSetting(
+    val enabled: Boolean = false,
+    val dailyTarget: Double,
+)
+
+/**
+ * Defaults mirror [com.nomi.app.domain.Micronutrient.referenceDailyAmount]. They are repeated as
+ * literals because a stored preference must deserialize to a stable value rather than to whatever
+ * the current build believes the reference intake to be; a unit test pins the two together so the
+ * duplication cannot drift unnoticed.
+ */
+@Serializable
+data class MicronutrientPreferences(
+    val fiber: MicronutrientSetting = MicronutrientSetting(dailyTarget = 30.0),
+    val sugar: MicronutrientSetting = MicronutrientSetting(dailyTarget = 25.0),
+    val saturatedFat: MicronutrientSetting = MicronutrientSetting(dailyTarget = 20.0),
+    val sodium: MicronutrientSetting = MicronutrientSetting(dailyTarget = 2_000.0),
+) {
+    val anyEnabled: Boolean
+        get() = fiber.enabled || sugar.enabled || saturatedFat.enabled || sodium.enabled
+}
+
+/**
  * Small resumable draft only; calculated plans and completed profiles are persisted in Room.
  * Strings intentionally mirror stable domain codes rather than UI display labels.
  */
@@ -104,6 +133,7 @@ data class AppPreferences(
         model = DEFAULT_OPENROUTER_MODEL,
     ),
     val reminders: ReminderPreferences = ReminderPreferences(),
+    val micronutrients: MicronutrientPreferences = MicronutrientPreferences(),
     val onboardingDraft: PersistedOnboardingDraft? = null,
     val onboardingCompleted: Boolean = false,
     val aiDebugEnabled: Boolean = false,
@@ -132,6 +162,37 @@ internal fun ProviderSelection.withSupportedModel(): ProviderSelection =
     } else {
         this
     }
+
+fun MicronutrientPreferences.settingFor(micronutrient: Micronutrient): MicronutrientSetting =
+    when (micronutrient) {
+        Micronutrient.FIBER -> fiber
+        Micronutrient.SUGAR -> sugar
+        Micronutrient.SATURATED_FAT -> saturatedFat
+        Micronutrient.SODIUM -> sodium
+    }
+
+fun MicronutrientPreferences.with(
+    micronutrient: Micronutrient,
+    setting: MicronutrientSetting,
+): MicronutrientPreferences = when (micronutrient) {
+    Micronutrient.FIBER -> copy(fiber = setting)
+    Micronutrient.SUGAR -> copy(sugar = setting)
+    Micronutrient.SATURATED_FAT -> copy(saturatedFat = setting)
+    Micronutrient.SODIUM -> copy(sodium = setting)
+}
+
+/** The nutrients the user is currently tracking, in the order they are presented. */
+fun MicronutrientPreferences.enabledMicronutrients(): List<Micronutrient> =
+    Micronutrient.entries.filter { settingFor(it).enabled }
+
+/**
+ * Guards the stored target against a typo or a value from an older build whose reference has
+ * since changed. Anything unusable falls back to the nutrient's reference intake rather than
+ * leaving a progress bar dividing by zero.
+ */
+fun MicronutrientSetting.resolvedTarget(micronutrient: Micronutrient): Double =
+    dailyTarget.takeIf { it.isFinite() && it > 0.0 && it <= micronutrient.maximumTarget }
+        ?: micronutrient.referenceDailyAmount
 
 fun AppPreferences.providerSelection(pipeline: ProviderPipeline): ProviderSelection =
     when (pipeline) {

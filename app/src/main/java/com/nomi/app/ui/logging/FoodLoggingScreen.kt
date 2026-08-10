@@ -83,6 +83,9 @@ fun FoodLoggingScreen(
     onEditItem: (Int) -> Unit,
     onChangePortion: (Int) -> Unit,
     onConfirm: () -> Unit,
+    onPhotoDescriptionChanged: (String) -> Unit = {},
+    onPhotoPlaceChanged: (String) -> Unit = {},
+    onConfirmPhotoDescription: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -114,6 +117,15 @@ fun FoodLoggingScreen(
             is FoodLoggingUiState.Processing -> ProcessingContent(
                 stage = state.stage,
                 sourceUrls = state.sourceUrls,
+                modifier = Modifier.padding(innerPadding),
+            )
+
+            is FoodLoggingUiState.PhotoReview -> PhotoReviewContent(
+                state = state,
+                onDescriptionChanged = onPhotoDescriptionChanged,
+                onPlaceChanged = onPhotoPlaceChanged,
+                onMealCategoryChanged = onMealCategoryChanged,
+                onConfirm = onConfirmPhotoDescription,
                 modifier = Modifier.padding(innerPadding),
             )
 
@@ -200,6 +212,110 @@ private fun InputContent(
         }
         OutlinedButton(onClick = onManual, modifier = Modifier.fillMaxWidth()) {
             Text(nomiString("Enter manually", "Manuell eingeben"))
+        }
+    }
+}
+
+/**
+ * The checkpoint between seeing and looking up.
+ *
+ * The description is presented as the user's own sentence to edit, which is the cheapest place
+ * in the whole flow to fix a misread: one word here, instead of a full nutrition search that
+ * has to be thrown away and run again.
+ */
+@Composable
+private fun PhotoReviewContent(
+    state: FoodLoggingUiState.PhotoReview,
+    onDescriptionChanged: (String) -> Unit,
+    onPlaceChanged: (String) -> Unit,
+    onMealCategoryChanged: (MealCategory) -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        item {
+            Text(
+                nomiString("Is this what you ate?", "Ist das, was du gegessen hast?"),
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        item {
+            Text(
+                nomiString(
+                    "Nomi read your photo as the words below. Fix anything it got wrong before it looks up the nutrition.",
+                    "Nomi hat dein Foto als den folgenden Text gelesen. Korrigiere alles Falsche, bevor die Nährwerte recherchiert werden.",
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = state.description,
+                onValueChange = onDescriptionChanged,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 8,
+                label = { Text(nomiString("What's in the photo", "Was auf dem Foto ist")) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
+                supportingText = {
+                    Text(
+                        nomiString(
+                            "Correct a food, an amount, or an ingredient — it reads like anything you'd type.",
+                            "Korrigiere ein Lebensmittel, eine Menge oder eine Zutat – es liest sich wie alles, was du tippst.",
+                        ),
+                    )
+                },
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = state.place,
+                onValueChange = onPlaceChanged,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(nomiString("Restaurant or shop (optional)", "Restaurant oder Laden (optional)")) },
+                placeholder = { Text(nomiString("e.g. Five Guys", "z. B. Five Guys")) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
+                supportingText = {
+                    Text(
+                        nomiString(
+                            "Naming the place sends Nomi to its own published nutrition instead of a generic recipe.",
+                            "Mit dem Namen sucht Nomi in den offiziellen Nährwerten des Anbieters statt in einem allgemeinen Rezept.",
+                        ),
+                    )
+                },
+            )
+        }
+        if (state.notes.isNotEmpty()) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    state.notes.forEach { note ->
+                        Text(
+                            text = "• $note",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        item { MealCategorySelector(state.mealCategory, onMealCategoryChanged) }
+        item {
+            Button(
+                onClick = onConfirm,
+                enabled = state.canContinue,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                Spacer(Modifier.padding(4.dp))
+                Text(nomiString("Find nutrition", "Nährwerte suchen"))
+            }
         }
     }
 }

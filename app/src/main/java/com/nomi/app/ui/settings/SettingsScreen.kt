@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Upload
@@ -50,6 +51,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.profile.localizedName
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -62,6 +64,7 @@ fun SettingsScreen(
     onActivityTargetAdjustmentChanged: (Boolean) -> Unit,
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
+    onMicronutrients: () -> Unit,
     onAiProvider: (Int) -> Unit,
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
     onHealthConnect: () -> Unit,
@@ -109,6 +112,23 @@ fun SettingsScreen(
                         nomiString("Recommended targets", "Empfohlene Ziele")
                     },
                     onClick = onNutrition,
+                )
+            }
+            item {
+                SettingsLink(
+                    icon = { Icon(Icons.Default.Science, contentDescription = null) },
+                    title = nomiString("Micronutrients", "Mikronährstoffe"),
+                    supporting = if (state.trackedMicronutrients.isEmpty()) {
+                        nomiString(
+                            "Track fiber, sugar, saturated fat or sodium",
+                            "Ballaststoffe, Zucker, gesättigte Fettsäuren oder Natrium verfolgen",
+                        )
+                    } else {
+                        state.trackedMicronutrients
+                            .map { nutrient -> nutrient.localizedName() }
+                            .joinToString(" · ")
+                    },
+                    onClick = onMicronutrients,
                 )
             }
             item { SectionTitle(nomiString("Appearance & units", "Darstellung & Einheiten")) }

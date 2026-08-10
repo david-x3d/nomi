@@ -28,12 +28,16 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.DirectionsRun
 import androidx.compose.material.icons.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Female
 import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Grain
+import androidx.compose.material.icons.outlined.Grass
 import androidx.compose.material.icons.outlined.Male
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.MonitorWeight
 import androidx.compose.material.icons.outlined.SelfImprovement
 import androidx.compose.material.icons.outlined.TrendingDown
@@ -83,6 +87,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.R
+import com.nomi.app.data.preferences.settingFor
+import com.nomi.app.domain.Micronutrient
 import com.nomi.app.domain.model.ActivityLevel
 import com.nomi.app.domain.model.EnergySex
 import com.nomi.app.domain.model.GoalType
@@ -594,6 +600,78 @@ private data class RateOption(
     val title: String,
     val description: String,
 )
+
+/**
+ * Makes the micronutrient capability visible before the plan reveal.
+ *
+ * Nothing is preselected. The point of the step is that a new user learns Nomi can do this at
+ * all - the most common reason people bounce off a tracker is assuming a feature is missing -
+ * and the wording says plainly that skipping costs nothing.
+ */
+@Composable
+internal fun MicronutrientsScreen(state: OnboardingUiState, actions: OnboardingActions) {
+    QuestionPage(
+        title = "Want to track anything beyond calories?",
+        supportingText = "Nomi records these for every food you log. Turn on the ones you care " +
+            "about and they get their own daily goal, or skip this - you can change it any time " +
+            "in Settings.",
+        error = state.validationMessage,
+        onContinue = actions::goNext,
+    ) {
+        MicronutrientOption(
+            micronutrient = Micronutrient.FIBER,
+            title = "Fiber",
+            description = "Most people get less than half the 30 g a day that's recommended.",
+            icon = Icons.Outlined.Grass,
+            state = state,
+            actions = actions,
+        )
+        MicronutrientOption(
+            micronutrient = Micronutrient.SUGAR,
+            title = "Sugar",
+            description = "Drinks are where a day's 25 g adds up fastest, usually unnoticed.",
+            icon = Icons.Outlined.Cookie,
+            state = state,
+            actions = actions,
+        )
+        MicronutrientOption(
+            micronutrient = Micronutrient.SATURATED_FAT,
+            title = "Saturated fat",
+            description = "About 20 g a day, roughly a tenth of a 2,000 kcal day.",
+            icon = Icons.Outlined.WaterDrop,
+            state = state,
+            actions = actions,
+        )
+        MicronutrientOption(
+            micronutrient = Micronutrient.SODIUM,
+            title = "Sodium",
+            description = "Under 2,000 mg a day, which is about 5 g of salt.",
+            icon = Icons.Outlined.Grain,
+            state = state,
+            actions = actions,
+        )
+    }
+}
+
+@Composable
+private fun MicronutrientOption(
+    micronutrient: Micronutrient,
+    title: String,
+    description: String,
+    icon: ImageVector,
+    state: OnboardingUiState,
+    actions: OnboardingActions,
+) {
+    val enabled = state.micronutrients.settingFor(micronutrient).enabled
+    SelectionCard(
+        title = title,
+        description = description,
+        icon = icon,
+        selected = enabled,
+        onClick = { actions.toggleMicronutrient(micronutrient, !enabled) },
+        testTag = "onboarding_micronutrient_${micronutrient.name.lowercase()}",
+    )
+}
 
 @Composable
 private fun QuestionPage(

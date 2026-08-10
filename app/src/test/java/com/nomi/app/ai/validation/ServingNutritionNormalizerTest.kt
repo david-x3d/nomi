@@ -9,6 +9,7 @@ import com.nomi.app.ai.prompt.AiPrompts
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -755,6 +756,154 @@ class ServingNutritionNormalizerTest {
         assertTrue(prompt.contains("1 EL/Essloeffel/tbsp/tablespoon = 15 ml"))
         assertTrue(prompt.contains("unqualified German Löffel/Loeffel means EL"))
         assertTrue(prompt.contains("1.5 EL jam may use gramsEquivalent=30"))
+    }
+
+    @Test
+    fun `micronutrients are normalized on the same source-serving basis as the macros`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 250.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+                calories = 200.0,
+                protein = 5.0,
+                carbs = 30.0,
+                fat = 6.0,
+            ).copy(
+                fiberGrams = 2.0,
+                sugarGrams = 12.0,
+                saturatedFatGrams = 3.0,
+                sodiumMilligrams = 400.0,
+            ),
+            requestedQuantity = 250.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(5.0, normalized.fiberGrams!!, 1e-9)
+        assertEquals(30.0, normalized.sugarGrams!!, 1e-9)
+        assertEquals(7.5, normalized.saturatedFatGrams!!, 1e-9)
+        assertEquals(1_000.0, normalized.sodiumMilligrams!!, 1e-9)
+
+        val validation = normalized.servingValidation!!
+        assertEquals(12.0, validation.sugarGramsPer100!!, 1e-9)
+        assertEquals(3.0, validation.saturatedFatGramsPer100!!, 1e-9)
+        assertEquals(400.0, validation.sodiumMilligramsPer100!!, 1e-9)
+    }
+
+    /** A nutrient the source never published stays absent instead of becoming a claimed zero. */
+    @Test
+    fun `an unreported micronutrient stays null through normalization`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 150.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+            ).copy(sugarGrams = 4.0),
+            requestedQuantity = 150.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(6.0, normalized.sugarGrams!!, 1e-9)
+        assertNull(normalized.saturatedFatGrams)
+        assertNull(normalized.sodiumMilligrams)
+        assertNull(normalized.servingValidation!!.sodiumMilligramsPer100)
+    }
+
+    @Test
+    fun `more sugar than carbohydrate is refused as two different rows`() {
+        val error = assertThrows(AiValidationException::class.java) {
+            normalize(
+                raw = sourceItem(
+                    loggedQuantity = 100.0,
+                    loggedUnit = "g",
+                    sourceQuantity = 100.0,
+                    sourceUnit = "g",
+                    carbs = 5.0,
+                ).copy(sugarGrams = 40.0),
+                requestedQuantity = 100.0,
+                requestedUnit = "g",
+            )
+        }
+        assertTrue(error.message!!.contains("more sugar than carbohydrates"))
+    }
+
+    @Test
+    fun `more saturated fat than fat is refused as two different rows`() {
+        val error = assertThrows(AiValidationException::class.java) {
+            normalize(
+                raw = sourceItem(
+                    loggedQuantity = 100.0,
+                    loggedUnit = "g",
+                    sourceQuantity = 100.0,
+                    sourceUnit = "g",
+                    fat = 2.0,
+                ).copy(saturatedFatGrams = 18.0),
+                requestedQuantity = 100.0,
+                requestedUnit = "g",
+            )
+        }
+        assertTrue(error.message!!.contains("more saturated fat than fat"))
+    }
+
+    /** Label rows round independently, so a hair over the parent is real and must be allowed. */
+    @Test
+    fun `a component rounded just above its parent is accepted`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 100.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+                carbs = 0.4,
+            ).copy(sugarGrams = 0.5),
+            requestedQuantity = 100.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(0.5, normalized.sugarGrams!!, 1e-9)
+    }
+
+    @Test
+    fun `a rescaled portion carries its micronutrients with it`() {
+        val normalized = normalize(
+            raw = sourceItem(
+                loggedQuantity = 100.0,
+                loggedUnit = "g",
+                sourceQuantity = 100.0,
+                sourceUnit = "g",
+                calories = 200.0,
+                carbs = 30.0,
+                fat = 6.0,
+            ).copy(sugarGrams = 12.0, sodiumMilligrams = 400.0),
+            requestedQuantity = 100.0,
+            requestedUnit = "g",
+        )
+
+        val halved = ServingNutritionNormalizer.rescaleValidatedItemTo(
+            item = normalized,
+            loggedQuantity = 50.0,
+            loggedUnit = "g",
+            loggedGramsEquivalent = 50.0,
+        )
+
+        assertEquals(6.0, halved.sugarGrams!!, 1e-9)
+        assertEquals(200.0, halved.sodiumMilligrams!!, 1e-9)
+    }
+
+    @Test
+    fun `the research prompt tells the provider how to report micronutrients`() {
+        val prompt = AiPrompts.researchNutrition(
+            intent = intent(100.0, "g"),
+            json = Json { encodeDefaults = true },
+        )
+
+        assertTrue(prompt.contains("MICRONUTRIENTS ARE REPORTED ONLY WHEN PUBLISHED"))
+        assertTrue(prompt.contains("sodium_mg = salt_g * 400"))
+        assertTrue(prompt.contains("\"sugarGrams\""))
+        assertTrue(prompt.contains("\"saturatedFatGrams\""))
+        assertTrue(prompt.contains("\"sodiumMilligrams\""))
     }
 
     private fun normalize(

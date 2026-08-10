@@ -5,12 +5,14 @@ import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.FoodEditClassification
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
 import com.nomi.app.ai.model.VisionFoodResult
 import com.nomi.app.ai.prompt.AiPrompts
+import com.nomi.app.ai.provider.FoodEditClassificationProvider
 import com.nomi.app.ai.provider.FoodParsingProvider
 import com.nomi.app.ai.provider.NutritionLabelProvider
 import com.nomi.app.ai.provider.NutritionResearchProvider
@@ -42,6 +44,7 @@ class OpenAiCompatibleProviders(
 ) : FoodParsingProvider,
     NutritionResearchProvider,
     PortionAdjustmentProvider,
+    FoodEditClassificationProvider,
     NutritionLabelProvider,
     VisionFoodProvider {
 
@@ -120,6 +123,25 @@ class OpenAiCompatibleProviders(
         )
         val adjustment: PortionAdjustment = client.json.decodeFromString(raw)
         return AiResponseValidator.validate(current, adjustment)
+    }
+
+    /**
+     * Runs on the cheap portion model rather than the research model, which is the point: this
+     * call exists to decide whether the expensive one is needed at all.
+     */
+    override suspend fun classifyEdit(
+        current: PortionContext,
+        userEdit: String,
+    ): FoodEditClassification {
+        require(userEdit.isNotBlank()) { "Describe what should change" }
+        val raw = client.completeJson(
+            config = portionConfig,
+            credential = portionCredential(),
+            systemPrompt = "You route food corrections and never produce nutrition values.",
+            userPrompt = AiPrompts.classifyFoodEdit(current, userEdit, client.json),
+        )
+        val classification: FoodEditClassification = client.json.decodeFromString(raw)
+        return AiResponseValidator.validate(classification)
     }
 
     override suspend fun readNutritionLabel(

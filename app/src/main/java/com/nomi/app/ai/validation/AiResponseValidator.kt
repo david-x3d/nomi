@@ -2,6 +2,8 @@ package com.nomi.app.ai.validation
 
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.FoodEditClassification
+import com.nomi.app.ai.model.FoodEditType
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
@@ -18,6 +20,9 @@ object AiResponseValidator {
     private const val MAX_TEXT_LIST_ITEMS = 50
     private const val MAX_ITEM_CALORIES = 10_000.0
     private const val MAX_MACRO_GRAMS = 5_000.0
+
+    /** Sodium is stored in milligrams, so it needs its own ceiling rather than the gram one. */
+    private const val MAX_SODIUM_MILLIGRAMS = 5_000_000.0
     private const val MAX_PORTION_GRAMS = 100_000.0
     private const val MAX_QUANTITY = 1_000_000.0
     private const val MAX_PORTION_MULTIPLIER = 20.0
@@ -94,6 +99,13 @@ object AiResponseValidator {
         requireFiniteNonNegative(reading.carbohydrateGrams, "label carbohydrates", MAX_MACRO_GRAMS)
         requireFiniteNonNegative(reading.fatGrams, "label fat", MAX_MACRO_GRAMS)
         reading.fiberGrams?.let { requireFiniteNonNegative(it, "label fibre", MAX_MACRO_GRAMS) }
+        reading.sugarGrams?.let { requireFiniteNonNegative(it, "label sugar", MAX_MACRO_GRAMS) }
+        reading.saturatedFatGrams?.let {
+            requireFiniteNonNegative(it, "label saturated fat", MAX_MACRO_GRAMS)
+        }
+        reading.sodiumMilligrams?.let {
+            requireFiniteNonNegative(it, "label sodium", MAX_SODIUM_MILLIGRAMS)
+        }
 
         // Per 100 g/ml no food can contain more than 100 g of anything.
         if (reading.basisQuantity == 100.0 && reading.basisUnit.trim().lowercase() in setOf("g", "ml")) {
@@ -170,6 +182,30 @@ object AiResponseValidator {
         return adjustment
     }
 
+    /**
+     * A classification is a routing decision, so the only thing worth enforcing is that its
+     * fields are usable. An instruction attached to a non-portion type is dropped rather than
+     * rejected: the route is still correct, and the arithmetic simply will not be used.
+     */
+    fun validate(classification: FoodEditClassification): FoodEditClassification {
+        validateText(classification.reason, "edit reason", maxChars = MAX_DETAIL_CHARS)
+        classification.confidence?.let(::requireConfidence)
+        val portion = classification.portion?.takeIf {
+            classification.type == FoodEditType.PORTION_ONLY
+        }
+        portion?.let { instruction ->
+            runCatching { instruction.requireUsable() }.getOrElse {
+                throw AiValidationException(
+                    it.message ?: "The proposed portion change is not usable",
+                )
+            }
+            instruction.factor?.let { requireFinitePositive(it, "portion factor", MAX_PORTION_MULTIPLIER) }
+            instruction.quantity?.let { requireFinitePositive(it, "portion quantity", MAX_QUANTITY) }
+            validateText(instruction.unit, "portion unit", maxChars = MAX_UNIT_CHARS)
+        }
+        return classification.copy(portion = portion)
+    }
+
     private fun validateItem(item: AnalyzedFoodItem) {
         validateText(item.name, "food name", required = true, maxChars = MAX_NAME_CHARS)
         validateText(item.brand, "brand", maxChars = MAX_BRAND_CHARS)
@@ -205,6 +241,9 @@ object AiResponseValidator {
         requireFiniteNonNegative(item.carbohydrateGrams, "carbohydrates", MAX_MACRO_GRAMS)
         requireFiniteNonNegative(item.fatGrams, "fat", MAX_MACRO_GRAMS)
         item.fiberGrams?.let { requireFiniteNonNegative(it, "fiber", MAX_MACRO_GRAMS) }
+        item.sugarGrams?.let { requireFiniteNonNegative(it, "sugar", MAX_MACRO_GRAMS) }
+        item.saturatedFatGrams?.let { requireFiniteNonNegative(it, "saturated fat", MAX_MACRO_GRAMS) }
+        item.sodiumMilligrams?.let { requireFiniteNonNegative(it, "sodium", MAX_SODIUM_MILLIGRAMS) }
         item.confidence?.let(::requireConfidence)
         val macroCalories = item.proteinGrams * 4 + item.carbohydrateGrams * 4 + item.fatGrams * 9
         if (item.calories >= 20 && macroCalories > item.calories * 2.0 + 50) {

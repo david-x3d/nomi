@@ -78,6 +78,7 @@ import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.PortionEditSheet
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.onboarding.OnboardingRoute
+import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.progress.ProgressScreen
@@ -109,6 +110,7 @@ fun NomiRoot(
         AppStartState.Onboarding -> OnboardingRoute(
             onComplete = viewModel::completeOnboarding,
             onDraftChanged = viewModel::persistOnboardingDraft,
+            onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
             modifier = modifier,
         )
 
@@ -263,6 +265,7 @@ private fun NomiMain(
                     onActivityAdjustment = viewModel::setActivityAdjustment,
                     onProfile = { navController.navigate(Routes.PROFILE) },
                     onNutrition = { navController.navigate(Routes.PLAN) },
+                    onMicronutrients = { navController.navigate(Routes.MICRONUTRIENTS) },
                     onAiProvider = { index ->
                         selectedProviderIndex = index
                         providerEditor = viewModel.providerEditorState(index)
@@ -297,6 +300,9 @@ private fun NomiMain(
                     onEditItem = { editedItemIndex = it },
                     onChangePortion = viewModel::beginPortionEdit,
                     onConfirm = viewModel::confirmLogging,
+                    onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
+                    onPhotoPlaceChanged = viewModel::updatePhotoPlace,
+                    onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
                 )
             }
 
@@ -441,6 +447,18 @@ private fun NomiMain(
                         },
                     )
                 } ?: LoadingPage()
+            }
+
+            composable(Routes.MICRONUTRIENTS) {
+                val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+                MicronutrientSettingsScreen(
+                    preferences = preferences.micronutrients,
+                    onBack = { navController.popBackStack() },
+                    onSave = { updated ->
+                        viewModel.saveMicronutrientPreferences(updated)
+                        navController.popBackStack()
+                    },
+                )
             }
 
             composable(Routes.HEALTH) {
@@ -613,6 +631,7 @@ private fun LoggingEditingOverlays(
             onInterpret = viewModel::interpretPortionCorrection,
             onApply = viewModel::applyPortionCorrection,
             onDismiss = viewModel::dismissPortionEdit,
+            onResearch = viewModel::researchEditedItem,
         )
     }
 }
@@ -645,6 +664,7 @@ private fun MainNavigationSuite(
     onActivityAdjustment: (Boolean) -> Unit,
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
+    onMicronutrients: () -> Unit,
     onAiProvider: (Int) -> Unit,
     onAiRequestTimeoutDisabled: (Boolean) -> Unit,
     onHealth: () -> Unit,
@@ -742,6 +762,9 @@ private fun MainNavigationSuite(
                     onEditPreview = onEditLoggingPreview,
                     onDismissDraft = onDismissLoggingDraft,
                     onQuickMethod = onAddFood,
+                    onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
+                    onPhotoPlaceChanged = viewModel::updatePhotoPlace,
+                    onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
                 )
             }
             MainDestination.PROGRESS -> {
@@ -763,6 +786,7 @@ private fun MainNavigationSuite(
                     onActivityTargetAdjustmentChanged = onActivityAdjustment,
                     onProfile = onProfile,
                     onNutrition = onNutrition,
+                    onMicronutrients = onMicronutrients,
                     onAiProvider = onAiProvider,
                     onAiRequestTimeoutDisabledChanged = onAiRequestTimeoutDisabled,
                     onHealthConnect = onHealth,
@@ -809,6 +833,7 @@ private object Routes {
     const val FOOD = "food/{id}"
     const val PROFILE = "profile"
     const val PLAN = "plan"
+    const val MICRONUTRIENTS = "micronutrients"
     const val HEALTH = "health"
     const val DEVELOPER = "developer"
     fun food(id: Long) = "food/$id"

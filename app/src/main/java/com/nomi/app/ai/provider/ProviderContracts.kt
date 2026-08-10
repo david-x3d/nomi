@@ -1,6 +1,7 @@
 package com.nomi.app.ai.provider
 
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.FoodEditClassification
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
@@ -31,10 +32,25 @@ fun interface PortionAdjustmentProvider {
     ): PortionAdjustment
 }
 
+/**
+ * Decides whether a correction is arithmetic or a different food.
+ *
+ * Deliberately a separate contract from [NutritionResearchProvider]: this is the cheap, fast
+ * model whose entire job is to keep the expensive one from being called for something that
+ * multiplication can answer.
+ */
+fun interface FoodEditClassificationProvider {
+    suspend fun classifyEdit(
+        current: PortionContext,
+        userEdit: String,
+    ): FoodEditClassification
+}
+
 data class AiProviderRegistry(
     val foodParser: FoodParsingProvider,
     val nutritionResearcher: NutritionResearchProvider,
     val visionFoodProvider: VisionFoodProvider,
     val nutritionLabelProvider: NutritionLabelProvider,
     val portionAdjustmentProvider: PortionAdjustmentProvider,
+    val foodEditClassifier: FoodEditClassificationProvider,
 )

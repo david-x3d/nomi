@@ -1,6 +1,7 @@
 package com.nomi.app.ui.settings
 
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.domain.Micronutrient
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
@@ -49,6 +50,8 @@ data class SettingsUiState(
     val healthConnectEnabled: Boolean = false,
     val healthConnect: HealthConnectUiState = HealthConnectUiState(),
     val nutritionTargets: NutritionTargetSetting = NutritionTargetSetting(2_000, 130, 240, 65, false),
+    /** The micronutrients currently being tracked, in presentation order. */
+    val trackedMicronutrients: List<Micronutrient> = emptyList(),
     val aiProviders: List<AiProviderSetting> = emptyList(),
     val aiRequestTimeoutDisabled: Boolean = false,
     val reminders: List<ReminderSetting> = listOf(

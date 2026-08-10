@@ -202,6 +202,15 @@ object AiPrompts {
         values to per 100 g/ml (or per 100 compatible count units) and scales them to the
         logged amount, and it rejects results whose basis does not reconcile.
 
+        MICRONUTRIENTS ARE REPORTED ONLY WHEN PUBLISHED. `sugarGrams`, `saturatedFatGrams`, and
+        `sodiumMilligrams` follow the same serving basis as the macros. Report a value only when
+        the cited source actually publishes that row; otherwise return null. Never infer, derive,
+        or default a micronutrient to zero, because a null means "not published" and a zero is a
+        claim about the food. `sugarGrams` is total sugars and cannot exceed `carbohydrateGrams`;
+        `saturatedFatGrams` cannot exceed `fatGrams`. Sodium is reported in MILLIGRAMS: if the
+        source prints salt in grams, convert with sodium_mg = salt_g * 400, and if it prints
+        sodium in grams, multiply by 1000.
+
         CRITICAL SERVING-BASIS RULE: `calories`, `proteinGrams`, `carbohydrateGrams`,
         `fatGrams`, and `fiberGrams` MUST describe EXACTLY the amount given by
         `sourceServingQuantity` and `sourceServingUnit`. They MUST NEVER describe the user's
@@ -271,6 +280,9 @@ object AiPrompts {
             "carbohydrateGrams": non-negative number,
             "fatGrams": non-negative number,
             "fiberGrams": non-negative number|null,
+            "sugarGrams": non-negative number|null,
+            "saturatedFatGrams": non-negative number|null,
+            "sodiumMilligrams": non-negative number|null,
             "sourceName": non-empty string,
             "sourceProductName": non-empty string,
             "sourceDomain": hostname string|null,
@@ -324,6 +336,61 @@ object AiPrompts {
         """.trimIndent()
     }
 
+    /**
+     * The routing decision, made by the cheapest model available.
+     *
+     * Its only job is to keep a web search from running for something multiplication can
+     * answer. The asymmetry stated in the prompt is the important part: researching an edit
+     * that only needed arithmetic wastes a search, while scaling an edit that actually changed
+     * the food leaves the wrong nutrition behind a number the user trusts more for having
+     * corrected it. So anything uncertain is sent to research.
+     */
+    fun classifyFoodEdit(current: PortionContext, edit: String, json: Json): String = """
+        Classify what the user's correction changes about an already-researched food. Return
+        strict JSON only. Do not calculate nutrition and do not restate the food.
+
+        Types:
+        - "PORTION_ONLY": only how much of the SAME food was eaten changed. Examples: "half",
+          "1/2", "50%", "2x", "double", "only ate 3 of the 6 pieces", "200g instead of 400g",
+          "one third", "75% of it", "55% of the package".
+        - "CONTENT_CHANGE": the food, its ingredients, brand, restaurant, product, or
+          preparation changed. Examples: "actually it was chicken, not tuna", "remove the
+          cheese", "it was the large McDonald's fries", "this was from Burger King", "add 20g
+          mayonnaise", "wrong brand", "different product".
+        - "RESEARCH_REQUIRED": the correction cannot be resolved without looking the food up
+          again, including anything you are unsure about.
+
+        WHEN IN DOUBT, DO NOT CHOOSE PORTION_ONLY. Being wrong in that direction leaves
+        incorrect nutrition attached to a food the user believes they just corrected. Being
+        wrong the other way only costs one extra search. Report honest `confidence`.
+
+        For PORTION_ONLY, also return the arithmetic as `portion`. Nomi computes every nutrient
+        itself from that instruction, so never return nutrition values:
+        - a share of the current amount: {"operation":"SCALE","factor":0.5}
+        - a replacement amount: {"operation":"SET_QUANTITY","quantity":176,"unit":"g"}
+        Use SCALE for fractions, percentages and multipliers; use SET_QUANTITY only when the
+        user names an explicit new amount with a unit. Omit `portion` for every other type.
+
+        Recognize mg/g/kg and EL/Essloeffel/tbsp/tablespoon or TL/Teeloeffel/tsp/teaspoon. An
+        unqualified German Löffel/Loeffel means EL.
+
+        Current item: ${json.encodeToString(current)}
+        User correction: ${edit.trim()}
+
+        Shape:
+        {
+          "type": "PORTION_ONLY"|"CONTENT_CHANGE"|"RESEARCH_REQUIRED",
+          "confidence": number between 0 and 1,
+          "reason": short string,
+          "portion": {
+            "operation": "SCALE"|"SET_QUANTITY",
+            "factor": positive number|null,
+            "quantity": positive number|null,
+            "unit": string|null
+          }|null
+        }
+    """.trimIndent()
+
     fun adjustPortion(current: PortionContext, correction: String, json: Json): String = """
         Interpret only the requested portion change. Do not calculate new calories or macros.
         Return a mathematically consistent quantity multiplier for the app to validate and apply.
@@ -375,6 +442,13 @@ object AiPrompts {
         printed, including decimals; "<0,5 g" is 0. German labels use a comma as the decimal
         separator, so "1,5 g" is 1.5.
 
+        EU tables print "davon gesättigte Fettsäuren" (saturates) indented under fat and "davon
+        Zucker" (sugars) indented under carbohydrate. Read those indented rows into
+        `saturatedFatGrams` and `sugarGrams`; they are parts of the row above, so they can never
+        exceed it. Salt is printed as "Salz"/"Salt" in grams: report SODIUM in milligrams with
+        sodium_mg = salt_g * 400. A label that prints sodium directly in grams is * 1000. Leave
+        any of these null when that row is not printed - never derive one from another.
+
         `productName` and `brand` come from the front of the package if they are visible in the
         image; leave them null rather than guessing. `packageQuantity`/`packageUnit` are the net
         content ("500 g", "0,33 l") and are informational only. `servingLabel` is the serving
@@ -391,6 +465,9 @@ object AiPrompts {
           "carbohydrateGrams": non-negative number,
           "fatGrams": non-negative number,
           "fiberGrams": non-negative number|null,
+          "sugarGrams": non-negative number|null,
+          "saturatedFatGrams": non-negative number|null,
+          "sodiumMilligrams": non-negative number|null,
           "packageQuantity": positive number|null,
           "packageUnit": string|null,
           "servingLabel": string|null,
@@ -399,8 +476,50 @@ object AiPrompts {
         }
     """.trimIndent()
 
+    /**
+     * Describes a photo. It does not price it.
+     *
+     * This model is fast and cheap and cannot search the web, so it is asked for the one thing
+     * a picture can actually establish: what is on the plate and roughly how much. Every
+     * nutrition number comes from the research step that follows, working from this
+     * description. A calorie figure guessed from pixels would look exactly as authoritative as
+     * a researched one and be worth nothing, so it is forbidden outright.
+     */
     fun identifyFoodFromPhoto(): String = """
-        Identify visible foods and estimate portions from this image. Do not claim exact calories.
+        Describe the food in this image so it can be researched afterwards. You are the eyes of
+        this pipeline, not its source of nutrition.
+
+        NEVER report calories, macros, or any nutrition value, and never estimate them silently.
+        A separate research step looks up real published nutrition from your description. Your
+        only job is to say what is there and how much of it, precisely enough to be looked up.
+
+        For each distinct food, drink, side, sauce, or topping you can see, report:
+        - `name`: what it is, as specifically as the image supports ("salmon nigiri", not "sushi").
+          Include the preparation when it is visible: grilled, fried, breaded, raw, steamed.
+        - `visibleIngredients`: components you can actually see - toppings, garnishes, dressings,
+          visible cheese, sauces on or beside the dish. Do not list ingredients you merely expect
+          a dish to contain.
+        - `estimatedQuantity` and `unit`: count the pieces when they are countable ("8", "pieces");
+          otherwise estimate the served portion.
+        - `estimatedGrams`: your best estimate of the total mass of that item, for the whole
+          amount shown, not per piece.
+        - `confidence`: your honest confidence for that item.
+
+        Count countable things exactly rather than approximating: eight pieces of sashimi is
+        eight, not "some". Use everyday objects in frame for scale where you can.
+
+        List dips, sauces, and drinks as their own items when they are visible, and put anything
+        served on the side but plainly not eaten into `notes` instead of `items` - for example a
+        soy sauce dish that is still full.
+
+        Together the items should read like a careful description of the plate, for example:
+        8 pieces salmon sashimi around 160 g total, a small portion of shredded daikon, with
+        soy sauce present but not counted.
+
+        Say what you are unsure about in `notes`, including anything hidden, stacked, or cut off
+        by the frame. The user reads and corrects this description before anything is researched,
+        so an honest doubt is more useful than a confident guess.
+
         Return only strict JSON in this shape:
         {
           "items": [{

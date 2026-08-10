@@ -49,6 +49,10 @@ data class BarcodeProduct(
     val carbohydratesPer100g: Double?,
     val fatPer100g: Double?,
     val fiberPer100g: Double?,
+    val sugarPer100g: Double? = null,
+    val saturatedFatPer100g: Double? = null,
+    /** Open Food Facts publishes sodium in grams; Nomi stores milligrams. */
+    val sodiumMilligramsPer100g: Double? = null,
     val sourceName: String = "Open Food Facts",
     val sourceUrl: String,
 )
@@ -84,6 +88,9 @@ private data class OpenFoodFactsProduct(
             carbohydratesPer100g = nutriments.carbohydratesPer100g,
             fatPer100g = nutriments.fatPer100g,
             fiberPer100g = nutriments.fiberPer100g,
+            sugarPer100g = nutriments.sugarPer100g,
+            saturatedFatPer100g = nutriments.saturatedFatPer100g,
+            sodiumMilligramsPer100g = nutriments.sodiumGramsPer100g?.times(1_000.0),
             sourceUrl = "https://world.openfoodfacts.org/product/$barcode",
         )
     }
@@ -96,4 +103,7 @@ private data class Nutriments(
     @SerialName("carbohydrates_100g") val carbohydratesPer100g: Double? = null,
     @SerialName("fat_100g") val fatPer100g: Double? = null,
     @SerialName("fiber_100g") val fiberPer100g: Double? = null,
+    @SerialName("sugars_100g") val sugarPer100g: Double? = null,
+    @SerialName("saturated-fat_100g") val saturatedFatPer100g: Double? = null,
+    @SerialName("sodium_100g") val sodiumGramsPer100g: Double? = null,
 )

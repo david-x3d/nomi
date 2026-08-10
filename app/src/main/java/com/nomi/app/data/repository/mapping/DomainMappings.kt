@@ -26,6 +26,9 @@ fun Nutrition.toPersistenceValues(): NutritionValues = NutritionValues(
     carbohydrateGrams = carbsGrams,
     fatGrams = fatGrams,
     fiberGrams = fiberGrams,
+    sugarGrams = sugarGrams,
+    saturatedFatGrams = saturatedFatGrams,
+    sodiumMilligrams = sodiumMilligrams,
 )
 
 fun NutritionValues.toDomainNutrition(): Nutrition = Nutrition(
@@ -34,6 +37,9 @@ fun NutritionValues.toDomainNutrition(): Nutrition = Nutrition(
     carbsGrams = carbohydrateGrams,
     fatGrams = fatGrams,
     fiberGrams = fiberGrams ?: 0.0,
+    sugarGrams = sugarGrams ?: 0.0,
+    saturatedFatGrams = saturatedFatGrams ?: 0.0,
+    sodiumMilligrams = sodiumMilligrams ?: 0.0,
 )
 
 fun OnboardingDraft.toPersistedDraft(

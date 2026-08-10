@@ -31,18 +31,19 @@ fun PortionEditSheet(
     onInterpret: () -> Unit,
     onApply: () -> Unit,
     onDismiss: () -> Unit,
+    onResearch: () -> Unit = {},
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(nomiString("Change portion", "Portion ändern"), style = MaterialTheme.typography.headlineSmall)
+            Text(nomiString("Change this food", "Dieses Essen ändern"), style = MaterialTheme.typography.headlineSmall)
             OutlinedTextField(
                 value = state.correction,
                 onValueChange = onCorrectionChanged,
                 label = { Text(nomiString("What should I change?", "Was soll ich ändern?")) },
-                placeholder = { Text(nomiString("Actually it was 3 slices", "Tatsächlich waren es 3 Stück")) },
+                placeholder = { Text(nomiString("Half, or actually it was tuna", "Die Hälfte, oder es war doch Thunfisch")) },
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -62,6 +63,45 @@ fun PortionEditSheet(
             }
             state.errorMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
+            }
+            // An edit that changes the food cannot be answered by arithmetic, so it asks
+            // before spending a web search rather than quietly running one.
+            if (state.needsResearch) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            nomiString(
+                                "That changes the food, not just the amount",
+                                "Das ändert das Essen, nicht nur die Menge",
+                            ),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            state.researchReason ?: nomiString(
+                                "Nomi needs to look up nutrition for the corrected food.",
+                                "Nomi muss die Nährwerte für das korrigierte Essen neu nachschlagen.",
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Button(
+                            onClick = onResearch,
+                            enabled = !state.isProcessing,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(
+                                if (state.isProcessing) {
+                                    nomiString("Looking it up…", "Wird nachgeschlagen…")
+                                } else {
+                                    nomiString("Look it up again", "Neu nachschlagen")
+                                },
+                            )
+                        }
+                    }
+                }
             }
             state.proposed?.let { proposed ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {

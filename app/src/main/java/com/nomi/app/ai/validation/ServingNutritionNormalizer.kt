@@ -29,6 +29,10 @@ object ServingNutritionNormalizer {
     /** 100 ml of honey weighs about 142 g, the densest common food. */
     private const val MAX_PLAUSIBLE_DENSITY = 1.5
 
+    /** Headroom for a component row rounded up while its parent row rounded down. */
+    private const val COMPONENT_ROUNDING_ALLOWANCE = 1.05
+    private const val COMPONENT_ROUNDING_GRAMS = 1.0
+
     private const val MEDIUM_APPLE_GRAMS_PER_PIECE = 182.0
     private const val MEDIUM_APPLE_MASS_ASSUMPTION =
         "Estimated 182 g per medium apple because no exact piece weight was provided."
@@ -134,6 +138,9 @@ object ServingNutritionNormalizer {
             carbohydrateGrams = previous.carbohydrateGramsPer100 * loggedFactor,
             fatGrams = previous.fatGramsPer100 * loggedFactor,
             fiberGrams = previous.fiberGramsPer100?.times(loggedFactor),
+            sugarGrams = previous.sugarGramsPer100?.times(loggedFactor),
+            saturatedFatGrams = previous.saturatedFatGramsPer100?.times(loggedFactor),
+            sodiumMilligrams = previous.sodiumMilligramsPer100?.times(loggedFactor),
             assumptions = (item.assumptions +
                 "Validated serving changed to ${clean(loggedQuantity)} $loggedUnit.").takeLast(12),
             servingValidation = updatedValidation,
@@ -207,18 +214,55 @@ object ServingNutritionNormalizer {
                 validation.fatGramsPer100 * validation.loggedBaseAmount / 100.0,
                 "fat",
             )
-            when {
-                item.fiberGrams == null && validation.fiberGramsPer100 == null -> Unit
-                item.fiberGrams == null || validation.fiberGramsPer100 == null ->
-                    throw AiValidationException("fiber basis changed before saving")
-                else -> requireNutrient(
-                    item.fiberGrams,
-                    validation.fiberGramsPer100 * validation.loggedBaseAmount / 100.0,
-                    "fiber",
-                )
-            }
+            requireOptionalNutrient(
+                item.fiberGrams,
+                validation.fiberGramsPer100,
+                validation.loggedBaseAmount,
+                "fiber",
+            )
+            requireOptionalNutrient(
+                item.sugarGrams,
+                validation.sugarGramsPer100,
+                validation.loggedBaseAmount,
+                "sugar",
+            )
+            requireOptionalNutrient(
+                item.saturatedFatGrams,
+                validation.saturatedFatGramsPer100,
+                validation.loggedBaseAmount,
+                "saturated fat",
+            )
+            requireOptionalNutrient(
+                item.sodiumMilligrams,
+                validation.sodiumMilligramsPer100,
+                validation.loggedBaseAmount,
+                "sodium",
+            )
         }
         return analysis
+    }
+
+    /**
+     * A nutrient the source never reported stays absent on both sides. One side appearing or
+     * disappearing means the item and its validated basis no longer describe the same reading,
+     * which is exactly the kind of silent drift this check exists to catch.
+     */
+    private fun requireOptionalNutrient(
+        loggedAmount: Double?,
+        amountPer100: Double?,
+        loggedBaseAmount: Double,
+        name: String,
+    ) {
+        when {
+            loggedAmount == null && amountPer100 == null -> Unit
+            loggedAmount == null || amountPer100 == null ->
+                throw AiValidationException("$name basis changed before saving")
+            else -> requireNutrient(
+                loggedAmount,
+                amountPer100 * loggedBaseAmount / 100.0,
+                name,
+            )
+        }
     }
 
     private fun normalizeItem(item: AnalyzedFoodItem, requested: ParsedFoodItem?): AnalyzedFoodItem {
@@ -317,6 +361,9 @@ object ServingNutritionNormalizer {
             carbohydrateGramsPer100 = item.carbohydrateGrams * per100Factor,
             fatGramsPer100 = item.fatGrams * per100Factor,
             fiberGramsPer100 = item.fiberGrams?.times(per100Factor),
+            sugarGramsPer100 = item.sugarGrams?.times(per100Factor),
+            saturatedFatGramsPer100 = item.saturatedFatGrams?.times(per100Factor),
+            sodiumMilligramsPer100 = item.sodiumMilligrams?.times(per100Factor),
         )
         requirePhysicallyPossiblePer100(validation, sourceMeasure.dimension)
         return item.copy(
@@ -329,6 +376,9 @@ object ServingNutritionNormalizer {
             carbohydrateGrams = validation.carbohydrateGramsPer100 * loggedFactor,
             fatGrams = validation.fatGramsPer100 * loggedFactor,
             fiberGrams = validation.fiberGramsPer100?.times(loggedFactor),
+            sugarGrams = validation.sugarGramsPer100?.times(loggedFactor),
+            saturatedFatGrams = validation.saturatedFatGramsPer100?.times(loggedFactor),
+            sodiumMilligrams = validation.sodiumMilligramsPer100?.times(loggedFactor),
             isEstimate = item.isEstimate ||
                 estimatedAppleGramsEquivalent != null ||
                 estimatedJamGramsEquivalent != null ||
@@ -450,11 +500,27 @@ object ServingNutritionNormalizer {
      * 100 g of food cannot contain more than 100 g of macronutrients, and pure fat (884 kcal
      * per 100 g) bounds the energy. Volume bases allow for dense liquids such as honey, whose
      * 100 ml weighs about 142 g.
+     *
+     * Sugar and saturated fat are components of carbohydrate and fat, so they are checked
+     * against their parent rather than added to the total: a sugar figure larger than the
+     * carbohydrate it came from means the two were read from different columns.
      */
     private fun requirePhysicallyPossiblePer100(
         validation: ServingSizeValidation,
         dimension: Dimension,
     ) {
+        requireComponentWithinParent(
+            component = validation.sugarGramsPer100,
+            parent = validation.carbohydrateGramsPer100,
+            componentName = "sugar",
+            parentName = "carbohydrates",
+        )
+        requireComponentWithinParent(
+            component = validation.saturatedFatGramsPer100,
+            parent = validation.fatGramsPer100,
+            componentName = "saturated fat",
+            parentName = "fat",
+        )
         val densityAllowance = when (dimension) {
             Dimension.Mass -> 1.0
             Dimension.Volume -> MAX_PLAUSIBLE_DENSITY
@@ -474,6 +540,26 @@ object ServingNutritionNormalizer {
                 "The researched nutrition is not possible per 100 ${dimension.per100Label}: " +
                     "${clean(round(validation.caloriesPer100))} kcal. The source values may " +
                     "already be scaled to the logged amount.",
+            )
+        }
+    }
+
+    /**
+     * Labels round each row independently, so a component may legitimately print a hair above
+     * its parent — 0.5 g of sugar in 0.4 g of carbohydrate. The allowance absorbs that without
+     * admitting a genuinely swapped column.
+     */
+    private fun requireComponentWithinParent(
+        component: Double?,
+        parent: Double,
+        componentName: String,
+        parentName: String,
+    ) {
+        if (component == null) return
+        if (component > parent * COMPONENT_ROUNDING_ALLOWANCE + COMPONENT_ROUNDING_GRAMS) {
+            throw AiValidationException(
+                "The researched nutrition reports more $componentName than $parentName, so those " +
+                    "two values were probably read from different rows.",
             )
         }
     }

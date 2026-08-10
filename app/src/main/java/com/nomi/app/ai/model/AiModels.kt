@@ -85,6 +85,14 @@ data class AnalyzedFoodItem(
     val carbohydrateGrams: Double,
     val fatGrams: Double,
     val fiberGrams: Double? = null,
+    /**
+     * Micronutrients stay nullable all the way through: a source that does not print sugar is
+     * telling us it is unknown, which is a different fact from zero and must not be summed as
+     * though the food contained none.
+     */
+    val sugarGrams: Double? = null,
+    val saturatedFatGrams: Double? = null,
+    val sodiumMilligrams: Double? = null,
     val sourceName: String? = null,
     val sourceUrl: String? = null,
     /** Additional provider-cited pages used to cross-check this item's nutrition. */
@@ -128,6 +136,9 @@ data class ServingSizeValidation(
     val carbohydrateGramsPer100: Double,
     val fatGramsPer100: Double,
     val fiberGramsPer100: Double? = null,
+    val sugarGramsPer100: Double? = null,
+    val saturatedFatGramsPer100: Double? = null,
+    val sodiumMilligramsPer100: Double? = null,
 )
 
 @Serializable
@@ -196,6 +207,9 @@ data class NutritionLabelReading(
     val carbohydrateGrams: Double,
     val fatGrams: Double,
     val fiberGrams: Double? = null,
+    val sugarGrams: Double? = null,
+    val saturatedFatGrams: Double? = null,
+    val sodiumMilligrams: Double? = null,
     /** Net content printed on the package, informational only. */
     val packageQuantity: Double? = null,
     val packageUnit: String? = null,

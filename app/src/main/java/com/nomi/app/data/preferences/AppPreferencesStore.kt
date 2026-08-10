@@ -24,6 +24,7 @@ interface AppPreferencesStore {
     suspend fun setUnits(weight: WeightUnitPreference, height: HeightUnitPreference)
     suspend fun setProvider(pipeline: ProviderPipeline, selection: ProviderSelection)
     suspend fun setReminders(reminders: ReminderPreferences)
+    suspend fun setMicronutrients(micronutrients: MicronutrientPreferences)
     suspend fun setOnboardingDraft(draft: PersistedOnboardingDraft?)
     suspend fun markOnboardingCompleted(completed: Boolean, clearDraft: Boolean = completed)
     suspend fun setAiDebugEnabled(enabled: Boolean)
@@ -83,6 +84,12 @@ class DataStoreAppPreferencesStore(
     override suspend fun setReminders(reminders: ReminderPreferences) {
         dataStore.edit { values ->
             values[Keys.REMINDERS] = json.encodeToString(reminders)
+        }
+    }
+
+    override suspend fun setMicronutrients(micronutrients: MicronutrientPreferences) {
+        dataStore.edit { values ->
+            values[Keys.MICRONUTRIENTS] = json.encodeToString(micronutrients)
         }
     }
 
@@ -151,6 +158,7 @@ class DataStoreAppPreferencesStore(
                 defaults.smartFallbackProvider,
             ).withSupportedModel(),
             reminders = decode(values[Keys.REMINDERS], defaults.reminders),
+            micronutrients = decode(values[Keys.MICRONUTRIENTS], defaults.micronutrients),
             onboardingDraft = decodeOrNull(values[Keys.ONBOARDING_DRAFT]),
             onboardingCompleted = values[Keys.ONBOARDING_COMPLETED] ?: false,
             aiDebugEnabled = values[Keys.AI_DEBUG_ENABLED] ?: false,
@@ -178,6 +186,7 @@ class DataStoreAppPreferencesStore(
         val VISION_PROVIDER = stringPreferencesKey("providers.vision")
         val SMART_FALLBACK_PROVIDER = stringPreferencesKey("providers.smart_fallback")
         val REMINDERS = stringPreferencesKey("reminders")
+        val MICRONUTRIENTS = stringPreferencesKey("nutrition.micronutrients")
         val ONBOARDING_DRAFT = stringPreferencesKey("onboarding.draft")
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding.completed")
         val AI_DEBUG_ENABLED = booleanPreferencesKey("developer.ai_debug")

@@ -129,7 +129,10 @@ object PortionChangeValidator {
             approximatelyEqual(expected.proteinGrams, actual.proteinGrams, 0.05, 0.5) &&
             approximatelyEqual(expected.carbsGrams, actual.carbsGrams, 0.05, 0.5) &&
             approximatelyEqual(expected.fatGrams, actual.fatGrams, 0.05, 0.5) &&
-            approximatelyEqual(expected.fiberGrams, actual.fiberGrams, 0.05, 0.5)
+            approximatelyEqual(expected.fiberGrams, actual.fiberGrams, 0.05, 0.5) &&
+            approximatelyEqual(expected.sugarGrams, actual.sugarGrams, 0.05, 0.5) &&
+            approximatelyEqual(expected.saturatedFatGrams, actual.saturatedFatGrams, 0.05, 0.5) &&
+            approximatelyEqual(expected.sodiumMilligrams, actual.sodiumMilligrams, 0.05, 25.0)
 
     private fun approximatelyEqual(
         first: Double,

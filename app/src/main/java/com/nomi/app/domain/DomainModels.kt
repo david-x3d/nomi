@@ -51,13 +51,22 @@ data class OnboardingDraft(
         get() = customCalorieTarget
 }
 
-/** Exact nutrition values. Rounding belongs at the display or persistence boundary. */
+/**
+ * Exact nutrition values. Rounding belongs at the display or persistence boundary.
+ *
+ * Sugar and saturated fat are components of carbohydrate and fat respectively, and sodium is
+ * carried in milligrams because that is the unit every label prints it in. None of the three is
+ * added to [macroCaloriesKcal]: their energy is already counted by the macro they belong to.
+ */
 data class Nutrition(
     val caloriesKcal: Double,
     val proteinGrams: Double,
     val carbsGrams: Double,
     val fatGrams: Double,
     val fiberGrams: Double = 0.0,
+    val sugarGrams: Double = 0.0,
+    val saturatedFatGrams: Double = 0.0,
+    val sodiumMilligrams: Double = 0.0,
 ) {
     init {
         require(caloriesKcal.isFinite() && caloriesKcal >= 0.0) {
@@ -74,6 +83,15 @@ data class Nutrition(
         }
         require(fiberGrams.isFinite() && fiberGrams >= 0.0) {
             "Fiber must be a finite, non-negative value."
+        }
+        require(sugarGrams.isFinite() && sugarGrams >= 0.0) {
+            "Sugar must be a finite, non-negative value."
+        }
+        require(saturatedFatGrams.isFinite() && saturatedFatGrams >= 0.0) {
+            "Saturated fat must be a finite, non-negative value."
+        }
+        require(sodiumMilligrams.isFinite() && sodiumMilligrams >= 0.0) {
+            "Sodium must be a finite, non-negative value."
         }
     }
 

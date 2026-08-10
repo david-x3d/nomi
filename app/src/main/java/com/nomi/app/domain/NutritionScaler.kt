@@ -11,6 +11,9 @@ object NutritionScaler {
             carbsGrams = nutrition.carbsGrams * multiplier,
             fatGrams = nutrition.fatGrams * multiplier,
             fiberGrams = nutrition.fiberGrams * multiplier,
+            sugarGrams = nutrition.sugarGrams * multiplier,
+            saturatedFatGrams = nutrition.saturatedFatGrams * multiplier,
+            sodiumMilligrams = nutrition.sodiumMilligrams * multiplier,
         )
     }
 
@@ -40,6 +43,9 @@ object NutritionScaler {
             carbsGrams = total.carbsGrams + next.carbsGrams,
             fatGrams = total.fatGrams + next.fatGrams,
             fiberGrams = total.fiberGrams + next.fiberGrams,
+            sugarGrams = total.sugarGrams + next.sugarGrams,
+            saturatedFatGrams = total.saturatedFatGrams + next.saturatedFatGrams,
+            sodiumMilligrams = total.sodiumMilligrams + next.sodiumMilligrams,
         )
     }
 }

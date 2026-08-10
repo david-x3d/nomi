@@ -87,6 +87,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -135,6 +136,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.hairlineOnPitchBlack
+import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.feedback.rememberNomiHaptics
@@ -178,6 +180,9 @@ fun NomiNotesTodayScreen(
     onEditPreview: () -> Unit,
     onDismissDraft: () -> Unit,
     onQuickMethod: (AddFoodMethod) -> Unit,
+    onPhotoDescriptionChanged: (String) -> Unit = {},
+    onPhotoPlaceChanged: (String) -> Unit = {},
+    onConfirmPhotoDescription: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberNomiHaptics()
@@ -189,6 +194,7 @@ fun NomiNotesTodayScreen(
     val loggingDescription = when (loggingState) {
         is FoodLoggingUiState.Input -> loggingState.text
         is FoodLoggingUiState.Processing -> loggingState.originalText
+        is FoodLoggingUiState.PhotoReview -> loggingState.description
         is FoodLoggingUiState.Preview -> loggingState.originalText
         is FoodLoggingUiState.Error -> loggingState.originalText
         is FoodLoggingUiState.Manual -> loggingState.draft.name
@@ -400,6 +406,12 @@ fun NomiNotesTodayScreen(
                             onAnalyze = { haptics.sent(); onAnalyze() },
                             onConfirm = { haptics.confirmed(); onConfirm() },
                             onRetry = onRetry,
+                            onPhotoDescriptionChanged = onPhotoDescriptionChanged,
+                            onPhotoPlaceChanged = onPhotoPlaceChanged,
+                            onConfirmPhotoDescription = {
+                                haptics.sent()
+                                onConfirmPhotoDescription()
+                            },
                             onEditText = onEditText,
                             onEditPreview = onEditPreview,
                             onDismissDraft = onDismissDraft,
@@ -882,6 +894,9 @@ private fun InlineLoggingState(
     onEditText: () -> Unit,
     onEditPreview: () -> Unit,
     onDismissDraft: () -> Unit,
+    onPhotoDescriptionChanged: (String) -> Unit,
+    onPhotoPlaceChanged: (String) -> Unit,
+    onConfirmPhotoDescription: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         when (state) {
@@ -898,6 +913,14 @@ private fun InlineLoggingState(
                 description = rememberedDescription,
                 sourceUrls = state.sourceUrls,
                 onEditText = onEditText,
+                onCancel = onDismissDraft,
+            )
+
+            is FoodLoggingUiState.PhotoReview -> PhotoReviewNote(
+                state = state,
+                onDescriptionChanged = onPhotoDescriptionChanged,
+                onPlaceChanged = onPhotoPlaceChanged,
+                onConfirm = onConfirmPhotoDescription,
                 onCancel = onDismissDraft,
             )
 
@@ -1228,6 +1251,84 @@ private fun PreviewNote(
                     Spacer(Modifier.size(6.dp))
                     Text(nomiString("Add", "Hinzufügen"), maxLines = 1)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * A photo's reading, offered as words before anything is looked up.
+ *
+ * This is the cheap moment to disagree with the camera. Editing here costs one word; editing
+ * after research means throwing away a web search and running another. The note deliberately
+ * looks like the meal already written on the page, because that is what it is.
+ */
+@Composable
+private fun PhotoReviewNote(
+    state: FoodLoggingUiState.PhotoReview,
+    onDescriptionChanged: (String) -> Unit,
+    onPlaceChanged: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = nomiString("From your photo", "Aus deinem Foto"),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = state.description,
+                onValueChange = onDescriptionChanged,
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 6,
+                textStyle = MaterialTheme.typography.bodyLarge,
+                placeholder = {
+                    Text(nomiString("Describe what you ate", "Beschreibe, was du gegessen hast"))
+                },
+            )
+            OutlinedTextField(
+                value = state.place,
+                onValueChange = onPlaceChanged,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = {
+                    Text(nomiString("Restaurant (optional)", "Restaurant (optional)"))
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
+            )
+            Text(
+                text = nomiString(
+                    "Fix anything Nomi misread, then look up the nutrition.",
+                    "Korrigiere, was Nomi falsch gelesen hat, und suche dann die Nährwerte.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onConfirm,
+                enabled = state.canContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
+            ) {
+                Text(nomiString("Find nutrition", "Nährwerte suchen"))
+            }
+            TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                Text(nomiString("Discard", "Verwerfen"))
             }
         }
     }
@@ -1649,6 +1750,9 @@ private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
             )
             CalorieGoalCard(state)
             MacroGoalCard(state)
+            if (state.micronutrients.isNotEmpty()) {
+                MicronutrientGoalCard(state.micronutrients)
+            }
         }
     }
 }
@@ -1723,6 +1827,73 @@ private fun MacroGoalCard(state: TodayUiState) {
                 label = nomiString("Fat", "Fett"),
                 progress = state.fat,
                 color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+    }
+}
+
+/**
+ * The nutrients the user chose to follow, shown the same way the macros are so the day reads as
+ * one picture. Fiber is a target to reach; sugar, saturated fat, and sodium are ceilings, and a
+ * crossed ceiling is coloured rather than merely full.
+ */
+@Composable
+private fun MicronutrientGoalCard(progress: List<MicronutrientProgress>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp),
+        ) {
+            progress.forEach { entry ->
+                MicronutrientGoalRow(entry)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MicronutrientGoalRow(progress: MicronutrientProgress) {
+    val locale = nomiLocale()
+    val suffix = progress.nutrient.storageUnit.suffix
+    val color = when {
+        progress.isOverLimit -> MaterialTheme.colorScheme.error
+        progress.nutrient.isLimit -> MaterialTheme.colorScheme.secondary
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                text = progress.nutrient.localizedName(),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = progress.consumed?.let { amount ->
+                    "${amount.roundToInt().formatted(locale)} / " +
+                        "${progress.target.roundToInt().formatted(locale)} $suffix"
+                } ?: nomiString("No data yet", "Noch keine Daten"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        GoalWave(fraction = progress.fraction, color = color)
+        if (progress.isPartial) {
+            Text(
+                text = nomiString(
+                    "Some of today's foods didn't publish this value, so the real total is higher.",
+                    "Für einige Lebensmittel von heute wurde kein Wert veröffentlicht, die tatsächliche Summe liegt also höher.",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

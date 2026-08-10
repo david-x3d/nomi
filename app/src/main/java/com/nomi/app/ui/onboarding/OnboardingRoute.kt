@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 
@@ -45,12 +46,19 @@ fun OnboardingRoute(
     onComplete: (OnboardingDraft, NutritionPlan) -> Unit,
     modifier: Modifier = Modifier,
     onDraftChanged: (OnboardingDraft) -> Unit = {},
+    onMicronutrientsChanged: (MicronutrientPreferences) -> Unit = {},
     viewModel: OnboardingViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(state.draft) {
         onDraftChanged(state.draft)
+    }
+
+    // Persisted as they are toggled rather than at the end, so a journey abandoned after this
+    // step still leaves the choice made here in effect.
+    LaunchedEffect(state.micronutrients) {
+        onMicronutrientsChanged(state.micronutrients)
     }
 
     BackHandler(enabled = state.currentStep != OnboardingStep.WELCOME) {
@@ -119,6 +127,7 @@ internal fun OnboardingFlow(
                     OnboardingStep.TARGET_WEIGHT -> TargetWeightScreen(state = state, actions = actions)
                     OnboardingStep.ACTIVITY -> ActivityScreen(state = state, actions = actions)
                     OnboardingStep.PROGRESS_RATE -> ProgressRateScreen(state = state, actions = actions)
+                    OnboardingStep.MICRONUTRIENTS -> MicronutrientsScreen(state = state, actions = actions)
                     OnboardingStep.PLAN -> PlanRevealScreen(
                         state = state,
                         actions = actions,
