@@ -368,6 +368,70 @@ class OpenAiCompatibleClientTest {
         assertEquals(HttpTimeoutConfig.INFINITE_TIMEOUT_MS, config.effectiveTimeoutMillis())
     }
 
+    /**
+     * Sonar on OpenRouter is a chat-completions model that searches by itself. Sending it the
+     * Responses-API server tools made every food-research request fail with HTTP 400, so the
+     * routing flag that keeps it on the chat path is worth pinning down by name.
+     */
+    @Test
+    fun `openrouter sonar models search natively and must not take the server-tool path`() {
+        listOf(
+            "perplexity/sonar",
+            "perplexity/sonar-pro",
+            "perplexity/sonar-reasoning",
+            "perplexity/sonar-deep-research",
+            "perplexity/llama-3.1-sonar-large-128k-online",
+            "PERPLEXITY/SONAR",
+        ).forEach { model ->
+            assertTrue(
+                "$model searches natively and cannot accept openrouter server tools",
+                config(AiProviderKind.OPEN_ROUTER, model).usesNativeWebSearch(),
+            )
+        }
+    }
+
+    @Test
+    fun `an openrouter online variant also searches natively`() {
+        assertTrue(config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol:online").usesNativeWebSearch())
+    }
+
+    @Test
+    fun `an ordinary openrouter model still uses the server-tool research path`() {
+        listOf("openai/gpt-5.6-sol", "anthropic/claude-sonnet-5", "google/gemini-2.5-flash")
+            .forEach { model ->
+                assertFalse(
+                    "$model has no search of its own and needs the server tools",
+                    config(AiProviderKind.OPEN_ROUTER, model).usesNativeWebSearch(),
+                )
+            }
+    }
+
+    @Test
+    fun `native web search is an openrouter concern only`() {
+        // Direct Perplexity already has its own request path and must not be diverted by this flag.
+        assertFalse(config(AiProviderKind.PERPLEXITY, "sonar").usesNativeWebSearch())
+        assertFalse(config(AiProviderKind.CODEX_EASY, "gpt-5.6-sol").usesNativeWebSearch())
+    }
+
+    @Test
+    fun `openrouter sonar research is a plain chat request with no server tools`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "perplexity/sonar"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        // The three fields that make OpenRouter reject a Sonar request.
+        assertFalse(encoded.contains("openrouter:web_search"))
+        assertFalse(encoded.contains("openrouter:web_fetch"))
+        assertFalse(encoded.contains("max_tool_calls"))
+        // Sonar searches on its own, so it needs no web_search_options either.
+        assertFalse(encoded.contains("web_search_options"))
+        assertTrue(encoded.contains("\"model\":\"perplexity/sonar\""))
+    }
+
     private fun config(kind: AiProviderKind, model: String) = AiProviderConfig(
         kind = kind,
         endpoint = when (kind) {

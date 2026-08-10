@@ -69,7 +69,7 @@ class OpenAiCompatibleClient(
         systemPrompt: String,
         userPrompt: String,
     ): WebSearchCompletion {
-        if (config.kind == AiProviderKind.OPEN_ROUTER) {
+        if (config.kind == AiProviderKind.OPEN_ROUTER && !config.usesNativeWebSearch()) {
             return completeOpenRouterResponsesResearch(
                 config = config,
                 credential = credential,
@@ -332,6 +332,25 @@ internal fun AiProviderConfig.supportsJsonObjectResponseFormat(): Boolean {
  * OpenRouter variants can also differ in sampling-parameter support, so let the routed endpoint
  * use its default. Direct OpenAI gpt-5 and o-series models likewise require their default.
  */
+/**
+ * Whether this model does its own web search as part of answering.
+ *
+ * Sonar and OpenRouter's `:online` variants search natively through chat completions. They are
+ * not Responses-API models and reject the `openrouter:web_search` / `openrouter:web_fetch`
+ * server tools outright with HTTP 400, so routing them down the server-tool path fails every
+ * request. They already return `citations` and `search_results`, which is the same provider
+ * metadata Nomi grounds its sources on, so the ordinary chat path serves them correctly.
+ */
+internal fun AiProviderConfig.usesNativeWebSearch(): Boolean {
+    if (kind != AiProviderKind.OPEN_ROUTER) return false
+    val slug = model.trim().lowercase(Locale.ROOT)
+    return slug.startsWith("perplexity/") ||
+        slug.contains("sonar") ||
+        // OpenRouter's ":online" suffix bolts its own search onto any model, again over chat
+        // completions rather than server tools.
+        slug.contains(":online")
+}
+
 internal fun AiProviderConfig.supportsCustomTemperature(): Boolean {
     if (kind == AiProviderKind.OPEN_ROUTER) return false
     val normalized = model.trim().lowercase(Locale.ROOT).removePrefix("openai/")
