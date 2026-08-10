@@ -308,18 +308,23 @@ internal fun chatCompletionRequest(
         else -> null
     },
     webSearchOptions = WebSearchOptions().takeIf {
-        requireWebSearch && config.kind == AiProviderKind.OPEN_AI
+        requireWebSearch && config.usesOpenAiWebSearch()
     },
 ).also {
-    // OpenAI accepts web_search_options only on its search models and 400s otherwise.
+    // OpenAI accepts web_search_options only on its search models and 400s otherwise. A relay
+    // of the same API inherits that rule, and researching without search returns no citations.
     require(
-        !requireWebSearch || config.kind != AiProviderKind.OPEN_AI ||
+        !requireWebSearch || !config.usesOpenAiWebSearch() ||
             config.model.contains("search", ignoreCase = true),
     ) {
         "Configure Food research with an OpenAI web-search model such as " +
             "gpt-4o-search-preview, or use Perplexity/OpenRouter."
     }
 }
+
+/** Providers that speak OpenAI's own `web_search_options` dialect on chat completions. */
+internal fun AiProviderConfig.usesOpenAiWebSearch(): Boolean =
+    kind == AiProviderKind.OPEN_AI || kind == AiProviderKind.CODEX_EASY
 
 internal fun openRouterResponsesResearchRequest(
     config: AiProviderConfig,

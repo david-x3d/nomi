@@ -8,6 +8,8 @@ enum class AiProviderKind {
     PERPLEXITY,
     OPEN_ROUTER,
     OPEN_AI,
+    /** Codex Easy: an OpenAI-compatible relay that speaks the OpenAI API under its own key. */
+    CODEX_EASY,
     CUSTOM_OPEN_AI_COMPATIBLE,
 }
 

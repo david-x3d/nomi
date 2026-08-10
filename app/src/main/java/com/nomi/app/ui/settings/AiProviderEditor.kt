@@ -190,7 +190,8 @@ fun AiProviderEditorDialog(
 
 private val PROVIDER_ROWS = listOf(
     listOf(AiProviderKind.PERPLEXITY, AiProviderKind.OPEN_ROUTER),
-    listOf(AiProviderKind.OPEN_AI, AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE),
+    listOf(AiProviderKind.OPEN_AI, AiProviderKind.CODEX_EASY),
+    listOf(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE),
 )
 
 private fun AiProviderEditorState.configurationError(
@@ -218,6 +219,7 @@ private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
     AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
+    AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
 
@@ -229,6 +231,9 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
         DEFAULT_OPENROUTER_MODEL
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
+    // Codex Easy relays whatever models the account is entitled to, so the name is left to
+    // the user rather than guessed; `/v1/models` on the same key lists them.
+    AiProviderKind.CODEX_EASY,
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
     -> ""
 }
@@ -238,6 +243,7 @@ private fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "Perplexity"
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.OPEN_AI -> "OpenAI"
+    AiProviderKind.CODEX_EASY -> "Codex Easy"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom", "Benutzerdefiniert")
 }
 

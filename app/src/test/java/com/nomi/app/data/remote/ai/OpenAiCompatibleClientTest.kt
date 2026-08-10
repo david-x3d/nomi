@@ -270,6 +270,47 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `codex easy keeps json object mode like the openai api it relays`() {
+        val config = config(AiProviderKind.CODEX_EASY, "gpt-5.2")
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config,
+                listOf(ChatMessage("user", JsonPrimitive("Reply with JSON"))),
+            ),
+        )
+
+        assertTrue(config.supportsJsonObjectResponseFormat())
+        assertTrue(encoded.contains("\"response_format\":{\"type\":\"json_object\"}"))
+        assertFalse(encoded.contains("web_search_options"))
+    }
+
+    @Test
+    fun `codex easy research sends openai web search options`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.CODEX_EASY, "gpt-4o-search-preview"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"web_search_options\""))
+    }
+
+    @Test
+    fun `codex easy research without a search model is refused before the request`() {
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            chatCompletionRequest(
+                config(AiProviderKind.CODEX_EASY, "gpt-5.2"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            )
+        }
+
+        assertTrue(error.message.orEmpty().contains("search model"))
+    }
+
+    @Test
     fun `configured timeout is used for both the request and the socket`() {
         val config = config(AiProviderKind.OPEN_ROUTER, "openai/gpt-5.6-sol")
 
@@ -289,6 +330,7 @@ class OpenAiCompatibleClientTest {
         kind = kind,
         endpoint = when (kind) {
             AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
+            AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
             else -> "https://openrouter.ai/api/v1"
         },
         model = model,

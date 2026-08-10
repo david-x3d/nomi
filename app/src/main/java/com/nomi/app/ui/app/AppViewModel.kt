@@ -1635,6 +1635,7 @@ class AppViewModel(
             "perplexity" -> "https://www.perplexity.ai"
             "openrouter" -> "https://openrouter.ai"
             "openai" -> "https://openai.com"
+            "codex-easy" -> "https://codex-easy.ai"
             else -> selection.endpoint
         }
     }
@@ -2079,6 +2080,9 @@ private fun ProviderSelection.resolvedEndpoint(): String {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
         AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
         AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
+        // Codex Easy publishes both a bare host and a /v1 base; Nomi appends OpenAI request
+        // paths, so the versioned base is the one that resolves to /v1/chat/completions.
+        AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
         AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint?.trim()?.takeIf(String::isNotBlank)
             ?: error("Enter a provider endpoint in Settings.")
     }.trimEnd('/')
@@ -2111,6 +2115,7 @@ private fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.ROO
     "perplexity" -> AiProviderKind.PERPLEXITY
     "openrouter" -> AiProviderKind.OPEN_ROUTER
     "openai" -> AiProviderKind.OPEN_AI
+    "codex-easy" -> AiProviderKind.CODEX_EASY
     else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
 }
 
@@ -2118,6 +2123,7 @@ private fun AiProviderKind.toProviderId(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "perplexity"
     AiProviderKind.OPEN_ROUTER -> "openrouter"
     AiProviderKind.OPEN_AI -> "openai"
+    AiProviderKind.CODEX_EASY -> "codex-easy"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
 }
 
@@ -2125,6 +2131,7 @@ private fun String.displayProviderName(): String = when (lowercase(Locale.ROOT))
     "perplexity" -> "Perplexity"
     "openrouter" -> "OpenRouter"
     "openai" -> "OpenAI"
+    "codex-easy" -> "Codex Easy"
     else -> "custom provider"
 }
 
