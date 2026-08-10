@@ -41,6 +41,8 @@ import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.data.preferences.WeightUnitPreference
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.withSupportedModel
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
@@ -205,7 +207,9 @@ class AppViewModel(
         repository.currentPlan,
         selectedDate,
         repository.preferences,
-    ) { logs, plan, date, prefs -> mapToday(date, logs, plan, prefs.micronutrients) }
+    ) { logs, plan, date, prefs ->
+        mapToday(date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(isLoading = true))
     val aiDebugEvents: StateFlow<List<AiDebugEventEntity>> = repository.aiDebugEvents().stateIn(
         viewModelScope,
@@ -304,6 +308,19 @@ class AppViewModel(
     private var analysisJob: Job? = null
     private var analysisRequestId = 0L
     private var loggingSaveInProgress = false
+
+    /**
+     * An entry saved from a provisional estimate, waiting for its research to come back.
+     * [savedLogs] is what was written, so a row the user has since corrected can be recognized
+     * and left alone.
+     */
+    private data class PendingResearchUpgrade(
+        val requestId: Long,
+        val logIds: List<Long>,
+        val savedLogs: List<FoodLogEntity>,
+    )
+
+    private var pendingResearchUpgrade: PendingResearchUpgrade? = null
     private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
     val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
     private var lastLoggingText = ""
@@ -726,54 +743,99 @@ class AppViewModel(
             originalText = text,
         )
         val job = viewModelScope.launch {
-            runCatching {
-                val intent = (
+            val intent = runCatching {
+                (
                     LocalFoodIntentParser.parseOrNull(text)
                         ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
                             providerFor(config, key).parseFood(text)
                         }
                     ).withKnownSpellings()
-                cachedNutritionAnalysis(intent)?.let { return@runCatching it }
+            }.getOrElse { error ->
+                if (error is CancellationException) throw error
+                if (requestId == analysisRequestId) {
+                    mutableLoggingState.value = FoodLoggingUiState.Error(
+                        error.safeAiMessage(),
+                        canRetry = true,
+                        originalText = text,
+                    )
+                }
+                return@launch
+            }
 
+            cachedNutritionAnalysis(intent)?.let { cached ->
+                if (requestId == analysisRequestId) {
+                    mutableLoggingState.value = FoodLoggingUiState.Preview(
+                        cached,
+                        current.mealCategory,
+                        originalText = text,
+                    )
+                }
+                return@launch
+            }
+
+            // Phase one: the fast unsourced answer, so the meal is on screen in a second or two.
+            mutableLoggingState.value = FoodLoggingUiState.Processing(
+                AiProcessingStage.FINDING_NUTRITION,
+                originalText = text,
+            )
+            val estimate = runCatching { estimateNutrition(intent) }
+                .onFailure { if (it is CancellationException) throw it }
+                .getOrNull()
+            if (estimate != null && requestId == analysisRequestId) {
+                recordRoute(
+                    route = NutritionRoute.NEW_RESEARCH,
+                    decision = NutritionRoute.Decision.DIRECT,
+                    detail = "Fast estimate shown while research runs",
+                )
+                mutableLoggingState.value = FoodLoggingUiState.Preview(
+                    estimate,
+                    current.mealCategory,
+                    originalText = text,
+                    isProvisional = true,
+                )
+            } else if (estimate == null && requestId == analysisRequestId) {
                 mutableLoggingState.value = FoodLoggingUiState.Processing(
                     AiProcessingStage.FINDING_NUTRITION,
                     originalText = text,
                     sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
                 )
-                val analysis = researchNutrition(intent)
-                recordRoute(
-                    route = NutritionRoute.NEW_RESEARCH,
-                    decision = NutritionRoute.Decision.DIRECT,
-                    detail = "New food entry researched on the web",
-                )
-                val researchSourceUrls = analysis.researchSourceUrls()
-                mutableLoggingState.value = FoodLoggingUiState.Processing(
-                    AiProcessingStage.CHECKING_PORTIONS,
-                    originalText = text,
-                    sourceUrls = researchSourceUrls,
-                )
-                mutableLoggingState.value = FoodLoggingUiState.Processing(
-                    AiProcessingStage.PUTTING_IT_TOGETHER,
-                    originalText = text,
-                    sourceUrls = researchSourceUrls,
-                )
-                analysis
-            }.onSuccess { analysis ->
-                if (requestId != analysisRequestId) return@onSuccess
-                recentFoodAnalysisCache.put(cacheKey, analysis)
-                mutableLoggingState.value = FoodLoggingUiState.Preview(
-                    analysis,
-                    current.mealCategory,
-                    originalText = text,
-                )
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                if (requestId != analysisRequestId) return@onFailure
-                mutableLoggingState.value = FoodLoggingUiState.Error(
-                    error.safeAiMessage(),
-                    canRetry = true,
-                    originalText = text,
-                )
+            }
+
+            // Phase two: sourced research replaces the estimate wherever it ended up.
+            suspend fun research() {
+                runCatching { researchNutrition(intent) }
+                    .onSuccess { analysis ->
+                        recentFoodAnalysisCache.put(cacheKey, analysis)
+                        recordRoute(
+                            route = NutritionRoute.NEW_RESEARCH,
+                            decision = NutritionRoute.Decision.DIRECT,
+                            detail = "New food entry researched on the web",
+                        )
+                        applyResearchedAnalysis(requestId, analysis, text, current.mealCategory)
+                    }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        if (requestId != analysisRequestId) return@onFailure
+                        // With an estimate already shown there is nothing to report: it is a
+                        // complete, labeled entry, and research was the optional half.
+                        if (estimate == null) {
+                            mutableLoggingState.value = FoodLoggingUiState.Error(
+                                error.safeAiMessage(),
+                                canRetry = true,
+                                originalText = text,
+                            )
+                        }
+                    }
+            }
+
+            if (estimate == null) {
+                // Nothing is on screen yet, so this call still owns the input and must stay
+                // cancellable by Back or a retyped meal.
+                research()
+            } else {
+                // The meal is already logged or previewed. Detaching lets the upgrade survive
+                // the user saving it and immediately typing the next one.
+                viewModelScope.launch { research() }
             }
         }
         analysisJob = job
@@ -1166,7 +1228,19 @@ class AppViewModel(
                             val logs = validated.items.map { item ->
                                 item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
                             }
-                            repository.addLogs(logs)
+                            val ids = repository.addLogs(logs)
+                            // Saving before research returns is normal now, so the rows stay
+                            // claimable until it does.
+                            pendingResearchUpgrade = if (current.isProvisional) {
+                                PendingResearchUpgrade(
+                                    requestId = analysisRequestId,
+                                    logIds = ids,
+                                    savedLogs = logs,
+                                )
+                            } else {
+                                null
+                            }
+                            ids
                         }
                         is FoodLoggingUiState.Manual -> {
                             require(current.draft.isValid)
@@ -1560,6 +1634,18 @@ class AppViewModel(
         viewModelScope.launch { repository.appPreferencesStore.setAdjustTargetFromActivity(enabled) }
     }
 
+    fun setGoalsCardStyle(style: GoalsCardStyle) {
+        viewModelScope.launch { repository.appPreferencesStore.setGoalsCardStyle(style) }
+    }
+
+    fun setCalorieEstimateBias(bias: CalorieEstimateBias) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setCalorieEstimateBias(bias)
+            // Cached analyses were biased under the previous setting.
+            recentFoodAnalysisCache.clear()
+        }
+    }
+
     fun toggleReminder(index: Int, enabled: Boolean) {
         viewModelScope.launch {
             val current = preferences.value.reminders
@@ -1569,6 +1655,29 @@ class AppViewModel(
                 2 -> current.copy(dinner = current.dinner.copy(enabled = enabled))
                 3 -> current.copy(dailySummary = current.dailySummary.copy(enabled = enabled))
                 4 -> current.copy(weight = current.weight.copy(enabled = enabled))
+                else -> return@launch
+            }
+            repository.appPreferencesStore.setReminders(updated)
+            container.reminderScheduler.reconcile(updated)
+        }
+    }
+
+    /**
+     * Moves one reminder to a new time of day and reschedules it.
+     *
+     * A reminder that is off keeps its new time so turning it on later fires when the user
+     * expects, rather than at whatever default it shipped with.
+     */
+    fun setReminderTime(index: Int, hour: Int, minute: Int) {
+        viewModelScope.launch {
+            val localTime = "%02d:%02d".format(hour, minute)
+            val current = preferences.value.reminders
+            val updated = when (index) {
+                0 -> current.copy(breakfast = current.breakfast.copy(localTime = localTime))
+                1 -> current.copy(lunch = current.lunch.copy(localTime = localTime))
+                2 -> current.copy(dinner = current.dinner.copy(localTime = localTime))
+                3 -> current.copy(dailySummary = current.dailySummary.copy(localTime = localTime))
+                4 -> current.copy(weight = current.weight.copy(localTime = localTime))
                 else -> return@launch
             }
             repository.appPreferencesStore.setReminders(updated)
@@ -1611,12 +1720,12 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching {
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val draft = state.toProviderSelection()
+                val draft = state.toProviderSelection(pipeline)
                 val config = draft.toRuntimeConfig()
                 val selection = draft.copy(endpoint = config.endpoint)
                 state.apiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
                     try {
-                        container.secretStore.put(secretId(pipeline, selection), chars)
+                        container.secretStore.put(secretId(selection), chars)
                     } finally {
                         chars.fill('\u0000')
                     }
@@ -1640,8 +1749,8 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching {
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val selection = state.toProviderSelection()
-                container.secretStore.delete(secretId(pipeline, selection))
+                val selection = state.toProviderSelection(pipeline)
+                container.secretStore.delete(secretId(selection))
             }.onSuccess { removed ->
                 recentFoodAnalysisCache.clear()
                 refreshProviderAndHealthStatus()
@@ -1659,7 +1768,7 @@ class AppViewModel(
         viewModelScope.launch {
             val result = runCatching {
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val draft = state.toProviderSelection()
+                val draft = state.toProviderSelection(pipeline)
                 val config = draft.toRuntimeConfig()
                 val selection = draft.copy(endpoint = config.endpoint)
                 suspend fun testWith(
@@ -1695,7 +1804,7 @@ class AppViewModel(
                         block = ::testWith,
                     )
                 } else {
-                    container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
+                    container.secretStore.useSecret(secretId(selection)) { chars ->
                         testWith(config, AiRuntimeCredential.from(chars.concatToString()))
                     } ?: error("Enter an API key before testing this provider.")
                 }
@@ -1709,19 +1818,9 @@ class AppViewModel(
         viewModelScope.launch {
             val prefs = loadedPreferences()
             keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
-                val selection = prefs.selectionFor(pipeline)
-                val direct = runCatching {
-                    container.secretStore.contains(secretId(pipeline, selection))
+                runCatching {
+                    container.secretStore.contains(secretId(prefs.selectionFor(pipeline)))
                 }.getOrDefault(false)
-                direct || if (pipeline == ProviderPipeline.SMART_FALLBACK &&
-                    selection.sharesCredentialWith(prefs.foodResearchProvider)
-                ) {
-                    runCatching {
-                        container.secretStore.contains(
-                            secretId(ProviderPipeline.FOOD_RESEARCH, prefs.foodResearchProvider),
-                        )
-                    }.getOrDefault(false)
-                } else false
             }
         }
         viewModelScope.launch { refreshHealthConnectAndSync() }
@@ -1923,6 +2022,97 @@ class AppViewModel(
         ).withCleanDisplayNames()
 
     /**
+     * Runs on the interpretation provider rather than the research one: this call exists to be
+     * fast, and it needs no search, so the cheap model is the right model for it.
+     */
+    private suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis =
+        withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
+            providerFor(config, key).estimateNutrition(intent)
+        }.withCleanDisplayNames()
+
+    /**
+     * Delivers sourced research to wherever the estimate it replaces ended up.
+     *
+     * The user does not wait for research, so by the time it lands the meal may still be in the
+     * preview or already saved to the journal. Both are upgraded in place; anything else means
+     * the user moved on, and a silent rewrite of something they are no longer looking at would
+     * be worse than leaving a labeled estimate alone.
+     */
+    private suspend fun applyResearchedAnalysis(
+        requestId: Long,
+        analysis: FoodAnalysis,
+        text: String,
+        mealCategory: MealCategory,
+    ) {
+        val pending = pendingResearchUpgrade
+        if (pending != null && pending.requestId == requestId) {
+            pendingResearchUpgrade = null
+            upgradeSavedLogs(pending, analysis)
+            return
+        }
+        if (requestId != analysisRequestId) return
+        val current = mutableLoggingState.value
+        // A preview the user has been editing is theirs, not research's, to change.
+        if (current !is FoodLoggingUiState.Preview || !current.isProvisional) return
+        mutableLoggingState.value = FoodLoggingUiState.Preview(
+            analysis,
+            mealCategory,
+            originalText = text,
+            isProvisional = false,
+        )
+    }
+
+    /**
+     * Replaces the estimate stored for an entry the user already saved.
+     *
+     * Each row is checked against the estimate that produced it before anything is written, so a
+     * portion the user corrected in the meantime keeps the number they chose. Amount and meal
+     * stay as saved; only the nutrition and its source are upgraded.
+     */
+    private suspend fun upgradeSavedLogs(pending: PendingResearchUpgrade, analysis: FoodAnalysis) {
+        val validated = runCatching {
+            ServingNutritionNormalizer.validateBeforeSave(analysis)
+        }.getOrNull() ?: return
+        if (validated.items.size != pending.logIds.size) return
+        var upgraded = 0
+        pending.logIds.forEachIndexed { index, logId ->
+            val existing = repository.foodLog(logId) ?: return@forEachIndexed
+            val estimated = pending.savedLogs.getOrNull(index) ?: return@forEachIndexed
+            val untouched = existing.amount == estimated.amount &&
+                existing.unit == estimated.unit &&
+                existing.nutritionSnapshot.caloriesKcal == estimated.nutritionSnapshot.caloriesKcal
+            if (!untouched) return@forEachIndexed
+            val researched = validated.items[index].toLog(
+                MealCategory.valueOf(existing.mealCategory),
+                existing.inputMethod,
+            )
+            val success = runCatching {
+                repository.updateLog(
+                    existing.copy(
+                        displayNameSnapshot = researched.displayNameSnapshot,
+                        brandSnapshot = researched.brandSnapshot,
+                        nutritionSnapshot = researched.nutritionSnapshot,
+                        sourceSnapshot = researched.sourceSnapshot,
+                        isEstimated = researched.isEstimated,
+                        updatedAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }.getOrDefault(false)
+            if (success) upgraded++
+        }
+        if (upgraded > 0) {
+            mutableEvents.emit(
+                AppEvent.Message(
+                    inUserLanguage(
+                        english = "Nutrition sources found - the entry was updated.",
+                        german = "Nährwertquellen gefunden - der Eintrag wurde aktualisiert.",
+                    ),
+                ),
+            )
+        }
+    }
+
+    /**
      * Every researched item passes through here on its way to the page, so the name that is
      * previewed is the same one that is saved and later reopened for rewriting. The prompts
      * ask the model for a clean short name; this only removes what a provider left behind.
@@ -1961,7 +2151,7 @@ class AppViewModel(
         val prefs = loadedPreferences()
         val selection = prefs.selectionFor(pipeline)
         require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
-        return container.secretStore.useSecret(secretId(pipeline, selection)) { chars ->
+        return container.secretStore.useSecret(secretId(selection)) { chars ->
             val credential = AiRuntimeCredential.from(chars.concatToString())
             block(selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled), credential)
         } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
@@ -2006,6 +2196,7 @@ class AppViewModel(
             portionCredential = { credential },
             visionConfig = config,
             visionCredential = { credential },
+            calorieBiasProvider = { preferences.value.calorieEstimateBias },
         )
 
     private fun mapToday(
@@ -2013,6 +2204,7 @@ class AppViewModel(
         logs: List<FoodLogEntity>,
         plan: NutritionPlanEntity?,
         micronutrients: MicronutrientPreferences,
+        goalsCardStyle: GoalsCardStyle,
     ): TodayUiState {
         val totals = logs.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
         return TodayUiState(
@@ -2024,6 +2216,7 @@ class AppViewModel(
             fat = MacroProgress(totals.fatGrams, plan?.fatTargetGrams ?: 65.0),
             micronutrients = micronutrients.toProgress(logs, totals),
             entries = logs.map { it.toTodayEntry() },
+            goalsCardStyle = goalsCardStyle,
         )
     }
 
@@ -2108,6 +2301,8 @@ class AppViewModel(
             germanTranslationEnabled = prefs.germanTranslationEnabled,
             unitSystem = if (prefs.weightUnit == WeightUnitPreference.KILOGRAMS) UnitSystem.METRIC else UnitSystem.IMPERIAL,
             activityTargetAdjustment = prefs.adjustTargetFromActivity,
+            calorieEstimateBias = prefs.calorieEstimateBias,
+            goalsCardStyle = prefs.goalsCardStyle,
             healthConnectAvailable = health.status != HealthConnectPermissionStatus.UNAVAILABLE,
             healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED,
             healthConnect = health,
@@ -2441,11 +2636,13 @@ private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSel
     ProviderPipeline.SMART_FALLBACK -> smartFallbackProvider
 }
 
-private fun AiProviderEditorState.toProviderSelection(): ProviderSelection = ProviderSelection(
+private fun AiProviderEditorState.toProviderSelection(
+    pipeline: ProviderPipeline = ProviderPipeline.FOOD_INTERPRETATION,
+): ProviderSelection = ProviderSelection(
     providerId = provider.toProviderId(),
     model = model.trim(),
     endpoint = endpoint.asHttpsEndpoint(),
-).withSupportedModel()
+).withSupportedModel(pipeline)
 
 
 private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
@@ -2531,10 +2728,9 @@ internal fun smartFallbackCredentialIds(
     selection: ProviderSelection,
     primary: ProviderSelection,
 ): List<String> = buildList {
-    add(secretId(ProviderPipeline.SMART_FALLBACK, selection))
-    if (selection.sharesCredentialWith(primary)) {
-        add(secretId(ProviderPipeline.FOOD_RESEARCH, primary))
-    }
+    add(secretId(selection))
+    // Only a fallback on the same provider account may reuse the research key.
+    if (selection.sharesCredentialWith(primary)) add(secretId(primary))
 }.distinct()
 
 internal suspend fun <T> runWithSmartFallback(
@@ -2573,9 +2769,14 @@ private fun ThemeMode.toPreference(): ThemePreference = when (this) {
     ThemeMode.DARK -> ThemePreference.DARK
 }
 
-private fun secretId(pipeline: ProviderPipeline, selection: ProviderSelection): String {
+/**
+ * Keys are scoped to the provider account, not to the pipeline that happens to use it. All five
+ * pipelines run on the same OpenRouter key by default, so entering it once in any of them
+ * configures the rest; a second provider still gets its own separate secret.
+ */
+private fun secretId(selection: ProviderSelection): String {
     val endpoint = selection.resolvedEndpoint().lowercase(Locale.ROOT)
-    val material = "${pipeline.name}|${selection.providerId.lowercase(Locale.ROOT)}|$endpoint"
+    val material = "${selection.providerId.lowercase(Locale.ROOT)}|$endpoint"
     val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
     val token = digest.take(16).joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     return "provider:$token"

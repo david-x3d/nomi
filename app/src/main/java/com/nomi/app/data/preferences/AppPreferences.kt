@@ -22,6 +22,30 @@ enum class HeightUnitPreference {
     FEET_AND_INCHES,
 }
 
+/** How the daily goals are drawn on Today. */
+@Serializable
+enum class GoalsCardStyle {
+    /** Nomi's original: a calorie hero with three macro bars beneath it. */
+    BARS,
+
+    /** One card: calories as a bar, every other target as a ring. */
+    RINGS,
+}
+
+/**
+ * Where inside an estimate's plausible range the logged value should land.
+ *
+ * Only estimated foods are affected: a researched manufacturer table has no range to move in.
+ */
+@Serializable
+enum class CalorieEstimateBias {
+    STRONGLY_UNDERESTIMATE,
+    UNDERESTIMATE,
+    NONE,
+    OVERESTIMATE,
+    STRONGLY_OVERESTIMATE,
+}
+
 @Serializable
 enum class ProviderPipeline {
     FOOD_RESEARCH,
@@ -117,7 +141,7 @@ data class AppPreferences(
     val heightUnit: HeightUnitPreference = HeightUnitPreference.CENTIMETERS,
     val foodResearchProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_MODEL,
+        model = DEFAULT_OPENROUTER_RESEARCH_MODEL,
     ),
     val foodInterpretationProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
@@ -127,7 +151,10 @@ data class AppPreferences(
         providerId = "openrouter",
         model = DEFAULT_OPENROUTER_MODEL,
     ),
-    val visionProvider: ProviderSelection = ProviderSelection(),
+    val visionProvider: ProviderSelection = ProviderSelection(
+        providerId = "openrouter",
+        model = DEFAULT_OPENROUTER_MODEL,
+    ),
     val smartFallbackProvider: ProviderSelection = ProviderSelection(
         providerId = "openrouter",
         model = DEFAULT_OPENROUTER_MODEL,
@@ -138,30 +165,60 @@ data class AppPreferences(
     val onboardingCompleted: Boolean = false,
     val aiDebugEnabled: Boolean = false,
     val adjustTargetFromActivity: Boolean = false,
+    val calorieEstimateBias: CalorieEstimateBias = CalorieEstimateBias.NONE,
+    val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
     /** When on, AI requests wait for the provider instead of failing at the built-in limit. */
     val aiRequestTimeoutDisabled: Boolean = false,
 )
 
-internal const val DEFAULT_OPENROUTER_MODEL = "openai/gpt-5.6-sol"
+/**
+ * Every pipeline runs through OpenRouter on one key. Research uses Sonar because it searches
+ * natively over chat completions and returns its own citations; the remaining pipelines only
+ * interpret text or images, so they use the cheap fast model.
+ */
+internal const val DEFAULT_OPENROUTER_RESEARCH_MODEL = "perplexity/sonar"
+internal const val DEFAULT_OPENROUTER_MODEL = "google/gemini-3.5-flash-lite"
 internal const val RETIRED_OPENROUTER_MODEL = "deepseek/deepseek-v4"
 internal const val PREVIOUS_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
-private val OPENROUTER_GPT_5_6_SOL_ALIASES = setOf(
+internal const val PREVIOUS_OPENROUTER_DEFAULT_MODEL = "openai/gpt-5.6-sol"
+private val RETIRED_OPENROUTER_MODELS = setOf(
+    RETIRED_OPENROUTER_MODEL,
+    PREVIOUS_OPENROUTER_MODEL,
+    PREVIOUS_OPENROUTER_DEFAULT_MODEL,
     "gpt5.6sol",
     "gpt-5.6-sol",
     "openai/gpt5.6sol",
 )
 
-/** Keeps existing provider keys usable while replacing retired defaults and common shorthand. */
-internal fun ProviderSelection.withSupportedModel(): ProviderSelection =
-    if (providerId.equals("openrouter", ignoreCase = true) &&
-        (model.equals(RETIRED_OPENROUTER_MODEL, ignoreCase = true) ||
-            model.equals(PREVIOUS_OPENROUTER_MODEL, ignoreCase = true) ||
-            model.trim().lowercase() in OPENROUTER_GPT_5_6_SOL_ALIASES)
-    ) {
-        copy(model = DEFAULT_OPENROUTER_MODEL)
+internal fun ProviderPipeline.defaultOpenRouterModel(): String =
+    if (this == ProviderPipeline.FOOD_RESEARCH) {
+        DEFAULT_OPENROUTER_RESEARCH_MODEL
+    } else {
+        DEFAULT_OPENROUTER_MODEL
+    }
+
+/**
+ * Keeps a deliberately chosen provider untouched while filling in anything unconfigured and
+ * replacing models that are no longer the default, so an existing install lands on the same
+ * one-key OpenRouter setup as a fresh one.
+ */
+internal fun ProviderSelection.withSupportedModel(
+    pipeline: ProviderPipeline = ProviderPipeline.FOOD_INTERPRETATION,
+): ProviderSelection {
+    if (providerId.isBlank()) {
+        return ProviderSelection(
+            providerId = "openrouter",
+            model = pipeline.defaultOpenRouterModel(),
+        )
+    }
+    if (!providerId.equals("openrouter", ignoreCase = true)) return this
+    val slug = model.trim().lowercase()
+    return if (slug.isEmpty() || slug in RETIRED_OPENROUTER_MODELS) {
+        copy(model = pipeline.defaultOpenRouterModel())
     } else {
         this
     }
+}
 
 fun MicronutrientPreferences.settingFor(micronutrient: Micronutrient): MicronutrientSetting =
     when (micronutrient) {

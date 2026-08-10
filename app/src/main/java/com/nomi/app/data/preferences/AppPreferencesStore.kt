@@ -29,6 +29,8 @@ interface AppPreferencesStore {
     suspend fun markOnboardingCompleted(completed: Boolean, clearDraft: Boolean = completed)
     suspend fun setAiDebugEnabled(enabled: Boolean)
     suspend fun setAdjustTargetFromActivity(enabled: Boolean)
+    suspend fun setCalorieEstimateBias(bias: CalorieEstimateBias)
+    suspend fun setGoalsCardStyle(style: GoalsCardStyle)
     suspend fun setAiRequestTimeoutDisabled(disabled: Boolean)
 }
 
@@ -77,7 +79,8 @@ class DataStoreAppPreferencesStore(
         selection: ProviderSelection,
     ) {
         dataStore.edit { values ->
-            values[Keys.provider(pipeline)] = json.encodeToString(selection.withSupportedModel())
+            values[Keys.provider(pipeline)] =
+                json.encodeToString(selection.withSupportedModel(pipeline))
         }
     }
 
@@ -118,6 +121,14 @@ class DataStoreAppPreferencesStore(
         dataStore.edit { values -> values[Keys.ADJUST_TARGET_FROM_ACTIVITY] = enabled }
     }
 
+    override suspend fun setCalorieEstimateBias(bias: CalorieEstimateBias) {
+        dataStore.edit { values -> values[Keys.CALORIE_ESTIMATE_BIAS] = bias.name }
+    }
+
+    override suspend fun setGoalsCardStyle(style: GoalsCardStyle) {
+        dataStore.edit { values -> values[Keys.GOALS_CARD_STYLE] = style.name }
+    }
+
     override suspend fun setAiRequestTimeoutDisabled(disabled: Boolean) {
         dataStore.edit { values -> values[Keys.AI_REQUEST_TIMEOUT_DISABLED] = disabled }
     }
@@ -140,29 +151,37 @@ class DataStoreAppPreferencesStore(
             foodResearchProvider = decode(
                 values[Keys.FOOD_RESEARCH_PROVIDER],
                 defaults.foodResearchProvider,
-            ).withSupportedModel(),
+            ).withSupportedModel(ProviderPipeline.FOOD_RESEARCH),
             foodInterpretationProvider = decode(
                 values[Keys.FOOD_INTERPRETATION_PROVIDER],
                 defaults.foodInterpretationProvider,
-            ).withSupportedModel(),
+            ).withSupportedModel(ProviderPipeline.FOOD_INTERPRETATION),
             portionChangeProvider = decode(
                 values[Keys.PORTION_CHANGE_PROVIDER],
                 defaults.portionChangeProvider,
-            ).withSupportedModel(),
+            ).withSupportedModel(ProviderPipeline.PORTION_CHANGE),
             visionProvider = decode(
                 values[Keys.VISION_PROVIDER],
                 defaults.visionProvider,
-            ).withSupportedModel(),
+            ).withSupportedModel(ProviderPipeline.VISION),
             smartFallbackProvider = decode(
                 values[Keys.SMART_FALLBACK_PROVIDER],
                 defaults.smartFallbackProvider,
-            ).withSupportedModel(),
+            ).withSupportedModel(ProviderPipeline.SMART_FALLBACK),
             reminders = decode(values[Keys.REMINDERS], defaults.reminders),
             micronutrients = decode(values[Keys.MICRONUTRIENTS], defaults.micronutrients),
             onboardingDraft = decodeOrNull(values[Keys.ONBOARDING_DRAFT]),
             onboardingCompleted = values[Keys.ONBOARDING_COMPLETED] ?: false,
             aiDebugEnabled = values[Keys.AI_DEBUG_ENABLED] ?: false,
             adjustTargetFromActivity = values[Keys.ADJUST_TARGET_FROM_ACTIVITY] ?: false,
+            calorieEstimateBias = values[Keys.CALORIE_ESTIMATE_BIAS]
+                ?.let { encoded ->
+                    enumValues<CalorieEstimateBias>().firstOrNull { it.name == encoded }
+                }
+                ?: defaults.calorieEstimateBias,
+            goalsCardStyle = values[Keys.GOALS_CARD_STYLE]
+                ?.let { encoded -> enumValues<GoalsCardStyle>().firstOrNull { it.name == encoded } }
+                ?: defaults.goalsCardStyle,
             aiRequestTimeoutDisabled = values[Keys.AI_REQUEST_TIMEOUT_DISABLED]
                 ?: defaults.aiRequestTimeoutDisabled,
         )
@@ -191,6 +210,8 @@ class DataStoreAppPreferencesStore(
         val ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding.completed")
         val AI_DEBUG_ENABLED = booleanPreferencesKey("developer.ai_debug")
         val ADJUST_TARGET_FROM_ACTIVITY = booleanPreferencesKey("nutrition.adjust_from_activity")
+        val CALORIE_ESTIMATE_BIAS = stringPreferencesKey("nutrition.calorie_estimate_bias")
+        val GOALS_CARD_STYLE = stringPreferencesKey("appearance.goals_card_style")
         val AI_REQUEST_TIMEOUT_DISABLED = booleanPreferencesKey("ai.request_timeout_disabled")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {

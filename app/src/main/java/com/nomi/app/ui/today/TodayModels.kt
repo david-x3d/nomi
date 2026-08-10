@@ -1,5 +1,6 @@
 package com.nomi.app.ui.today
 
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.Micronutrient
 import java.time.LocalDate
 import java.time.LocalTime
@@ -186,6 +187,7 @@ data class TodayUiState(
     val micronutrients: List<MicronutrientProgress> = emptyList(),
     val entries: List<TodayFoodEntry> = emptyList(),
     val isLoading: Boolean = false,
+    val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
 ) {
     val caloriesDifference: Double get() = calorieTarget - caloriesConsumed
     val calorieFraction: Float

@@ -233,7 +233,7 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `explicit null provider metadata decodes before reporting missing citations`() {
+    fun `explicit null provider metadata decodes to an uncited completion`() {
         val fixture = """
             {
               "choices": [{
@@ -247,11 +247,11 @@ class OpenAiCompatibleClientTest {
             }
         """.trimIndent()
 
-        val error = assertThrows(IllegalStateException::class.java) {
-            decodeWebSearchCompletionPayload(json, fixture)
-        }
+        val completion = decodeWebSearchCompletionPayload(json, fixture)
 
-        assertTrue(error.message.orEmpty().contains("citations"))
+        // Missing citations cost the food its VERIFIED status downstream, not the whole entry.
+        assertEquals("{\"ok\":true}", completion.content)
+        assertTrue(completion.evidenceUrls.isEmpty())
     }
 
     @Test
@@ -332,7 +332,7 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `research without provider citations is refused rather than trusted`() {
+    fun `research without provider citations is kept without evidence`() {
         val fixture = """
             {
               "output": [
@@ -345,11 +345,10 @@ class OpenAiCompatibleClientTest {
             }
         """.trimIndent()
 
-        val error = assertThrows(IllegalStateException::class.java) {
-            decodeOpenAiResponsesResearchPayload(json, fixture)
-        }
+        val completion = decodeOpenAiResponsesResearchPayload(json, fixture)
 
-        assertTrue(error.message.orEmpty().contains("citations"))
+        assertEquals("{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}", completion.content)
+        assertTrue(completion.evidenceUrls.isEmpty())
     }
 
     @Test

@@ -131,6 +131,7 @@ fun FoodLoggingScreen(
 
             is FoodLoggingUiState.Preview -> PreviewContent(
                 analysis = state.analysis,
+                isProvisional = state.isProvisional,
                 mealCategory = state.mealCategory,
                 onMealCategoryChanged = onMealCategoryChanged,
                 onEditItem = onEditItem,
@@ -363,6 +364,7 @@ private fun ProcessingContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PreviewContent(
     analysis: FoodAnalysis,
@@ -372,6 +374,7 @@ private fun PreviewContent(
     onChangePortion: (Int) -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
+    isProvisional: Boolean = false,
 ) {
     val total = analysis.items.sumOf(AnalyzedFoodItem::calories)
     val locale = nomiLocale()
@@ -389,6 +392,23 @@ private fun PreviewContent(
                     nomiString("Check the portions before saving.", "Prüfe die Portionen vor dem Speichern."),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (isProvisional) {
+                    // Saving now is fine: the sources land on the saved entry either way.
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LoadingIndicator()
+                        Text(
+                            text = nomiString(
+                                "Estimated - looking up sources, you can save now.",
+                                "Geschätzt - Quellen werden gesucht, du kannst schon speichern.",
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 MealCategorySelector(mealCategory, onMealCategoryChanged)
             }
         }

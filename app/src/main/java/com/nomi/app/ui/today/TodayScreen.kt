@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.theme.NomiTheme
 import java.time.LocalDate
@@ -130,21 +131,30 @@ fun TodayScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-            item {
-                CalorieHero(
-                    consumed = state.caloriesConsumed,
-                    target = state.calorieTarget,
-                    fraction = state.calorieFraction,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
-            item {
-                MacroSection(
-                    protein = state.protein,
-                    carbohydrates = state.carbohydrates,
-                    fat = state.fat,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
+            if (state.goalsCardStyle == GoalsCardStyle.RINGS) {
+                item {
+                    GoalsRingCard(
+                        state = state,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            } else {
+                item {
+                    CalorieHero(
+                        consumed = state.caloriesConsumed,
+                        target = state.calorieTarget,
+                        fraction = state.calorieFraction,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+                item {
+                    MacroSection(
+                        protein = state.protein,
+                        carbohydrates = state.carbohydrates,
+                        fat = state.fat,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
             }
             if (state.entries.isEmpty()) {
                 item {
@@ -398,6 +408,9 @@ private fun AddFoodSheet(
                     )
                 },
                 leadingContent = { Icon(method.icon(), contentDescription = null) },
+                // Same reason as the settings sheet: an opaque ListItem would paint
+                // colorScheme.surface over the sheet's own surfaceContainerLow.
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSelect(method) },

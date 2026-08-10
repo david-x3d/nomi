@@ -62,6 +62,8 @@ import androidx.navigation.navArgument
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.data.backup.BackupInspection
 import com.nomi.app.data.preferences.AppPreferences
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.di.AppContainer
 import com.nomi.app.integration.camera.MealImagePreprocessor
 import com.nomi.app.integration.camera.deleteOwnedCameraCapture
@@ -263,6 +265,9 @@ private fun NomiMain(
                     onGermanTranslation = viewModel::setGermanTranslationEnabled,
                     onUnits = viewModel::setUnits,
                     onActivityAdjustment = viewModel::setActivityAdjustment,
+                    onCalorieEstimateBias = viewModel::setCalorieEstimateBias,
+                    onGoalsCardStyle = viewModel::setGoalsCardStyle,
+                    onReminderTime = viewModel::setReminderTime,
                     onProfile = { navController.navigate(Routes.PROFILE) },
                     onNutrition = { navController.navigate(Routes.PLAN) },
                     onMicronutrients = { navController.navigate(Routes.MICRONUTRIENTS) },
@@ -662,6 +667,9 @@ private fun MainNavigationSuite(
     onGermanTranslation: (Boolean) -> Unit,
     onUnits: (com.nomi.app.ui.settings.UnitSystem) -> Unit,
     onActivityAdjustment: (Boolean) -> Unit,
+    onCalorieEstimateBias: (CalorieEstimateBias) -> Unit,
+    onGoalsCardStyle: (GoalsCardStyle) -> Unit,
+    onReminderTime: (index: Int, hour: Int, minute: Int) -> Unit,
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
     onMicronutrients: () -> Unit,
@@ -791,6 +799,9 @@ private fun MainNavigationSuite(
                     onAiRequestTimeoutDisabledChanged = onAiRequestTimeoutDisabled,
                     onHealthConnect = onHealth,
                     onReminderChanged = onReminder,
+                    onCalorieEstimateBiasChanged = onCalorieEstimateBias,
+                    onGoalsCardStyleChanged = onGoalsCardStyle,
+                    onReminderTimeChanged = onReminderTime,
                     onExport = onExport,
                     onImport = onImport,
                     onDeveloper = onDeveloper,

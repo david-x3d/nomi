@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFloatingActionButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -51,7 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nomi.app.ui.localization.nomiString
-import com.nomi.app.integration.voice.SpeechRecognizerController
+import com.nomi.app.integration.voice.WhisperVoiceController
 
 /**
  * Captures one free-form meal description and returns the final transcription.
@@ -63,12 +64,13 @@ fun VoiceCaptureScreen(
     onTranscription: (String) -> Unit,
     onManualEntry: () -> Unit,
     modifier: Modifier = Modifier,
-    controllerFactory: (Context) -> SpeechRecognizerController = ::SpeechRecognizerController,
+    controllerFactory: (Context) -> WhisperVoiceController = ::WhisperVoiceController,
 ) {
     val context = LocalContext.current
     val appContext = context.applicationContext
     val controller = remember(appContext) { controllerFactory(appContext) }
     val recognitionState by controller.state.collectAsStateWithLifecycle()
+    val downloadProgress by controller.downloadProgress.collectAsStateWithLifecycle()
     val recognitionAvailable = remember(controller) { controller.isAvailable() }
     var microphoneGranted by remember {
         mutableStateOf(
@@ -136,6 +138,25 @@ fun VoiceCaptureScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            downloadProgress?.let { progress ->
+                // Only ever shown once. Without it the first tap looks like the app froze,
+                // because a 57 MB model takes a moment before anything can be recorded.
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = nomiString(
+                        "Preparing offline speech recognition, once only…",
+                        "Offline-Spracherkennung wird einmalig vorbereitet …",
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(36.dp))
 
             LargeFloatingActionButton(

@@ -16,6 +16,17 @@ fun interface NutritionResearchProvider {
     suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis
 }
 
+/**
+ * Answers a meal from model knowledge alone, with no search and no sourcing requirement.
+ *
+ * Separate from [NutritionResearchProvider] because it trades provenance for latency on purpose:
+ * this is what puts a number on screen in a second or two, while research is still running. Its
+ * results are always marked as estimates, and research replaces them when it arrives.
+ */
+fun interface NutritionEstimateProvider {
+    suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis
+}
+
 fun interface VisionFoodProvider {
     suspend fun identifyFood(imageBytes: ByteArray, mediaType: String): VisionFoodResult
 }

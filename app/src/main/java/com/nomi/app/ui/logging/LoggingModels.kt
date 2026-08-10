@@ -48,10 +48,17 @@ sealed interface FoodLoggingUiState {
             get() = description.trim() != recognizedDescription.trim()
     }
 
+    /**
+     * [isProvisional] marks a preview built from the fast estimate while sourced research is
+     * still running. The entry is complete and can be saved as it stands; if research finishes
+     * first the values are replaced in place, and if the user saves first the saved row is
+     * upgraded instead.
+     */
     data class Preview(
         val analysis: FoodAnalysis,
         val mealCategory: MealCategory,
         val originalText: String = "",
+        val isProvisional: Boolean = false,
     ) : FoodLoggingUiState
 
     data class Error(

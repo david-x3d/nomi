@@ -141,6 +141,7 @@ import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.format.quantityDisplay
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
@@ -1748,10 +1749,16 @@ private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
                     .padding(bottom = 4.dp)
                     .semantics { heading() },
             )
-            CalorieGoalCard(state)
-            MacroGoalCard(state)
-            if (state.micronutrients.isNotEmpty()) {
-                MicronutrientGoalCard(state.micronutrients)
+            if (state.goalsCardStyle == GoalsCardStyle.RINGS) {
+                // One compact card instead of three stacked ones: calories as a bar, every
+                // other target as a ring, water underneath.
+                GoalsRingCard(state)
+            } else {
+                CalorieGoalCard(state)
+                MacroGoalCard(state)
+                if (state.micronutrients.isNotEmpty()) {
+                    MicronutrientGoalCard(state.micronutrients)
+                }
             }
         }
     }

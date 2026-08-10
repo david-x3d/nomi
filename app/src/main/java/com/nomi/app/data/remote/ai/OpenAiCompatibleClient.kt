@@ -464,10 +464,8 @@ private fun ChatCompletionResponse.webSearchCompletion(): WebSearchCompletion {
             }
         }
     }
-    check(evidenceUrls.isNotEmpty()) {
-        "Configure Food research with a provider that returns live web-search citations; " +
-            "this response contained none."
-    }
+    // A response without citations is not a failure: the values are kept and labeled an
+    // estimate downstream rather than costing the user their entry.
     return WebSearchCompletion(
         content = structuredContent(),
         evidenceUrls = evidenceUrls,
@@ -525,9 +523,6 @@ private fun JsonObject.responsesWebCompletion(
         }
     }
 
-    check(evidenceUrls.isNotEmpty()) {
-        "$providerName returned no web-search citations for this food."
-    }
     val raw = contentParts.joinToString("\n").takeIf(String::isNotBlank)
         ?: throw IllegalStateException("$providerName returned no structured Responses content")
     return WebSearchCompletion(

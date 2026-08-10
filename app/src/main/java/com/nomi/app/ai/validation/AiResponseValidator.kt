@@ -245,6 +245,9 @@ object AiResponseValidator {
         item.saturatedFatGrams?.let { requireFiniteNonNegative(it, "saturated fat", MAX_MACRO_GRAMS) }
         item.sodiumMilligrams?.let { requireFiniteNonNegative(it, "sodium", MAX_SODIUM_MILLIGRAMS) }
         item.confidence?.let(::requireConfidence)
+        item.uncertaintyPercent?.let {
+            requireFiniteNonNegative(it, "estimate uncertainty", 100.0)
+        }
         val macroCalories = item.proteinGrams * 4 + item.carbohydrateGrams * 4 + item.fatGrams * 9
         if (item.calories >= 20 && macroCalories > item.calories * 2.0 + 50) {
             throw AiValidationException("Calories and macronutrients are inconsistent")

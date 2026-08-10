@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
+import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.ui.localization.nomiString
 import java.net.URI
 
@@ -225,8 +226,8 @@ private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
 
 private fun AiProviderKind.suggestedModel(purpose: String): String = when (this) {
     AiProviderKind.PERPLEXITY -> if (purpose == "Fallback") "sonar-pro" else "sonar"
-    AiProviderKind.OPEN_ROUTER -> if (purpose == "Fallback") {
-        "~openai/gpt-latest"
+    AiProviderKind.OPEN_ROUTER -> if (purpose == "Food research") {
+        DEFAULT_OPENROUTER_RESEARCH_MODEL
     } else {
         DEFAULT_OPENROUTER_MODEL
     }

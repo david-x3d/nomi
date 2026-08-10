@@ -29,6 +29,27 @@ class AiPromptsTest {
     }
 
     @Test
+    fun `estimate prompt always answers and keeps the per 100 serving contract`() {
+        val prompt = AiPrompts.estimateNutrition(
+            intent = ParsedFoodIntent(
+                originalText = "2 Scheiben Toast",
+                items = listOf(
+                    ParsedFoodItem(name = "Toast", quantity = 2.0, unit = "slices"),
+                ),
+            ),
+            json = Json,
+            localeCountry = "DE",
+        )
+
+        assertTrue(prompt.contains("never return an error"))
+        assertTrue(prompt.contains("No web research is required"))
+        assertTrue(prompt.contains("`sourceServingQuantity` MUST be 100"))
+        assertTrue(prompt.contains("NOT for the logged amount"))
+        assertTrue(prompt.contains("`isEstimate` to true"))
+        assertTrue(prompt.contains("\"unit\":\"slices\""))
+    }
+
+    @Test
     fun `nutrition research prompt demands exact product and source integrity`() {
         val prompt = AiPrompts.researchNutrition(
             intent = ParsedFoodIntent(

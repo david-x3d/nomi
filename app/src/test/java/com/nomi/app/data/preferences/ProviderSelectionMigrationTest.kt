@@ -6,15 +6,31 @@ import org.junit.Test
 
 class ProviderSelectionMigrationTest {
     @Test
-    fun `new defaults use an available OpenRouter model`() {
+    fun `every pipeline defaults to OpenRouter with its hardcoded model`() {
         val preferences = AppPreferences()
 
         assertEquals("openrouter", preferences.foodResearchProvider.providerId)
-        assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.foodResearchProvider.model)
+        assertEquals(DEFAULT_OPENROUTER_RESEARCH_MODEL, preferences.foodResearchProvider.model)
         assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.foodInterpretationProvider.model)
         assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.portionChangeProvider.model)
+        assertEquals("openrouter", preferences.visionProvider.providerId)
+        assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.visionProvider.model)
         assertEquals("openrouter", preferences.smartFallbackProvider.providerId)
         assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.smartFallbackProvider.model)
+    }
+
+    @Test
+    fun `research keeps the searching model while other pipelines get the fast one`() {
+        val retired = ProviderSelection(providerId = "openrouter", model = RETIRED_OPENROUTER_MODEL)
+
+        assertEquals(
+            DEFAULT_OPENROUTER_RESEARCH_MODEL,
+            retired.withSupportedModel(ProviderPipeline.FOOD_RESEARCH).model,
+        )
+        assertEquals(
+            DEFAULT_OPENROUTER_MODEL,
+            retired.withSupportedModel(ProviderPipeline.VISION).model,
+        )
     }
 
     @Test
@@ -35,22 +51,28 @@ class ProviderSelectionMigrationTest {
     }
 
     @Test
-    fun `previous OpenRouter default migrates to GPT 5 6 Sol`() {
-        val previous = ProviderSelection(
-            providerId = "openrouter",
-            model = PREVIOUS_OPENROUTER_MODEL,
-        )
-
-        assertEquals(DEFAULT_OPENROUTER_MODEL, previous.withSupportedModel().model)
-    }
-
-    @Test
-    fun `common GPT 5 6 Sol shorthand is normalized for OpenRouter`() {
-        listOf("gpt5.6sol", "gpt-5.6-sol", "openai/gpt5.6sol").forEach { shorthand ->
-            val selection = ProviderSelection(providerId = "openrouter", model = shorthand)
+    fun `earlier OpenRouter defaults and their shorthand all migrate`() {
+        listOf(
+            PREVIOUS_OPENROUTER_MODEL,
+            PREVIOUS_OPENROUTER_DEFAULT_MODEL,
+            "gpt5.6sol",
+            "gpt-5.6-sol",
+            "openai/gpt5.6sol",
+        ).forEach { retiredModel ->
+            val selection = ProviderSelection(providerId = "openrouter", model = retiredModel)
 
             assertEquals(DEFAULT_OPENROUTER_MODEL, selection.withSupportedModel().model)
         }
+    }
+
+    @Test
+    fun `an unconfigured pipeline is filled in so one key covers everything`() {
+        val unconfigured = ProviderSelection()
+
+        val filled = unconfigured.withSupportedModel(ProviderPipeline.VISION)
+
+        assertEquals("openrouter", filled.providerId)
+        assertEquals(DEFAULT_OPENROUTER_MODEL, filled.model)
     }
 
     @Test
@@ -58,5 +80,12 @@ class ProviderSelectionMigrationTest {
         val selected = ProviderSelection(providerId = "openrouter", model = "openai/gpt-5.2")
 
         assertSame(selected, selected.withSupportedModel())
+    }
+
+    @Test
+    fun `another provider is never rewritten to OpenRouter`() {
+        val perplexity = ProviderSelection(providerId = "perplexity", model = "sonar")
+
+        assertSame(perplexity, perplexity.withSupportedModel(ProviderPipeline.FOOD_RESEARCH))
     }
 }

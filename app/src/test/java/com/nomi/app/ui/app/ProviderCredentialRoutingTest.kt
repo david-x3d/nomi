@@ -24,21 +24,35 @@ class ProviderCredentialRoutingTest {
     }
 
     @Test
-    fun `fallback reuses matching research credential independently of model`() {
-        val primary = ProviderSelection(providerId = "perplexity", model = "sonar")
-        val fallback = ProviderSelection(providerId = "perplexity", model = "sonar-pro")
+    fun `pipelines on one provider account share a single stored key`() {
+        val research = ProviderSelection(providerId = "openrouter", model = "perplexity/sonar")
+        val fallback = ProviderSelection(
+            providerId = "openrouter",
+            model = "google/gemini-3.5-flash-lite",
+        )
 
-        val ids = smartFallbackCredentialIds(fallback, primary)
+        val ids = smartFallbackCredentialIds(fallback, research)
 
-        assertEquals(2, ids.size)
-        assertNotEquals(ids[0], ids[1])
+        // Same provider and endpoint, so the key entered once in either place serves both.
+        assertEquals(1, ids.size)
         assertEquals(
             ids,
             smartFallbackCredentialIds(
-                fallback.copy(model = "sonar-reasoning-pro"),
-                primary.copy(model = "sonar-deep-research"),
+                fallback.copy(model = "openai/gpt-5.2"),
+                research.copy(model = "perplexity/sonar-pro"),
             ),
         )
+    }
+
+    @Test
+    fun `a second provider still gets its own key`() {
+        val openRouter = ProviderSelection(providerId = "openrouter", model = "perplexity/sonar")
+        val perplexity = ProviderSelection(providerId = "perplexity", model = "sonar")
+
+        val ids = smartFallbackCredentialIds(perplexity, openRouter)
+
+        assertEquals(1, ids.size)
+        assertNotEquals(ids, smartFallbackCredentialIds(openRouter, openRouter))
     }
 
     @Test

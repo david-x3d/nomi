@@ -13,11 +13,30 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 43
-        versionName = "1.0.42"
+        versionCode = 47
+        versionName = "1.0.46"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // On-device speech recognition. Only the native runtime ships in the APK - a few MB per
+        // ABI - because the model itself is downloaded on first use and would otherwise triple
+        // the download size for everyone, including people who never dictate a meal.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
+        externalNativeBuild {
+            cmake {
+                arguments += listOf("-DGGML_BUILD_EXAMPLES=OFF", "-DGGML_BUILD_TESTS=OFF")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/jni/whisper/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     signingConfigs {

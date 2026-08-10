@@ -202,6 +202,11 @@ object AiPrompts {
         values to per 100 g/ml (or per 100 compatible count units) and scales them to the
         logged amount, and it rejects results whose basis does not reconcile.
 
+        `uncertaintyPercent` IS REQUIRED WHENEVER isEstimate IS TRUE and must be null otherwise.
+        It is the half-width of the plausible range around your values, in percent: a food that
+        could reasonably be 500 to 700 kcal reported as 600 has an uncertainty of 17. An exact
+        figure read from a manufacturer's own table is not an estimate and carries no range.
+
         MICRONUTRIENTS ARE REPORTED ONLY WHEN PUBLISHED. `sugarGrams`, `saturatedFatGrams`, and
         `sodiumMilligrams` follow the same serving basis as the macros. Report a value only when
         the cited source actually publishes that row; otherwise return null. Never infer, derive,
@@ -293,6 +298,7 @@ object AiPrompts {
             "sourcePackageQuantity": positive number|null,
             "sourcePackageUnit": string|null,
             "isEstimate": boolean,
+            "uncertaintyPercent": number|null,
             "confidence": number|null,
             "assumptions": [string]
           }],
@@ -335,6 +341,85 @@ object AiPrompts {
             citation, product-identity, and JSON-schema rules above still apply.
         """.trimIndent()
     }
+
+    /**
+     * The last resort when sourced research cannot produce a usable result.
+     *
+     * Everything about sourcing is dropped here on purpose: the user ate something and wants it
+     * in their log, and a labeled estimate is far more useful to them than an error. The serving
+     * contract stays identical to [researchNutrition] so the same deterministic normalizer scales
+     * the answer, and every item is marked as an estimate before it is shown.
+     */
+    fun estimateNutrition(
+        intent: ParsedFoodIntent,
+        json: Json,
+        localeCountry: String? = null,
+    ): String = """
+        Estimate the nutrition of the structured meal below from your own food knowledge.
+        No web research is required and no citation is expected. You MUST return a result for
+        every item: never return an error, never return an empty list, and never return zero
+        calories with zero macros for a food that contains energy.
+
+        Answer for the user's market (locale country
+        ${localeCountry?.takeIf { it.isNotBlank() } ?: "unknown"}) and for the most common
+        variety, cut, brand formulation, or preparation when the input does not specify one.
+        State every such choice in `assumptions` in the language of the input. Prefer the
+        slightly higher plausible values so tracking errs against under-counting.
+
+        SERVING BASIS - THIS IS THE PART THAT MUST BE EXACT:
+        - `quantity` and `unit` MUST repeat the amount the user logged, unchanged.
+        - `sourceServingQuantity` MUST be 100 and `sourceServingUnit` MUST be "g" for foods or
+          "ml" for drinks.
+        - `calories`, `proteinGrams`, `carbohydrateGrams`, `fatGrams`, and `fiberGrams` MUST be
+          the values for 100 g / 100 ml, NOT for the logged amount. Nomi scales them itself, so
+          pre-scaled values would be counted twice.
+        - When the logged unit is not g or ml (piece, slice, serving, EL, TL, cup, ...),
+          `gramsEquivalent` MUST be the total grams or millilitres of the ENTIRE logged amount,
+          for example quantity=2, unit="slices", gramsEquivalent=60 for two 30 g slices.
+        - protein*4 + carbohydrates*4 + fat*9 must roughly match the calories per 100.
+
+        REPORT HOW UNCERTAIN YOU ARE. `uncertaintyPercent` is the half-width of the plausible
+        range around your values, as a percentage of them: if this food could reasonably be
+        anywhere from 500 to 700 kcal and you answered 600, that is 17. Use a small number for a
+        standard packaged item and a large one for a homemade dish whose recipe you cannot see.
+        Nomi uses it only to honour the user's own over- or under-estimate preference, so report
+        it honestly rather than defensively.
+
+        Set `isEstimate` to true for every item. Set `sourceName` to "Estimate" and leave
+        `sourceUrl`, `sourceProductName`, and `sourceDomain` out. Report `sugarGrams`,
+        `saturatedFatGrams`, and `sodiumMilligrams` only when you are reasonably confident,
+        otherwise null. Keep `name` the short everyday display name in the user's language,
+        with the brand in `brand`. Return exactly one result per input item, in the same order.
+
+        Return only:
+        {
+          "items": [{
+            "name": string,
+            "brand": string|null,
+            "quantity": positive number,
+            "unit": string,
+            "gramsEquivalent": positive number|null,
+            "calories": non-negative number,
+            "proteinGrams": non-negative number,
+            "carbohydrateGrams": non-negative number,
+            "fatGrams": non-negative number,
+            "fiberGrams": non-negative number|null,
+            "sugarGrams": non-negative number|null,
+            "saturatedFatGrams": non-negative number|null,
+            "sodiumMilligrams": non-negative number|null,
+            "sourceName": "Estimate",
+            "sourceServingQuantity": 100,
+            "sourceServingUnit": "g"|"ml",
+            "isEstimate": true,
+            "uncertaintyPercent": number,
+            "confidence": number|null,
+            "assumptions": [string]
+          }],
+          "overallConfidence": number|null
+        }
+
+        Structured meal: ${json.encodeToString(intent)}
+    """.trimIndent()
 
     /**
      * The routing decision, made by the cheapest model available.

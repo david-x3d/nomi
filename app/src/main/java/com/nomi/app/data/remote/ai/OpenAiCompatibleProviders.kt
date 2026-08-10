@@ -14,6 +14,7 @@ import com.nomi.app.ai.model.VisionFoodResult
 import com.nomi.app.ai.prompt.AiPrompts
 import com.nomi.app.ai.provider.FoodEditClassificationProvider
 import com.nomi.app.ai.provider.FoodParsingProvider
+import com.nomi.app.ai.provider.NutritionEstimateProvider
 import com.nomi.app.ai.provider.NutritionLabelProvider
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.provider.PortionAdjustmentProvider
@@ -23,9 +24,12 @@ import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import java.net.URI
 import java.text.Normalizer
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -41,8 +45,10 @@ class OpenAiCompatibleProviders(
     private val visionConfig: AiProviderConfig,
     private val visionCredential: () -> AiRuntimeCredential,
     private val localeCountryProvider: () -> String? = { Locale.getDefault().country },
+    private val calorieBiasProvider: () -> CalorieEstimateBias = { CalorieEstimateBias.NONE },
 ) : FoodParsingProvider,
     NutritionResearchProvider,
+    NutritionEstimateProvider,
     PortionAdjustmentProvider,
     FoodEditClassificationProvider,
     NutritionLabelProvider,
@@ -63,11 +69,39 @@ class OpenAiCompatibleProviders(
         )
     }
 
+    /**
+     * Sourced research first, a labeled estimate rather than an error second.
+     *
+     * The gates below research are deliberately strict, and every one of them used to end the
+     * user's logging attempt. A person who ate something wants it in their journal, so a refusal
+     * now falls through to an estimate that is plainly marked as one, and only a failure of that
+     * too - no key, no network, no usable answer - surfaces the original research error.
+     */
     override suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis {
         val localeCountry = localeCountryProvider()
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
+        return try {
+            researchNutritionFromSources(reconciledIntent, localeCountry)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (researchFailure: Throwable) {
+            try {
+                estimateReconciledNutrition(reconciledIntent, localeCountry)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (estimateFailure: Throwable) {
+                researchFailure.addSuppressed(estimateFailure)
+                throw researchFailure
+            }
+        }
+    }
+
+    private suspend fun researchNutritionFromSources(
+        reconciledIntent: ParsedFoodIntent,
+        localeCountry: String?,
+    ): FoodAnalysis {
         suspend fun research(prompt: String): FoodAnalysis {
             val completion = client.completeWebSearchJson(
                 config = nutritionConfig,
@@ -84,7 +118,10 @@ class OpenAiCompatibleProviders(
                 fetchedUrls = completion.fetchedUrls,
                 requiresFetchedBrandedSource = completion.requiresFetchedBrandedSource,
             )
-            return UserQuantityResolver.reconcileAnalysis(reconciledIntent, groundedAnalysis)
+            return UserQuantityResolver.reconcileAnalysis(
+                reconciledIntent,
+                withCalorieBias(groundedAnalysis),
+            )
         }
 
         var reconciledAnalysis = research(
@@ -109,6 +146,64 @@ class OpenAiCompatibleProviders(
         val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
         return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
+
+    /**
+     * The fast path: one completion, no search, answered from model knowledge.
+     *
+     * This is what the text-logging flow calls first so a meal appears in a second or two
+     * instead of after a web search. It is also what [researchNutrition] falls back to when
+     * sourced research refuses, which is why it is public rather than private to that path.
+     */
+    override suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis {
+        val localeCountry = localeCountryProvider()
+        val reconciledIntent = AiResponseValidator.validate(
+            UserQuantityResolver.reconcileIntent(intent, localeCountry),
+        )
+        return estimateReconciledNutrition(reconciledIntent, localeCountry)
+    }
+
+    /**
+     * One plain completion, no search, no citation requirement. The serving arithmetic and the
+     * plausibility checks still run, so an estimate cannot smuggle in impossible numbers - it
+     * just no longer has to prove where it came from.
+     */
+    private suspend fun estimateReconciledNutrition(
+        reconciledIntent: ParsedFoodIntent,
+        localeCountry: String?,
+    ): FoodAnalysis {
+        val raw = client.completeJson(
+            config = nutritionConfig,
+            credential = nutritionCredential(),
+            systemPrompt = "You estimate nutrition per 100 g or 100 ml as validated JSON only; " +
+                "Nomi performs all serving arithmetic.",
+            userPrompt = AiPrompts.estimateNutrition(reconciledIntent, client.json, localeCountry),
+        )
+        val analysis: FoodAnalysis = client.json.decodeFromString(raw)
+        val labeled = analysis.copy(
+            items = analysis.items.map { item ->
+                item.copy(
+                    isEstimate = true,
+                    sourceUrl = null,
+                    supportingSourceUrls = emptyList(),
+                    sourceDomain = null,
+                )
+            },
+        )
+        val reconciled = UserQuantityResolver.reconcileAnalysis(
+            reconciledIntent,
+            withCalorieBias(labeled),
+        )
+        val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciled)
+        return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
+    }
+
+    /**
+     * Applied to the source-serving values, before the normalizer scales them to the logged
+     * amount. Biasing afterwards would leave the stored per-100 basis disagreeing with the
+     * stored total, and the save-time validation would reject the entry.
+     */
+    private fun withCalorieBias(analysis: FoodAnalysis): FoodAnalysis =
+        CalorieBiasAdjuster.apply(analysis, calorieBiasProvider())
 
     override suspend fun interpretAdjustment(
         current: PortionContext,
@@ -260,33 +355,16 @@ internal fun groundWithWebSearchEvidence(
         citationsBySite.putIfAbsent(site, url)
     }
     if (citationsBySite.isEmpty()) {
-        throw AiValidationException(
-            "The food research provider returned no web-search citations. Try again or " +
-                "configure Perplexity, OpenRouter, or OpenAI for Food research.",
-        )
+        // Nothing to attribute the values to, so they are kept as a plainly labeled estimate.
+        return analysis.copy(items = analysis.items.map { it.copy(isEstimate = true) })
     }
     val fetchedSites = fetchedUrls.mapNotNull(::canonicalResearchSite).toSet()
-    if (requiresFetchedBrandedSource) {
-        val unfetchedBrandedItem = analysis.items.firstOrNull { item ->
-            !item.brand.isNullOrBlank() &&
-                canonicalClaimedResearchSite(item.sourceDomain) !in fetchedSites
-        }
-        if (unfetchedBrandedItem != null) {
-            throw AiValidationException(
-                "Branded food research must fetch the cited product page before using its nutrition.",
-            )
-        }
-    }
     val fetchedOfficialSourceIsCanonical = citationsBySite.size == 1 &&
         analysis.items.singleOrNull()?.hasFetchedOfficialBrandSource(
             citationsBySite = citationsBySite,
             fetchedUrls = fetchedUrls,
         ) == true
-    if (citationsBySite.size < 2 && !fetchedOfficialSourceIsCanonical) {
-        throw AiValidationException(
-            "Food research needs citations from at least two independent websites.",
-        )
-    }
+    val singleSiteOnly = citationsBySite.size < 2 && !fetchedOfficialSourceIsCanonical
     return analysis.copy(
         items = analysis.items.map { item ->
             val claimedSite = canonicalClaimedResearchSite(item.sourceDomain)
@@ -302,10 +380,15 @@ internal fun groundWithWebSearchEvidence(
             val primarySourceName = runCatching {
                 URI(primaryUrl).host?.removePrefix("www.")
             }.getOrNull()?.takeIf(String::isNotBlank)
+            // A branded product whose own page was never opened is one site's claim about
+            // another site's product, which is exactly what "estimated" means here.
+            val unfetchedBrandedSource = requiresFetchedBrandedSource &&
+                !item.brand.isNullOrBlank() && claimedSite !in fetchedSites
             item.copy(
                 sourceName = item.sourceName?.takeIf(String::isNotBlank) ?: primarySourceName,
                 sourceUrl = primaryUrl,
                 supportingSourceUrls = supportingUrls,
+                isEstimate = item.isEstimate || singleSiteOnly || unfetchedBrandedSource,
             )
         },
     )

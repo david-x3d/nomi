@@ -109,6 +109,12 @@ data class AnalyzedFoodItem(
     val verificationStatus: NutritionVerificationStatus = NutritionVerificationStatus.UNKNOWN,
     val sourceCountry: String? = null,
     val isEstimate: Boolean,
+    /**
+     * Half-width of the plausible range around these values, in percent. "500 to 700 kcal" for a
+     * 600 kcal answer is 17. Only meaningful while [isEstimate] is true, and only used to decide
+     * where inside that range the user's calorie bias setting lands.
+     */
+    val uncertaintyPercent: Double? = null,
     /** Optional retail pack declared by the source; never used as the logged amount. */
     val sourcePackageQuantity: Double? = null,
     val sourcePackageUnit: String? = null,

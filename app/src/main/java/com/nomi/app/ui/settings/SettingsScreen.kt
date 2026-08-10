@@ -33,25 +33,38 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Text
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -69,12 +82,16 @@ fun SettingsScreen(
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
     onHealthConnect: () -> Unit,
     onReminderChanged: (Int, Boolean) -> Unit,
+    onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
+    onGoalsCardStyleChanged: (GoalsCardStyle) -> Unit,
+    onReminderTimeChanged: (index: Int, hour: Int, minute: Int) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onDeveloper: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var picker by remember { mutableStateOf<SettingPicker?>(null) }
+    var editingReminder by remember { mutableStateOf<Int?>(null) }
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and History, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -169,7 +186,33 @@ fun SettingsScreen(
                     onClick = { picker = SettingPicker.Units },
                 )
             }
+            item {
+                SettingsLink(
+                    icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
+                    title = nomiString("Goals view", "Ziele-Ansicht"),
+                    supporting = state.goalsCardStyle.localizedDisplayName(),
+                    onClick = { picker = SettingPicker.GoalsStyle },
+                )
+            }
             item { SectionTitle(nomiString("AI providers", "KI-Anbieter")) }
+            item {
+                ListItem(
+                    headlineContent = {
+                        Text(nomiString("One key for everything", "Ein Schlüssel für alles"))
+                    },
+                    supportingContent = {
+                        Text(
+                            nomiString(
+                                "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API " +
+                                    "key in any pipeline below and all of them use it.",
+                                "Nomi ist für OpenRouter vorkonfiguriert. Gib deinen OpenRouter-" +
+                                    "API-Schlüssel unten bei einem Bereich ein, alle nutzen ihn.",
+                            ),
+                        )
+                    },
+                    leadingContent = { Icon(Icons.Default.Key, contentDescription = null) },
+                )
+            }
             if (state.aiProviders.isEmpty()) {
                 item {
                     ListItem(
@@ -233,15 +276,24 @@ fun SettingsScreen(
                     onCheckedChange = onActivityTargetAdjustmentChanged,
                 )
             }
+            item {
+                CalorieBiasSetting(
+                    bias = state.calorieEstimateBias,
+                    onBiasChanged = onCalorieEstimateBiasChanged,
+                )
+            }
             item { SectionTitle(nomiString("Reminders", "Erinnerungen")) }
             state.reminders.forEachIndexed { index, reminder ->
                 item(key = "reminder-$index") {
                     ToggleSetting(
                         icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                         title = reminder.name.localizedReminderName(),
-                        supporting = reminder.timeText,
+                        // Tapping the row edits the time; the switch stays for on and off.
+                        supporting = reminder.timeText + " · " +
+                            nomiString("tap to change", "tippen zum Ändern"),
                         checked = reminder.enabled,
                         onCheckedChange = { onReminderChanged(index, it) },
+                        onClick = { editingReminder = index },
                     )
                 }
             }
@@ -283,6 +335,23 @@ fun SettingsScreen(
         }
     }
 
+    editingReminder?.let { index ->
+        val reminder = state.reminders.getOrNull(index)
+        if (reminder == null) {
+            editingReminder = null
+        } else {
+            ReminderTimeDialog(
+                title = reminder.name.localizedReminderName(),
+                currentTime = reminder.timeText,
+                onDismiss = { editingReminder = null },
+                onConfirm = { hour, minute ->
+                    onReminderTimeChanged(index, hour, minute)
+                    editingReminder = null
+                },
+            )
+        }
+    }
+
     when (picker) {
         SettingPicker.Theme -> ChoiceSheet(
             title = nomiString("Theme", "Design"),
@@ -297,6 +366,14 @@ fun SettingsScreen(
             choices = UnitSystem.entries.map { it.localizedDisplayName() },
             selectedIndex = UnitSystem.entries.indexOf(state.unitSystem),
             onSelect = { onUnitSystemChanged(UnitSystem.entries[it]); picker = null },
+            onDismiss = { picker = null },
+        )
+
+        SettingPicker.GoalsStyle -> ChoiceSheet(
+            title = nomiString("Goals view", "Ziele-Ansicht"),
+            choices = GoalsCardStyle.entries.map { it.localizedDisplayName() },
+            selectedIndex = GoalsCardStyle.entries.indexOf(state.goalsCardStyle),
+            onSelect = { onGoalsCardStyleChanged(GoalsCardStyle.entries[it]); picker = null },
             onDismiss = { picker = null },
         )
 
@@ -341,6 +418,7 @@ private fun ToggleSetting(
     supporting: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    onClick: (() -> Unit)? = null,
 ) {
     ListItem(
         headlineContent = { Text(title) },
@@ -349,9 +427,41 @@ private fun ToggleSetting(
         trailingContent = {
             Switch(checked = checked, onCheckedChange = onCheckedChange)
         },
-        modifier = Modifier.fillMaxWidth().clickable { onCheckedChange(!checked) },
+        modifier = Modifier.fillMaxWidth().clickable {
+            onClick?.invoke() ?: onCheckedChange(!checked)
+        },
     )
     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+}
+
+/** The official Material time picker, prefilled with the time the reminder currently uses. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimeDialog(
+    title: String,
+    currentTime: String,
+    onDismiss: () -> Unit,
+    onConfirm: (hour: Int, minute: Int) -> Unit,
+) {
+    val parts = currentTime.split(':')
+    val state = rememberTimePickerState(
+        initialHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 8,
+        initialMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0,
+        is24Hour = true,
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { TimePicker(state = state) },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
+                Text(nomiString("Save", "Speichern"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(nomiString("Cancel", "Abbrechen")) }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -371,6 +481,9 @@ private fun ChoiceSheet(
                 leadingContent = {
                     RadioButton(selected = index == selectedIndex, onClick = { onSelect(index) })
                 },
+                // A ListItem paints colorScheme.surface by default, but a bottom sheet is
+                // surfaceContainerLow, so an opaque row draws a visible seam across the sheet.
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier = Modifier.fillMaxWidth().clickable { onSelect(index) },
             )
         }
@@ -381,6 +494,7 @@ private fun ChoiceSheet(
 private sealed interface SettingPicker {
     data object Theme : SettingPicker
     data object Units : SettingPicker
+    data object GoalsStyle : SettingPicker
 }
 
 @Composable
@@ -394,6 +508,107 @@ private fun ThemeMode.localizedDisplayName(): String = when (this) {
 private fun UnitSystem.localizedDisplayName(): String = when (this) {
     UnitSystem.METRIC -> nomiString("Metric", "Metrisch")
     UnitSystem.IMPERIAL -> nomiString("Imperial", "Imperial")
+}
+
+/**
+ * Five discrete stops on one official Material slider.
+ *
+ * The setting is a scale with a natural middle, not five unrelated options, so a slider says what
+ * a list cannot: that "no bias" is the centre and each step moves the same distance away from it.
+ * The example underneath updates as the thumb moves, so the effect is visible before release.
+ * The preference is only written on release; dragging must not fire a DataStore write per pixel.
+ */
+@Composable
+private fun CalorieBiasSetting(
+    bias: CalorieEstimateBias,
+    onBiasChanged: (CalorieEstimateBias) -> Unit,
+) {
+    val entries = CalorieEstimateBias.entries
+    var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
+    val selected = entries[position.roundToInt().coerceIn(0, entries.lastIndex)]
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Straighten, contentDescription = null)
+            Column {
+                Text(nomiString("Calorie estimate bias", "Kalorienschätzung"))
+                Text(
+                    text = selected.localizedDisplayName(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Slider(
+            value = position,
+            onValueChange = { position = it },
+            onValueChangeFinished = { onBiasChanged(selected) },
+            valueRange = 0f..entries.lastIndex.toFloat(),
+            steps = entries.size - 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = nomiString("Lower", "Niedriger"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = nomiString("Higher", "Höher"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = selected.localizedSupportingText(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+}
+
+/**
+ * Says what the setting does to a real number rather than naming it again, because "Overestimate"
+ * on its own does not tell anyone how much.
+ */
+@Composable
+private fun CalorieEstimateBias.localizedSupportingText(): String {
+    val example = CalorieBiasAdjuster.scaleFor(uncertaintyPercent = 16.7, bias = this) * 600.0
+    val rounded = example.roundToInt()
+    return when (this) {
+        CalorieEstimateBias.NONE -> nomiString(
+            "Estimates are logged as given. A 500-700 kcal meal counts as 600.",
+            "Schätzungen werden unverändert übernommen. 500-700 kcal zählen als 600.",
+        )
+        else -> nomiString(
+            "${localizedDisplayName()} - a 500-700 kcal meal counts as $rounded.",
+            "${localizedDisplayName()} - 500-700 kcal zählen als $rounded.",
+        )
+    }
+}
+
+@Composable
+private fun GoalsCardStyle.localizedDisplayName(): String = when (this) {
+    GoalsCardStyle.BARS -> nomiString("Calories and bars", "Kalorien und Balken")
+    GoalsCardStyle.RINGS -> nomiString("One card with rings", "Eine Karte mit Ringen")
+}
+
+@Composable
+private fun CalorieEstimateBias.localizedDisplayName(): String = when (this) {
+    CalorieEstimateBias.STRONGLY_UNDERESTIMATE ->
+        nomiString("Underestimate more", "Stärker unterschätzen")
+    CalorieEstimateBias.UNDERESTIMATE -> nomiString("Underestimate", "Unterschätzen")
+    CalorieEstimateBias.NONE -> nomiString("No bias", "Keine Verzerrung")
+    CalorieEstimateBias.OVERESTIMATE -> nomiString("Overestimate", "Überschätzen")
+    CalorieEstimateBias.STRONGLY_OVERESTIMATE ->
+        nomiString("Overestimate more", "Stärker überschätzen")
 }
 
 @Composable

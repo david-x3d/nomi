@@ -1,6 +1,8 @@
 package com.nomi.app.ui.settings
 
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.Micronutrient
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 
@@ -46,6 +48,8 @@ data class SettingsUiState(
     val germanTranslationEnabled: Boolean = false,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val activityTargetAdjustment: Boolean = false,
+    val calorieEstimateBias: CalorieEstimateBias = CalorieEstimateBias.NONE,
+    val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
     val healthConnectAvailable: Boolean = false,
     val healthConnectEnabled: Boolean = false,
     val healthConnect: HealthConnectUiState = HealthConnectUiState(),

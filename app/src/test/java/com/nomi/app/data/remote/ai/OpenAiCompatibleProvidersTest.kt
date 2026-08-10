@@ -5,6 +5,7 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.validation.AiValidationException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,7 +62,7 @@ class OpenAiCompatibleProvidersTest {
     }
 
     @Test
-    fun `one branded snippet citation cannot bypass independent evidence`() {
+    fun `one branded snippet citation is kept but downgraded to an estimate`() {
         val branded = analyzedItem(sourceName = "Official manufacturer").copy(
             brand = "Example Brand",
             sourceProductName = "Exact vegan mortadella",
@@ -69,16 +70,15 @@ class OpenAiCompatibleProvidersTest {
             isEstimate = false,
         )
 
-        val error = assertThrows(AiValidationException::class.java) {
-            groundWithWebSearchEvidence(
-                FoodAnalysis(items = listOf(branded)),
-                evidenceUrls = linkedSetOf(
-                    "https://manufacturer.example/products/exact-product",
-                ),
-            )
-        }
+        val grounded = groundWithWebSearchEvidence(
+            FoodAnalysis(items = listOf(branded)),
+            evidenceUrls = linkedSetOf(
+                "https://manufacturer.example/products/exact-product",
+            ),
+        ).items.single()
 
-        assertEquals("Food research needs citations from at least two independent websites.", error.message)
+        assertEquals("https://manufacturer.example/products/exact-product", grounded.sourceUrl)
+        assertTrue(grounded.isEstimate)
     }
     @Test
     fun oneCompletedFetchedOfficialBrandSourceIsSufficient() {
@@ -110,39 +110,34 @@ class OpenAiCompatibleProvidersTest {
             isEstimate = false,
         )
 
-        val error = assertThrows(AiValidationException::class.java) {
-            groundWithWebSearchEvidence(
-                analysis = FoodAnalysis(items = listOf(branded)),
-                evidenceUrls = setOf(
-                    "https://example-brand.com/products/exact-product",
-                    "https://retailer.example/exact-product",
-                ),
-                fetchedUrls = setOf("https://retailer.example/exact-product"),
-                requiresFetchedBrandedSource = true,
-            )
-        }
+        val grounded = groundWithWebSearchEvidence(
+            analysis = FoodAnalysis(items = listOf(branded)),
+            evidenceUrls = setOf(
+                "https://example-brand.com/products/exact-product",
+                "https://retailer.example/exact-product",
+            ),
+            fetchedUrls = setOf("https://retailer.example/exact-product"),
+            requiresFetchedBrandedSource = true,
+        ).items.single()
 
-        assertTrue(error.message.orEmpty().contains("must fetch the cited product page"))
+        // The brand's own page was never opened, so the values may be kept but not trusted.
+        assertTrue(grounded.isEstimate)
     }
 
 
     @Test
-    fun `two independent provider hosts are required`() {
-        val error = assertThrows(AiValidationException::class.java) {
-            groundWithWebSearchEvidence(
-                analysis(),
-                evidenceUrls = linkedSetOf(
-                    "https://www.shop.example.com/product",
-                    "https://shop.example.com/nutrition",
-                    "not-a-url",
-                ),
-            )
-        }
+    fun `a single provider host downgrades the item instead of failing`() {
+        val grounded = groundWithWebSearchEvidence(
+            analysis(),
+            evidenceUrls = linkedSetOf(
+                "https://www.shop.example.com/product",
+                "https://shop.example.com/nutrition",
+                "not-a-url",
+            ),
+        ).items.single()
 
-        assertEquals(
-            "Food research needs citations from at least two independent websites.",
-            error.message,
-        )
+        assertEquals("https://www.shop.example.com/product", grounded.sourceUrl)
+        assertTrue(grounded.isEstimate)
     }
 
     @Test
@@ -171,19 +166,15 @@ class OpenAiCompatibleProvidersTest {
     }
 
     @Test
-    fun `missing valid provider evidence is rejected`() {
-        val error = assertThrows(AiValidationException::class.java) {
-            groundWithWebSearchEvidence(
-                analysis(),
-                evidenceUrls = linkedSetOf("", "not-a-url", "file:///tmp/product"),
-            )
-        }
+    fun `missing valid provider evidence keeps the food as an estimate`() {
+        val grounded = groundWithWebSearchEvidence(
+            analysis(),
+            evidenceUrls = linkedSetOf("", "not-a-url", "file:///tmp/product"),
+        ).items.single()
 
-        assertEquals(
-            "The food research provider returned no web-search citations. Try again or " +
-                "configure Perplexity, OpenRouter, or OpenAI for Food research.",
-            error.message,
-        )
+        assertEquals(250.0, grounded.calories, 0.0)
+        assertNull(grounded.sourceUrl)
+        assertTrue(grounded.isEstimate)
     }
 
     @Test
