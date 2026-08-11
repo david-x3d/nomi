@@ -14,39 +14,34 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiFieldShape
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiShapes
+import com.nomi.app.ui.components.NomiSheet
+import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BarcodeAmountSheet(
     state: BarcodeAmountUiState,
@@ -56,58 +51,29 @@ fun BarcodeAmountSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(
+    NomiSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier.testTag("barcode_amount_sheet"),
     ) {
+        NomiSheetHeader(
+            title = nomiString("How much did you eat?", "Wie viel hast du gegessen?"),
+            subtitle = listOfNotNull(state.sourceItem.brand, state.sourceItem.name)
+                .joinToString(" · "),
+            icon = Icons.Outlined.QrCodeScanner,
+        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 20.dp),
+                .padding(horizontal = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.QrCodeScanner,
-                        contentDescription = null,
-                        modifier = Modifier.padding(12.dp).size(26.dp),
-                    )
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = nomiString("How much did you eat?", "Wie viel hast du gegessen?"),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    Text(
-                        text = listOfNotNull(state.sourceItem.brand, state.sourceItem.name)
-                            .joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            TextField(
+            NomiTextField(
                 value = state.amount,
                 onValueChange = onAmountChanged,
-                modifier = Modifier.fillMaxWidth().testTag("barcode_amount_input"),
-                label = { Text(nomiString("Amount eaten", "Gegessene Menge")) },
-                singleLine = true,
+                modifier = Modifier.testTag("barcode_amount_input"),
+                label = nomiString("Amount eaten", "Gegessene Menge"),
                 isError = state.amount.isNotBlank() && state.parsedAmount == null,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
@@ -132,6 +98,7 @@ fun BarcodeAmountSheet(
                         FilterChip(
                             selected = state.unit == unit,
                             onClick = { onUnitChanged(unit) },
+                            shape = NomiShapes.Action,
                             label = { Text(unit, maxLines = 1) },
                             modifier = Modifier.testTag("barcode_unit_$unit"),
                         )
@@ -140,7 +107,7 @@ fun BarcodeAmountSheet(
             }
 
             Surface(
-                shape = MaterialTheme.shapes.large,
+                shape = NomiFieldShape,
                 color = MaterialTheme.colorScheme.surfaceContainer,
             ) {
                 AnimatedContent(
@@ -169,29 +136,31 @@ fun BarcodeAmountSheet(
             }
 
             AnimatedVisibility(visible = state.errorMessage != null) {
-                Text(
-                    text = state.errorMessage.orEmpty(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                NomiInlineError(
+                    message = state.errorMessage.orEmpty(),
                     modifier = Modifier.testTag("barcode_amount_error"),
                 )
             }
 
-            Button(
-                onClick = onCalculate,
-                enabled = state.canCalculate,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 56.dp)
-                    .testTag("barcode_calculate"),
-            ) {
-                Text(nomiString("Calculate nutrition", "Nährwerte berechnen"), maxLines = 1)
-            }
-            TextButton(
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(nomiString("Cancel", "Abbrechen"))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = NomiShapes.Action,
+                    modifier = Modifier.weight(1f).heightIn(min = 56.dp),
+                ) {
+                    Text(nomiString("Cancel", "Abbrechen"), maxLines = 1)
+                }
+                Button(
+                    onClick = onCalculate,
+                    enabled = state.canCalculate,
+                    shape = NomiShapes.Action,
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .heightIn(min = 56.dp)
+                        .testTag("barcode_calculate"),
+                ) {
+                    Text(nomiString("Calculate nutrition", "Nährwerte berechnen"), maxLines = 1)
+                }
             }
         }
     }

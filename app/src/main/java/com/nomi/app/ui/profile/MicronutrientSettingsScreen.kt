@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Save
@@ -21,7 +20,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +47,7 @@ import com.nomi.app.data.preferences.resolvedTarget
 import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.data.preferences.with
 import com.nomi.app.domain.Micronutrient
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 
 /**
@@ -250,30 +249,23 @@ private fun MicronutrientCard(
                 )
             }
             if (enabled) {
-                OutlinedTextField(
+                NomiTextField(
                     value = target,
                     onValueChange = onTargetChanged,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .semantics { errorMessage?.let { error(it) } }
                         .testTag("micronutrient_target_${nutrient.name}"),
-                    label = { Text(nomiString("Daily target", "Tagesziel")) },
-                    suffix = {
-                        Text(
-                            nomiString(
-                                "${nutrient.storageUnit.suffix}/day",
-                                "${nutrient.storageUnit.suffix}/Tag",
-                            ),
-                        )
-                    },
-                    supportingText = errorMessage?.let { message -> { Text(message) } },
+                    label = nomiString("Daily target", "Tagesziel"),
+                    suffix = nomiString(
+                        "${nutrient.storageUnit.suffix}/day",
+                        "${nutrient.storageUnit.suffix}/Tag",
+                    ),
+                    supportingText = errorMessage,
                     isError = errorMessage != null,
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Decimal,
                         imeAction = ImeAction.Done,
                     ),
-                    keyboardActions = KeyboardActions(),
                 )
             }
         }

@@ -12,17 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -40,6 +36,10 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiMenu
+import com.nomi.app.ui.components.NomiMenuItem
+import com.nomi.app.ui.components.NomiPickerField
 import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,37 +114,30 @@ internal fun StringSelector(
         ?: selectedValue.toReadableLabel().ifBlank { nomiString("Choose an option", "Option auswählen") }
     val showOptionsDescription = nomiString("Show $label options", "Optionen für $label anzeigen")
 
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, style = MaterialTheme.typography.labelLarge)
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
+            NomiPickerField(
+                label = label,
+                value = selectedLabel.takeIf { selectedValue.isNotBlank() },
+                placeholder = selectedLabel,
                 onClick = { expanded = true },
+                trailingIconDescription = showOptionsDescription,
+                isError = errorMessage != null,
                 modifier = Modifier
-                    .fillMaxWidth()
                     .semantics {
                         stateDescription = selectedLabel
                         errorMessage?.let { error(it) }
                     }
                     .testTag(testTag),
-            ) {
-                Text(
-                    text = selectedLabel,
-                    modifier = Modifier.weight(1f),
-                    color = if (selectedValue.isBlank()) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                )
-                Icon(Icons.Outlined.ArrowDropDown, contentDescription = showOptionsDescription)
-            }
-            DropdownMenu(
+            )
+            NomiMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
             ) {
                 options.forEach { (value, displayName) ->
-                    DropdownMenuItem(
-                        text = { Text(displayName) },
+                    NomiMenuItem(
+                        text = displayName,
+                        selected = value == selectedValue,
                         onClick = {
                             expanded = false
                             onSelected(value)
@@ -154,10 +147,8 @@ internal fun StringSelector(
             }
         }
         errorMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+            NomiInlineError(
+                message = message,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }

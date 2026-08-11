@@ -3,27 +3,36 @@ package com.nomi.app.ui.logging
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiShapes
+import com.nomi.app.ui.components.NomiSheet
+import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PortionEditSheet(
     state: PortionEditUiState,
@@ -33,26 +42,32 @@ fun PortionEditSheet(
     onDismiss: () -> Unit,
     onResearch: () -> Unit = {},
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    NomiSheet(onDismissRequest = onDismiss) {
+        NomiSheetHeader(
+            title = nomiString("Change this food", "Dieses Essen ändern"),
+            subtitle = "${state.current.currentQuantity} ${state.current.currentUnit}",
+            icon = Icons.Default.EditNote,
+        )
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(nomiString("Change this food", "Dieses Essen ändern"), style = MaterialTheme.typography.headlineSmall)
-            OutlinedTextField(
+            NomiTextField(
                 value = state.correction,
                 onValueChange = onCorrectionChanged,
-                label = { Text(nomiString("What should I change?", "Was soll ich ändern?")) },
-                placeholder = { Text(nomiString("Half, or actually it was tuna", "Die Hälfte, oder es war doch Thunfisch")) },
+                label = nomiString("What should I change?", "Was soll ich ändern?"),
+                placeholder = nomiString("Half, or actually it was tuna", "Die Hälfte, oder es war doch Thunfisch"),
+                singleLine = false,
                 minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
             )
             FilledTonalButton(
                 onClick = onInterpret,
                 enabled = state.correction.isNotBlank() && !state.isProcessing,
-                modifier = Modifier.fillMaxWidth(),
+                shape = NomiShapes.Action,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
                 Text(
                     if (state.isProcessing) {
                         nomiString("Interpreting…", "Wird interpretiert…")
@@ -61,23 +76,26 @@ fun PortionEditSheet(
                     },
                 )
             }
-            state.errorMessage?.let {
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            state.errorMessage?.let { NomiInlineError(it) }
             // An edit that changes the food cannot be answered by arithmetic, so it asks
             // before spending a web search rather than quietly running one.
             if (state.needsResearch) {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
                             nomiString(
                                 "That changes the food, not just the amount",
                                 "Das ändert das Essen, nicht nur die Menge",
                             ),
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
                             state.researchReason ?: nomiString(
@@ -85,12 +103,12 @@ fun PortionEditSheet(
                                 "Nomi muss die Nährwerte für das korrigierte Essen neu nachschlagen.",
                             ),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Button(
                             onClick = onResearch,
                             enabled = !state.isProcessing,
-                            modifier = Modifier.fillMaxWidth(),
+                            shape = NomiShapes.Action,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
                         ) {
                             Text(
                                 if (state.isProcessing) {
@@ -104,22 +122,39 @@ fun PortionEditSheet(
                 }
             }
             state.proposed?.let { proposed ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     PortionCard(
                         title = nomiString("Before", "Vorher"),
                         quantity = "${state.current.currentQuantity} ${state.current.currentUnit}",
                         calories = state.current.calories,
                         modifier = Modifier.weight(1f),
                     )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     PortionCard(
                         title = nomiString("After", "Nachher"),
                         quantity = "${proposed.newQuantity} ${proposed.newUnit}",
                         calories = state.current.calories * proposed.multiplier,
+                        highlighted = true,
                         modifier = Modifier.weight(1f),
                     )
                 }
-                Text(proposed.interpretation, style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = onApply, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    proposed.interpretation,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = onApply,
+                    shape = NomiShapes.Action,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) {
                     Text(nomiString("Apply", "Übernehmen"))
                 }
             }
@@ -127,22 +162,44 @@ fun PortionEditSheet(
     }
 }
 
+/**
+ * One side of the before/after comparison. The "after" card takes the accent container so the
+ * pair reads as a change with a direction rather than as two equal readings.
+ */
 @Composable
 private fun PortionCard(
     title: String,
     quantity: String,
     calories: Double,
     modifier: Modifier = Modifier,
+    highlighted: Boolean = false,
 ) {
     val locale = nomiLocale()
-    Card(modifier = modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = if (highlighted) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        contentColor = if (highlighted) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(title.uppercase(locale), style = MaterialTheme.typography.labelMedium)
+            Text(
+                title.uppercase(locale),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(quantity, style = MaterialTheme.typography.titleMedium)
-            Text("${calories.roundToInt()} kcal")
+            Text("${calories.roundToInt()} kcal", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

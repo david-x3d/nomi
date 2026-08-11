@@ -15,25 +15,26 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
@@ -85,6 +86,7 @@ import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.progress.ProgressScreen
+import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.settings.AiProviderEditorDialog
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.SettingsScreen
@@ -642,33 +644,48 @@ private fun NomiMain(
 
     backupInspection?.let { inspection ->
         val summary = inspection.summary
-        AlertDialog(
+        NomiDialog(
             onDismissRequest = { backupInspection = null },
-            title = { Text("Replace local Nomi data?") },
-            text = {
-                Text(
-                    "Validated ${summary.foodLogCount} food logs, ${summary.foodCount} foods, " +
-                        "${summary.savedMealCount} saved meals, ${summary.weightEntryCount} weights, and " +
-                        "${summary.nutritionPlanCount} plans. API keys stay on this device and are never imported.",
-                )
+            title = "Replace local Nomi data?",
+            icon = Icons.Default.SettingsBackupRestore,
+            subtitle = "API keys stay on this device and are never imported.",
+            confirmLabel = "Replace data",
+            destructive = true,
+            onConfirm = {
+                val confirmed = inspection
+                backupInspection = null
+                scope.launch {
+                    runCatching { container.backupService.importValidated(confirmed) }
+                        .onSuccess {
+                            container.reminderScheduler.reconcileFrom(container.preferencesStore)
+                            viewModel.refreshProviderAndHealthStatus()
+                            showMessage("Backup restored")
+                        }
+                        .onFailure { showMessage(it.message ?: "Nomi couldn't restore that backup") }
+                }
             },
-            confirmButton = {
-                Button(onClick = {
-                    val confirmed = inspection
-                    backupInspection = null
-                    scope.launch {
-                        runCatching { container.backupService.importValidated(confirmed) }
-                            .onSuccess {
-                                container.reminderScheduler.reconcileFrom(container.preferencesStore)
-                                viewModel.refreshProviderAndHealthStatus()
-                                showMessage("Backup restored")
-                            }
-                            .onFailure { showMessage(it.message ?: "Nomi couldn't restore that backup") }
-                    }
-                }) { Text("Replace data") }
-            },
-            dismissButton = { TextButton(onClick = { backupInspection = null }) { Text("Cancel") } },
-        )
+            dismissLabel = "Cancel",
+        ) {
+            // The counts are what the decision turns on, so they are a readable list rather
+            // than a comma-separated sentence to parse under a destructive button.
+            BackupSummaryLine("Food logs", summary.foodLogCount)
+            BackupSummaryLine("Foods", summary.foodCount)
+            BackupSummaryLine("Saved meals", summary.savedMealCount)
+            BackupSummaryLine("Weights", summary.weightEntryCount)
+            BackupSummaryLine("Plans", summary.nutritionPlanCount)
+        }
+    }
+}
+
+/** One counted category from a validated backup envelope. */
+@Composable
+private fun BackupSummaryLine(label: String, count: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(count.toString(), style = MaterialTheme.typography.titleMedium)
     }
 }
 

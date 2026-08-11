@@ -2,8 +2,6 @@ package com.nomi.app.ui.app
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,9 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,24 +32,21 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,11 +59,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiSheet
+import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.components.WebsiteFaviconUrl
 import com.nomi.app.ui.format.quantityDisplay
@@ -129,56 +122,16 @@ fun NomiFoodDetailScreen(
                             ),
                         )
                     }
-                    Box {
-                        IconButton(
-                            onClick = { menuExpanded = true },
-                            enabled = entry != null,
-                        ) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = nomiString("Food entry actions", "Aktionen für den Lebensmitteleintrag"),
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = false,
-                            onDismissRequest = { menuExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(nomiString("Add to favorites", "Zu Favoriten hinzufügen")) },
-                                leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null) },
-                                enabled = entry?.foodId != null,
-                                onClick = {
-                                    menuExpanded = false
-                                    entry?.let { onFavorite(it.id) }
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(nomiString("Duplicate entry", "Eintrag duplizieren")) },
-                                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    entry?.let { onDuplicate(it.id) }
-                                },
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text(nomiString("Delete entry", "Eintrag löschen")) },
-                                leadingIcon = {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error,
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    entry?.let {
-                                        onDelete(it.id)
-                                        onBack()
-                                    }
-                                },
-                            )
-                        }
+                    // The overflow raises a sheet, not a menu: the actions need a line of
+                    // explanation each, which a menu row has no room for.
+                    IconButton(
+                        onClick = { menuExpanded = true },
+                        enabled = entry != null,
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = nomiString("Food entry actions", "Aktionen für den Lebensmitteleintrag"),
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -225,7 +178,6 @@ fun NomiFoodDetailScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FoodEntryActionsSheet(
     entry: TodayFoodEntry,
@@ -235,93 +187,67 @@ private fun FoodEntryActionsSheet(
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var contentVisible by remember { mutableStateOf(false) }
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-
-    LaunchedEffect(Unit) { contentVisible = true }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 36.dp, topEnd = 36.dp),
-    ) {
-        AnimatedVisibility(
-            visible = contentVisible,
-            enter = fadeIn(animationSpec = effectsSpec) +
-                slideInVertically(animationSpec = spatialSpec) { height -> height / 8 },
+    NomiSheet(onDismissRequest = onDismiss) {
+        NomiSheetHeader(
+            title = nomiString("Entry actions", "Aktionen"),
+            subtitle = entry.name,
+            icon = Icons.Default.Restaurant,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = nomiString("Entry actions", "Aktionen"),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    text = entry.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                FoodEntryActionRow(
-                    icon = Icons.Default.Edit,
-                    title = nomiString("Change amount", "Menge ändern"),
-                    description = nomiString(
-                        "Recalculate this entry if you ate more or less",
-                        "Neu berechnen, wenn du mehr oder weniger gegessen hast",
-                    ),
-                    onClick = onEditAmount,
-                )
-                FoodEntryActionRow(
-                    icon = Icons.Default.Favorite,
-                    title = nomiString("Add to favorites", "Zu Favoriten hinzufügen"),
-                    description = if (entry.foodId != null) {
-                        nomiString(
-                            "Keep this food ready for faster logging",
-                            "Dieses Lebensmittel schneller wieder eintragen",
-                        )
-                    } else {
-                        nomiString(
-                            "Available after this food is saved to your library",
-                            "Verfügbar, sobald das Lebensmittel gespeichert ist",
-                        )
-                    },
-                    enabled = entry.foodId != null,
-                    onClick = onFavorite,
-                )
-                FoodEntryActionRow(
-                    icon = Icons.Default.ContentCopy,
-                    title = nomiString("Duplicate entry", "Eintrag duplizieren"),
-                    description = nomiString(
-                        "Add another copy to this day",
-                        "Eine weitere Portion für diesen Tag eintragen",
-                    ),
-                    onClick = onDuplicate,
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
-                FoodEntryActionRow(
-                    icon = Icons.Default.Delete,
-                    title = nomiString("Delete entry", "Eintrag löschen"),
-                    description = nomiString(
-                        "Remove it from this day",
-                        "Aus diesem Tag entfernen",
-                    ),
-                    destructive = true,
-                    onClick = onDelete,
-                )
-            }
+            FoodEntryActionRow(
+                icon = Icons.Default.Edit,
+                title = nomiString("Change amount", "Menge ändern"),
+                description = nomiString(
+                    "Recalculate this entry if you ate more or less",
+                    "Neu berechnen, wenn du mehr oder weniger gegessen hast",
+                ),
+                onClick = onEditAmount,
+            )
+            FoodEntryActionRow(
+                icon = Icons.Default.Favorite,
+                title = nomiString("Add to favorites", "Zu Favoriten hinzufügen"),
+                description = if (entry.foodId != null) {
+                    nomiString(
+                        "Keep this food ready for faster logging",
+                        "Dieses Lebensmittel schneller wieder eintragen",
+                    )
+                } else {
+                    nomiString(
+                        "Available after this food is saved to your library",
+                        "Verfügbar, sobald das Lebensmittel gespeichert ist",
+                    )
+                },
+                enabled = entry.foodId != null,
+                onClick = onFavorite,
+            )
+            FoodEntryActionRow(
+                icon = Icons.Default.ContentCopy,
+                title = nomiString("Duplicate entry", "Eintrag duplizieren"),
+                description = nomiString(
+                    "Add another copy to this day",
+                    "Eine weitere Portion für diesen Tag eintragen",
+                ),
+                onClick = onDuplicate,
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+            FoodEntryActionRow(
+                icon = Icons.Default.Delete,
+                title = nomiString("Delete entry", "Eintrag löschen"),
+                description = nomiString(
+                    "Remove it from this day",
+                    "Aus diesem Tag entfernen",
+                ),
+                destructive = true,
+                onClick = onDelete,
+            )
         }
     }
 }

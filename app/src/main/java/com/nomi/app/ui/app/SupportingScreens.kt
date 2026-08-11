@@ -17,8 +17,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +43,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
+import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.settings.HealthConnectUiState
 import com.nomi.app.ui.today.MealCategory
@@ -58,41 +59,32 @@ fun WeightEntryDialog(
     var weight by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     val parsed = weight.replace(',', '.').toDoubleOrNull()
-    AlertDialog(
+    NomiDialog(
         onDismissRequest = onDismiss,
-        title = { Text(nomiString("Log weight", "Gewicht eintragen")) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = weight,
-                    onValueChange = { weight = it.filter { character -> character.isDigit() || character in ".," } },
-                    label = { Text(nomiString("Weight in kg", "Gewicht in kg")) },
-                    suffix = { Text("kg") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { note = it.take(120) },
-                    label = { Text(nomiString("Note (optional)", "Notiz (optional)")) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    nomiString("Your trend matters more than any single weigh-in.", "Dein Verlauf ist wichtiger als eine einzelne Messung."),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { parsed?.let { onSave(it, note); onDismiss() } },
-                enabled = parsed != null && parsed in 20.0..500.0,
-            ) { Text(nomiString("Save", "Speichern")) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(nomiString("Cancel", "Abbrechen")) } },
-    )
+        title = nomiString("Log weight", "Gewicht eintragen"),
+        icon = Icons.Default.MonitorWeight,
+        subtitle = nomiString(
+            "Your trend matters more than any single weigh-in.",
+            "Dein Verlauf ist wichtiger als eine einzelne Messung.",
+        ),
+        confirmLabel = nomiString("Save", "Speichern"),
+        onConfirm = { parsed?.let { onSave(it, note); onDismiss() } },
+        confirmEnabled = parsed != null && parsed in 20.0..500.0,
+        dismissLabel = nomiString("Cancel", "Abbrechen"),
+    ) {
+        NomiTextField(
+            value = weight,
+            onValueChange = { weight = it.filter { character -> character.isDigit() || character in ".," } },
+            label = nomiString("Weight in kg", "Gewicht in kg"),
+            suffix = "kg",
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        )
+        NomiTextField(
+            value = note,
+            onValueChange = { note = it.take(120) },
+            label = nomiString("Note (optional)", "Notiz (optional)"),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

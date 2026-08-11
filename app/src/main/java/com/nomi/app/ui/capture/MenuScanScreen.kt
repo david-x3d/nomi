@@ -27,7 +27,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +41,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.MenuDish
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import java.util.Locale
 
@@ -169,15 +170,13 @@ fun MenuScanScreen(
                             ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        OutlinedTextField(
+                        NomiTextField(
                             value = state.query,
                             onValueChange = onQueryChanged,
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                            label = { Text(nomiString("Search dishes, ingredients or numbers", "Gerichte, Zutaten oder Nummern suchen")) },
+                            leadingIcon = Icons.Default.Search,
+                            label = nomiString("Search dishes, ingredients or numbers", "Gerichte, Zutaten oder Nummern suchen"),
                         )
-                        state.errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                        state.errorMessage?.let { NomiInlineError(it) }
                     }
                 }
 

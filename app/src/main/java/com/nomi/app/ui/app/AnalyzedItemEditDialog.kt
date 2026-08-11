@@ -1,15 +1,13 @@
 package com.nomi.app.ui.app
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
+import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.components.NomiTextField
 
 @Composable
 fun AnalyzedItemEditDialog(
@@ -35,52 +35,52 @@ fun AnalyzedItemEditDialog(
     val parsed = listOf(quantity, calories, protein, carbs, fat).map { it.replace(',', '.').toDoubleOrNull() }
     val valid = unit.isNotBlank() && parsed.all { it != null && it >= 0.0 } && (parsed.firstOrNull() ?: 0.0) > 0.0
 
-    AlertDialog(
+    NomiDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit ${item.name}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DecimalField(quantity, { quantity = it }, "Amount", Modifier.weight(1f))
-                    OutlinedTextField(
-                        value = unit,
-                        onValueChange = { unit = it.take(24) },
-                        label = { Text("Unit") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                DecimalField(calories, { calories = it }, "Calories", Modifier.fillMaxWidth())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DecimalField(protein, { protein = it }, "Protein g", Modifier.weight(1f))
-                    DecimalField(carbs, { carbs = it }, "Carbs g", Modifier.weight(1f))
-                    DecimalField(fat, { fat = it }, "Fat g", Modifier.weight(1f))
-                }
-                Text("Values are saved as an immutable snapshot for this log entry.")
-            }
+        title = item.name,
+        icon = Icons.Default.Tune,
+        subtitle = "Values are saved as an immutable snapshot for this log entry.",
+        confirmLabel = "Apply",
+        onConfirm = {
+            onSave(
+                item.copy(
+                    quantity = parsed[0]!!,
+                    unit = unit.trim(),
+                    calories = parsed[1]!!,
+                    proteinGrams = parsed[2]!!,
+                    carbohydrateGrams = parsed[3]!!,
+                    fatGrams = parsed[4]!!,
+                    isEstimate = true,
+                    assumptions = item.assumptions + "Adjusted before saving",
+                ),
+            )
+            onDismiss()
         },
-        confirmButton = {
-            Button(
-                onClick = {
-                    onSave(
-                        item.copy(
-                            quantity = parsed[0]!!,
-                            unit = unit.trim(),
-                            calories = parsed[1]!!,
-                            proteinGrams = parsed[2]!!,
-                            carbohydrateGrams = parsed[3]!!,
-                            fatGrams = parsed[4]!!,
-                            isEstimate = true,
-                            assumptions = item.assumptions + "Adjusted before saving",
-                        ),
-                    )
-                    onDismiss()
-                },
-                enabled = valid,
-            ) { Text("Apply") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+        confirmEnabled = valid,
+        dismissLabel = "Cancel",
+        contentSpacing = 10.dp,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DecimalField(quantity, { quantity = it }, "Amount", Modifier.weight(1f))
+            NomiTextField(
+                value = unit,
+                onValueChange = { unit = it.take(24) },
+                label = "Unit",
+                modifier = Modifier.weight(1f),
+            )
+        }
+        DecimalField(calories, { calories = it }, "Calories", Modifier.fillMaxWidth())
+        Text(
+            text = "Macros in grams",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DecimalField(protein, { protein = it }, "Protein", Modifier.weight(1f))
+            DecimalField(carbs, { carbs = it }, "Carbs", Modifier.weight(1f))
+            DecimalField(fat, { fat = it }, "Fat", Modifier.weight(1f))
+        }
+    }
 }
 
 @Composable
@@ -90,14 +90,13 @@ private fun DecimalField(
     label: String,
     modifier: Modifier,
 ) {
-    OutlinedTextField(
+    NomiTextField(
         value = value,
         onValueChange = { next ->
             onValueChanged(next.filter { it.isDigit() || it == '.' || it == ',' })
         },
-        label = { Text(label) },
+        label = label,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        singleLine = true,
         modifier = modifier,
     )
 }

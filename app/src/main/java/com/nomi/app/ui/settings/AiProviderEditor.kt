@@ -5,19 +5,17 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +30,11 @@ import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
+import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.components.NomiFieldShape
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiShapes
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import java.net.URI
 
@@ -75,147 +78,153 @@ fun AiProviderEditorDialog(
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
-    AlertDialog(
+    NomiDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(state.purpose.localizedPurpose()) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+        title = state.purpose.localizedPurpose(),
+        icon = Icons.Outlined.Key,
+        confirmLabel = if (state.isSaving) {
+            nomiString("Saving…", "Wird gespeichert…")
+        } else {
+            nomiString("Save", "Speichern")
+        },
+        onConfirm = onSave,
+        confirmEnabled = configurationError == null && !busy,
+        dismissLabel = nomiString("Cancel", "Abbrechen"),
+        onDismissAction = { if (!busy) onDismiss() },
+    ) {
+        Text(
+            nomiString("Provider", "Anbieter"),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        providerRows(state.purpose).forEach { providers ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(nomiString("Provider", "Anbieter"), style = MaterialTheme.typography.labelLarge)
-                providerRows(state.purpose).forEach { providers ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        providers.forEach { provider ->
-                            FilterChip(
-                                selected = state.provider == provider,
-                                onClick = {
-                                    if (state.provider != provider) {
-                                        onStateChanged(state.switchTo(provider))
-                                    }
-                                },
-                                enabled = !busy,
-                                label = { Text(provider.localizedDisplayName()) },
-                            )
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = state.provider.canonicalEndpoint() ?: state.endpoint,
-                    onValueChange = { value ->
-                        val targetChanged = value.secretEndpointKey() != state.endpoint.secretEndpointKey()
-                        onStateChanged(
-                            state.copy(
-                                endpoint = value,
-                                hasStoredApiKey = if (targetChanged) false else state.hasStoredApiKey,
-                                testResult = null,
-                                errorMessage = null,
-                            ),
-                        )
-                    },
-                    label = { Text(nomiString("API endpoint", "API-Endpunkt")) },
-                    readOnly = state.provider.canonicalEndpoint() != null,
-                    enabled = !busy,
-                    isError = configurationError?.contains("endpoint", ignoreCase = true) == true,
-                    supportingText = if (state.provider.canonicalEndpoint() != null) {
-                        { Text(nomiString("Built-in provider endpoint managed by Nomi", "Nomi verwaltet den Endpunkt dieses integrierten Anbieters.")) }
-                    } else {
-                        { Text(nomiString("OpenAI-compatible base URL (https:// optional)", "OpenAI-kompatible Basis-URL (https:// optional)")) }
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = state.model,
-                    onValueChange = {
-                        onStateChanged(
-                            state.copy(model = it, testResult = null, errorMessage = null),
-                        )
-                    },
-                    label = { Text(nomiString("Model", "Modell")) },
-                    enabled = !busy,
-                    isError = state.model.isBlank(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = state.apiKeyInput,
-                    onValueChange = {
-                        onStateChanged(
-                            state.copy(apiKeyInput = it, testResult = null, errorMessage = null),
-                        )
-                    },
-                    label = {
-                        val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
-                            "Google Gemini API key"
-                        } else {
-                            nomiString("API key", "API-Schlüssel")
-                        }
-                        Text(if (state.hasStoredApiKey) "$keyName (stored securely)" else keyName)
-                    },
-                    placeholder = { if (state.hasStoredApiKey) Text(nomiString("Leave blank to keep existing key", "Leer lassen, um den vorhandenen Schlüssel zu behalten")) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    enabled = !busy,
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (state.provider == AiProviderKind.EXA_GEMINI) {
-                    OutlinedTextField(
-                        value = state.searchApiKeyInput,
-                        onValueChange = {
-                            onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
+                providers.forEach { provider ->
+                    FilterChip(
+                        selected = state.provider == provider,
+                        onClick = {
+                            if (state.provider != provider) {
+                                onStateChanged(state.switchTo(provider))
+                            }
                         },
-                        label = { Text(if (state.hasStoredSearchApiKey) "Exa API key (stored securely)" else "Exa API key") },
-                        placeholder = { if (state.hasStoredSearchApiKey) Text("Leave blank to keep existing key") },
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         enabled = !busy,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        shape = NomiShapes.Action,
+                        label = { Text(provider.localizedDisplayName()) },
                     )
-                    Text("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device.", style = MaterialTheme.typography.bodySmall)
-                }
-                if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
-                    TextButton(
-                        onClick = onRemoveStoredKey,
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (state.isRemovingKey) nomiString("Removing stored key…", "Gespeicherter Schlüssel wird entfernt…") else nomiString("Remove stored key", "Gespeicherten Schlüssel entfernen"))
-                    }
-                }
-                configurationError?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
-                }
-                OutlinedButton(
-                    onClick = onTestConnection,
-                    enabled = canTest,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (state.isTesting) nomiString("Testing…", "Wird getestet…") else nomiString("Test connection", "Verbindung testen"))
-                }
-                state.testResult?.let { Text(it, modifier = Modifier.padding(top = 4.dp)) }
-                state.errorMessage?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = onSave,
-                enabled = configurationError == null && !busy,
+        }
+        NomiTextField(
+            value = state.provider.canonicalEndpoint() ?: state.endpoint,
+            onValueChange = { value ->
+                val targetChanged = value.secretEndpointKey() != state.endpoint.secretEndpointKey()
+                onStateChanged(
+                    state.copy(
+                        endpoint = value,
+                        hasStoredApiKey = if (targetChanged) false else state.hasStoredApiKey,
+                        testResult = null,
+                        errorMessage = null,
+                    ),
+                )
+            },
+            label = nomiString("API endpoint", "API-Endpunkt"),
+            readOnly = state.provider.canonicalEndpoint() != null,
+            enabled = !busy,
+            isError = configurationError?.contains("endpoint", ignoreCase = true) == true,
+            supportingText = if (state.provider.canonicalEndpoint() != null) {
+                nomiString("Built-in provider endpoint managed by Nomi", "Nomi verwaltet den Endpunkt dieses integrierten Anbieters.")
+            } else {
+                nomiString("OpenAI-compatible base URL (https:// optional)", "OpenAI-kompatible Basis-URL (https:// optional)")
+            },
+        )
+        NomiTextField(
+            value = state.model,
+            onValueChange = {
+                onStateChanged(
+                    state.copy(model = it, testResult = null, errorMessage = null),
+                )
+            },
+            label = nomiString("Model", "Modell"),
+            enabled = !busy,
+            isError = state.model.isBlank(),
+        )
+        val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
+            "Google Gemini API key"
+        } else {
+            nomiString("API key", "API-Schlüssel")
+        }
+        NomiTextField(
+            value = state.apiKeyInput,
+            onValueChange = {
+                onStateChanged(
+                    state.copy(apiKeyInput = it, testResult = null, errorMessage = null),
+                )
+            },
+            label = if (state.hasStoredApiKey) "$keyName (stored securely)" else keyName,
+            placeholder = if (state.hasStoredApiKey) {
+                nomiString("Leave blank to keep existing key", "Leer lassen, um den vorhandenen Schlüssel zu behalten")
+            } else {
+                null
+            },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            enabled = !busy,
+        )
+        if (state.provider == AiProviderKind.EXA_GEMINI) {
+            NomiTextField(
+                value = state.searchApiKeyInput,
+                onValueChange = {
+                    onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
+                },
+                label = if (state.hasStoredSearchApiKey) "Exa API key (stored securely)" else "Exa API key",
+                placeholder = if (state.hasStoredSearchApiKey) "Leave blank to keep existing key" else null,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                enabled = !busy,
+            )
+            Text(
+                "Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
+            TextButton(
+                onClick = onRemoveStoredKey,
+                enabled = !busy,
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (state.isSaving) nomiString("Saving…", "Wird gespeichert…") else nomiString("Save", "Speichern"))
+                Text(if (state.isRemovingKey) nomiString("Removing stored key…", "Gespeicherter Schlüssel wird entfernt…") else nomiString("Remove stored key", "Gespeicherten Schlüssel entfernen"))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text(nomiString("Cancel", "Abbrechen")) }
-        },
-    )
+        }
+        configurationError?.let { NomiInlineError(it) }
+        OutlinedButton(
+            onClick = onTestConnection,
+            enabled = canTest,
+            shape = NomiShapes.Action,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) {
+            Text(if (state.isTesting) nomiString("Testing…", "Wird getestet…") else nomiString("Test connection", "Verbindung testen"))
+        }
+        state.testResult?.let {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = NomiFieldShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+        }
+        state.errorMessage?.let { NomiInlineError(it) }
+    }
 }
 
 private val BASE_PROVIDER_ROWS = listOf(

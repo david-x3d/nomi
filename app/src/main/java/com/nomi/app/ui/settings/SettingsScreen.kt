@@ -2,6 +2,7 @@ package com.nomi.app.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Translate
@@ -33,15 +35,10 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Text
@@ -55,13 +52,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
+import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.components.NomiSelectionRow
+import com.nomi.app.ui.components.NomiSheet
+import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
 import kotlin.math.roundToInt
@@ -449,22 +449,29 @@ private fun ReminderTimeDialog(
         initialMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0,
         is24Hour = true,
     )
-    AlertDialog(
+    NomiDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour, state.minute) }) {
-                Text(nomiString("Save", "Speichern"))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(nomiString("Cancel", "Abbrechen")) }
-        },
-    )
+        title = title,
+        icon = Icons.Default.Schedule,
+        confirmLabel = nomiString("Save", "Speichern"),
+        onConfirm = { onConfirm(state.hour, state.minute) },
+        dismissLabel = nomiString("Cancel", "Abbrechen"),
+    ) {
+        // The picker is wider than the dialog's text column, so it centres in the body
+        // instead of hanging off the left edge.
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            TimePicker(state = state)
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+/**
+ * A short list of mutually exclusive settings.
+ *
+ * Radio buttons in a bottom sheet ask you to read four labels and then hunt for the one filled
+ * circle. The expressive selection rows carry the answer in the shape and tone of the whole row,
+ * so the current setting is the first thing the sheet says.
+ */
 @Composable
 private fun ChoiceSheet(
     title: String,
@@ -473,21 +480,20 @@ private fun ChoiceSheet(
     onSelect: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(20.dp))
-        choices.forEachIndexed { index, choice ->
-            ListItem(
-                headlineContent = { Text(choice) },
-                leadingContent = {
-                    RadioButton(selected = index == selectedIndex, onClick = { onSelect(index) })
-                },
-                // A ListItem paints colorScheme.surface by default, but a bottom sheet is
-                // surfaceContainerLow, so an opaque row draws a visible seam across the sheet.
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                modifier = Modifier.fillMaxWidth().clickable { onSelect(index) },
-            )
+    NomiSheet(onDismissRequest = onDismiss) {
+        NomiSheetHeader(title = title)
+        Column(
+            modifier = Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            choices.forEachIndexed { index, choice ->
+                NomiSelectionRow(
+                    title = choice,
+                    selected = index == selectedIndex,
+                    onClick = { onSelect(index) },
+                )
+            }
         }
-        Spacer(Modifier.height(24.dp))
     }
 }
 

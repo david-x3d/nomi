@@ -35,7 +35,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
@@ -66,6 +65,7 @@ import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.today.MealCategory
 import kotlin.math.roundToInt
@@ -191,16 +191,17 @@ private fun InputContent(
             ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedTextField(
+        NomiTextField(
             value = state.text,
             onValueChange = onTextChanged,
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            modifier = Modifier.focusRequester(focusRequester),
+            singleLine = false,
             minLines = 3,
             maxLines = 7,
-            placeholder = { Text(nomiString("Tell Nomi what you ate", "Sag Nomi, was du gegessen hast")) },
+            placeholder = nomiString("Tell Nomi what you ate", "Sag Nomi, was du gegessen hast"),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { if (state.text.isNotBlank()) onAnalyze() }),
-            supportingText = { Text(nomiString("German and English work naturally.", "Deutsch und Englisch funktionieren ganz natürlich.")) },
+            supportingText = nomiString("German and English work naturally.", "Deutsch und Englisch funktionieren ganz natürlich."),
         )
         MealCategorySelector(state.mealCategory, onMealCategoryChanged)
         Spacer(Modifier.weight(1f))
@@ -257,42 +258,32 @@ private fun PhotoReviewContent(
             )
         }
         item {
-            OutlinedTextField(
+            NomiTextField(
                 value = state.description,
                 onValueChange = onDescriptionChanged,
-                modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
                 minLines = 3,
                 maxLines = 8,
-                label = { Text(nomiString("What's in the photo", "Was auf dem Foto ist")) },
+                label = nomiString("What's in the photo", "Was auf dem Foto ist"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                supportingText = {
-                    Text(
-                        nomiString(
-                            "Correct a food, an amount, or an ingredient — it reads like anything you'd type.",
-                            "Korrigiere ein Lebensmittel, eine Menge oder eine Zutat – es liest sich wie alles, was du tippst.",
-                        ),
-                    )
-                },
+                supportingText = nomiString(
+                    "Correct a food, an amount, or an ingredient — it reads like anything you'd type.",
+                    "Korrigiere ein Lebensmittel, eine Menge oder eine Zutat – es liest sich wie alles, was du tippst.",
+                ),
             )
         }
         item {
-            OutlinedTextField(
+            NomiTextField(
                 value = state.place,
                 onValueChange = onPlaceChanged,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text(nomiString("Restaurant or shop (optional)", "Restaurant oder Laden (optional)")) },
-                placeholder = { Text(nomiString("e.g. Five Guys", "z. B. Five Guys")) },
+                label = nomiString("Restaurant or shop (optional)", "Restaurant oder Laden (optional)"),
+                placeholder = nomiString("e.g. Five Guys", "z. B. Five Guys"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
-                supportingText = {
-                    Text(
-                        nomiString(
-                            "Naming the place sends Nomi to its own published nutrition instead of a generic recipe.",
-                            "Mit dem Namen sucht Nomi in den offiziellen Nährwerten des Anbieters statt in einem allgemeinen Rezept.",
-                        ),
-                    )
-                },
+                supportingText = nomiString(
+                    "Naming the place sends Nomi to its own published nutrition instead of a generic recipe.",
+                    "Mit dem Namen sucht Nomi in den offiziellen Nährwerten des Anbieters statt in einem allgemeinen Rezept.",
+                ),
             )
         }
         if (state.notes.isNotEmpty()) {
@@ -585,12 +576,11 @@ private fun ManualTextField(
     modifier: Modifier = Modifier,
     numeric: Boolean = false,
 ) {
-    OutlinedTextField(
+    NomiTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(label) },
-        singleLine = true,
-        modifier = modifier.fillMaxWidth(),
+        label = label,
+        modifier = modifier,
         keyboardOptions = KeyboardOptions(
             keyboardType = if (numeric) KeyboardType.Decimal else KeyboardType.Text,
             imeAction = ImeAction.Next,

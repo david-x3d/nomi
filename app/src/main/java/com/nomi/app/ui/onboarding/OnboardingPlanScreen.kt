@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoGraph
@@ -42,7 +41,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +66,7 @@ import com.nomi.app.domain.model.EnergySex
 import com.nomi.app.domain.model.GoalType
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.ProgressRate
+import com.nomi.app.ui.components.NomiTextField
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -583,20 +582,16 @@ private fun PlanNumberField(
     modifier: Modifier = Modifier,
     decimal: Boolean = false,
 ) {
-    OutlinedTextField(
+    NomiTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(testTag),
-        label = { Text(label) },
-        suffix = { Text(suffix) },
-        singleLine = true,
+        modifier = modifier.testTag(testTag),
+        label = label,
+        suffix = suffix,
         keyboardOptions = KeyboardOptions(
             keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number,
             imeAction = ImeAction.Done,
         ),
-        keyboardActions = KeyboardActions.Default,
     )
 }
 

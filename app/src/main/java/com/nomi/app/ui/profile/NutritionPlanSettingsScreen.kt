@@ -21,7 +21,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -390,18 +390,16 @@ private fun TargetTextField(
     onImeAction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
+    NomiTextField(
         value = value,
         onValueChange = onValueChanged,
         modifier = modifier
-            .fillMaxWidth()
             .semantics { errorMessage?.let { error(it) } }
             .testTag(testTag),
-        label = { Text(label) },
-        suffix = { Text(suffix) },
-        supportingText = errorMessage?.let { message -> { Text(message) } },
+        label = label,
+        suffix = suffix,
+        supportingText = errorMessage,
         isError = errorMessage != null,
-        singleLine = true,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
             imeAction = imeAction,

@@ -21,18 +21,14 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,6 +58,9 @@ import com.nomi.app.domain.EnergySex
 import com.nomi.app.domain.GoalType
 import com.nomi.app.domain.ProgressRate
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.components.NomiDatePickerDialog
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import java.time.Instant
 import java.time.LocalDate
@@ -171,32 +170,20 @@ fun ProfileSettingsScreen(
                 )
             }
             item {
-                OutlinedTextField(
+                NomiTextField(
                     value = dateOfBirth,
                     onValueChange = { dateOfBirth = it.take(10) },
                     modifier = Modifier
-                        .fillMaxWidth()
                         .semantics {
                             if (submitted) dateOfBirthError?.let { error(it) }
                         }
                         .testTag("profile_date_of_birth"),
-                    label = { Text(nomiString("Date of birth", "Geburtsdatum")) },
-                    placeholder = { Text(nomiString("YYYY-MM-DD", "JJJJ-MM-TT")) },
-                    supportingText = {
-                        Text(
-                            if (submitted) {
-                                dateOfBirthError ?: nomiString(
-                                    "Stored as a date so your age updates automatically.",
-                                    "Als Datum gespeichert, damit dein Alter automatisch aktualisiert wird.",
-                                )
-                            } else {
-                                nomiString(
-                                    "Stored as a date so your age updates automatically.",
-                                    "Als Datum gespeichert, damit dein Alter automatisch aktualisiert wird.",
-                                )
-                            },
-                        )
-                    },
+                    label = nomiString("Date of birth", "Geburtsdatum"),
+                    placeholder = nomiString("YYYY-MM-DD", "JJJJ-MM-TT"),
+                    supportingText = dateOfBirthError.takeIf { submitted } ?: nomiString(
+                        "Stored as a date so your age updates automatically.",
+                        "Als Datum gespeichert, damit dein Alter automatisch aktualisiert wird.",
+                    ),
                     isError = submitted && dateOfBirthError != null,
                     trailingIcon = {
                         IconButton(onClick = { showDatePicker = true }) {
@@ -206,7 +193,6 @@ fun ProfileSettingsScreen(
                             )
                         }
                     },
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Next,
@@ -231,23 +217,19 @@ fun ProfileSettingsScreen(
                 )
             }
             item {
-                OutlinedTextField(
+                NomiTextField(
                     value = heightText,
                     onValueChange = { heightText = it.decimalInput(maxIntegerDigits = 3) },
                     modifier = Modifier
-                        .fillMaxWidth()
                         .focusRequester(heightFocusRequester)
                         .semantics {
                             if (submitted) heightError?.let { error(it) }
                         }
                         .testTag("profile_height_cm"),
-                    label = { Text(nomiString("Height", "Körpergröße")) },
-                    suffix = { Text("cm") },
-                    supportingText = heightError.takeIf { submitted }?.let { message ->
-                        { Text(message) }
-                    },
+                    label = nomiString("Height", "Körpergröße"),
+                    suffix = "cm",
+                    supportingText = heightError.takeIf { submitted },
                     isError = submitted && heightError != null,
-                    singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Decimal,
                         imeAction = ImeAction.Done,
@@ -282,23 +264,19 @@ fun ProfileSettingsScreen(
             }
             if (goal != GoalType.MAINTAIN) {
                 item {
-                    OutlinedTextField(
+                    NomiTextField(
                         value = targetWeightText,
                         onValueChange = { targetWeightText = it.decimalInput(maxIntegerDigits = 3) },
                         modifier = Modifier
-                            .fillMaxWidth()
                             .focusRequester(targetFocusRequester)
                             .semantics {
                                 if (submitted) targetWeightError?.let { error(it) }
                             }
                             .testTag("profile_target_weight_kg"),
-                        label = { Text(nomiString("Target weight", "Zielgewicht")) },
-                        suffix = { Text("kg") },
-                        supportingText = targetWeightError.takeIf { submitted }?.let { message ->
-                            { Text(message) }
-                        },
+                        label = nomiString("Target weight", "Zielgewicht"),
+                        suffix = "kg",
+                        supportingText = targetWeightError.takeIf { submitted },
                         isError = submitted && targetWeightError != null,
-                        singleLine = true,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Decimal,
                             imeAction = ImeAction.Done,
@@ -431,48 +409,29 @@ fun ProfileSettingsScreen(
             initialSelectedDateMillis = initialDate?.toUtcMilliseconds(),
             yearRange = (today.year - 120)..today.year,
         )
-        DatePickerDialog(
+        NomiDatePickerDialog(
+            state = datePickerState,
             onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    enabled = datePickerState.selectedDateMillis != null,
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { milliseconds ->
-                            dateOfBirth = Instant.ofEpochMilli(milliseconds)
-                                .atZone(ZoneOffset.UTC)
-                                .toLocalDate()
-                                .toString()
-                        }
-                        showDatePicker = false
-                    },
-                ) { Text(nomiString("Save", "Speichern")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(nomiString("Cancel", "Abbrechen"))
+            onConfirm = {
+                datePickerState.selectedDateMillis?.let { milliseconds ->
+                    dateOfBirth = Instant.ofEpochMilli(milliseconds)
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate()
+                        .toString()
                 }
+                showDatePicker = false
             },
-        ) {
-            DatePicker(
-                state = datePickerState,
-                showModeToggle = true,
-                title = {
-                    Text(
-                        nomiString("Date of birth", "Geburtsdatum"),
-                        modifier = Modifier.padding(start = 24.dp, top = 16.dp),
-                    )
-                },
-            )
-        }
+            confirmLabel = nomiString("Save", "Speichern"),
+            dismissLabel = nomiString("Cancel", "Abbrechen"),
+            title = nomiString("Date of birth", "Geburtsdatum"),
+        )
     }
 }
 
 @Composable
 private fun FieldError(message: String) {
-    Text(
-        text = message,
-        color = MaterialTheme.colorScheme.error,
-        style = MaterialTheme.typography.bodySmall,
+    NomiInlineError(
+        message = message,
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
     )
 }

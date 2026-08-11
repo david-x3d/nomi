@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,10 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Cookie
 import androidx.compose.material.icons.outlined.DirectionsRun
@@ -44,15 +43,8 @@ import androidx.compose.material.icons.outlined.TrendingDown
 import androidx.compose.material.icons.outlined.TrendingFlat
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -93,6 +85,12 @@ import com.nomi.app.domain.model.ActivityLevel
 import com.nomi.app.domain.model.EnergySex
 import com.nomi.app.domain.model.GoalType
 import com.nomi.app.domain.model.ProgressRate
+import com.nomi.app.ui.components.NomiDatePickerDialog
+import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiPickerField
+import com.nomi.app.ui.components.NomiSelectionRow
+import com.nomi.app.ui.components.NomiShapes
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.theme.NomiTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -156,12 +154,13 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
         Spacer(Modifier.height(44.dp))
         Button(
             onClick = onContinue,
+            shape = NomiShapes.Action,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(64.dp)
                 .testTag("onboarding_get_started"),
         ) {
-            Text("Get started")
+            Text("Get started", style = MaterialTheme.typography.titleMedium)
         }
         Spacer(Modifier.height(16.dp))
         Text(
@@ -191,22 +190,20 @@ internal fun DateOfBirthScreen(
         error = error,
         onContinue = onContinue,
     ) {
-        OutlinedButton(
+        NomiPickerField(
+            label = "Date of birth",
+            value = dateOfBirth?.format(formatter),
+            placeholder = "Choose date of birth",
             onClick = { showPicker = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .testTag("date_of_birth_picker"),
-        ) {
-            Icon(imageVector = Icons.Outlined.CalendarMonth, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
-            Text(dateOfBirth?.format(formatter) ?: "Choose date of birth")
-        }
+            leadingIcon = Icons.Outlined.CalendarMonth,
+            modifier = Modifier.testTag("date_of_birth_picker"),
+        )
         dateOfBirth?.let { selected ->
             Text(
                 text = "Age ${Period.between(selected, today).years} today",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp),
             )
         }
     }
@@ -216,34 +213,22 @@ internal fun DateOfBirthScreen(
             initialSelectedDateMillis = dateOfBirth?.toUtcMilliseconds(),
             yearRange = (today.year - 120)..today.year,
         )
-        DatePickerDialog(
+        NomiDatePickerDialog(
+            state = pickerState,
             onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(
-                    enabled = pickerState.selectedDateMillis != null,
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { milliseconds ->
-                            val selected = Instant.ofEpochMilli(milliseconds)
-                                .atZone(ZoneOffset.UTC)
-                                .toLocalDate()
-                            onDateSelected(selected.toEpochDay())
-                        }
-                        showPicker = false
-                    },
-                ) {
-                    Text("Save")
+            onConfirm = {
+                pickerState.selectedDateMillis?.let { milliseconds ->
+                    val selected = Instant.ofEpochMilli(milliseconds)
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate()
+                    onDateSelected(selected.toEpochDay())
                 }
+                showPicker = false
             },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) { Text("Cancel") }
-            },
-        ) {
-            DatePicker(
-                state = pickerState,
-                showModeToggle = true,
-                title = { Text("Date of birth", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) },
-            )
-        }
+            confirmLabel = "Save",
+            dismissLabel = "Cancel",
+            title = "Date of birth",
+        )
     }
 }
 
@@ -289,16 +274,13 @@ internal fun EnergySexScreen(
             enter = expandVertically(animationSpec = spatialSpec) + fadeIn(animationSpec = effectsSpec),
             exit = shrinkVertically(animationSpec = spatialSpec) + fadeOut(animationSpec = effectsSpec),
         ) {
-            OutlinedTextField(
+            NomiTextField(
                 value = state.manualCaloriesText,
                 onValueChange = actions::updateManualCalories,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("manual_calories"),
-                label = { Text("Daily calorie target") },
-                suffix = { Text("kcal/day") },
-                supportingText = { Text("You can fine-tune calories and macros before saving.") },
-                singleLine = true,
+                modifier = Modifier.testTag("manual_calories"),
+                label = "Daily calorie target",
+                suffix = "kcal/day",
+                supportingText = "You can fine-tune calories and macros before saving.",
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
                     imeAction = ImeAction.Done,
@@ -709,12 +691,9 @@ private fun QuestionPage(
         item { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
         error?.let { message ->
             item {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                NomiInlineError(
+                    message = message,
                     modifier = Modifier
-                        .fillMaxWidth()
                         .semantics { liveRegion = LiveRegionMode.Polite }
                         .testTag("onboarding_error"),
                 )
@@ -727,17 +706,25 @@ private fun QuestionPage(
                     focusManager.clearFocus()
                     onContinue()
                 },
+                shape = NomiShapes.Action,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(60.dp)
                     .testTag("onboarding_continue"),
             ) {
-                Text("Continue")
+                Text("Continue", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }
 }
 
+/** Every onboarding question offers the same kind of answer, so they all look the same. */
 @Composable
 private fun SelectionCard(
     title: String,
@@ -747,55 +734,14 @@ private fun SelectionCard(
     onClick: () -> Unit,
     testTag: String,
 ) {
-    Card(
+    NomiSelectionRow(
+        title = title,
+        description = description,
+        icon = icon,
+        selected = selected,
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { this.selected = selected }
-            .testTag(testTag),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant
-            },
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(44.dp),
-                shape = CircleShape,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.surface
-                },
-                contentColor = if (selected) {
-                    MaterialTheme.colorScheme.onPrimary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            RadioButton(selected = selected, onClick = null)
-        }
-    }
+        modifier = Modifier.testTag(testTag),
+    )
 }
 
 @Composable
@@ -810,7 +756,7 @@ private fun MeasurementSystemPicker(
         MeasurementSystem.METRIC to metricLabel,
         MeasurementSystem.IMPERIAL to imperialLabel,
     )
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().height(56.dp)) {
         items.forEachIndexed { index, item ->
             SegmentedButton(
                 selected = selected == item.first,
@@ -834,16 +780,13 @@ private fun DecimalField(
     modifier: Modifier = Modifier,
     decimal: Boolean = true,
 ) {
-    OutlinedTextField(
+    NomiTextField(
         value = value,
         onValueChange = onValueChange,
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(testTag),
-        label = { Text(label) },
-        suffix = { Text(suffix) },
-        leadingIcon = { Icon(Icons.Outlined.MonitorWeight, contentDescription = null) },
-        singleLine = true,
+        modifier = modifier.testTag(testTag),
+        label = label,
+        suffix = suffix,
+        leadingIcon = Icons.Outlined.MonitorWeight,
         keyboardOptions = KeyboardOptions(
             keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number,
             imeAction = ImeAction.Done,

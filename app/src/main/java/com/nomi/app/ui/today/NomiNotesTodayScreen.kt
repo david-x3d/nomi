@@ -52,6 +52,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChevronRight
@@ -80,10 +81,7 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -131,6 +129,9 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
+import com.nomi.app.ui.components.NomiSheet
+import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.hairlineOnPitchBlack
 import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.components.NomiFox
@@ -1277,25 +1278,19 @@ private fun PhotoReviewNote(
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(
+            NomiTextField(
                 value = state.description,
                 onValueChange = onDescriptionChanged,
-                modifier = Modifier.fillMaxWidth(),
+                singleLine = false,
                 minLines = 2,
                 maxLines = 6,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = {
-                    Text(nomiString("Describe what you ate", "Beschreibe, was du gegessen hast"))
-                },
+                placeholder = nomiString("Describe what you ate", "Beschreibe, was du gegessen hast"),
             )
-            OutlinedTextField(
+            NomiTextField(
                 value = state.place,
                 onValueChange = onPlaceChanged,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = {
-                    Text(nomiString("Restaurant (optional)", "Restaurant (optional)"))
-                },
+                label = nomiString("Restaurant (optional)", "Restaurant (optional)"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
             )
@@ -1603,30 +1598,14 @@ private fun NotesCircleAction(
 
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        // Skipping the half-open stop removes the mid-flight settle that made the sheet look
-        // like it hesitated on the way up.
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(bottom = 12.dp),
-        ) {
-            Text(
-                text = nomiString("Add food another way", "Essen anders hinzufügen"),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
-                    .semantics { heading() },
-            )
+    NomiSheet(onDismissRequest = onDismiss) {
+        NomiSheetHeader(
+            title = nomiString("Add food another way", "Essen anders hinzufügen"),
+            icon = Icons.Default.Add,
+        )
+        Column(modifier = Modifier.fillMaxWidth()) {
             QuickAddRow(
                 icon = Icons.Default.CameraAlt,
                 title = nomiString("Photo", "Foto"),
@@ -1687,9 +1666,13 @@ private fun QuickAddRow(
     onClick: () -> Unit,
 ) {
     // A real ListItem rather than a hand-built row, so it inherits Material's own heights,
-    // spacing and text colours and stays right when the theme or the font scale changes.
+    // spacing and text colours and stays right when the theme or the font scale changes. The
+    // rounded clip is what makes the press highlight a pill instead of a full-bleed band.
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         leadingContent = {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
@@ -1702,7 +1685,13 @@ private fun QuickAddRow(
                 }
             }
         },
-        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+        headlineContent = {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        },
         supportingContent = { Text(description) },
         trailingContent = {
             Icon(Icons.Default.ChevronRight, contentDescription = null)
@@ -1719,33 +1708,21 @@ private fun QuickAddRow(
  * bottom sheet already has. Swiping it down is the way out now, so nothing has to explain
  * itself.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        // Skipping the half-open stop removes the mid-flight settle that made the sheet look
-        // like it hesitated on the way up.
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
+    NomiSheet(onDismissRequest = onDismiss) {
+        NomiSheetHeader(
+            title = nomiString("Goals", "Ziele"),
+            icon = Icons.Default.Flag,
+        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
+                .padding(bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = nomiString("Goals", "Ziele"),
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .padding(bottom = 4.dp)
-                    .semantics { heading() },
-            )
             if (state.goalsCardStyle == GoalsCardStyle.RINGS) {
                 // One compact card instead of three stacked ones: calories as a bar, every
                 // other target as a ring, water underneath.

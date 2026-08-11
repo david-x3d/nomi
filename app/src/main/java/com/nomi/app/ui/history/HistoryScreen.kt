@@ -19,8 +19,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -28,10 +26,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
@@ -45,6 +41,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.components.NomiDatePickerDialog
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.today.MealCategory
 import java.time.Instant
@@ -96,14 +94,13 @@ fun HistoryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
-                OutlinedTextField(
+                NomiTextField(
                     value = state.query,
                     onValueChange = onQueryChanged,
-                    label = { Text(nomiString("Search history", "Verlauf durchsuchen")) },
-                    placeholder = { Text(nomiString("Toast, McDonald's, Banana…", "Toastbrot, McDonald's, Banane…")) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    label = nomiString("Search history", "Verlauf durchsuchen"),
+                    placeholder = nomiString("Toast, McDonald's, Banana…", "Toastbrot, McDonald's, Banane…"),
+                    leadingIcon = Icons.Default.Search,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
             if (state.visibleDays.isEmpty()) {
@@ -179,26 +176,19 @@ fun HistoryScreen(
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = state.selectedDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
         )
-        DatePickerDialog(
+        NomiDatePickerDialog(
+            state = pickerState,
             onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { millis ->
-                            onDateSelected(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
-                        }
-                        showDatePicker = false
-                    },
-                ) { Text(nomiString("Select", "Auswählen")) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(nomiString("Cancel", "Abbrechen"))
+            onConfirm = {
+                pickerState.selectedDateMillis?.let { millis ->
+                    onDateSelected(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
                 }
+                showDatePicker = false
             },
-        ) {
-            DatePicker(state = pickerState)
-        }
+            confirmLabel = nomiString("Select", "Auswählen"),
+            dismissLabel = nomiString("Cancel", "Abbrechen"),
+            showModeToggle = false,
+        )
     }
 }
 

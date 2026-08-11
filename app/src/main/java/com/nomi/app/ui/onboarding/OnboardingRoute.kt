@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,10 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -139,6 +140,16 @@ internal fun OnboardingFlow(
     }
 }
 
+/**
+ * How far in you are, and the way back out.
+ *
+ * The bar carries the wavy determinate indicator rather than the flat one. It is the one place in
+ * onboarding where something is genuinely in motion between screens, and the wave animating toward
+ * the stop indicator makes the progress feel like it is being made rather than merely reported.
+ * The step count also animates, so the number and the bar move together. The hairline rule
+ * underneath is gone: the indicator already separates the bar from the question.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun OnboardingTopBar(
     state: OnboardingUiState,
@@ -146,6 +157,11 @@ private fun OnboardingTopBar(
 ) {
     val journey = state.activeJourney()
     val stepNumber = journey.indexOf(state.currentStep).coerceAtLeast(1)
+    val progress by animateFloatAsState(
+        targetValue = state.progress,
+        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+        label = "onboarding_progress_value",
+    )
 
     Column(
         modifier = Modifier
@@ -177,16 +193,16 @@ private fun OnboardingTopBar(
             Spacer(Modifier.weight(1f))
             Spacer(Modifier.size(48.dp))
         }
-        LinearProgressIndicator(
-            progress = { state.progress },
+        LinearWavyProgressIndicator(
+            progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 8.dp)
                 .testTag("onboarding_progress"),
             color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
