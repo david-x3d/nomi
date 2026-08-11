@@ -2,6 +2,7 @@ package com.nomi.app.ui.today
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -49,7 +51,13 @@ fun GoalsRingCard(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -109,6 +117,7 @@ private fun RingGrid(state: TodayUiState) {
                 target = state.carbohydrates.targetGrams,
                 unit = "g",
                 fraction = state.carbohydrates.fraction,
+                color = MaterialTheme.colorScheme.error,
             ),
         )
         add(
@@ -118,6 +127,7 @@ private fun RingGrid(state: TodayUiState) {
                 target = state.protein.targetGrams,
                 unit = "g",
                 fraction = state.protein.fraction,
+                color = MaterialTheme.colorScheme.tertiary,
             ),
         )
         add(
@@ -127,9 +137,10 @@ private fun RingGrid(state: TodayUiState) {
                 target = state.fat.targetGrams,
                 unit = "g",
                 fraction = state.fat.fraction,
+                color = MaterialTheme.colorScheme.secondary,
             ),
         )
-        state.micronutrients.forEach { progress ->
+        state.micronutrients.forEachIndexed { index, progress ->
             add(
                 RingValue(
                     label = progress.nutrient.localizedName(),
@@ -137,6 +148,11 @@ private fun RingGrid(state: TodayUiState) {
                     target = progress.target,
                     unit = progress.nutrient.storageUnit.suffix,
                     fraction = progress.fraction,
+                    color = when (index % 3) {
+                        0 -> MaterialTheme.colorScheme.primary
+                        1 -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.secondary
+                    },
                 ),
             )
         }
@@ -163,6 +179,7 @@ private data class RingValue(
     val target: Double,
     val unit: String,
     val fraction: Float,
+    val color: Color,
 )
 
 @Composable
@@ -172,8 +189,8 @@ private fun NutrientRing(ring: RingValue, modifier: Modifier = Modifier) {
         animationSpec = tween(durationMillis = 600),
         label = "ring-${ring.label}",
     )
-    val trackColor = MaterialTheme.colorScheme.surfaceVariant
-    val arcColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val arcColor = ring.color
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,

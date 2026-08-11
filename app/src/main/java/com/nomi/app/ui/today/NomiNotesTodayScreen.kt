@@ -107,6 +107,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -1846,29 +1847,72 @@ private fun QuickAddRow(
 @Composable
 private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
     NomiSheet(onDismissRequest = onDismiss) {
-        NomiSheetHeader(
-            title = nomiString("Goals", "Ziele"),
-            icon = Icons.Default.Flag,
-        )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.06f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        ) {
+            GoalsSheetHeader()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (state.goalsCardStyle == GoalsCardStyle.RINGS) {
-                // One compact card instead of three stacked ones: calories as a bar, every
-                // other target as a ring, water underneath.
-                GoalsRingCard(state)
-            } else {
-                CalorieGoalCard(state)
-                MacroGoalCard(state)
-                if (state.micronutrients.isNotEmpty()) {
-                    MicronutrientGoalCard(state.micronutrients)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (state.goalsCardStyle == GoalsCardStyle.RINGS) {
+                    // One compact card instead of three stacked ones: calories as a bar, every
+                    // other target as a ring, water underneath.
+                    GoalsRingCard(state)
+                } else {
+                    CalorieGoalCard(state)
+                    MacroGoalCard(state)
+                    if (state.micronutrients.isNotEmpty()) {
+                        MicronutrientGoalCard(state.micronutrients)
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun GoalsSheetHeader() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
+            Box(modifier = Modifier.size(50.dp), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(26.dp))
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = nomiString("Goals", "Ziele"),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = nomiString("Your day at a glance", "Dein Tag im Überblick"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -1880,8 +1924,13 @@ private fun CalorieGoalCard(state: TodayUiState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = hairlineOnPitchBlack(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -1922,8 +1971,13 @@ private fun MacroGoalCard(state: TodayUiState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = hairlineOnPitchBlack(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
@@ -1958,8 +2012,13 @@ private fun MicronutrientGoalCard(progress: List<MicronutrientProgress>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = hairlineOnPitchBlack(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 22.dp),
