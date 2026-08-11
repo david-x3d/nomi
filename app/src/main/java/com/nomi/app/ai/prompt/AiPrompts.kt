@@ -636,6 +636,10 @@ object AiPrompts {
           text; null when none is printed. Do not add ingredients from general knowledge.
         - category: the nearest visible menu heading, such as Pizza, Burgers, Drinks, or Desserts.
         - price: the price exactly as printed, including currency; null when unreadable.
+        - quantityText: the exact printed quantity for the whole orderable serving, otherwise null.
+          Keep combined serving forms such as "3 Kugeln / 165 g" together. Do not put ingredient
+          amounts here: in "1 Stueck - 180 g Rind", quantityText is "1 Stueck" because
+          180 g describes only the beef component.
 
         If one dish has separately orderable sizes or variants, return separate items when each
         has its own price or number. Preserve accents and menu-specific names. Use notes for cut
@@ -649,7 +653,8 @@ object AiPrompts {
             "name": string,
             "description": string|null,
             "category": string|null,
-            "price": string|null
+            "price": string|null,
+            "quantityText": string|null
           }],
           "notes": [string]
         }

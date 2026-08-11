@@ -9,6 +9,7 @@ import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
+import com.nomi.app.ai.model.QuantityOrigin
 import com.nomi.app.ai.model.QuantityResolutionMetadata
 import com.nomi.app.ai.model.QuantitySemantic
 import com.nomi.app.ai.model.VisionFoodResult
@@ -156,6 +157,7 @@ object AiResponseValidator {
             validateText(item.description, "menu item description", maxChars = MAX_DETAIL_CHARS)
             validateText(item.category, "menu category", maxChars = MAX_NAME_CHARS)
             validateText(item.price, "menu price", maxChars = 64)
+            validateText(item.quantityText, "menu quantity", maxChars = 120)
         }
         return menu
     }
@@ -282,7 +284,9 @@ object AiResponseValidator {
             required = true,
             maxChars = MAX_UNIT_CHARS,
         )
-        if (resolution.canonicalUnit != "g" && resolution.canonicalUnit != "ml") {
+        if (resolution.origin != QuantityOrigin.MENU_EXPLICIT &&
+            resolution.canonicalUnit != "g" && resolution.canonicalUnit != "ml"
+        ) {
             throw AiValidationException("Resolved quantity must use canonical g or ml")
         }
         if (itemQuantity == null || itemUnit == null ||

@@ -152,6 +152,8 @@ data class ServingSizeValidation(
 @Serializable
 enum class QuantityOrigin {
     USER_EXPLICIT,
+    /** Explicit serving text read from a menu and resolved by app-side Kotlin logic. */
+    MENU_EXPLICIT,
     GERMAN_LOCAL_DEFAULT,
     SOURCE_OR_INFERRED,
 }
@@ -213,6 +215,8 @@ data class MenuDish(
     val category: String? = null,
     /** Price is retained as printed because OCR must not silently convert currencies. */
     val price: String? = null,
+    /** Exact printed whole-serving text, for example "0.33 l" or "3 Kugeln / 165 g". */
+    val quantityText: String? = null,
 )
 
 /**

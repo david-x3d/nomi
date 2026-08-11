@@ -6,6 +6,41 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class QuantityDisplayFormatterTest {
+    @Test
+    fun `exact menu weight retains scoop serving context`() {
+        val display = QuantityDisplayFormatter.format(
+            QuantityDisplayRequest(
+                quantity = 165.0,
+                unit = "g",
+                gramsEquivalent = 165.0,
+                canonicalQuantity = 165.0,
+                canonicalUnit = "g",
+                enteredQuantity = 3.0,
+                enteredUnit = "Kugeln",
+            ),
+            Locale.GERMANY,
+        )
+
+        assertEquals("165 g", display.primary)
+        assertEquals("3 Kugeln", display.context)
+    }
+
+    @Test
+    fun `menu piece without total weight is not duplicated as context`() {
+        val display = QuantityDisplayFormatter.format(
+            QuantityDisplayRequest(
+                quantity = 1.0,
+                unit = "St\u00fcck",
+                enteredQuantity = 1.0,
+                enteredUnit = "St\u00fcck",
+            ),
+            Locale.GERMANY,
+        )
+
+        assertEquals("1 St\u00fcck", display.primary)
+        assertEquals(null, display.context)
+    }
+
     private val english = Locale.US
     private val german = Locale.GERMANY
 

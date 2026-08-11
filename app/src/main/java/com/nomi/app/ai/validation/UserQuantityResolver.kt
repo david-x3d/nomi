@@ -2,6 +2,7 @@ package com.nomi.app.ai.validation
 
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.QuantityOrigin
@@ -50,6 +51,32 @@ object UserQuantityResolver {
         """(?iu)$decimal\s*[-–—]?\s*$amountUnit\b""",
     )
 
+    private val menuHouseholdServingPattern = Regex(
+        """(?iu)(\d+(?:[.,]\d+)?)\s*(st(?:\u00fc|ue|u)ck(?:e)?|pieces?|kugel(?:n)?|scoops?)\b""",
+    )
+
+    /**
+     * Applies quantities read from a selected menu after interpretation but before research.
+     * MENU_EXPLICIT prevents later provider reconciliation from replacing the printed serving.
+     */
+    fun applyMenuQuantities(
+        menuItems: List<MenuDish>,
+        parsed: ParsedFoodIntent,
+    ): ParsedFoodIntent {
+        if (menuItems.isEmpty() || parsed.items.isEmpty()) return parsed
+        val unusedMenuIndexes = menuItems.indices.toMutableSet()
+        val items = parsed.items.mapIndexed { parsedIndex, item ->
+            val normalizedName = item.name.menuIdentity()
+            val menuIndex = unusedMenuIndexes.firstOrNull {
+                menuItems[it].name.menuIdentity() == normalizedName
+            } ?: parsedIndex.takeIf { it in unusedMenuIndexes }
+            val dish = menuIndex?.let(menuItems::get) ?: return@mapIndexed item
+            unusedMenuIndexes -= menuIndex
+            resolveMenuQuantity(dish)?.let { resolution -> item.withResolution(resolution) } ?: item
+        }
+        return parsed.copy(items = items)
+    }
+
     fun reconcileParsedIntent(
         userText: String,
         parsed: ParsedFoodIntent,
@@ -64,7 +91,9 @@ object UserQuantityResolver {
         val localeIsGermany = localeCountry.equals("DE", ignoreCase = true)
 
         val items = enrichedItems.mapIndexed { index, item ->
-            val resolution = assignments[index]
+            val resolution = item.quantityResolution
+                ?.takeIf { it.origin == QuantityOrigin.MENU_EXPLICIT }
+                ?: assignments[index]
                 ?: germanRedBullDefault(cleanText, item, parsed.items.size, localeIsGermany)
             if (resolution == null) {
                 // Clear any provider-forged resolution metadata.
@@ -132,6 +161,8 @@ object UserQuantityResolver {
         assumptions = (assumptions + when (resolution.origin) {
             QuantityOrigin.USER_EXPLICIT ->
                 "The user's explicit quantity was preserved by deterministic app logic."
+            QuantityOrigin.MENU_EXPLICIT ->
+                "The menu's explicit serving quantity was preserved by deterministic app logic."
             QuantityOrigin.GERMAN_LOCAL_DEFAULT ->
                 "German Red Bull can default: 250 ml because no explicit size was provided."
             QuantityOrigin.SOURCE_OR_INFERRED ->
@@ -199,6 +230,61 @@ object UserQuantityResolver {
                 )
             }
         return (packageDetections + directDetections).sortedBy { it.range.first }
+    }
+
+    private fun resolveMenuQuantity(dish: MenuDish): QuantityResolutionMetadata? {
+        val structured = dish.quantityText?.trim()?.takeIf(String::isNotBlank)
+        val raw = structured ?: dish.description?.trim()?.takeIf(String::isNotBlank) ?: return null
+        val household = menuHouseholdServingPattern.find(raw)
+            ?.takeIf { structured != null || it.range.first <= MENU_LEADING_QUANTITY_MAX_OFFSET }
+        if (household != null) {
+            val servingQuantity = household.groupValues[1].number()
+            val servingUnit = household.groupValues[2]
+            val slashIndex = raw.indexOf('/', startIndex = household.range.last + 1)
+            val exactWeight = slashIndex
+                .takeIf { it >= 0 }
+                ?.let { directAmountPattern.find(raw, startIndex = it + 1) }
+                ?.takeIf { match ->
+                    canonicalMeasure(match.groupValues[1].number(), match.groupValues[2]).unit == "g"
+                }
+            if (exactWeight != null) {
+                val enteredWeight = exactWeight.groupValues[1].number()
+                val enteredWeightUnit = exactWeight.groupValues[2]
+                val canonicalWeight = canonicalMeasure(enteredWeight, enteredWeightUnit)
+                return QuantityResolutionMetadata(
+                    origin = QuantityOrigin.MENU_EXPLICIT,
+                    semantic = QuantitySemantic.DIRECT_AMOUNT,
+                    canonicalQuantity = canonicalWeight.quantity,
+                    canonicalUnit = canonicalWeight.unit,
+                    enteredQuantity = servingQuantity,
+                    enteredUnit = servingUnit,
+                )
+            }
+            // A later amount separated by a dash describes an ingredient, not the whole dish.
+            return QuantityResolutionMetadata(
+                origin = QuantityOrigin.MENU_EXPLICIT,
+                semantic = QuantitySemantic.DIRECT_AMOUNT,
+                canonicalQuantity = servingQuantity,
+                canonicalUnit = servingUnit,
+                enteredQuantity = servingQuantity,
+                enteredUnit = servingUnit,
+            )
+        }
+
+        val metric = directAmountPattern.find(raw)
+            ?.takeIf { structured != null || it.range.first <= MENU_LEADING_QUANTITY_MAX_OFFSET }
+            ?: return null
+        val enteredQuantity = metric.groupValues[1].number()
+        val enteredUnit = metric.groupValues[2]
+        val canonical = canonicalMeasure(enteredQuantity, enteredUnit)
+        return QuantityResolutionMetadata(
+            origin = QuantityOrigin.MENU_EXPLICIT,
+            semantic = QuantitySemantic.DIRECT_AMOUNT,
+            canonicalQuantity = canonical.quantity,
+            canonicalUnit = canonical.unit,
+            enteredQuantity = enteredQuantity,
+            enteredUnit = enteredUnit,
+        )
     }
 
     private fun packageResolution(
@@ -373,6 +459,12 @@ object UserQuantityResolver {
         .replace(Regex("\\s+"), " ")
         .trim()
 
+    private fun String.menuIdentity(): String = trim()
+        .lowercase(Locale.ROOT)
+        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
     private fun IntRange.overlaps(other: IntRange): Boolean =
         first <= other.last && other.first <= last
 
@@ -391,4 +483,6 @@ object UserQuantityResolver {
     )
 
     private data class CanonicalMeasure(val quantity: Double, val unit: String)
+
+    private const val MENU_LEADING_QUANTITY_MAX_OFFSET = 8
 }

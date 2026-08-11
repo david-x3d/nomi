@@ -66,6 +66,7 @@ object QuantityDisplayFormatter {
                 QuantityDisplaySemantic.DIRECT_AMOUNT -> null
             }
         val spoonContext = enteredSpoonContext(request, locale)
+        val householdContext = enteredHouseholdContext(request, locale)
         val canonical = if (spoonContext != null && request.gramsEquivalent?.let(::isUsableAmount) == true) {
             CanonicalAmount(
                 value = requireNotNull(request.gramsEquivalent),
@@ -75,7 +76,7 @@ object QuantityDisplayFormatter {
         } else {
             canonicalAmount(request)
         }
-        val context = spoonContext ?: semanticContext(request, packageKind, locale)
+        val context = spoonContext ?: householdContext ?: semanticContext(request, packageKind, locale)
         val primary = canonical?.let { amount ->
             val approximate = request.isApproximate ||
                 amount.convertedApproximately ||
@@ -121,6 +122,29 @@ object QuantityDisplayFormatter {
         val quantity = if (metadataUnit != null) request.enteredQuantity else request.quantity
         val usableQuantity = quantity?.takeIf(::isUsableAmount) ?: return null
         return "${formatNumber(usableQuantity, locale, 2)} ${localizedUnit(unit, usableQuantity, locale)}"
+    }
+
+    private fun enteredHouseholdContext(
+        request: QuantityDisplayRequest,
+        locale: Locale,
+    ): String? {
+        val hasExactMetricAmount = canonicalFrom(
+            request.canonicalQuantity,
+            request.canonicalUnit,
+        ) != null || request.gramsEquivalent?.let(::isUsableAmount) == true
+        if (!hasExactMetricAmount) return null
+        val metadataUnit = request.enteredUnit?.takeIf(::isHouseholdCountUnit)
+        val unit = metadataUnit ?: request.unit.takeIf(::isHouseholdCountUnit) ?: return null
+        val quantity = (if (metadataUnit != null) request.enteredQuantity else request.quantity)
+            ?.takeIf(::isUsableAmount) ?: return null
+        return "${formatNumber(quantity, locale, 2)} $unit"
+    }
+
+    private fun isHouseholdCountUnit(rawUnit: String): Boolean = when (normalizeUnit(rawUnit)) {
+        "piece", "pieces", "pc", "pcs", "st\u00fcck", "st\u00fccke", "stueck", "stuecke",
+        "kugel", "kugeln", "scoop", "scoops",
+        -> true
+        else -> false
     }
 
     private fun isSpoonUnit(rawUnit: String): Boolean = when (normalizeUnit(rawUnit)) {

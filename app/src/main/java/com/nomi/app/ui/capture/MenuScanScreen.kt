@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.MenuDish
@@ -128,12 +130,23 @@ fun MenuScanScreen(
             if (state.isProcessing) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             if (state.items.isEmpty() && state.isProcessing) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth()
+                            .padding(horizontal = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(48.dp))
-                        Text(nomiString("Reading the complete menu...", "Vollst\u00e4ndige Speisekarte wird gelesen..."))
+                        Text(
+                            nomiString("Reading the complete menu...", "Vollst\u00e4ndige Speisekarte wird gelesen..."),
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Center,
+                        )
                         Text(
                             nomiString("Gemini is extracting names, descriptions, numbers and prices.", "Gemini \u00fcbernimmt Namen, Beschreibungen, Nummern und Preise."),
+                            modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }

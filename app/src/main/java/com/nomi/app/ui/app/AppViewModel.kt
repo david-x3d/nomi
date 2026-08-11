@@ -335,6 +335,8 @@ class AppViewModel(
     private val mutableMenuScanState = MutableStateFlow(MenuScanUiState())
     val menuScanState = mutableMenuScanState.asStateFlow()
     private var menuScanRequestId = 0L
+    private var pendingMenuDishes: List<MenuDish> = emptyList()
+    private var pendingMenuLoggingText: String? = null
     private val mutablePortionEditState = MutableStateFlow<PortionEditUiState?>(null)
     val portionEditState = mutablePortionEditState.asStateFlow()
     private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
@@ -389,6 +391,8 @@ class AppViewModel(
 
     fun beginLogging(method: AddFoodMethod, initialText: String = "") {
         cancelAnalysis()
+        pendingMenuDishes = emptyList()
+        pendingMenuLoggingText = null
         barcodeLookupRequestId += 1
         mutableBarcodeAmountState.value = null
         val category = defaultMealCategory()
@@ -400,6 +404,10 @@ class AppViewModel(
     }
 
     fun updateLoggingText(value: String) {
+        if (value != pendingMenuLoggingText) {
+            pendingMenuDishes = emptyList()
+            pendingMenuLoggingText = null
+        }
         lastLoggingText = value
         val current = mutableLoggingState.value
         if (current is FoodLoggingUiState.Input) mutableLoggingState.value = current.copy(text = value)
@@ -418,6 +426,8 @@ class AppViewModel(
 
     fun dismissLoggingDraft() {
         cancelAnalysis()
+        pendingMenuDishes = emptyList()
+        pendingMenuLoggingText = null
         barcodeLookupRequestId += 1
         mutableBarcodeAmountState.value = null
         lastLoggingText = ""
@@ -545,9 +555,14 @@ class AppViewModel(
                 dish.description?.takeIf(String::isNotBlank)?.let {
                     append(". Menu description: ").append(it.trim())
                 }
+                dish.quantityText?.takeIf(String::isNotBlank)?.let {
+                    append(". Printed serving: ").append(it.trim())
+                }
             }
         }.take(MAX_MENU_LOGGING_TEXT_CHARS)
         beginLogging(AddFoodMethod.TYPE, text)
+        pendingMenuDishes = dishes
+        pendingMenuLoggingText = text
         analyzeText()
     }
 
@@ -824,9 +839,10 @@ class AppViewModel(
         val current = mutableLoggingState.value as? FoodLoggingUiState.Input ?: return
         val text = current.text.trim()
         if (text.isBlank()) return
+        val menuDishes = pendingMenuDishes.takeIf { pendingMenuLoggingText == text && it.isNotEmpty() }
         lastLoggingText = text
         val cacheKey = foodAnalysisCacheKey(text)
-        recentFoodAnalysisCache.get(cacheKey)?.let { analysis ->
+        recentFoodAnalysisCache.get(cacheKey)?.takeIf { menuDishes == null }?.let { analysis ->
             mutableLoggingState.value = FoodLoggingUiState.Preview(
                 analysis = analysis,
                 mealCategory = current.mealCategory,
@@ -849,7 +865,10 @@ class AppViewModel(
                         ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
                             providerFor(config, key).parseFood(text)
                         }
-                    ).withKnownSpellings()
+                    ).withKnownSpellings().let { parsed ->
+                        menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) }
+                            ?: parsed
+                    }
             }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 if (requestId == analysisRequestId) {
@@ -2484,16 +2503,16 @@ class AppViewModel(
 
     private fun AnalyzedFoodItem.toLog(category: MealCategory, inputMethod: String): FoodLogEntity {
         val now = System.currentTimeMillis()
-        val enteredSpoonUnit = quantityResolution?.enteredUnit
-            ?.takeIf { it.isSpoonLoggingUnit() }
-        val enteredSpoonQuantity = quantityResolution?.enteredQuantity
-            ?.takeIf { enteredSpoonUnit != null && it.isFinite() && it > 0.0 }
+        val enteredServingUnit = quantityResolution?.enteredUnit
+            ?.takeIf { it.isSpoonLoggingUnit() || it.isHouseholdCountLoggingUnit() }
+        val enteredServingQuantity = quantityResolution?.enteredQuantity
+            ?.takeIf { enteredServingUnit != null && it.isFinite() && it > 0.0 }
         return FoodLogEntity(
             mealCategory = category.name,
             displayNameSnapshot = name.trim(),
             brandSnapshot = brand,
-            amount = enteredSpoonQuantity ?: quantity,
-            unit = enteredSpoonUnit?.takeIf { enteredSpoonQuantity != null } ?: unit,
+            amount = enteredServingQuantity ?: quantity,
+            unit = enteredServingUnit?.takeIf { enteredServingQuantity != null } ?: unit,
             grams = gramsEquivalent,
             nutritionSnapshot = NutritionValues(
                 caloriesKcal = calories,
@@ -2962,6 +2981,14 @@ private fun String.isSpoonLoggingUnit(): Boolean = trim()
     "el", "essloffel", "tbsp", "tbs", "tablespoon", "tablespoons",
     "tl", "teeloffel", "tsp", "teaspoon", "teaspoons",
     "loffel", "spoon", "spoons",
+)
+
+private fun String.isHouseholdCountLoggingUnit(): Boolean = trim()
+    .lowercase(Locale.ROOT)
+    .replace('\u00fc', 'u')
+    .replace("ue", "u") in setOf(
+    "piece", "pieces", "pc", "pcs", "stuck", "stucke",
+    "kugel", "kugeln", "scoop", "scoops",
 )
 private fun Throwable.safeProviderSettingsMessage(): String = when {
     causeChain().any { it is SecretUnavailableException } ->
