@@ -1,6 +1,7 @@
 package com.nomi.app.ui.settings
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BugReport
@@ -29,16 +31,16 @@ import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.Text
@@ -52,6 +54,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.CalorieEstimateBias
@@ -105,8 +109,20 @@ fun SettingsScreen(
                 scrollBehavior = scrollBehavior,
             )
         },
+        containerColor = MaterialTheme.colorScheme.surface,
     ) { innerPadding ->
-        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = innerPadding) {
+        val backdrop = Brush.verticalGradient(
+            listOf(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.07f),
+                MaterialTheme.colorScheme.surface,
+            ),
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().background(backdrop),
+            contentPadding = innerPadding,
+        ) {
             item { SectionTitle(nomiString("You", "Du")) }
             item {
                 SettingsLink(
@@ -117,6 +133,7 @@ fun SettingsScreen(
                         "Geburtstag, Größe, Gewicht, Aktivität und Ziel",
                     ),
                     onClick = onProfile,
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
             item {
@@ -129,6 +146,7 @@ fun SettingsScreen(
                         nomiString("Recommended targets", "Empfohlene Ziele")
                     },
                     onClick = onNutrition,
+                    iconColor = MaterialTheme.colorScheme.tertiary,
                 )
             }
             item {
@@ -146,6 +164,7 @@ fun SettingsScreen(
                             .joinToString(" · ")
                     },
                     onClick = onMicronutrients,
+                    iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             item { SectionTitle(nomiString("Appearance & units", "Darstellung & Einheiten")) }
@@ -155,6 +174,7 @@ fun SettingsScreen(
                     title = nomiString("Theme", "Design"),
                     supporting = state.themeMode.localizedDisplayName(),
                     onClick = { picker = SettingPicker.Theme },
+                    iconColor = MaterialTheme.colorScheme.tertiary,
                 )
             }
             item {
@@ -167,6 +187,7 @@ fun SettingsScreen(
                     ),
                     checked = state.dynamicColor,
                     onCheckedChange = onDynamicColorChanged,
+                    iconColor = MaterialTheme.colorScheme.tertiary,
                 )
             }
             item {
@@ -176,6 +197,7 @@ fun SettingsScreen(
                     supporting = nomiString("Translate Nomi’s interface into German", "Nomis Oberfläche auf Deutsch anzeigen"),
                     checked = state.germanTranslationEnabled,
                     onCheckedChange = onGermanTranslationChanged,
+                    iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             item {
@@ -184,6 +206,7 @@ fun SettingsScreen(
                     title = nomiString("Units", "Einheiten"),
                     supporting = state.unitSystem.localizedDisplayName(),
                     onClick = { picker = SettingPicker.Units },
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
             item {
@@ -192,33 +215,33 @@ fun SettingsScreen(
                     title = nomiString("Goals view", "Ziele-Ansicht"),
                     supporting = state.goalsCardStyle.localizedDisplayName(),
                     onClick = { picker = SettingPicker.GoalsStyle },
+                    iconColor = MaterialTheme.colorScheme.error,
                 )
             }
             item { SectionTitle(nomiString("AI providers", "KI-Anbieter")) }
             item {
-                ListItem(
-                    headlineContent = {
-                        Text(nomiString("One key for everything", "Ein Schlüssel für alles"))
-                    },
-                    supportingContent = {
-                        Text(
-                            nomiString(
-                                "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API " +
-                                    "key in any pipeline below and all of them use it.",
-                                "Nomi ist für OpenRouter vorkonfiguriert. Gib deinen OpenRouter-" +
-                                    "API-Schlüssel unten bei einem Bereich ein, alle nutzen ihn.",
-                            ),
-                        )
-                    },
-                    leadingContent = { Icon(Icons.Default.Key, contentDescription = null) },
+                SettingsInfo(
+                    icon = { Icon(Icons.Default.Key, contentDescription = null) },
+                    title = nomiString("One key for everything", "Ein Schlüssel für alles"),
+                    supporting = nomiString(
+                        "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API " +
+                            "key in any pipeline below and all of them use it.",
+                        "Nomi ist für OpenRouter vorkonfiguriert. Gib deinen OpenRouter-" +
+                            "API-Schlüssel unten bei einem Bereich ein, alle nutzen ihn.",
+                    ),
+                    iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             if (state.aiProviders.isEmpty()) {
                 item {
-                    ListItem(
-                        headlineContent = { Text(nomiString("No provider configured", "Kein Anbieter eingerichtet")) },
-                        supportingContent = { Text(nomiString("Configure a provider to analyze text, photos and portions.", "Richte einen Anbieter ein, um Text, Fotos und Portionen zu analysieren.")) },
-                        leadingContent = { Icon(Icons.Default.Key, contentDescription = null) },
+                    SettingsInfo(
+                        icon = { Icon(Icons.Default.Key, contentDescription = null) },
+                        title = nomiString("No provider configured", "Kein Anbieter eingerichtet"),
+                        supporting = nomiString(
+                            "Configure a provider to analyze text, photos and portions.",
+                            "Richte einen Anbieter ein, um Text, Fotos und Portionen zu analysieren.",
+                        ),
+                        iconColor = MaterialTheme.colorScheme.error,
                     )
                 }
             } else {
@@ -229,6 +252,7 @@ fun SettingsScreen(
                             title = provider.purpose.localizedPurpose(),
                             supporting = "${provider.provider.localizedDisplayName()} · ${provider.model}",
                             onClick = { onAiProvider(index) },
+                            iconColor = MaterialTheme.colorScheme.secondary,
                         )
                     }
                 }
@@ -243,6 +267,7 @@ fun SettingsScreen(
                     ),
                     checked = state.aiRequestTimeoutDisabled,
                     onCheckedChange = onAiRequestTimeoutDisabledChanged,
+                    iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             item { SectionTitle(nomiString("Health & activity", "Gesundheit & Aktivität")) }
@@ -262,6 +287,7 @@ fun SettingsScreen(
                     },
                     enabled = state.healthConnect.status != HealthConnectPermissionStatus.UNAVAILABLE,
                     onClick = onHealthConnect,
+                    iconColor = MaterialTheme.colorScheme.tertiary,
                 )
             }
             item {
@@ -274,6 +300,7 @@ fun SettingsScreen(
                     ),
                     checked = state.activityTargetAdjustment,
                     onCheckedChange = onActivityTargetAdjustmentChanged,
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
             item {
@@ -294,6 +321,7 @@ fun SettingsScreen(
                         checked = reminder.enabled,
                         onCheckedChange = { onReminderChanged(index, it) },
                         onClick = { editingReminder = index },
+                        iconColor = MaterialTheme.colorScheme.tertiary,
                     )
                 }
             }
@@ -304,6 +332,7 @@ fun SettingsScreen(
                     title = nomiString("Export backup", "Sicherung exportieren"),
                     supporting = nomiString("Versioned JSON without API keys", "Versioniertes JSON ohne API-Schlüssel"),
                     onClick = onExport,
+                    iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             item {
@@ -312,6 +341,7 @@ fun SettingsScreen(
                     title = nomiString("Import backup", "Sicherung importieren"),
                     supporting = nomiString("Validated before existing data changes", "Wird vor Änderungen an vorhandenen Daten geprüft"),
                     onClick = onImport,
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
             item { SectionTitle(nomiString("Developer", "Entwicklung")) }
@@ -321,6 +351,7 @@ fun SettingsScreen(
                     title = nomiString("AI debug", "KI-Debug"),
                     supporting = nomiString("Provider, timing, source and validation — never keys", "Anbieter, Dauer, Quelle und Prüfung – niemals Schlüssel"),
                     onClick = onDeveloper,
+                    iconColor = MaterialTheme.colorScheme.error,
                 )
             }
             item {
@@ -385,9 +416,9 @@ fun SettingsScreen(
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 6.dp),
     )
 }
 
@@ -398,17 +429,32 @@ private fun SettingsLink(
     supporting: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
+    iconColor: Color = Color.Unspecified,
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(supporting) },
-        leadingContent = icon,
-        trailingContent = {
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-        },
-        modifier = Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick),
-    )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+    val resolvedIconColor = if (iconColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        iconColor
+    }
+    GlassSettingSurface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        onClick = onClick,
+        enabled = enabled,
+    ) {
+        ListItem(
+            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+            supportingContent = { Text(supporting) },
+            leadingContent = { SettingsIconTile(resolvedIconColor, icon) },
+            trailingContent = {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
 }
 
 @Composable
@@ -419,19 +465,95 @@ private fun ToggleSetting(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     onClick: (() -> Unit)? = null,
+    iconColor: Color = Color.Unspecified,
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(supporting) },
-        leadingContent = icon,
-        trailingContent = {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        },
-        modifier = Modifier.fillMaxWidth().clickable {
-            onClick?.invoke() ?: onCheckedChange(!checked)
-        },
+    val resolvedIconColor = if (iconColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        iconColor
+    }
+    GlassSettingSurface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        onClick = { onClick?.invoke() ?: onCheckedChange(!checked) },
+    ) {
+        ListItem(
+            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+            supportingContent = { Text(supporting) },
+            leadingContent = { SettingsIconTile(resolvedIconColor, icon) },
+            trailingContent = {
+                Switch(checked = checked, onCheckedChange = onCheckedChange)
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun SettingsInfo(
+    icon: @Composable () -> Unit,
+    title: String,
+    supporting: String,
+    iconColor: Color,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
+        ),
+    ) {
+        ListItem(
+            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
+            supportingContent = { Text(supporting) },
+            leadingContent = { SettingsIconTile(iconColor, icon) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+@Composable
+private fun GlassSettingSurface(
+    modifier: Modifier,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
+        content = content,
     )
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
+}
+
+@Composable
+private fun SettingsIconTile(
+    color: Color,
+    icon: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = Modifier,
+        shape = RoundedCornerShape(13.dp),
+        color = color.copy(alpha = 0.14f),
+        contentColor = color,
+    ) {
+        Box(
+            modifier = Modifier.padding(10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon()
+        }
+    }
 }
 
 /** The official Material time picker, prefilled with the time the reminder currently uses. */
@@ -532,52 +654,67 @@ private fun CalorieBiasSetting(
     val entries = CalorieEstimateBias.entries
     var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
     val selected = entries[position.roundToInt().coerceIn(0, entries.lastIndex)]
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        tonalElevation = 2.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(Icons.Default.Straighten, contentDescription = null)
-            Column {
-                Text(nomiString("Calorie estimate bias", "Kalorienschätzung"))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SettingsIconTile(MaterialTheme.colorScheme.error) {
+                    Icon(Icons.Default.Straighten, contentDescription = null)
+                }
+                Column {
+                    Text(
+                        nomiString("Calorie estimate bias", "Kalorienschätzung"),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = selected.localizedDisplayName(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Slider(
+                value = position,
+                onValueChange = { position = it },
+                onValueChangeFinished = { onBiasChanged(selected) },
+                valueRange = 0f..entries.lastIndex.toFloat(),
+                steps = entries.size - 2,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = selected.localizedDisplayName(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = nomiString("Lower", "Niedriger"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = nomiString("Higher", "Höher"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        Slider(
-            value = position,
-            onValueChange = { position = it },
-            onValueChangeFinished = { onBiasChanged(selected) },
-            valueRange = 0f..entries.lastIndex.toFloat(),
-            steps = entries.size - 2,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = nomiString("Lower", "Niedriger"),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = nomiString("Higher", "Höher"),
-                style = MaterialTheme.typography.labelSmall,
+                text = selected.localizedSupportingText(),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Text(
-            text = selected.localizedSupportingText(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
-    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
 }
 
 /**
