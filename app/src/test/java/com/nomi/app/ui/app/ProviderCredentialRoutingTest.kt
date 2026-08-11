@@ -3,6 +3,7 @@ package com.nomi.app.ui.app
 import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.security.SecretUnavailableException
+import com.nomi.app.data.remote.ai.ProviderTemporarilyUnavailableException
 import java.io.IOException
 import kotlinx.serialization.SerializationException
 import org.junit.Assert.assertArrayEquals
@@ -100,6 +101,21 @@ class ProviderCredentialRoutingTest {
         assertEquals(
             "Nomi couldn't reach the provider. Check the internet connection and endpoint.",
             IOException("connection reset").safeAiMessage(),
+        )
+    }
+
+    @Test
+    fun `exhausted transient retries identify the failing provider`() {
+        val error = ProviderTemporarilyUnavailableException(
+            providerName = "Google Gemini",
+            statusCode = 503,
+            cause = IOException("overloaded"),
+        )
+
+        assertEquals(
+            "Google Gemini is temporarily unavailable (HTTP 503) after automatic retries. " +
+                "Try again shortly.",
+            error.safeProviderConnectionMessage(),
         )
     }
 

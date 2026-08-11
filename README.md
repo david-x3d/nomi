@@ -44,14 +44,18 @@ Nomi's existing default research provider remains OpenRouter `perplexity/sonar`.
 can instead select **Exa + Gemini**, which makes one request to Exa's official Search API and then
 one structured-extraction request directly to Google's Gemini API. Configure both fields in that
 provider dialog: the primary key is a Google Gemini API key and the second key is an Exa API key.
-The current direct Google model identifier is `gemini-3.6-flash`.
+The default direct Google model identifier is `gemini-2.5-flash`, a stable structured-output model
+suited to extraction. Transient 429/5xx responses from Exa or Google are retried with bounded
+exponential backoff. A configured `gemini-3.6-flash` call that remains unavailable falls back to
+`gemini-2.5-flash` before Nomi uses the separately configured smart fallback.
 
 Exa receives a simple query built from the original food text. Gemini receives only that exact
 input, Nomi's parsed quantity context, and the returned Exa documents. It selects opaque Exa source
 IDs; Nomi maps those IDs back to retrieved URLs, verifies that the selected document supports the
 product and values, then runs the existing Kotlin quantity reconciliation, serving normalizer,
 all-zero rejection, and source-integrity checks. A validation failure can use the separately
-configured smart fallback (normally Sonar); there is no retry loop.
+configured smart fallback (normally Sonar). Only transient transport failures are retried; Nomi
+does not retry rejected or unsupported nutrition results.
 
 For OpenRouter-hosted Perplexity models, use the full model identifier, for example
 `perplexity/sonar`.

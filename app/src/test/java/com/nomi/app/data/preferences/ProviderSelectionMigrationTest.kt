@@ -103,4 +103,5 @@ class ProviderSelectionMigrationTest {
         assertEquals(previous.providerId, migrated.providerId)
         assertEquals(previous.endpoint, migrated.endpoint)
     }
+
 }

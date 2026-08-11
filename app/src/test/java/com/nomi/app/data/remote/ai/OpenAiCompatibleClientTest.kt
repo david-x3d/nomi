@@ -435,7 +435,7 @@ class OpenAiCompatibleClientTest {
     fun `bounded completions use model supported token field`() {
         val encoded = json.encodeToString(
             chatCompletionRequest(
-                config(AiProviderKind.EXA_GEMINI, "gemini-3.6-flash"),
+                config(AiProviderKind.EXA_GEMINI, "gemini-2.5-flash"),
                 listOf(ChatMessage("user", JsonPrimitive("Extract nutrition"))),
                 maxTokens = 4_096,
             ),

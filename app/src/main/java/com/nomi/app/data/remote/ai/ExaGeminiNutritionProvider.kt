@@ -16,6 +16,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.timeout
 import io.ktor.client.request.header
@@ -24,11 +25,13 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import java.io.IOException
 import java.net.URI
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.system.measureTimeMillis
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -40,7 +43,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal const val DEFAULT_GEMINI_NUTRITION_MODEL = "gemini-3.6-flash"
+internal const val DEFAULT_GEMINI_NUTRITION_MODEL = "gemini-2.5-flash"
 internal const val EXA_API_ENDPOINT = "https://api.exa.ai"
 internal const val GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -87,6 +90,7 @@ internal class ExaGeminiHttpClient(
         install(HttpTimeout)
         expectSuccess = true
     },
+    private val retryDelay: suspend (Long) -> Unit = { delay(it) },
 ) : ExaNutritionSearchGateway, GeminiNutritionExtractionGateway, AutoCloseable {
 
     override suspend fun search(
@@ -94,22 +98,24 @@ internal class ExaGeminiHttpClient(
         credential: AiRuntimeCredential,
         timeoutMillis: Long,
     ): ExaSearchResponse {
-        val response = httpClient.post("$EXA_API_ENDPOINT/search") {
-            contentType(ContentType.Application.Json)
-            header("x-api-key", credential.revealForRequest())
-            setBody(
-                ExaSearchRequest(
-                    query = query,
-                    contents = ExaContentsRequest(
-                        highlights = ExaHighlightsRequest(query = query),
+        val response = withTransientHttpRetry("Exa") {
+            httpClient.post("$EXA_API_ENDPOINT/search") {
+                contentType(ContentType.Application.Json)
+                header("x-api-key", credential.revealForRequest())
+                setBody(
+                    ExaSearchRequest(
+                        query = query,
+                        contents = ExaContentsRequest(
+                            highlights = ExaHighlightsRequest(query = query),
+                        ),
                     ),
-                ),
-            )
-            timeout {
-                requestTimeoutMillis = timeoutMillis
-                socketTimeoutMillis = timeoutMillis
-            }
-        }.body<ExaSearchApiResponse>()
+                )
+                timeout {
+                    requestTimeoutMillis = timeoutMillis
+                    socketTimeoutMillis = timeoutMillis
+                }
+            }.body<ExaSearchApiResponse>()
+        }
         return ExaSearchResponse(
             requestId = response.requestId,
             results = response.results.map { result ->
@@ -149,25 +155,36 @@ internal class ExaGeminiHttpClient(
         require(config.model.matches(Regex("[A-Za-z0-9._-]+"))) {
             "Choose a valid Gemini model identifier in Settings."
         }
-        val endpoint = config.endpoint.trimEnd('/') + "/models/${config.model}:generateContent"
-        val response = httpClient.post(endpoint) {
-            contentType(ContentType.Application.Json)
-            header("x-goog-api-key", credential.revealForRequest())
-            setBody(
-                GeminiGenerateContentRequest(
-                    systemInstruction = GeminiContent(parts = listOf(GeminiPart(systemPrompt))),
-                    contents = listOf(GeminiContent(parts = listOf(GeminiPart(userPrompt)))),
-                    generationConfig = GeminiGenerationConfig(
-                        temperature = config.temperature,
-                        responseJsonSchema = responseJsonSchema,
-                    ),
-                ),
-            )
-            timeout {
-                requestTimeoutMillis = config.effectiveTimeoutMillis()
-                socketTimeoutMillis = config.effectiveTimeoutMillis()
+        suspend fun generate(model: String): GeminiGenerateContentResponse {
+            val endpoint = config.endpoint.trimEnd('/') + "/models/$model:generateContent"
+            return withTransientHttpRetry("Google Gemini") {
+                httpClient.post(endpoint) {
+                    contentType(ContentType.Application.Json)
+                    header("x-goog-api-key", credential.revealForRequest())
+                    setBody(
+                        GeminiGenerateContentRequest(
+                            systemInstruction = GeminiContent(parts = listOf(GeminiPart(systemPrompt))),
+                            contents = listOf(GeminiContent(parts = listOf(GeminiPart(userPrompt)))),
+                            generationConfig = GeminiGenerationConfig(
+                                responseJsonSchema = responseJsonSchema,
+                            ),
+                        ),
+                    )
+                    timeout {
+                        requestTimeoutMillis = config.effectiveTimeoutMillis()
+                        socketTimeoutMillis = config.effectiveTimeoutMillis()
+                    }
+                }.body<GeminiGenerateContentResponse>()
             }
-        }.body<GeminiGenerateContentResponse>()
+        }
+        val response = try {
+            generate(config.model)
+        } catch (failure: ProviderTemporarilyUnavailableException) {
+            if (!config.model.equals(PREVIOUS_GEMINI_NUTRITION_MODEL, ignoreCase = true)) {
+                throw failure
+            }
+            generate(DEFAULT_GEMINI_NUTRITION_MODEL)
+        }
         return response.candidates.firstOrNull()
             ?.content?.parts.orEmpty()
             .mapNotNull(GeminiPart::text)
@@ -177,10 +194,56 @@ internal class ExaGeminiHttpClient(
     }
 
     override fun close() = httpClient.close()
+
+    private suspend fun <T> withTransientHttpRetry(
+        providerName: String,
+        request: suspend () -> T,
+    ): T {
+        var lastFailure: ResponseException? = null
+        repeat(TRANSIENT_HTTP_ATTEMPTS) { attempt ->
+            try {
+                return request()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: ResponseException) {
+                if (failure.response.status.value !in TRANSIENT_HTTP_STATUS_CODES) throw failure
+                lastFailure = failure
+                if (attempt < TRANSIENT_HTTP_ATTEMPTS - 1) {
+                    val retryAfterMillis = failure.response.headers["Retry-After"]
+                        ?.toLongOrNull()?.times(1_000)
+                    retryDelay(transientRetryDelayMillis(attempt, retryAfterMillis))
+                }
+            }
+        }
+        val failure = checkNotNull(lastFailure)
+        throw ProviderTemporarilyUnavailableException(
+            providerName = providerName,
+            statusCode = failure.response.status.value,
+            cause = failure,
+        )
+    }
 }
 
+internal class ProviderTemporarilyUnavailableException(
+    val providerName: String,
+    val statusCode: Int,
+    cause: Throwable,
+) : IOException("$providerName is temporarily unavailable (HTTP $statusCode) after retrying.", cause)
+
+internal fun transientRetryDelayMillis(attempt: Int, retryAfterMillis: Long?): Long {
+    val exponential = TRANSIENT_HTTP_BASE_DELAY_MILLIS * (1L shl attempt.coerceIn(0, 3))
+    return maxOf(exponential, retryAfterMillis ?: 0L).coerceAtMost(TRANSIENT_HTTP_MAX_DELAY_MILLIS)
+}
+
+private const val TRANSIENT_HTTP_ATTEMPTS = 4
+private const val TRANSIENT_HTTP_BASE_DELAY_MILLIS = 750L
+private const val TRANSIENT_HTTP_MAX_DELAY_MILLIS = 10_000L
+private val TRANSIENT_HTTP_STATUS_CODES = setOf(429, 500, 502, 503, 504)
+private const val PREVIOUS_GEMINI_NUTRITION_MODEL = "gemini-3.6-flash"
+
 /**
- * Exactly one Exa retrieval followed by exactly one Gemini extraction.
+ * One Exa retrieval phase followed by one Gemini extraction phase. Individual HTTP requests may
+ * be repeated after transient capacity failures without changing the query or extracted contract.
  *
  * Gemini selects opaque source IDs, never URLs. Nomi resolves those IDs back to Exa results,
  * verifies that the selected extractive text contains the claimed values, and only then hands the
@@ -610,7 +673,6 @@ private data class GeminiPart(val text: String? = null)
 
 @Serializable
 private data class GeminiGenerationConfig(
-    val temperature: Double,
     val responseMimeType: String = "application/json",
     val responseJsonSchema: JsonObject? = null,
 )

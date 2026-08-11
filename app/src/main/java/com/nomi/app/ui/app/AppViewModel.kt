@@ -51,6 +51,7 @@ import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
+import com.nomi.app.data.remote.ai.ProviderTemporarilyUnavailableException
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
 import com.nomi.app.data.repository.HEALTH_CONNECT_WEIGHT_SOURCE
@@ -3018,6 +3019,10 @@ private fun Throwable.safeProviderFailureMessage(): String? {
     val causes = causeChain()
     if (causes.any { it is SecretUnavailableException }) {
         return "Nomi couldn't read the stored API key. Remove it in Settings and enter it again."
+    }
+    causes.filterIsInstance<ProviderTemporarilyUnavailableException>().firstOrNull()?.let { error ->
+        return "${error.providerName} is temporarily unavailable (HTTP ${error.statusCode}) " +
+            "after automatic retries. Try again shortly."
     }
     val responseError = causes.filterIsInstance<ResponseException>().firstOrNull()
     if (responseError != null) {
