@@ -91,6 +91,7 @@ import com.nomi.app.ui.library.LibraryUiState
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.logging.PortionEditUiState
+import com.nomi.app.ui.logging.asSingleLoggedMeal
 import com.nomi.app.domain.usecase.toPortionContext
 import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
@@ -133,6 +134,7 @@ import java.util.Locale
 import java.util.UUID
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -148,6 +150,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlin.math.roundToInt
@@ -212,6 +215,8 @@ class AppViewModel(
 
     private val selectedDate = MutableStateFlow(today)
     private var dayLogSnapshot: List<FoodLogEntity> = emptyList()
+    /** Original wording kept briefly so a freshly saved row can visibly resolve into its label. */
+    private val recentlySavedInputs = MutableStateFlow<Map<String, String>>(emptyMap())
 
     val todayState: StateFlow<TodayUiState> = combine(
         selectedDate.flatMapLatest { repository.dayLogs(it.toString()) }
@@ -219,8 +224,9 @@ class AppViewModel(
         repository.currentPlan,
         selectedDate,
         repository.preferences,
-    ) { logs, plan, date, prefs ->
-        mapToday(date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle)
+        recentlySavedInputs,
+    ) { logs, plan, date, prefs, freshInputs ->
+        mapToday(date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle, freshInputs)
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(isLoading = true))
     val aiDebugEvents: StateFlow<List<AiDebugEventEntity>> = repository.aiDebugEvents().stateIn(
@@ -844,11 +850,7 @@ class AppViewModel(
         lastLoggingText = text
         val cacheKey = foodAnalysisCacheKey(text)
         recentFoodAnalysisCache.get(cacheKey)?.takeIf { menuDishes == null }?.let { analysis ->
-            mutableLoggingState.value = FoodLoggingUiState.Preview(
-                analysis = analysis,
-                mealCategory = current.mealCategory,
-                originalText = text,
-            )
+            saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
             return
         }
 
@@ -884,11 +886,7 @@ class AppViewModel(
 
             cachedNutritionAnalysis(intent)?.let { cached ->
                 if (requestId == analysisRequestId) {
-                    mutableLoggingState.value = FoodLoggingUiState.Preview(
-                        cached,
-                        current.mealCategory,
-                        originalText = text,
-                    )
+                    saveTextAnalysisAutomatically(cached, current.mealCategory, text)
                 }
                 return@launch
             }
@@ -915,11 +913,7 @@ class AppViewModel(
                         decision = NutritionRoute.Decision.DIRECT,
                         detail = "New food entry researched before preview",
                     )
-                    mutableLoggingState.value = FoodLoggingUiState.Preview(
-                        analysis = analysis,
-                        mealCategory = current.mealCategory,
-                        originalText = text,
-                    )
+                    saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
@@ -936,6 +930,70 @@ class AppViewModel(
             if (analysisJob === job) analysisJob = null
         }
     }
+
+    /**
+     * Typed and dictated meals become journal rows as soon as their researched nutrition is
+     * ready. Photos and manual entries still use their dedicated correction steps.
+     */
+    private fun saveTextAnalysisAutomatically(
+        analysis: FoodAnalysis,
+        category: MealCategory,
+        originalText: String,
+    ) {
+        if (loggingSaveInProgress) return
+        loggingSaveInProgress = true
+        mutableLoggingState.value = FoodLoggingUiState.Processing(
+            AiProcessingStage.FINDING_NUTRITION,
+            originalText = originalText,
+        )
+        val revealGroupId = UUID.randomUUID().toString()
+        recentlySavedInputs.update { current -> current + (revealGroupId to originalText) }
+        viewModelScope.launch {
+            try {
+                runCatching {
+                    val grouped = analysis.items.size > 1
+                    val visibleAnalysis = analysis.asSingleLoggedMeal(
+                        useGerman = preferences.value.germanTranslationEnabled,
+                    )
+                    val validated = ServingNutritionNormalizer.validateBeforeSave(visibleAnalysis)
+                    val logs = validated.items.map { item ->
+                        val foodId = if (grouped) null else cacheAnalyzedFood(item)
+                        item.toLog(category, "ai").copy(
+                            foodId = foodId,
+                            entryGroupId = revealGroupId,
+                        )
+                    }
+                    repository.addLogs(logs)
+                }.onSuccess {
+                    // The rewritten entry exists now, so the one it replaces can go.
+                    mutableEditedEntryId.value?.let { replaced ->
+                        mutableEditedEntryId.value = null
+                        runCatching { repository.deleteLog(replaced) }
+                    }
+                    lastLoggingText = ""
+                    dismissPortionEdit()
+                    mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
+                    mutableEvents.emit(AppEvent.FoodSaved)
+                    // The UI has enough time to finish its 850 ms reveal, then this transient
+                    // wording is discarded so old rows never replay the effect.
+                    viewModelScope.launch {
+                        delay(1_200L)
+                        recentlySavedInputs.update { current -> current - revealGroupId }
+                    }
+                }.onFailure { error ->
+                    recentlySavedInputs.update { current -> current - revealGroupId }
+                    mutableLoggingState.value = FoodLoggingUiState.Error(
+                        message = error.safeAiMessage(),
+                        canRetry = true,
+                        originalText = originalText,
+                    )
+                }
+            } finally {
+                loggingSaveInProgress = false
+            }
+        }
+    }
+
     fun retryAnalysis() {
         editLoggingText()
         analyzeText()
@@ -2423,6 +2481,7 @@ class AppViewModel(
         plan: NutritionPlanEntity?,
         micronutrients: MicronutrientPreferences,
         goalsCardStyle: GoalsCardStyle,
+        freshInputs: Map<String, String>,
     ): TodayUiState {
         val totals = logs.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
         return TodayUiState(
@@ -2433,7 +2492,9 @@ class AppViewModel(
             carbohydrates = MacroProgress(totals.carbohydrateGrams, plan?.carbohydrateTargetGrams ?: 240.0),
             fat = MacroProgress(totals.fatGrams, plan?.fatTargetGrams ?: 65.0),
             micronutrients = micronutrients.toProgress(logs, totals),
-            entries = logs.map { it.toTodayEntry() },
+            entries = logs.map { log ->
+                log.toTodayEntry(revealText = log.entryGroupId?.let(freshInputs::get))
+            },
             goalsCardStyle = goalsCardStyle,
         )
     }
@@ -2551,7 +2612,7 @@ class AppViewModel(
         )
     }
 
-    private fun FoodLogEntity.toTodayEntry(): TodayFoodEntry = TodayFoodEntry(
+    private fun FoodLogEntity.toTodayEntry(revealText: String? = null): TodayFoodEntry = TodayFoodEntry(
         id = id,
         name = displayNameSnapshot,
         brand = brandSnapshot,
@@ -2569,6 +2630,7 @@ class AppViewModel(
         grams = grams,
         sourceName = sourceSnapshot.displayName,
         sourceUrl = sourceSnapshot.url,
+        revealText = revealText,
     )
 
     private fun AnalyzedFoodItem.toLog(category: MealCategory, inputMethod: String): FoodLogEntity {

@@ -136,6 +136,8 @@ data class TodayFoodEntry(
     val grams: Double? = null,
     val sourceName: String? = null,
     val sourceUrl: String? = null,
+    /** Briefly present after auto-save so the written sentence can resolve into its short label. */
+    val revealText: String? = null,
 )
 
 /**

@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -104,10 +105,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -810,14 +813,61 @@ private fun NotesFoodRow(
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
 ) {
-    val description = entry.rowDescription()
+    val finalDescription = entry.rowDescription()
+    val originalDescription = entry.revealText?.trim()
+        ?.takeIf { it.isNotBlank() && it != finalDescription }
+    var showOriginal by remember(entry.id, originalDescription) {
+        mutableStateOf(originalDescription != null)
+    }
+    val revealSweep = remember(entry.id) { Animatable(1.35f) }
+    LaunchedEffect(originalDescription) {
+        if (originalDescription == null) {
+            showOriginal = false
+            revealSweep.snapTo(1.35f)
+        } else {
+            showOriginal = true
+            revealSweep.snapTo(-0.35f)
+            revealSweep.animateTo(
+                targetValue = 0.42f,
+                animationSpec = tween(durationMillis = 320, easing = LinearEasing),
+            )
+            showOriginal = false
+            revealSweep.animateTo(
+                targetValue = 1.35f,
+                animationSpec = tween(durationMillis = 500, easing = LinearEasing),
+            )
+        }
+    }
+    val description = if (showOriginal) originalDescription.orEmpty() else finalDescription
     val locale = nomiLocale()
     val amountDisplay = entry.quantityDisplay(locale).withContext
     val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
     val writeLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
+    val shimmerColor = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .drawWithContent {
+                drawContent()
+                if (originalDescription != null && revealSweep.value < 1.34f) {
+                    val center = size.width * revealSweep.value
+                    val halfBand = size.width * 0.22f
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                shimmerColor.copy(alpha = 0.08f),
+                                shimmerColor.copy(alpha = 0.34f),
+                                shimmerColor.copy(alpha = 0.08f),
+                                Color.Transparent,
+                            ),
+                            startX = center - halfBand,
+                            endX = center + halfBand,
+                        ),
+                        blendMode = BlendMode.SrcAtop,
+                    )
+                }
+            }
             // Past the end of the words the line still opens for writing, with the caret at
             // the end, the way tapping the empty part of a note's line behaves.
             .clickable(
@@ -888,7 +938,7 @@ private fun NotesFoodRow(
                 .wrapContentHeight(Alignment.Top),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.End,
         )
     }
