@@ -125,12 +125,15 @@ def validate_suite(path=SUITE_PATH):
     return data
 
 
-def missing_keys():
+def missing_keys(provider_mode="both"):
     missing = []
-    if not os.getenv("OPENROUTER_API_KEY"):
+    if provider_mode in {"both", "sonar"} and not os.getenv("OPENROUTER_API_KEY"):
         missing.append("OPENROUTER_API_KEY")
-    if not os.getenv("EXA_API_KEY"):
-        missing.append("EXA_API_KEY")
+    if provider_mode in {"both", "exa_gemini"}:
+        if not os.getenv("GEMINI_API_KEY"):
+            missing.append("GEMINI_API_KEY")
+        if not os.getenv("EXA_API_KEY"):
+            missing.append("EXA_API_KEY")
     return missing
 
 
@@ -582,7 +585,8 @@ def main():
     suite = validate_suite()
     print(f"Validated {len(suite['cases'])} cases from {SUITE_PATH}")
     load_dotenv(ROOT / "eval" / ".env")
-    missing = missing_keys()
+    requested_provider_mode = "exa_gemini" if args.smoke else "both"
+    missing = missing_keys(requested_provider_mode)
     if args.score_existing:
         sonar, exa, comp = score_existing_results(suite)
         print_failure_categories(exa)

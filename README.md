@@ -41,10 +41,10 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 Open **Settings → AI providers**, select a provider and model for each pipeline, enter the API key, then use **Test connection**. Credentials stay on-device and are never included in Room, DataStore backups, logs, or repository files.
 
 Nomi's existing default research provider remains OpenRouter `perplexity/sonar`. Food research
-can instead select **Exa + Gemini**, which makes one Exa Search request and then one OpenRouter
-Gemini structured-extraction request. Configure both fields in that provider dialog: the primary
-key is the OpenRouter API key and the second key is the Exa API key. The current model identifier is
-`google/gemini-3.6-flash`.
+can instead select **Exa + Gemini**, which makes one request to Exa's official Search API and then
+one structured-extraction request directly to Google's Gemini API. Configure both fields in that
+provider dialog: the primary key is a Google Gemini API key and the second key is an Exa API key.
+The current direct Google model identifier is `gemini-3.6-flash`.
 
 Exa receives a simple query built from the original food text. Gemini receives only that exact
 input, Nomi's parsed quantity context, and the returned Exa documents. It selects opaque Exa source
@@ -79,8 +79,9 @@ To classify and rescore already-saved full raw runs without API calls:
 python eval/run_eval.py --score-existing
 ```
 
-For live evaluation, put `OPENROUTER_API_KEY` and `EXA_API_KEY` in `eval/.env` (which is ignored by
-Git). Run the isolated, fresh-cache 10-case Exa + Gemini smoke first:
+For live evaluation, put `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, and `EXA_API_KEY` in `eval/.env`
+(which is ignored by Git). OpenRouter is needed only for the separate Sonar comparison; the Exa +
+Gemini provider calls Exa and Google directly. Run the isolated, fresh-cache 10-case smoke first:
 
 ```powershell
 python eval/run_eval.py --smoke

@@ -31,7 +31,7 @@ import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
-import com.nomi.app.data.remote.ai.OPENROUTER_GEMINI_ENDPOINT
+import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
 import com.nomi.app.ui.localization.nomiString
 import java.net.URI
 
@@ -148,7 +148,14 @@ fun AiProviderEditorDialog(
                             state.copy(apiKeyInput = it, testResult = null, errorMessage = null),
                         )
                     },
-                    label = { Text(if (state.hasStoredApiKey) nomiString("API key (stored securely)", "API-Schlüssel (sicher gespeichert)") else nomiString("API key", "API-Schlüssel")) },
+                    label = {
+                        val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
+                            "Google Gemini API key"
+                        } else {
+                            nomiString("API key", "API-Schlüssel")
+                        }
+                        Text(if (state.hasStoredApiKey) "$keyName (stored securely)" else keyName)
+                    },
                     placeholder = { if (state.hasStoredApiKey) Text(nomiString("Leave blank to keep existing key", "Leer lassen, um den vorhandenen Schlüssel zu behalten")) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -170,7 +177,7 @@ fun AiProviderEditorDialog(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Text("Exa retrieves sources; Gemini runs through OpenRouter. Both keys stay encrypted on this device.", style = MaterialTheme.typography.bodySmall)
+                    Text("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device.", style = MaterialTheme.typography.bodySmall)
                 }
                 if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
                     TextButton(
@@ -245,7 +252,7 @@ private fun AiProviderEditorState.switchTo(provider: AiProviderKind): AiProvider
 
 private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
-    AiProviderKind.EXA_GEMINI -> OPENROUTER_GEMINI_ENDPOINT
+    AiProviderKind.EXA_GEMINI -> GEMINI_API_ENDPOINT
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
     AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
     AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"

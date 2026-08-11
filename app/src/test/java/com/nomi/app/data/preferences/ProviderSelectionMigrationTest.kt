@@ -88,4 +88,19 @@ class ProviderSelectionMigrationTest {
 
         assertSame(perplexity, perplexity.withSupportedModel(ProviderPipeline.FOOD_RESEARCH))
     }
+
+    @Test
+    fun `OpenRouter Gemini slug migrates to the direct Google model identifier`() {
+        val previous = ProviderSelection(
+            providerId = "exa-gemini",
+            model = PREVIOUS_OPENROUTER_GEMINI_NUTRITION_MODEL,
+            endpoint = "https://openrouter.ai/api/v1",
+        )
+
+        val migrated = previous.withSupportedModel(ProviderPipeline.FOOD_RESEARCH)
+
+        assertEquals(DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL, migrated.model)
+        assertEquals(previous.providerId, migrated.providerId)
+        assertEquals(previous.endpoint, migrated.endpoint)
+    }
 }

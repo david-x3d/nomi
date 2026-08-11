@@ -5,7 +5,10 @@ import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
+import com.nomi.app.ai.prompt.AiPrompts
+import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
+import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import java.nio.file.Files
@@ -15,6 +18,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -38,8 +42,6 @@ class NutritionBenchmarkEvalTest {
     @Test
     fun executeProductionProviders() = runBlocking {
         if (System.getenv("NOMI_RUN_EVAL_LIVE") != "1") return@runBlocking
-        val openRouterKey = requiredEnv("OPENROUTER_API_KEY")
-        val exaKey = requiredEnv("EXA_API_KEY")
         val root = repositoryRoot()
         val allCases = json.parseToJsonElement(
             Files.readString(root.resolve("eval/eval_cases.json")),
@@ -56,6 +58,15 @@ class NutritionBenchmarkEvalTest {
         require(providerMode in setOf("both", "sonar", "exa_gemini")) {
             "NOMI_EVAL_PROVIDER must be both, sonar, or exa_gemini"
         }
+        val openRouterKey = if (providerMode in setOf("both", "sonar")) {
+            requiredEnv("OPENROUTER_API_KEY")
+        } else null
+        val geminiKey = if (providerMode in setOf("both", "exa_gemini")) {
+            requiredEnv("GEMINI_API_KEY")
+        } else null
+        val exaKey = if (providerMode in setOf("both", "exa_gemini")) {
+            requiredEnv("EXA_API_KEY")
+        } else null
         val suffix = System.getenv("NOMI_EVAL_OUTPUT_SUFFIX").orEmpty()
         require(suffix.matches(Regex("[A-Za-z0-9_-]*"))) { "Invalid eval output suffix" }
         val results = root.resolve("eval/results")
@@ -63,14 +74,19 @@ class NutritionBenchmarkEvalTest {
 
         if (providerMode in setOf("both", "sonar")) {
             val sonar = executeRun("sonar", cases) { case ->
-                executeSonar(case.input(), case.country(), openRouterKey)
+                executeSonar(case.input(), case.country(), checkNotNull(openRouterKey))
             }
             Files.writeString(results.resolve("sonar${suffix}_raw.json"), json.encodeToString(sonar))
         }
 
         if (providerMode in setOf("both", "exa_gemini")) {
             val exaGemini = executeRun("exa_gemini", cases) { case ->
-                executeExaGemini(case.input(), case.country(), openRouterKey, exaKey)
+                executeExaGemini(
+                    case.input(),
+                    case.country(),
+                    checkNotNull(geminiKey),
+                    checkNotNull(exaKey),
+                )
             }
             Files.writeString(
                 results.resolve("exa_gemini${suffix}_raw.json"),
@@ -114,33 +130,41 @@ class NutritionBenchmarkEvalTest {
     private suspend fun executeExaGemini(
         input: String,
         country: String,
-        openRouterKey: String,
+        geminiKey: String,
         exaKey: String,
     ): RawCase {
         val started = System.nanoTime()
         return capture(started) {
-            val intent = OpenAiCompatibleClient().use { client ->
-                val credential = AiRuntimeCredential.from(openRouterKey)
-                val parser = openRouterProvider(client, credential, country)
-                LocalFoodIntentParser.parseOrNull(input) ?: parser.parseFood(input)
-            }
-            ExaGeminiHttpClient().use { exaClient ->
-                OpenAiCompatibleClient().use { geminiClient ->
-                    ExaGeminiNutritionProvider(
-                        exaSearch = exaClient,
-                        geminiExtractor = OpenRouterGeminiExtractionGateway(geminiClient),
-                        exaCredential = { AiRuntimeCredential.from(exaKey) },
-                        geminiConfig = AiProviderConfig(
-                            kind = AiProviderKind.EXA_GEMINI,
-                            endpoint = OPENROUTER_GEMINI_ENDPOINT,
-                            model = System.getenv("OPENROUTER_GEMINI_MODEL")
-                                ?: DEFAULT_GEMINI_NUTRITION_MODEL,
-                            timeoutMillis = 60_000,
-                        ),
-                        geminiCredential = { AiRuntimeCredential.from(openRouterKey) },
-                        localeCountryProvider = { country },
-                    ).researchNutrition(intent)
+            ExaGeminiHttpClient().use { client ->
+                val credential = AiRuntimeCredential.from(geminiKey)
+                val config = AiProviderConfig(
+                    kind = AiProviderKind.EXA_GEMINI,
+                    endpoint = GEMINI_API_ENDPOINT,
+                    model = System.getenv("GEMINI_MODEL") ?: DEFAULT_GEMINI_NUTRITION_MODEL,
+                    timeoutMillis = 60_000,
+                )
+                val intent = LocalFoodIntentParser.parseOrNull(input) ?: run {
+                    val raw = client.generateStructuredJson(
+                        config = config,
+                        credential = credential,
+                        systemPrompt = "You are Nomi's structured multilingual food parser.",
+                        userPrompt = AiPrompts.parseFood(input),
+                    )
+                    val parsed = client.json.decodeFromString<com.nomi.app.ai.model.ParsedFoodIntent>(
+                        extractJsonDocument(raw),
+                    )
+                    AiResponseValidator.validate(
+                        UserQuantityResolver.reconcileParsedIntent(input, parsed, country),
+                    )
                 }
+                ExaGeminiNutritionProvider(
+                    exaSearch = client,
+                    geminiExtractor = client,
+                    exaCredential = { AiRuntimeCredential.from(exaKey) },
+                    geminiConfig = config,
+                    geminiCredential = { credential },
+                    localeCountryProvider = { country },
+                ).researchNutrition(intent)
             }
         }
     }

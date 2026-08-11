@@ -40,9 +40,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal const val DEFAULT_GEMINI_NUTRITION_MODEL = "google/gemini-3.6-flash"
+internal const val DEFAULT_GEMINI_NUTRITION_MODEL = "gemini-3.6-flash"
 internal const val EXA_API_ENDPOINT = "https://api.exa.ai"
-internal const val OPENROUTER_GEMINI_ENDPOINT = "https://openrouter.ai/api/v1"
+internal const val GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta"
 
 internal data class ExaSearchResponse(
     val requestId: String? = null,
@@ -73,28 +73,6 @@ internal fun interface GeminiNutritionExtractionGateway {
     ): GeminiNutritionExtraction
 }
 
-
-/** OpenRouter-hosted Gemini extraction; Exa remains the only web retrieval provider. */
-internal class OpenRouterGeminiExtractionGateway(
-    private val client: OpenAiCompatibleClient,
-) : GeminiNutritionExtractionGateway {
-    override suspend fun extract(
-        config: AiProviderConfig,
-        credential: AiRuntimeCredential,
-        systemPrompt: String,
-        userPrompt: String,
-    ): GeminiNutritionExtraction {
-        val raw = client.completeStructuredJson(
-            config = config,
-            credential = credential,
-            systemPrompt = systemPrompt,
-            userPrompt = userPrompt,
-            schemaName = "nomi_nutrition_extraction",
-            schema = GEMINI_NUTRITION_EXTRACTION_SCHEMA,
-        )
-        return client.json.decodeFromString(extractJsonDocument(raw))
-    }
-}
 
 /** Native REST client for the two deliberately separate halves of nutrition research. */
 internal class ExaGeminiHttpClient(
@@ -151,6 +129,23 @@ internal class ExaGeminiHttpClient(
         systemPrompt: String,
         userPrompt: String,
     ): GeminiNutritionExtraction {
+        val content = generateStructuredJson(
+            config = config,
+            credential = credential,
+            systemPrompt = systemPrompt,
+            userPrompt = userPrompt,
+            responseJsonSchema = GEMINI_NUTRITION_EXTRACTION_SCHEMA,
+        )
+        return json.decodeFromString(extractJsonDocument(content))
+    }
+
+    internal suspend fun generateStructuredJson(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+        responseJsonSchema: JsonObject? = null,
+    ): String {
         require(config.model.matches(Regex("[A-Za-z0-9._-]+"))) {
             "Choose a valid Gemini model identifier in Settings."
         }
@@ -164,7 +159,7 @@ internal class ExaGeminiHttpClient(
                     contents = listOf(GeminiContent(parts = listOf(GeminiPart(userPrompt)))),
                     generationConfig = GeminiGenerationConfig(
                         temperature = config.temperature,
-                        responseJsonSchema = GEMINI_NUTRITION_EXTRACTION_SCHEMA,
+                        responseJsonSchema = responseJsonSchema,
                     ),
                 ),
             )
@@ -173,13 +168,12 @@ internal class ExaGeminiHttpClient(
                 socketTimeoutMillis = config.effectiveTimeoutMillis()
             }
         }.body<GeminiGenerateContentResponse>()
-        val content = response.candidates.firstOrNull()
+        return response.candidates.firstOrNull()
             ?.content?.parts.orEmpty()
             .mapNotNull(GeminiPart::text)
             .joinToString("\n")
             .takeIf(String::isNotBlank)
             ?: throw AiValidationException("Gemini returned no structured nutrition content")
-        return json.decodeFromString(extractJsonDocument(content))
     }
 
     override fun close() = httpClient.close()
@@ -618,7 +612,7 @@ private data class GeminiPart(val text: String? = null)
 private data class GeminiGenerationConfig(
     val temperature: Double,
     val responseMimeType: String = "application/json",
-    val responseJsonSchema: JsonObject,
+    val responseJsonSchema: JsonObject? = null,
 )
 
 @Serializable

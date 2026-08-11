@@ -21,7 +21,7 @@ class ExaGeminiNutritionProviderTest {
     private val credential = AiRuntimeCredential.from("test-key")
     private val config = AiProviderConfig(
         kind = AiProviderKind.EXA_GEMINI,
-        endpoint = OPENROUTER_GEMINI_ENDPOINT,
+        endpoint = GEMINI_API_ENDPOINT,
         model = DEFAULT_GEMINI_NUTRITION_MODEL,
         timeoutMillis = 5_000,
     )

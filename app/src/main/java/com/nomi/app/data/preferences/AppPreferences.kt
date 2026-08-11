@@ -181,6 +181,8 @@ internal const val DEFAULT_OPENROUTER_MODEL = "google/gemini-3.5-flash-lite"
 internal const val RETIRED_OPENROUTER_MODEL = "deepseek/deepseek-v4"
 internal const val PREVIOUS_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
 internal const val PREVIOUS_OPENROUTER_DEFAULT_MODEL = "openai/gpt-5.6-sol"
+internal const val PREVIOUS_OPENROUTER_GEMINI_NUTRITION_MODEL = "google/gemini-3.6-flash"
+internal const val DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL = "gemini-3.6-flash"
 private val RETIRED_OPENROUTER_MODELS = setOf(
     RETIRED_OPENROUTER_MODEL,
     PREVIOUS_OPENROUTER_MODEL,
@@ -210,6 +212,14 @@ internal fun ProviderSelection.withSupportedModel(
             providerId = "openrouter",
             model = pipeline.defaultOpenRouterModel(),
         )
+    }
+    if (providerId.equals("exa-gemini", ignoreCase = true)) {
+        val slug = model.trim().lowercase()
+        return if (slug.isEmpty() || slug == PREVIOUS_OPENROUTER_GEMINI_NUTRITION_MODEL) {
+            copy(model = DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL)
+        } else {
+            this
+        }
     }
     if (!providerId.equals("openrouter", ignoreCase = true)) return this
     val slug = model.trim().lowercase()

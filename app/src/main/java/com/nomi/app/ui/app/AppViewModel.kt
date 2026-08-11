@@ -49,8 +49,7 @@ import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
 import com.nomi.app.data.remote.ai.EXA_API_ENDPOINT
 import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
-import com.nomi.app.data.remote.ai.OPENROUTER_GEMINI_ENDPOINT
-import com.nomi.app.data.remote.ai.OpenRouterGeminiExtractionGateway
+import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
@@ -1841,7 +1840,7 @@ class AppViewModel(
                     withDraftOrStoredCredential(
                         input = state.apiKeyInput,
                         storedId = secretId(selection),
-                        missingMessage = "Enter an OpenRouter API key before testing this provider.",
+                        missingMessage = "Enter a Google Gemini API key before testing this provider.",
                     ) { geminiCredential ->
                         withDraftOrStoredCredential(
                             input = state.searchApiKeyInput,
@@ -2251,7 +2250,7 @@ class AppViewModel(
                 val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
                 block(exaGeminiProvider(config, geminiCredential, exaCredential))
             } ?: error("Add the Exa API key in Settings first.")
-        } ?: error("Add the OpenRouter API key in Settings first.")
+        } ?: error("Add the Google Gemini API key in Settings first.")
     }
     private suspend fun <T : Any> withConfiguredSmartFallback(
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
@@ -2287,7 +2286,7 @@ class AppViewModel(
         exaCredential: AiRuntimeCredential,
     ) = ExaGeminiNutritionProvider(
         exaSearch = container.exaGeminiClient,
-        geminiExtractor = OpenRouterGeminiExtractionGateway(container.openAiClient),
+        geminiExtractor = container.exaGeminiClient,
         exaCredential = { exaCredential },
         geminiConfig = config,
         geminiCredential = { geminiCredential },
@@ -2819,7 +2818,7 @@ private fun ProviderSelection.resolvedEndpoint(): String {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
         AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
         AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
-        AiProviderKind.EXA_GEMINI -> OPENROUTER_GEMINI_ENDPOINT
+        AiProviderKind.EXA_GEMINI -> GEMINI_API_ENDPOINT
         // Codex Easy publishes both a bare host and a /v1 base; Nomi appends OpenAI request
         // paths, so the versioned base is the one that resolves to /v1/chat/completions.
         AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
