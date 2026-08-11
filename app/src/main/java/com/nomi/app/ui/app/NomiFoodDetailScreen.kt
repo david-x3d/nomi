@@ -572,7 +572,7 @@ private fun NutrientMetric(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = metric.amount?.let { "${formatNumber(it, locale)} ${metric.unit}" } ?: "—",
+            text = "${formatNumber(metric.amount ?: 0.0, locale)} ${metric.unit}",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )

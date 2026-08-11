@@ -111,6 +111,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -593,16 +594,21 @@ private fun NotesHeader(
 
 @Composable
 private fun NotesEmptyState() {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 44.dp),
+            .padding(horizontal = 28.dp, vertical = 28.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = nomiString("What did you eat?", "Was hast du gegessen?"),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.semantics { heading() },
+            text = nomiString(
+                "Tap below to log your first meal",
+                "Tippe unten, um deine erste Mahlzeit einzutragen",
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -843,31 +849,11 @@ private fun NotesFoodRow(
     val amountDisplay = entry.quantityDisplay(locale).withContext
     val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
     val writeLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
-    val shimmerColor = MaterialTheme.colorScheme.primary
+    val revealProgress = revealSweep.value
+    val revealActive = originalDescription != null && revealProgress < 1.34f
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .drawWithContent {
-                drawContent()
-                if (originalDescription != null && revealSweep.value < 1.34f) {
-                    val center = size.width * revealSweep.value
-                    val halfBand = size.width * 0.22f
-                    drawRect(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                shimmerColor.copy(alpha = 0.08f),
-                                shimmerColor.copy(alpha = 0.34f),
-                                shimmerColor.copy(alpha = 0.08f),
-                                Color.Transparent,
-                            ),
-                            startX = center - halfBand,
-                            endX = center + halfBand,
-                        ),
-                        blendMode = BlendMode.SrcAtop,
-                    )
-                }
-            }
             // Past the end of the words the line still opens for writing, with the caret at
             // the end, the way tapping the empty part of a note's line behaves.
             .clickable(
@@ -890,16 +876,25 @@ private fun NotesFoodRow(
             }
             Text(
                 text = description,
-                modifier = Modifier.pointerInput(entry.id, description) {
-                    detectTapGestures(
-                        onLongPress = { onOpenDetails() },
-                        onTap = { position ->
-                            val tapped = descriptionLayout?.getOffsetForPosition(position)
-                                ?: description.length
-                            onEditText(entry.reeditableCaretForDescription(tapped))
-                        },
+                modifier = Modifier
+                    .oneShotTextGradient(
+                        active = revealActive,
+                        progress = revealProgress,
+                        colors = listOf(
+                            Color(0xFFFF9A45),
+                            Color(0xFFB65CFF),
+                        ),
                     )
-                },
+                    .pointerInput(entry.id, description) {
+                        detectTapGestures(
+                            onLongPress = { onOpenDetails() },
+                            onTap = { position ->
+                                val tapped = descriptionLayout?.getOffsetForPosition(position)
+                                    ?: description.length
+                                onEditText(entry.reeditableCaretForDescription(tapped))
+                            },
+                        )
+                    },
                 onTextLayout = { descriptionLayout = it },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -928,6 +923,14 @@ private fun NotesFoodRow(
             // The calories are the way into the entry's details now that the words belong to
             // the keyboard, so the figure carries a touch target rather than only its glyphs.
             modifier = Modifier
+                .oneShotTextGradient(
+                    active = revealActive,
+                    progress = revealProgress,
+                    colors = listOf(
+                        Color(0xFFA7E8FF),
+                        Color(0xFF55AEFF),
+                    ),
+                )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -942,6 +945,29 @@ private fun NotesFoodRow(
             textAlign = TextAlign.End,
         )
     }
+}
+
+/** A fast one-shot colour sweep clipped to the glyphs, never painted across the row behind them. */
+private fun Modifier.oneShotTextGradient(
+    active: Boolean,
+    progress: Float,
+    colors: List<Color>,
+): Modifier {
+    if (!active) return this
+    return graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val center = size.width * progress
+            val halfBand = size.width * 0.34f
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent) + colors + Color.Transparent,
+                    startX = center - halfBand,
+                    endX = center + halfBand,
+                ),
+                blendMode = BlendMode.SrcAtop,
+            )
+        }
 }
 
 @Composable
@@ -2102,10 +2128,8 @@ private fun MicronutrientGoalRow(progress: MicronutrientProgress) {
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = progress.consumed?.let { amount ->
-                    "${amount.roundToInt().formatted(locale)} / " +
-                        "${progress.target.roundToInt().formatted(locale)} $suffix"
-                } ?: nomiString("No data yet", "Noch keine Daten"),
+                text = "${(progress.consumed ?: 0.0).roundToInt().formatted(locale)} / " +
+                    "${progress.target.roundToInt().formatted(locale)} $suffix",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

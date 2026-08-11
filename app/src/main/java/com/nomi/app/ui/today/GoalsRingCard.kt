@@ -6,11 +6,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -104,8 +106,8 @@ private fun CalorieRow(state: TodayUiState) {
 }
 
 /**
- * Four rings per row, wrapping into a second row when micronutrients are tracked. Chunking rather
- * than a flow layout keeps every ring the same width, so the columns line up between the rows.
+ * Three rings fill a row. A final row with one or two values is kept as one centered group,
+ * matching the nutrition detail grid instead of anchoring the remaining rings to an edge.
  */
 @Composable
 private fun RingGrid(state: TodayUiState) {
@@ -157,17 +159,22 @@ private fun RingGrid(state: TodayUiState) {
             )
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        rings.chunked(4).forEach { row ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                row.forEach { ring ->
-                    NutrientRing(ring, modifier = Modifier.weight(1f))
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val gap = 8.dp
+        val cellWidth = (maxWidth - gap * 2) / 3
+        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            rings.chunked(3).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = gap,
+                        alignment = Alignment.CenterHorizontally,
+                    ),
+                ) {
+                    row.forEach { ring ->
+                        NutrientRing(ring, modifier = Modifier.width(cellWidth))
+                    }
                 }
-                // Keeps a short final row aligned with the one above it.
-                repeat(4 - row.size) { Box(modifier = Modifier.weight(1f)) }
             }
         }
     }
@@ -225,7 +232,7 @@ private fun NutrientRing(ring: RingValue, modifier: Modifier = Modifier) {
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = ring.consumed?.roundToInt()?.toString() ?: "–",
+                    text = (ring.consumed ?: 0.0).roundToInt().toString(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
