@@ -1,5 +1,6 @@
 package com.nomi.app.ui.today
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -55,7 +56,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -128,7 +131,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ui.capture.InlineDictationState
+import com.nomi.app.ui.capture.rememberInlineDictation
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
+import com.nomi.app.ui.components.DictationWaveform
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
@@ -178,12 +184,16 @@ fun NomiNotesTodayScreen(
     onEditPreview: () -> Unit,
     onDismissDraft: () -> Unit,
     onQuickMethod: (AddFoodMethod) -> Unit,
+    onVoiceTranscription: (String) -> Unit = {},
     onPhotoDescriptionChanged: (String) -> Unit = {},
     onPhotoPlaceChanged: (String) -> Unit = {},
     onConfirmPhotoDescription: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberNomiHaptics()
+    // Dictation stays on this page: the row at the bottom becomes the microphone rather than
+    // handing the page over to a screen whose only job is to listen.
+    val dictation = rememberInlineDictation(onTranscription = onVoiceTranscription)
     var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
     var composerOpen by rememberSaveable { mutableStateOf(false) }
@@ -228,6 +238,8 @@ fun NomiNotesTodayScreen(
     LaunchedEffect(loggingState is FoodLoggingUiState.Error) {
         if (loggingState is FoodLoggingUiState.Error) haptics.failed()
     }
+    // Back means "forget what I just said" while the bar is listening, not "leave the day".
+    BackHandler(enabled = dictation.isActive) { dictation.cancel() }
 
     val pendingEntries = pendingDeletedFoods.values.map(PendingDeletedFood::entry)
     val displayedEntries = remember(state.entries, pendingEntries) {
@@ -261,8 +273,10 @@ fun NomiNotesTodayScreen(
                     state = state,
                     canSend = (loggingState as? FoodLoggingUiState.Input)
                         ?.text?.isNotBlank() == true,
+                    dictation = dictation,
                     onGoals = { showGoals = true },
-                    onVoice = { onQuickMethod(AddFoodMethod.VOICE) },
+                    onVoice = dictation.start,
+                    onDictationDone = { haptics.sent(); dictation.stop() },
                     onMore = { showQuickAdd = true },
                     onWrite = { composerOpen = true },
                     onSend = { haptics.sent(); onAnalyze() },
@@ -1462,13 +1476,19 @@ private fun ManualDraftNote(
 /**
  * The resting state of the page: one floating row holding the remaining calories and the ways
  * to add food. Nothing else competes with the writing surface above it.
+ *
+ * While Nomi is listening the same row is the dictation: the calorie pill becomes the waveform
+ * and the two actions become "done" and "forget it". Nothing opens on top of the day, because
+ * the day is what the sentence is about.
  */
 @Composable
 private fun NotesFloatingActionRow(
     state: TodayUiState,
     canSend: Boolean,
+    dictation: InlineDictationState,
     onGoals: () -> Unit,
     onVoice: () -> Unit,
+    onDictationDone: () -> Unit,
     onMore: () -> Unit,
     onWrite: () -> Unit,
     onSend: () -> Unit,
@@ -1488,83 +1508,198 @@ private fun NotesFloatingActionRow(
     } else {
         nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
     }
-    Row(
+    AnimatedContent(
+        targetState = dictation.isActive,
         modifier = Modifier
             .widthIn(max = 760.dp)
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            onClick = onGoals,
-            modifier = Modifier.weight(1f),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = hairlineOnPitchBlack(),
+        transitionSpec = {
+            (fadeIn(animationSpec = effectsSpec) +
+                scaleIn(animationSpec = effectsSpec, initialScale = 0.94f))
+                .togetherWith(
+                    fadeOut(animationSpec = effectsSpec) +
+                        scaleOut(animationSpec = effectsSpec, targetScale = 0.94f),
+                )
+        },
+        label = "dictation row",
+    ) { listening ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocalFireDepartment,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    text = calorieText,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        NotesCircleAction(
-            icon = Icons.Default.Mic,
-            description = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
-            onClick = onVoice,
-        )
-        NotesCircleAction(
-            icon = Icons.Default.Add,
-            description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
-            onClick = onMore,
-        )
-        // Once there is something written, the same slot becomes the way to send it, and it
-        // trades places rather than blinking.
-        AnimatedContent(
-            targetState = canSend,
-            transitionSpec = {
-                (fadeIn(animationSpec = effectsSpec) +
-                    scaleIn(animationSpec = effectsSpec, initialScale = 0.72f))
-                    .togetherWith(
-                        fadeOut(animationSpec = effectsSpec) +
-                            scaleOut(animationSpec = effectsSpec, targetScale = 0.72f),
-                    )
-            },
-            label = "composer action",
-        ) { sendable ->
-            if (sendable) {
+            if (listening) {
+                NotesPill(modifier = Modifier.weight(1f)) {
+                    DictationPillContent(dictation)
+                }
                 NotesCircleAction(
-                    icon = Icons.AutoMirrored.Filled.Send,
-                    description = nomiString("Analyze meal", "Mahlzeit analysieren"),
-                    onClick = onSend,
+                    icon = Icons.Default.Check,
+                    description = nomiString("Done speaking", "Fertig gesprochen"),
+                    onClick = onDictationDone,
                     emphasized = true,
                 )
-            } else {
                 NotesCircleAction(
-                    icon = Icons.Default.Keyboard,
-                    description = nomiString(
-                        "Write what you ate",
-                        "Schreiben, was du gegessen hast",
-                    ),
-                    onClick = onWrite,
+                    icon = Icons.Default.Close,
+                    description = nomiString("Discard dictation", "Diktat verwerfen"),
+                    onClick = dictation.cancel,
                 )
+            } else {
+                NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = calorieText,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                NotesCircleAction(
+                    icon = Icons.Default.Mic,
+                    description = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
+                    onClick = onVoice,
+                )
+                NotesCircleAction(
+                    icon = Icons.Default.Add,
+                    description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
+                    onClick = onMore,
+                )
+                // Once there is something written, the same slot becomes the way to send it, and
+                // it trades places rather than blinking.
+                AnimatedContent(
+                    targetState = canSend,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = effectsSpec) +
+                            scaleIn(animationSpec = effectsSpec, initialScale = 0.72f))
+                            .togetherWith(
+                                fadeOut(animationSpec = effectsSpec) +
+                                    scaleOut(animationSpec = effectsSpec, targetScale = 0.72f),
+                            )
+                    },
+                    label = "composer action",
+                ) { sendable ->
+                    if (sendable) {
+                        NotesCircleAction(
+                            icon = Icons.AutoMirrored.Filled.Send,
+                            description = nomiString("Analyze meal", "Mahlzeit analysieren"),
+                            onClick = onSend,
+                            emphasized = true,
+                        )
+                    } else {
+                        NotesCircleAction(
+                            icon = Icons.Default.Keyboard,
+                            description = nomiString(
+                                "Write what you ate",
+                                "Schreiben, was du gegessen hast",
+                            ),
+                            onClick = onWrite,
+                        )
+                    }
+                }
             }
         }
+    }
+}
+
+/** The rounded slot on the left of the floating row, whatever happens to be inside it. */
+@Composable
+private fun NotesPill(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    val shape = CircleShape
+    val color = MaterialTheme.colorScheme.surfaceContainerHigh
+    val border = hairlineOnPitchBlack()
+    val inner: @Composable () -> Unit = {
+        Box(
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            content()
+        }
+    }
+    if (onClick == null) {
+        Surface(modifier = modifier, shape = shape, color = color, border = border) { inner() }
+    } else {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            shape = shape,
+            color = color,
+            border = border,
+        ) { inner() }
+    }
+}
+
+/**
+ * What the pill says while it is the microphone: the waveform when there is something to hear,
+ * and words only when there is something the bars cannot say.
+ */
+@Composable
+private fun DictationPillContent(dictation: InlineDictationState) {
+    val progress = dictation.downloadProgress
+    when {
+        dictation.message != null -> Text(
+            text = dictation.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        progress != null -> Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = nomiString(
+                    "Preparing speech, once only…",
+                    "Spracherkennung wird einmalig vorbereitet …",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        dictation.isTranscribing -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+            )
+            Text(
+                text = nomiString("Writing it down…", "Wird aufgeschrieben …"),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        else -> DictationWaveform(
+            level = dictation.level,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

@@ -2,6 +2,7 @@ package com.nomi.app.integration.voice
 
 import android.content.Context
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +36,9 @@ class WhisperVoiceController(
     private val mutableDownloadProgress = MutableStateFlow<Float?>(null)
     val downloadProgress: StateFlow<Float?> = mutableDownloadProgress.asStateFlow()
 
+    /** Current microphone loudness from 0 to 1, for showing that speech is being heard. */
+    val level: StateFlow<Float> = recorder.level
+
     private var job: Job? = null
 
     /** Whisper needs no system recognizer, so it is available wherever the app runs. */
@@ -55,6 +59,7 @@ class WhisperVoiceController(
                 }
                 mutableDownloadProgress.value = null
                 downloaded.onFailure { error ->
+                    if (error is CancellationException) throw error
                     mutableState.value = VoiceRecognitionState(
                         errorMessage = error.message ?: "The speech model could not be downloaded.",
                     )
@@ -65,6 +70,9 @@ class WhisperVoiceController(
             mutableState.value = VoiceRecognitionState(isListening = true)
             val samples = runCatching { recorder.record() }
                 .getOrElse { error ->
+                    // Being cancelled is not a failure worth reporting: "forget it" has to
+                    // leave the bar the way it found it instead of explaining itself.
+                    if (error is CancellationException) throw error
                     mutableState.value = VoiceRecognitionState(
                         errorMessage = error.message ?: "The microphone could not be opened.",
                     )
@@ -72,7 +80,7 @@ class WhisperVoiceController(
                 }
 
             // Recording has stopped; the model now works on what was captured.
-            mutableState.value = VoiceRecognitionState(isListening = false, partialText = "")
+            mutableState.value = VoiceRecognitionState(isListening = false, isTranscribing = true)
             transcriber.transcribe(samples, locale.language)
                 .onSuccess { text ->
                     mutableState.value = if (text.isBlank()) {
@@ -82,6 +90,7 @@ class WhisperVoiceController(
                     }
                 }
                 .onFailure { error ->
+                    if (error is CancellationException) throw error
                     mutableState.value = VoiceRecognitionState(
                         errorMessage = error.message ?: "The recording could not be transcribed.",
                     )
@@ -91,6 +100,18 @@ class WhisperVoiceController(
 
     fun stop() {
         recorder.stop()
+    }
+
+    /**
+     * Clears a delivered result or a shown error, so the next dictation starts from silence.
+     *
+     * Without this the state would still hold the last sentence, and dictating the very same
+     * words twice would look like nothing happened the second time.
+     */
+    fun acknowledge() {
+        if (state.value.finalText != null || state.value.errorMessage != null) {
+            mutableState.value = VoiceRecognitionState()
+        }
     }
 
     /**

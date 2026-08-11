@@ -74,7 +74,6 @@ import com.nomi.app.ui.capture.BarcodeAmountSheet
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.capture.MenuScanScreen
-import com.nomi.app.ui.capture.VoiceCaptureScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.logging.FoodLoggingScreen
@@ -233,12 +232,18 @@ private fun NomiMain(
                     onDeleteFood = viewModel::deleteFoodLogForUndo,
                     onUndoDeleteFood = viewModel::undoDeletedFoodLog,
                     onDiscardDeletedFood = viewModel::discardDeletedFoodLog,
+                    onVoiceTranscription = { text ->
+                        viewModel.beginLogging(AddFoodMethod.VOICE, text)
+                        viewModel.analyzeText()
+                    },
                     onAddFood = { method ->
                         when (method) {
                             AddFoodMethod.TYPE -> {
                                 viewModel.beginLogging(method)
                             }
-                            AddFoodMethod.VOICE -> navController.navigate(Routes.VOICE)
+                            // Dictation happens in the bar at the bottom of the Today page,
+                            // so there is nothing to navigate to.
+                            AddFoodMethod.VOICE -> Unit
                             AddFoodMethod.PHOTO -> navController.navigate(Routes.PHOTO)
                             AddFoodMethod.MENU -> {
                                 viewModel.beginMenuScan()
@@ -318,21 +323,6 @@ private fun NomiMain(
                     onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
                     onPhotoPlaceChanged = viewModel::updatePhotoPlace,
                     onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
-                )
-            }
-
-            composable(Routes.VOICE) {
-                VoiceCaptureScreen(
-                    onBack = { navController.popBackStack() },
-                    onTranscription = { text ->
-                        viewModel.beginLogging(AddFoodMethod.VOICE, text)
-                        viewModel.analyzeText()
-                        navController.popBackStack(Routes.HOME, inclusive = false)
-                    },
-                    onManualEntry = {
-                        viewModel.beginLogging(AddFoodMethod.TYPE)
-                        navController.popBackStack(Routes.HOME, inclusive = false)
-                    },
                 )
             }
 
@@ -735,6 +725,7 @@ private fun MainNavigationSuite(
     onUndoDeleteFood: (Long) -> Unit,
     onDiscardDeletedFood: (Long) -> Unit,
     onAddFood: (AddFoodMethod) -> Unit,
+    onVoiceTranscription: (String) -> Unit,
     onLoggingTextChanged: (String) -> Unit,
     onAnalyzeLogging: () -> Unit,
     onConfirmLogging: () -> Unit,
@@ -852,6 +843,7 @@ private fun MainNavigationSuite(
                     onEditPreview = onEditLoggingPreview,
                     onDismissDraft = onDismissLoggingDraft,
                     onQuickMethod = onAddFood,
+                    onVoiceTranscription = onVoiceTranscription,
                     onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
                     onPhotoPlaceChanged = viewModel::updatePhotoPlace,
                     onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
@@ -918,7 +910,6 @@ private fun MainDestination.localizedLabel(): String = when (this) {
 private object Routes {
     const val HOME = "home"
     const val LOGGING = "logging"
-    const val VOICE = "voice"
     const val PHOTO = "photo"
     const val MENU_CAPTURE = "menu_capture"
     const val MENU_RESULTS = "menu_results"
