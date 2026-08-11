@@ -842,7 +842,7 @@ private fun NotesFoodRow(
                 launch {
                     calorieSweep.animateTo(
                         targetValue = 1.35f,
-                        animationSpec = tween(durationMillis = 720, easing = LinearEasing),
+                        animationSpec = tween(durationMillis = 1_100, easing = LinearEasing),
                     )
                 }
                 launch {
@@ -852,7 +852,7 @@ private fun NotesFoodRow(
                     showOriginal = false
                     summarySweep.animateTo(
                         targetValue = 1.35f,
-                        animationSpec = tween(durationMillis = 620, easing = LinearEasing),
+                        animationSpec = tween(durationMillis = 1_050, easing = LinearEasing),
                     )
                 }
             }

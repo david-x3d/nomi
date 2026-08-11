@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.CalorieEstimateBias
@@ -495,10 +496,15 @@ private fun SettingsInfo(
     supporting: String,
     iconColor: Color,
 ) {
+    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+        color = if (lightMode) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
+        },
         border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
@@ -520,13 +526,18 @@ private fun GlassSettingSurface(
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier,
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
+        color = if (lightMode) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
+        },
+        tonalElevation = if (lightMode) 0.dp else 2.dp,
         shadowElevation = 1.dp,
         border = BorderStroke(
             1.dp,
@@ -654,11 +665,16 @@ private fun CalorieBiasSetting(
     val entries = CalorieEstimateBias.entries
     var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
     val selected = entries[position.roundToInt().coerceIn(0, entries.lastIndex)]
+    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(22.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
+        color = if (lightMode) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
+        },
+        tonalElevation = if (lightMode) 0.dp else 2.dp,
         border = BorderStroke(
             1.dp,
             MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
