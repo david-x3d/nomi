@@ -330,9 +330,9 @@ class ExaGeminiNutritionProviderTest {
             listOf(source("Different Product", content = "Nutrition Different Product: 100 kcal, protein 10 g, carbs 20 g, fat 3 g")),
             extraction(item(case)),
         )
-        assertThrows(AiValidationException::class.java) {
-            runBlocking { unsupported.researchNutrition(case.intent()) }
-        }
+        val estimated = runBlocking { unsupported.researchNutrition(case.intent()) }.items.single()
+        assertTrue(estimated.isEstimate)
+        assertEquals(null, estimated.sourceUrl)
     }
 
     @Test

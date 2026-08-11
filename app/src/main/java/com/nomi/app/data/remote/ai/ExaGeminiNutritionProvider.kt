@@ -528,7 +528,7 @@ private fun groundGeminiExtraction(
         val groundedPrimary = try {
             requireNutritionEvidence(extracted, parsed, declaredSources)
             primary
-        } catch (declaredFailure: AiValidationException) {
+        } catch (_: AiValidationException) {
             // Gemini occasionally returns the adjacent source ID in a multi-item order (for
             // example an Extra Sauce page for a Cheeseburger). Correct only when another Exa
             // document independently passes the same strict product, calorie and macro checks.
@@ -536,7 +536,28 @@ private fun groundGeminiExtraction(
                 runCatching {
                     requireNutritionEvidence(extracted, parsed, listOf(candidate))
                 }.isSuccess
-            } ?: throw declaredFailure
+            }
+        }
+        if (groundedPrimary == null) {
+            val allZero = extracted.calories == 0.0 && extracted.proteinGrams == 0.0 &&
+                extracted.carbohydrateGrams == 0.0 && extracted.fatGrams == 0.0
+            if (allZero) {
+                throw AiValidationException(
+                    "A zero-calorie result needs explicit zero-calorie evidence from Exa",
+                )
+            }
+            return@mapIndexed extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
+                sourceName = null,
+                sourceUrl = null,
+                supportingSourceUrls = emptyList(),
+                sourceProductName = null,
+                isEstimate = true,
+                assumptions = (extracted.assumptions +
+                    "Live research ran for this item, but the retrieved page excerpt did not " +
+                    "contain every number needed for independent verification; shown as an estimate.")
+                    .distinct()
+                    .takeLast(12),
+            )
         }
         val groundedSupporting = supporting
             .takeIf { groundedPrimary.sourceId == primary.sourceId }
