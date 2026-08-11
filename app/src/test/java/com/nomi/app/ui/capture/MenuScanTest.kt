@@ -38,6 +38,15 @@ class MenuScanTest {
     }
 
     @Test
+    fun `dish identity remains stable while selecting richer merged text`() {
+        assertEquals(
+            menuDishKey(dishes.first()),
+            menuDishKey(dishes.first().copy(description = "Richer description")),
+        )
+        assertTrue(menuDishKey(dishes.first()) != menuDishKey(dishes[1]))
+    }
+
+    @Test
     fun `menu response and prompt preserve printed metadata`() {
         val result = AiResponseValidator.validate(
             MenuScanResult(restaurantName = "Nomi Grill", items = dishes),

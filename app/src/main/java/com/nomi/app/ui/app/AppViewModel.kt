@@ -83,6 +83,7 @@ import com.nomi.app.ui.history.HistoryUiState
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
 import com.nomi.app.ui.capture.MenuScanUiState
+import com.nomi.app.ui.capture.menuDishKey
 import com.nomi.app.ui.capture.mergeMenuDishes
 import com.nomi.app.ui.library.LibraryItem
 import com.nomi.app.ui.library.LibraryItemKind
@@ -513,20 +514,38 @@ class AppViewModel(
                     isProcessing = false,
                     errorMessage = inUserLanguage(
                         english = "Nomi couldn't read that menu page. Add a clearer photo.",
-                        german = "Nomi konnte diese Speisekartenseite nicht lesen. FÃ¼ge ein deutlicheres Foto hinzu.",
+                        german = "Nomi konnte diese Speisekartenseite nicht lesen. F\u00fcge ein deutlicheres Foto hinzu.",
                     ),
                 )
             }
         }.invokeOnCompletion { bytes.fill(0) }
     }
 
-    fun selectMenuDish(dish: MenuDish) {
-        val restaurant = mutableMenuScanState.value.restaurantName
+    fun toggleMenuDish(dish: MenuDish) {
+        val key = menuDishKey(dish)
+        val selected = mutableMenuScanState.value.selectedDishKeys
+        mutableMenuScanState.value = mutableMenuScanState.value.copy(
+            selectedDishKeys = if (key in selected) selected - key else selected + key,
+        )
+    }
+
+    fun selectMenuDishes() {
+        val state = mutableMenuScanState.value
+        val dishes = state.items.filter { menuDishKey(it) in state.selectedDishKeys }
+        if (dishes.isEmpty()) return
+        val restaurant = state.restaurantName
         val text = buildString {
-            append("1 serving ").append(dish.name.trim())
-            restaurant?.takeIf(String::isNotBlank)?.let { append(" at ").append(it.trim()) }
-            dish.number?.takeIf(String::isNotBlank)?.let { append(" (menu number ").append(it.trim()).append(')') }
-            dish.description?.takeIf(String::isNotBlank)?.let { append(". Menu description: ").append(it.trim()) }
+            restaurant?.takeIf(String::isNotBlank)?.let { append("At ").append(it.trim()).append(": ") }
+            dishes.forEachIndexed { index, dish ->
+                if (index > 0) append("; ")
+                append("1 serving ").append(dish.name.trim())
+                dish.number?.takeIf(String::isNotBlank)?.let {
+                    append(" (menu number ").append(it.trim()).append(')')
+                }
+                dish.description?.takeIf(String::isNotBlank)?.let {
+                    append(". Menu description: ").append(it.trim())
+                }
+            }
         }.take(MAX_MENU_LOGGING_TEXT_CHARS)
         beginLogging(AddFoodMethod.TYPE, text)
         analyzeText()

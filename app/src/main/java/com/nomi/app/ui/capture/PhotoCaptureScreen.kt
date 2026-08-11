@@ -183,7 +183,7 @@ fun PhotoCaptureScreen(
         PhotoCaptureSubject.MEAL ->
             nomiString("Keep the whole meal in frame", "Halte die ganze Mahlzeit im Bild")
         PhotoCaptureSubject.MENU ->
-            nomiString("Keep one complete page in frame", "Halte eine vollstÃ¤ndige Seite im Bild")
+            nomiString("Keep one complete page in frame", "Halte eine vollst\u00e4ndige Seite im Bild")
         PhotoCaptureSubject.NUTRITION_LABEL ->
             nomiString("Fill the frame with the table", "Die Tabelle formatfüllend aufnehmen")
     }

@@ -462,7 +462,7 @@ private fun PreviewContent(
                             IconButton(onClick = { onRemoveItem(index) }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = nomiString("Remove ${item.name} from meal", "${item.name} aus dem MenÃ¼ entfernen"),
+                                    contentDescription = nomiString("Remove ${item.name} from meal", "${item.name} aus dem Men\u00fc entfernen"),
                                 )
                             }
                         }

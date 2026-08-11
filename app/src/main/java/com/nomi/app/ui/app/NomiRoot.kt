@@ -439,8 +439,9 @@ private fun NomiMain(
                         menuAddingPage = true
                         navController.navigate(Routes.MENU_CAPTURE)
                     },
-                    onSelectDish = { dish ->
-                        viewModel.selectMenuDish(dish)
+                    onToggleDish = viewModel::toggleMenuDish,
+                    onAddSelected = {
+                        viewModel.selectMenuDishes()
                         navController.navigate(Routes.LOGGING) {
                             popUpTo(Routes.MENU_RESULTS) { inclusive = true }
                         }

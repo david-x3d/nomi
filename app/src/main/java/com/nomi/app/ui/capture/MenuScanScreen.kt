@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,7 +51,12 @@ data class MenuScanUiState(
     val isProcessing: Boolean = false,
     val errorMessage: String? = null,
     val notes: List<String> = emptyList(),
+    val selectedDishKeys: Set<String> = emptySet(),
 )
+
+internal fun menuDishKey(dish: MenuDish): String =
+    listOf(dish.category, dish.number, dish.name, dish.price)
+        .joinToString("|") { it.orEmpty().trim().lowercase(Locale.ROOT) }
 
 internal fun filteredMenuDishes(items: List<MenuDish>, query: String): List<MenuDish> {
     val terms = query.trim().lowercase(Locale.ROOT)
@@ -72,8 +78,7 @@ internal fun filteredMenuDishes(items: List<MenuDish>, query: String): List<Menu
 internal fun mergeMenuDishes(existing: List<MenuDish>, added: List<MenuDish>): List<MenuDish> {
     val byIdentity = linkedMapOf<String, MenuDish>()
     (existing + added).forEach { dish ->
-        val key = listOf(dish.category, dish.number, dish.name, dish.price)
-            .joinToString("|") { it.orEmpty().trim().lowercase(Locale.ROOT) }
+        val key = menuDishKey(dish)
         val current = byIdentity[key]
         byIdentity[key] = if ((dish.description?.length ?: 0) > (current?.description?.length ?: 0)) {
             dish
@@ -91,7 +96,8 @@ fun MenuScanScreen(
     onBack: () -> Unit,
     onQueryChanged: (String) -> Unit,
     onAddPage: () -> Unit,
-    onSelectDish: (MenuDish) -> Unit,
+    onToggleDish: (MenuDish) -> Unit,
+    onAddSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val filtered = filteredMenuDishes(state.items, state.query)
@@ -107,12 +113,12 @@ fun MenuScanScreen(
                 title = { Text(nomiString("Menu", "Speisekarte")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back", "ZurÃ¼ck"))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back", "Zur\u00fcck"))
                     }
                 },
                 actions = {
                     IconButton(onClick = onAddPage, enabled = !state.isProcessing) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = nomiString("Add another menu page", "Weitere MenÃ¼seite hinzufÃ¼gen"))
+                        Icon(Icons.Default.AddAPhoto, contentDescription = nomiString("Add another menu page", "Weitere Men\u00fcseite hinzuf\u00fcgen"))
                     }
                 },
             )
@@ -124,9 +130,9 @@ fun MenuScanScreen(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(48.dp))
-                        Text(nomiString("Reading the complete menuâ€¦", "VollstÃ¤ndige Speisekarte wird gelesenâ€¦"))
+                        Text(nomiString("Reading the complete menu...", "Vollst\u00e4ndige Speisekarte wird gelesen..."))
                         Text(
-                            nomiString("Gemini is extracting names, descriptions, numbers and prices.", "Gemini Ã¼bernimmt Namen, Beschreibungen, Nummern und Preise."),
+                            nomiString("Gemini is extracting names, descriptions, numbers and prices.", "Gemini \u00fcbernimmt Namen, Beschreibungen, Nummern und Preise."),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -134,7 +140,7 @@ fun MenuScanScreen(
                 return@Column
             }
 
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(modifier = Modifier.weight(1f)) {
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -145,8 +151,8 @@ fun MenuScanScreen(
                         }
                         Text(
                             nomiString(
-                                "${filtered.size} of ${state.items.size} dishes Â· ${state.pageCount} page(s)",
-                                "${filtered.size} von ${state.items.size} Gerichten Â· ${state.pageCount} Seite(n)",
+                                "${filtered.size} of ${state.items.size} dishes \u00b7 ${state.pageCount} page(s)",
+                                "${filtered.size} von ${state.items.size} Gerichten \u00b7 ${state.pageCount} Seite(n)",
                             ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -180,7 +186,7 @@ fun MenuScanScreen(
                             Button(onClick = onAddPage) {
                                 Icon(Icons.Default.AddAPhoto, contentDescription = null)
                                 Spacer(Modifier.size(8.dp))
-                                Text(nomiString("Add a clearer page", "Bessere Seite hinzufÃ¼gen"))
+                                Text(nomiString("Add a clearer page", "Bessere Seite hinzuf\u00fcgen"))
                             }
                         }
                     }
@@ -200,7 +206,11 @@ fun MenuScanScreen(
                         items = dishes,
                         key = { index, dish -> "$category-${dish.number}-${dish.name}-$index" },
                     ) { _, dish ->
-                        MenuDishCard(dish = dish, onClick = { onSelectDish(dish) })
+                        MenuDishCard(
+                            dish = dish,
+                            selected = menuDishKey(dish) in state.selectedDishKeys,
+                            onClick = { onToggleDish(dish) },
+                        )
                     }
                 }
 
@@ -218,12 +228,27 @@ fun MenuScanScreen(
                     }
                 }
             }
+            if (state.selectedDishKeys.isNotEmpty()) {
+                Button(
+                    onClick = onAddSelected,
+                    enabled = !state.isProcessing,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                ) {
+                    val count = state.selectedDishKeys.size
+                    Text(
+                        nomiString(
+                            "Add $count selected dish${if (count == 1) "" else "es"}",
+                            "$count ausgew\u00e4hlte ${if (count == 1) "Position" else "Positionen"} hinzuf\u00fcgen",
+                        ),
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun MenuDishCard(dish: MenuDish, onClick: () -> Unit) {
+private fun MenuDishCard(dish: MenuDish, selected: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable(onClick = onClick),
     ) {
@@ -250,8 +275,13 @@ private fun MenuDishCard(dish: MenuDish, onClick: () -> Unit) {
                     )
                 }
             },
-            trailingContent = dish.price?.takeIf(String::isNotBlank)?.let { price ->
-                { Text(price, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold) }
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    dish.price?.takeIf(String::isNotBlank)?.let { price ->
+                        Text(price, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    }
+                    Checkbox(checked = selected, onCheckedChange = null)
+                }
             },
         )
     }
