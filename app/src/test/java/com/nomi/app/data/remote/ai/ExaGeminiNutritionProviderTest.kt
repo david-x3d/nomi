@@ -27,6 +27,40 @@ class ExaGeminiNutritionProviderTest {
     )
 
     @Test
+    fun `retrieved source URLs are published before Gemini extraction completes`() = runBlocking {
+        val case = SuccessCase(
+            text = "100 g Test Food",
+            name = "Test Food",
+            quantity = 100.0,
+            sourceAmount = 100.0,
+            calories = 100.0,
+            protein = 5.0,
+            carbs = 10.0,
+            fat = 4.0,
+            expectedCalories = 100.0,
+            country = "DE",
+        )
+        var published = emptyList<String>()
+
+        provider(
+            sources = listOf(
+                source(
+                    title = "Official Test Food",
+                    url = "https://brand.test/nutrition",
+                    content = evidence(case),
+                ),
+            ),
+            extraction = extraction(item(case)),
+            onSources = { published = it },
+            beforeExtraction = {
+                assertEquals(listOf("https://brand.test/nutrition"), published)
+            },
+        ).researchNutrition(case.intent())
+
+        assertEquals(listOf("https://brand.test/nutrition"), published)
+    }
+
+    @Test
     fun `realistic products preserve intent and normalize the selected source basis`() = runBlocking {
         val cases = listOf(
             SuccessCase(
@@ -262,12 +296,15 @@ class ExaGeminiNutritionProviderTest {
         extraction: GeminiNutritionExtraction,
         localeCountry: String = "DE",
         onQuery: (String) -> Unit = {},
+        onSources: (List<String>) -> Unit = {},
+        beforeExtraction: () -> Unit = {},
     ) = ExaGeminiNutritionProvider(
         exaSearch = ExaNutritionSearchGateway { query, _, _ ->
             onQuery(query)
             ExaSearchResponse(requestId = "test", results = sources)
         },
         geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, prompt ->
+            beforeExtraction()
             assertTrue(prompt.contains("source IDs are authoritative"))
             extraction
         },
@@ -275,6 +312,7 @@ class ExaGeminiNutritionProviderTest {
         geminiConfig = config,
         geminiCredential = { credential },
         localeCountryProvider = { localeCountry },
+        searchProgressSink = { onSources(it) },
     )
 
     private fun SuccessCase.intent() = ParsedFoodIntent(

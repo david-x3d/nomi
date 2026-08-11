@@ -79,4 +79,25 @@ class WebsiteFaviconUrlTest {
             WebsiteFaviconUrl.normalizePublicHttpsHostname("https://xn--bcher-kva.de/lebensmittel"),
         )
     }
+
+    @Test
+    fun `research stack always reserves three calm source orbs`() {
+        assertEquals(listOf(null, null, null), researchSourceIconSlots(emptyList()))
+
+        assertEquals(
+            listOf(
+                "https://brand.com/nutrition",
+                "https://retailer.de/product",
+                null,
+            ),
+            researchSourceIconSlots(
+                listOf(
+                    "https://brand.com/nutrition",
+                    "https://www.brand.com/duplicate",
+                    "http://insecure.net/rejected",
+                    "https://retailer.de/product",
+                ),
+            ),
+        )
+    }
 }

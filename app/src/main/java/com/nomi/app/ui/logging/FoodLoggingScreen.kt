@@ -131,7 +131,6 @@ fun FoodLoggingScreen(
 
             is FoodLoggingUiState.Preview -> PreviewContent(
                 analysis = state.analysis,
-                isProvisional = state.isProvisional,
                 mealCategory = state.mealCategory,
                 onMealCategoryChanged = onMealCategoryChanged,
                 onEditItem = onEditItem,
@@ -339,14 +338,18 @@ private fun ProcessingContent(
         LoadingIndicator()
         Spacer(Modifier.height(28.dp))
         Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (showResearchSources) {
-                AnimatedWebsiteIconStack(sourceUrls = sourceUrls)
-                Spacer(Modifier.width(12.dp))
-            }
-            Text(stage.label(), style = MaterialTheme.typography.headlineSmall)
+            Text(
+                stage.label(),
+                style = MaterialTheme.typography.headlineSmall,
+                color = if (showResearchSources) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            if (showResearchSources) AnimatedWebsiteIconStack(sourceUrls = sourceUrls, maxIcons = 3)
         }
         Spacer(Modifier.height(16.dp))
         LinearProgressIndicator(
@@ -355,10 +358,17 @@ private fun ProcessingContent(
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            nomiString(
-                "Nomi is turning your description into editable foods.",
-                "Nomi verwandelt deine Beschreibung in bearbeitbare Lebensmittel.",
-            ),
+            if (showResearchSources) {
+                nomiString(
+                    "Nomi checks sources against the exact food and amount before showing calories.",
+                    "Nomi prüft Quellen, Lebensmittel und Menge, bevor Kalorien angezeigt werden.",
+                )
+            } else {
+                nomiString(
+                    "Nomi is turning your description into editable foods.",
+                    "Nomi verwandelt deine Beschreibung in bearbeitbare Lebensmittel.",
+                )
+            },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -374,7 +384,6 @@ private fun PreviewContent(
     onChangePortion: (Int) -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
-    isProvisional: Boolean = false,
 ) {
     val total = analysis.items.sumOf(AnalyzedFoodItem::calories)
     val locale = nomiLocale()
@@ -392,23 +401,6 @@ private fun PreviewContent(
                     nomiString("Check the portions before saving.", "Prüfe die Portionen vor dem Speichern."),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (isProvisional) {
-                    // Saving now is fine: the sources land on the saved entry either way.
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        LoadingIndicator()
-                        Text(
-                            text = nomiString(
-                                "Estimated - looking up sources, you can save now.",
-                                "Geschätzt - Quellen werden gesucht, du kannst schon speichern.",
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
                 MealCategorySelector(mealCategory, onMealCategoryChanged)
             }
         }

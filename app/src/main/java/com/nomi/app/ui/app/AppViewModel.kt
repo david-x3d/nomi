@@ -324,18 +324,6 @@ class AppViewModel(
     private var analysisRequestId = 0L
     private var loggingSaveInProgress = false
 
-    /**
-     * An entry saved from a provisional estimate, waiting for its research to come back.
-     * [savedLogs] is what was written, so a row the user has since corrected can be recognized
-     * and left alone.
-     */
-    private data class PendingResearchUpgrade(
-        val requestId: Long,
-        val logIds: List<Long>,
-        val savedLogs: List<FoodLogEntity>,
-    )
-
-    private var pendingResearchUpgrade: PendingResearchUpgrade? = null
     private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
     val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
     private var lastLoggingText = ""
@@ -788,70 +776,36 @@ class AppViewModel(
                 return@launch
             }
 
-            // Phase one: the fast unsourced answer, so the meal is on screen in a second or two.
+            // Keep one owner for the whole lookup. A quick estimate used to be saveable before
+            // research silently replaced its calories, making the day total change afterwards.
             mutableLoggingState.value = FoodLoggingUiState.Processing(
                 AiProcessingStage.FINDING_NUTRITION,
                 originalText = text,
             )
-            val estimate = runCatching { estimateNutrition(intent) }
-                .onFailure { if (it is CancellationException) throw it }
-                .getOrNull()
-            if (estimate != null && requestId == analysisRequestId) {
-                recordRoute(
-                    route = NutritionRoute.NEW_RESEARCH,
-                    decision = NutritionRoute.Decision.DIRECT,
-                    detail = "Fast estimate shown while research runs",
-                )
-                mutableLoggingState.value = FoodLoggingUiState.Preview(
-                    estimate,
-                    current.mealCategory,
-                    originalText = text,
-                    isProvisional = true,
-                )
-            } else if (estimate == null && requestId == analysisRequestId) {
-                mutableLoggingState.value = FoodLoggingUiState.Processing(
-                    AiProcessingStage.FINDING_NUTRITION,
-                    originalText = text,
-                    sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
-                )
-            }
-
-            // Phase two: sourced research replaces the estimate wherever it ended up.
-            suspend fun research() {
-                runCatching { researchNutrition(intent) }
-                    .onSuccess { analysis ->
-                        recentFoodAnalysisCache.put(cacheKey, analysis)
-                        recordRoute(
-                            route = NutritionRoute.NEW_RESEARCH,
-                            decision = NutritionRoute.Decision.DIRECT,
-                            detail = "New food entry researched on the web",
-                        )
-                        applyResearchedAnalysis(requestId, analysis, text, current.mealCategory)
-                    }
-                    .onFailure { error ->
-                        if (error is CancellationException) throw error
-                        if (requestId != analysisRequestId) return@onFailure
-                        // With an estimate already shown there is nothing to report: it is a
-                        // complete, labeled entry, and research was the optional half.
-                        if (estimate == null) {
-                            mutableLoggingState.value = FoodLoggingUiState.Error(
-                                error.safeAiMessage(),
-                                canRetry = true,
-                                originalText = text,
-                            )
-                        }
-                    }
-            }
-
-            if (estimate == null) {
-                // Nothing is on screen yet, so this call still owns the input and must stay
-                // cancellable by Back or a retyped meal.
-                research()
-            } else {
-                // The meal is already logged or previewed. Detaching lets the upgrade survive
-                // the user saving it and immediately typing the next one.
-                viewModelScope.launch { research() }
-            }
+            runCatching { researchNutrition(intent) }
+                .onSuccess { analysis ->
+                    if (requestId != analysisRequestId) return@onSuccess
+                    recentFoodAnalysisCache.put(cacheKey, analysis)
+                    recordRoute(
+                        route = NutritionRoute.NEW_RESEARCH,
+                        decision = NutritionRoute.Decision.DIRECT,
+                        detail = "New food entry researched before preview",
+                    )
+                    mutableLoggingState.value = FoodLoggingUiState.Preview(
+                        analysis = analysis,
+                        mealCategory = current.mealCategory,
+                        originalText = text,
+                    )
+                }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    if (requestId != analysisRequestId) return@onFailure
+                    mutableLoggingState.value = FoodLoggingUiState.Error(
+                        error.safeAiMessage(),
+                        canRetry = true,
+                        originalText = text,
+                    )
+                }
         }
         analysisJob = job
         job.invokeOnCompletion {
@@ -1243,19 +1197,7 @@ class AppViewModel(
                             val logs = validated.items.map { item ->
                                 item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
                             }
-                            val ids = repository.addLogs(logs)
-                            // Saving before research returns is normal now, so the rows stay
-                            // claimable until it does.
-                            pendingResearchUpgrade = if (current.isProvisional) {
-                                PendingResearchUpgrade(
-                                    requestId = analysisRequestId,
-                                    logIds = ids,
-                                    savedLogs = logs,
-                                )
-                            } else {
-                                null
-                            }
-                            ids
+                            repository.addLogs(logs)
                         }
                         is FoodLoggingUiState.Manual -> {
                             require(current.draft.isValid)
@@ -2098,97 +2040,6 @@ class AppViewModel(
         ).withCleanDisplayNames()
 
     /**
-     * Runs on the interpretation provider rather than the research one: this call exists to be
-     * fast, and it needs no search, so the cheap model is the right model for it.
-     */
-    private suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis =
-        withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
-            providerFor(config, key).estimateNutrition(intent)
-        }.withCleanDisplayNames()
-
-    /**
-     * Delivers sourced research to wherever the estimate it replaces ended up.
-     *
-     * The user does not wait for research, so by the time it lands the meal may still be in the
-     * preview or already saved to the journal. Both are upgraded in place; anything else means
-     * the user moved on, and a silent rewrite of something they are no longer looking at would
-     * be worse than leaving a labeled estimate alone.
-     */
-    private suspend fun applyResearchedAnalysis(
-        requestId: Long,
-        analysis: FoodAnalysis,
-        text: String,
-        mealCategory: MealCategory,
-    ) {
-        val pending = pendingResearchUpgrade
-        if (pending != null && pending.requestId == requestId) {
-            pendingResearchUpgrade = null
-            upgradeSavedLogs(pending, analysis)
-            return
-        }
-        if (requestId != analysisRequestId) return
-        val current = mutableLoggingState.value
-        // A preview the user has been editing is theirs, not research's, to change.
-        if (current !is FoodLoggingUiState.Preview || !current.isProvisional) return
-        mutableLoggingState.value = FoodLoggingUiState.Preview(
-            analysis,
-            mealCategory,
-            originalText = text,
-            isProvisional = false,
-        )
-    }
-
-    /**
-     * Replaces the estimate stored for an entry the user already saved.
-     *
-     * Each row is checked against the estimate that produced it before anything is written, so a
-     * portion the user corrected in the meantime keeps the number they chose. Amount and meal
-     * stay as saved; only the nutrition and its source are upgraded.
-     */
-    private suspend fun upgradeSavedLogs(pending: PendingResearchUpgrade, analysis: FoodAnalysis) {
-        val validated = runCatching {
-            ServingNutritionNormalizer.validateBeforeSave(analysis)
-        }.getOrNull() ?: return
-        if (validated.items.size != pending.logIds.size) return
-        var upgraded = 0
-        pending.logIds.forEachIndexed { index, logId ->
-            val existing = repository.foodLog(logId) ?: return@forEachIndexed
-            val estimated = pending.savedLogs.getOrNull(index) ?: return@forEachIndexed
-            val untouched = existing.amount == estimated.amount &&
-                existing.unit == estimated.unit &&
-                existing.nutritionSnapshot.caloriesKcal == estimated.nutritionSnapshot.caloriesKcal
-            if (!untouched) return@forEachIndexed
-            val researched = validated.items[index].toLog(
-                MealCategory.valueOf(existing.mealCategory),
-                existing.inputMethod,
-            )
-            val success = runCatching {
-                repository.updateLog(
-                    existing.copy(
-                        displayNameSnapshot = researched.displayNameSnapshot,
-                        brandSnapshot = researched.brandSnapshot,
-                        nutritionSnapshot = researched.nutritionSnapshot,
-                        sourceSnapshot = researched.sourceSnapshot,
-                        isEstimated = researched.isEstimated,
-                        updatedAtEpochMillis = System.currentTimeMillis(),
-                    ),
-                )
-            }.getOrDefault(false)
-            if (success) upgraded++
-        }
-        if (upgraded > 0) {
-            mutableEvents.emit(
-                AppEvent.Message(
-                    inUserLanguage(
-                        english = "Nutrition sources found - the entry was updated.",
-                        german = "Nährwertquellen gefunden - der Eintrag wurde aktualisiert.",
-                    ),
-                ),
-            )
-        }
-    }
-
-    /**
      * Every researched item passes through here on its way to the page, so the name that is
      * previewed is the same one that is saved and later reopened for rewriting. The prompts
      * ask the model for a clean short name; this only removes what a provider left behind.
@@ -2291,8 +2142,19 @@ class AppViewModel(
         exaCredential = { exaCredential },
         geminiConfig = config,
         geminiCredential = { geminiCredential },
+        searchProgressSink = ::showResearchSources,
         debugSink = ::recordExaGeminiTrace,
     )
+
+    private fun showResearchSources(sourceUrls: List<String>) {
+        val current = mutableLoggingState.value
+        if (current !is FoodLoggingUiState.Processing ||
+            current.stage != AiProcessingStage.FINDING_NUTRITION
+        ) return
+        mutableLoggingState.value = current.copy(
+            sourceUrls = sourceUrls.distinct().take(3),
+        )
+    }
 
     private suspend fun recordExaGeminiTrace(trace: ExaGeminiDebugTrace) {
         if (!preferences.value.aiDebugEnabled) return
@@ -3090,10 +2952,3 @@ private fun Throwable.causeMessageContains(vararg values: String): Boolean =
     causeChain().any { error ->
         values.any { value -> error.message?.contains(value, ignoreCase = true) == true }
     }
-
-private fun FoodAnalysis.researchSourceUrls(): List<String> =
-    items
-        .flatMap { item -> listOfNotNull(item.sourceUrl) + item.supportingSourceUrls }
-        .filter(String::isNotBlank)
-        .distinct()
-        .take(3)

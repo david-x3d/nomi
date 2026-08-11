@@ -7,6 +7,7 @@ Nomi is a native Android nutrition journal built around low-friction, natural-la
 - Type, dictate, photograph, or scan a meal.
 - Review researched calories and macros before saving.
 - Deterministic portion scaling that preserves explicit user quantities.
+- Research finishes before a meal can be previewed or saved, so calories never change silently in the background.
 - Quantity support for mg, g, kg, ml, l, US fl oz, tablespoons/Esslöffel, and teaspoons/Teelöffel.
 - Germany-aware product sourcing and German/English UI support.
 - Offline Room history, recents, favorites, saved meals, weight tracking, and progress.
@@ -56,6 +57,10 @@ product and values, then runs the existing Kotlin quantity reconciliation, servi
 all-zero rejection, and source-integrity checks. A validation failure can use the separately
 configured smart fallback (normally Sonar). Only transient transport failures are retried; Nomi
 does not retry rejected or unsupported nutrition results.
+
+While Exa research is running, Nomi shows three restrained shimmering source slots. As soon as Exa
+returns pages, those slots become the real website favicons while Gemini checks the product,
+serving basis, and requested amount. The preview appears only after that pipeline has settled.
 
 For OpenRouter-hosted Perplexity models, use the full model identifier, for example
 `perplexity/sonar`.

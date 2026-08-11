@@ -4,11 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -1051,71 +1047,63 @@ private fun ProcessingNote(
     onEditText: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    val processingPulse = rememberInfiniteTransition(label = "research pulse")
-    val pulseScale by processingPulse.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 850),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "research pulse scale",
-    )
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Text(
-                text = description.ifBlank {
-                    nomiString("Understanding your meal", "Deine Mahlzeit wird ausgewertet")
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-            )
+    val sourcesReady = sourceUrls.isNotEmpty()
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f),
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        AnimatedWebsiteIconStack(
-                            sourceUrls = sourceUrls,
-                            maxIcons = 2,
-                        )
-                        CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(18.dp)
-                                .graphicsLayer { scaleX = pulseScale; scaleY = pulseScale },
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = description.ifBlank {
+                            nomiString("Understanding your meal", "Deine Mahlzeit wird ausgewertet")
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    AnimatedContent(
+                        targetState = sourcesReady,
+                        label = "research source status",
+                    ) { ready ->
                         Text(
-                            text = nomiString("Thinking…", "Wird analysiert…"),
+                            text = if (ready) {
+                                nomiString(
+                                    "Checking sources and portions",
+                                    "Quellen und Portionen werden abgeglichen",
+                                )
+                            } else {
+                                nomiString(
+                                    "Preparing a careful lookup",
+                                    "Sorgfältige Recherche wird vorbereitet",
+                                )
+                            },
                             style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
                 }
+                AnimatedWebsiteIconStack(
+                    sourceUrls = sourceUrls,
+                    maxIcons = 3,
+                )
             }
-        }
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(onClick = onEditText) { Text(nomiString("Edit text", "Text bearbeiten")) }
-            TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
+            Row(
+                modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TextButton(onClick = onEditText) { Text(nomiString("Edit text", "Text bearbeiten")) }
+                TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
+            }
         }
     }
 }

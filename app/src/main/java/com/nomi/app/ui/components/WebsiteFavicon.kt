@@ -1,11 +1,11 @@
 package com.nomi.app.ui.components
 
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -21,6 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,7 +61,7 @@ fun WebsiteFavicon(
     }
 }
 
-/** A bounded, gently moving stack suitable for research/progress states. */
+/** Three quiet source orbs. Empty/loading slots shimmer until real site icons arrive. */
 @Composable
 fun AnimatedWebsiteIconStack(
     sourceUrls: List<String>,
@@ -67,50 +70,68 @@ fun AnimatedWebsiteIconStack(
 ) {
     val boundedMax = maxIcons.coerceIn(1, 3)
     val normalizedSources = remember(sourceUrls, boundedMax) {
-        sourceUrls
-            .mapNotNull { sourceUrl ->
-                WebsiteFaviconUrl.normalizePublicHttpsHostname(sourceUrl)?.let { sourceUrl }
-            }
-            .distinctBy(WebsiteFaviconUrl::normalizePublicHttpsHostname)
-            .take(boundedMax)
+        researchSourceIconSlots(sourceUrls, boundedMax)
     }
-    val visibleSources: List<String?> = normalizedSources.ifEmpty { listOf(null) }
-    val stackWidth = (30 + (18 * (visibleSources.size - 1))).dp
+    val stackWidth = (30 + (18 * (normalizedSources.size - 1))).dp
 
     Box(
         modifier = modifier.width(stackWidth).height(36.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        visibleSources.forEachIndexed { index, sourceUrl ->
-            val transition = rememberInfiniteTransition(label = "research-site-$index")
-            val verticalOffset = transition.animateFloat(
-                initialValue = -1.5f,
-                targetValue = 1.5f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 760, delayMillis = index * 120),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "research-site-offset-$index",
-            )
+        normalizedSources.forEachIndexed { index, sourceUrl ->
             WebsiteFavicon(
                 sourceUrl = sourceUrl,
                 size = 30.dp,
                 modifier = Modifier
-                    .offset(x = (18 * index).dp, y = verticalOffset.value.dp)
+                    .offset(x = (18 * index).dp)
                     .zIndex(index.toFloat()),
             )
         }
     }
 }
 
+internal fun researchSourceIconSlots(sourceUrls: List<String>, maxIcons: Int = 3): List<String?> {
+    val boundedMax = maxIcons.coerceIn(1, 3)
+    val sources = sourceUrls
+        .mapNotNull { sourceUrl ->
+            WebsiteFaviconUrl.normalizePublicHttpsHostname(sourceUrl)?.let { sourceUrl }
+        }
+        .distinctBy(WebsiteFaviconUrl::normalizePublicHttpsHostname)
+        .take(boundedMax)
+    return sources + List(boundedMax - sources.size) { null }
+}
+
 @Composable
 private fun FaviconFallback(contentDescription: String?) {
-    Box(contentAlignment = Alignment.Center) {
+    val transition = rememberInfiniteTransition(label = "source shimmer")
+    val shimmer = transition.animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(animation = tween(durationMillis = 1_450)),
+        label = "source shimmer position",
+    )
+    val base = MaterialTheme.colorScheme.surfaceContainerHighest
+    val highlight = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithCache {
+                val band = size.width * 0.7f
+                val startX = (size.width + band) * shimmer.value - band
+                val brush = Brush.linearGradient(
+                    colors = listOf(base, highlight, base),
+                    start = Offset(startX, 0f),
+                    end = Offset(startX + band, size.height),
+                )
+                onDrawBehind { drawRect(brush) }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
         Icon(
             imageVector = Icons.Rounded.Public,
             contentDescription = contentDescription,
             modifier = Modifier.size(17.dp),
-            tint = MaterialTheme.colorScheme.primary,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
         )
     }
 }

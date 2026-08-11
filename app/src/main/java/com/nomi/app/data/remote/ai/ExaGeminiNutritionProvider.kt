@@ -256,6 +256,7 @@ internal class ExaGeminiNutritionProvider(
     private val geminiConfig: AiProviderConfig,
     private val geminiCredential: () -> AiRuntimeCredential,
     private val localeCountryProvider: () -> String? = { Locale.getDefault().country },
+    private val searchProgressSink: suspend (List<String>) -> Unit = {},
     private val debugSink: suspend (ExaGeminiDebugTrace) -> Unit = {},
 ) : NutritionResearchProvider {
 
@@ -283,6 +284,7 @@ internal class ExaGeminiNutritionProvider(
             if (documents.isEmpty()) {
                 throw AiValidationException("Exa returned no usable nutrition sources")
             }
+            runCatching { searchProgressSink(documents.map(ExaNutritionDocument::url)) }
 
             extractionLatency = measureTimeMillis {
                 extraction = geminiExtractor.extract(
