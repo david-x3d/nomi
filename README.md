@@ -10,7 +10,7 @@ Nomi is a native Android nutrition journal built around low-friction, natural-la
 - Quantity support for mg, g, kg, ml, l, US fl oz, tablespoons/Esslöffel, and teaspoons/Teelöffel.
 - Germany-aware product sourcing and German/English UI support.
 - Offline Room history, recents, favorites, saved meals, weight tracking, and progress.
-- Configurable Perplexity, OpenRouter, OpenAI, and OpenAI-compatible providers.
+- Configurable Sonar, Exa + Gemini, Perplexity, OpenRouter, OpenAI, and OpenAI-compatible providers.
 - API keys stored with Android Keystore-backed encryption and excluded from backups.
 - Light, dark, dynamic color, edge-to-edge layout, and Material 3 Expressive motion.
 
@@ -40,18 +40,18 @@ The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
 Open **Settings → AI providers**, select a provider and model for each pipeline, enter the API key, then use **Test connection**. Credentials stay on-device and are never included in Room, DataStore backups, logs, or repository files.
 
-Nomi defaults text and live nutrition research to OpenRouter's `openai/gpt-5.6-sol`. OpenRouter
-research uses the Responses API with both the `openrouter:web_search` server tool (using Exa) and
-the `openrouter:web_fetch` server tool (using direct page extraction). Nomi validates the typed,
-completed fetch URL before accepting one official manufacturer page, so a search snippet cannot
-masquerade as the nutrition source. Research requires enough credit for model tokens and search.
-The complete model identifier is preferred;
-Nomi also normalizes `gpt5.6sol` and
-`gpt-5.6-sol` to `openai/gpt-5.6-sol`.
-OpenRouter variant suffixes such as `:free`, `:online`, and chained variants are preserved.
-They work only when OpenRouter currently advertises a matching endpoint; Nomi never removes
-`:free` automatically because doing so could turn a free request into a paid one.
+Nomi's existing default research provider remains OpenRouter `perplexity/sonar`. Food research
+can instead select **Exa + Gemini**, which makes one Exa Search request and then one OpenRouter
+Gemini structured-extraction request. Configure both fields in that provider dialog: the primary
+key is the OpenRouter API key and the second key is the Exa API key. The current model identifier is
+`google/gemini-3.6-flash`.
 
+Exa receives a simple query built from the original food text. Gemini receives only that exact
+input, Nomi's parsed quantity context, and the returned Exa documents. It selects opaque Exa source
+IDs; Nomi maps those IDs back to retrieved URLs, verifies that the selected document supports the
+product and values, then runs the existing Kotlin quantity reconciliation, serving normalizer,
+all-zero rejection, and source-integrity checks. A validation failure can use the separately
+configured smart fallback (normally Sonar); there is no retry loop.
 
 For OpenRouter-hosted Perplexity models, use the full model identifier, for example
 `perplexity/sonar`.
@@ -65,6 +65,35 @@ Nutrition history is local-first. Nomi sends meal text or a user-selected image 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest
 ```
+
+The nutrition benchmark validates all cases and writes machine-readable preflight results without
+spending API credits:
+
+```powershell
+python eval/run_eval.py
+```
+
+To classify and rescore already-saved full raw runs without API calls:
+
+```powershell
+python eval/run_eval.py --score-existing
+```
+
+For live evaluation, put `OPENROUTER_API_KEY` and `EXA_API_KEY` in `eval/.env` (which is ignored by
+Git). Run the isolated, fresh-cache 10-case Exa + Gemini smoke first:
+
+```powershell
+python eval/run_eval.py --smoke
+```
+
+The full isolated Sonar and Exa + Gemini run is accepted only after the latest smoke gate passes:
+
+```powershell
+python eval/run_eval.py --live
+```
+
+Results are written under `eval/results/`. Provider responses currently do not expose reliable
+per-request cost data, so cost stays null with an explanatory note rather than being guessed.
 
 ## License
 

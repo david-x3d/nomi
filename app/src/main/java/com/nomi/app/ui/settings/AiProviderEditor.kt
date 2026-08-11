@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
+import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
+import com.nomi.app.data.remote.ai.OPENROUTER_GEMINI_ENDPOINT
 import com.nomi.app.ui.localization.nomiString
 import java.net.URI
 
@@ -39,7 +41,9 @@ data class AiProviderEditorState(
     val endpoint: String,
     val model: String,
     val apiKeyInput: String = "",
+    val searchApiKeyInput: String = "",
     val hasStoredApiKey: Boolean = false,
+    val hasStoredSearchApiKey: Boolean = false,
     val isTesting: Boolean = false,
     val testResult: String? = null,
     val isSaving: Boolean = false,
@@ -63,8 +67,10 @@ fun AiProviderEditorDialog(
         missingEndpointMessage = nomiString("Enter an API endpoint.", "Gib einen API-Endpoint ein."),
         invalidEndpointMessage = nomiString("Enter a valid HTTPS API endpoint.", "Gib einen gültigen HTTPS-API-Endpoint ein."),
     )
-    val canTest = configurationError == null &&
-        (state.hasStoredApiKey || state.apiKeyInput.isNotBlank()) && !busy
+    val hasReasoningKey = state.hasStoredApiKey || state.apiKeyInput.isNotBlank()
+    val hasSearchKey = state.provider != AiProviderKind.EXA_GEMINI ||
+        state.hasStoredSearchApiKey || state.searchApiKeyInput.isNotBlank()
+    val canTest = configurationError == null && hasReasoningKey && hasSearchKey && !busy
     DisposableEffect(activity) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
@@ -78,7 +84,7 @@ fun AiProviderEditorDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(nomiString("Provider", "Anbieter"), style = MaterialTheme.typography.labelLarge)
-                PROVIDER_ROWS.forEach { providers ->
+                providerRows(state.purpose).forEach { providers ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -150,7 +156,23 @@ fun AiProviderEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                if (state.hasStoredApiKey) {
+                if (state.provider == AiProviderKind.EXA_GEMINI) {
+                    OutlinedTextField(
+                        value = state.searchApiKeyInput,
+                        onValueChange = {
+                            onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
+                        },
+                        label = { Text(if (state.hasStoredSearchApiKey) "Exa API key (stored securely)" else "Exa API key") },
+                        placeholder = { if (state.hasStoredSearchApiKey) Text("Leave blank to keep existing key") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        enabled = !busy,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text("Exa retrieves sources; Gemini runs through OpenRouter. Both keys stay encrypted on this device.", style = MaterialTheme.typography.bodySmall)
+                }
+                if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
                     TextButton(
                         onClick = onRemoveStoredKey,
                         enabled = !busy,
@@ -189,11 +211,14 @@ fun AiProviderEditorDialog(
     )
 }
 
-private val PROVIDER_ROWS = listOf(
+private val BASE_PROVIDER_ROWS = listOf(
     listOf(AiProviderKind.PERPLEXITY, AiProviderKind.OPEN_ROUTER),
     listOf(AiProviderKind.OPEN_AI, AiProviderKind.CODEX_EASY),
     listOf(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE),
 )
+
+private fun providerRows(purpose: String) = BASE_PROVIDER_ROWS +
+    listOfNotNull(listOf(AiProviderKind.EXA_GEMINI).takeIf { purpose == "Food research" })
 
 private fun AiProviderEditorState.configurationError(
     blankModelMessage: String,
@@ -209,7 +234,9 @@ private fun AiProviderEditorState.configurationError(
 private fun AiProviderEditorState.switchTo(provider: AiProviderKind): AiProviderEditorState = copy(
     provider = provider,
     endpoint = provider.canonicalEndpoint().orEmpty(),
+    searchApiKeyInput = "",
     model = provider.suggestedModel(purpose),
+    hasStoredSearchApiKey = false,
     apiKeyInput = "",
     hasStoredApiKey = false,
     testResult = null,
@@ -218,6 +245,7 @@ private fun AiProviderEditorState.switchTo(provider: AiProviderKind): AiProvider
 
 private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
+    AiProviderKind.EXA_GEMINI -> OPENROUTER_GEMINI_ENDPOINT
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
     AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
     AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
@@ -232,6 +260,7 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
         DEFAULT_OPENROUTER_MODEL
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
+    AiProviderKind.EXA_GEMINI -> DEFAULT_GEMINI_NUTRITION_MODEL
     // Codex Easy relays whatever models the account is entitled to, so the name is left to
     // the user rather than guessed; `/v1/models` on the same key lists them.
     AiProviderKind.CODEX_EASY,
@@ -242,6 +271,7 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
 @Composable
 private fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "Perplexity"
+    AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.OPEN_AI -> "OpenAI"
     AiProviderKind.CODEX_EASY -> "Codex Easy"

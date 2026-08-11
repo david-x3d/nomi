@@ -8,6 +8,8 @@ enum class AiProviderKind {
     PERPLEXITY,
     OPEN_ROUTER,
     OPEN_AI,
+    /** One Exa retrieval request followed by one native Gemini structured extraction request. */
+    EXA_GEMINI,
     /** Codex Easy: an OpenAI-compatible relay that speaks the OpenAI API under its own key. */
     CODEX_EASY,
     CUSTOM_OPEN_AI_COMPATIBLE,

@@ -616,6 +616,7 @@ private fun com.nomi.app.ai.model.AiProviderKind.localizedDisplayName(): String 
     com.nomi.app.ai.model.AiProviderKind.PERPLEXITY -> "Perplexity"
     com.nomi.app.ai.model.AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     com.nomi.app.ai.model.AiProviderKind.OPEN_AI -> "OpenAI"
+    com.nomi.app.ai.model.AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
     com.nomi.app.ai.model.AiProviderKind.CODEX_EASY -> "Codex Easy"
     com.nomi.app.ai.model.AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom endpoint", "Benutzerdefinierter Endpunkt")
 }

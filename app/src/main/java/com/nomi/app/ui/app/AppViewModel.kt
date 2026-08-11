@@ -44,6 +44,13 @@ import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.withSupportedModel
+import com.nomi.app.ai.provider.NutritionResearchProvider
+import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
+import com.nomi.app.data.remote.ai.EXA_API_ENDPOINT
+import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
+import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
+import com.nomi.app.data.remote.ai.OPENROUTER_GEMINI_ENDPOINT
+import com.nomi.app.data.remote.ai.OpenRouterGeminiExtractionGateway
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
@@ -110,6 +117,7 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
 
 import java.net.URI
 import java.time.Instant
@@ -260,7 +268,14 @@ class AppViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
-    private val keyPresence = MutableStateFlow<Map<ProviderPipeline, Boolean>>(emptyMap())
+    private data class ProviderKeyPresence(
+        val primary: Boolean,
+        val search: Boolean,
+    ) {
+        val complete: Boolean get() = primary && search
+    }
+
+    private val keyPresence = MutableStateFlow<Map<ProviderPipeline, ProviderKeyPresence>>(emptyMap())
     private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
     private val healthSyncMutex = Mutex()
     val settingsState: StateFlow<SettingsUiState> = combine(
@@ -1708,7 +1723,8 @@ class AppViewModel(
             provider = settings.provider,
             model = settings.model,
             endpoint = settings.endpoint,
-            hasStoredApiKey = settings.hasApiKey,
+            hasStoredApiKey = settings.hasPrimaryApiKey,
+            hasStoredSearchApiKey = settings.hasSearchApiKey,
         )
     }
 
@@ -1728,6 +1744,15 @@ class AppViewModel(
                         container.secretStore.put(secretId(selection), chars)
                     } finally {
                         chars.fill('\u0000')
+                    }
+                }
+                if (config.kind == AiProviderKind.EXA_GEMINI) {
+                    state.searchApiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
+                        try {
+                            container.secretStore.put(exaSecretId(), chars)
+                        } finally {
+                            chars.fill('\u0000')
+                        }
                     }
                 }
                 repository.appPreferencesStore.setProvider(pipeline, selection)
@@ -1750,7 +1775,11 @@ class AppViewModel(
             runCatching {
                 val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
                 val selection = state.toProviderSelection(pipeline)
-                container.secretStore.delete(secretId(selection))
+                val primaryRemoved = container.secretStore.delete(secretId(selection))
+                val searchRemoved = if (selection.providerId.equals("exa-gemini", true)) {
+                    container.secretStore.delete(exaSecretId())
+                } else false
+                primaryRemoved || searchRemoved
             }.onSuccess { removed ->
                 recentFoodAnalysisCache.clear()
                 refreshProviderAndHealthStatus()
@@ -1789,6 +1818,42 @@ class AppViewModel(
                         require(content.isNotBlank()) { "The provider returned an empty response." }
                     }
                 }
+                suspend fun <T> withDraftOrStoredCredential(
+                    input: String,
+                    storedId: String,
+                    missingMessage: String,
+                    block: suspend (AiRuntimeCredential) -> T,
+                ): T {
+                    val entered = input.normalizedApiKeyCharsOrNull()
+                    if (entered != null) {
+                        return try {
+                            block(AiRuntimeCredential.from(entered.concatToString()))
+                        } finally {
+                            entered.fill('\u0000')
+                        }
+                    }
+                    return container.secretStore.useSecret(storedId) { chars ->
+                        block(AiRuntimeCredential.from(chars.concatToString()))
+                    } ?: error(missingMessage)
+                }
+
+                if (config.kind == AiProviderKind.EXA_GEMINI) {
+                    withDraftOrStoredCredential(
+                        input = state.apiKeyInput,
+                        storedId = secretId(selection),
+                        missingMessage = "Enter an OpenRouter API key before testing this provider.",
+                    ) { geminiCredential ->
+                        withDraftOrStoredCredential(
+                            input = state.searchApiKeyInput,
+                            storedId = exaSecretId(),
+                            missingMessage = "Enter an Exa API key before testing this provider.",
+                        ) { exaCredential ->
+                            exaGeminiProvider(config, geminiCredential, exaCredential)
+                                .researchNutrition(providerConnectionTestIntent())
+                        }
+                    }
+                    return@runCatching "Connection successful"
+                }
 
                 val enteredKey = state.apiKeyInput.normalizedApiKeyCharsOrNull()
                 if (enteredKey != null) {
@@ -1818,9 +1883,14 @@ class AppViewModel(
         viewModelScope.launch {
             val prefs = loadedPreferences()
             keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
-                runCatching {
-                    container.secretStore.contains(secretId(prefs.selectionFor(pipeline)))
+                val selection = prefs.selectionFor(pipeline)
+                val primary = runCatching {
+                    container.secretStore.contains(secretId(selection))
                 }.getOrDefault(false)
+                val search = if (selection.providerId.equals("exa-gemini", true)) {
+                    runCatching { container.secretStore.contains(exaSecretId()) }.getOrDefault(false)
+                } else true
+                ProviderKeyPresence(primary = primary, search = search)
             }
         }
         viewModelScope.launch { refreshHealthConnectAndSync() }
@@ -2010,14 +2080,20 @@ class AppViewModel(
     private suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
         runWithSmartFallback(
             primary = {
-                withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
-                    providerFor(config, key).researchNutrition(intent)
+                withConfiguredResearchProvider { provider ->
+                    provider.researchNutrition(intent)
                 }
             },
             fallback = {
                 withConfiguredSmartFallback { config, key ->
                     providerFor(config, key).researchNutrition(intent)
                 }
+            },
+            onFallback = { error ->
+                recordResearchFallback(status = "FALLBACK_STARTED", error = error)
+            },
+            onFallbackSuccess = { analysis ->
+                recordResearchFallback(status = "FALLBACK_VALIDATED", analysis = analysis)
             },
         ).withCleanDisplayNames()
 
@@ -2126,6 +2202,7 @@ class AppViewModel(
             "perplexity" -> "https://www.perplexity.ai"
             "openrouter" -> "https://openrouter.ai"
             "openai" -> "https://openai.com"
+            "exa-gemini" -> "https://exa.ai"
             "codex-easy" -> "https://codex-easy.ai"
             else -> selection.endpoint
         }
@@ -2157,6 +2234,25 @@ class AppViewModel(
         } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
     }
 
+    private suspend fun <T> withConfiguredResearchProvider(
+        block: suspend (NutritionResearchProvider) -> T,
+    ): T {
+        val prefs = loadedPreferences()
+        val selection = prefs.foodResearchProvider
+        if (!selection.providerId.equals("exa-gemini", true)) {
+            return withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
+                block(providerFor(config, key))
+            }
+        }
+        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
+        return container.secretStore.useSecret(secretId(selection)) { geminiChars ->
+            val geminiCredential = AiRuntimeCredential.from(geminiChars.concatToString())
+            container.secretStore.useSecret(exaSecretId()) { exaChars ->
+                val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
+                block(exaGeminiProvider(config, geminiCredential, exaCredential))
+            } ?: error("Add the Exa API key in Settings first.")
+        } ?: error("Add the OpenRouter API key in Settings first.")
+    }
     private suspend fun <T : Any> withConfiguredSmartFallback(
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
     ): T {
@@ -2185,6 +2281,73 @@ class AppViewModel(
         )
     }
 
+    private fun exaGeminiProvider(
+        config: AiProviderConfig,
+        geminiCredential: AiRuntimeCredential,
+        exaCredential: AiRuntimeCredential,
+    ) = ExaGeminiNutritionProvider(
+        exaSearch = container.exaGeminiClient,
+        geminiExtractor = OpenRouterGeminiExtractionGateway(container.openAiClient),
+        exaCredential = { exaCredential },
+        geminiConfig = config,
+        geminiCredential = { geminiCredential },
+        debugSink = ::recordExaGeminiTrace,
+    )
+
+    private suspend fun recordExaGeminiTrace(trace: ExaGeminiDebugTrace) {
+        if (!preferences.value.aiDebugEnabled) return
+        runCatching {
+            repository.recordAiDebugEvent(
+                AiDebugEventEntity(
+                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
+                    providerId = trace.provider,
+                    model = trace.model,
+                    durationMillis = trace.totalLatencyMillis,
+                    cacheHit = false,
+                    sourceSummary = trace.returnedSources.joinToString(" | ") {
+                        "${it.sourceId}: ${it.title} (${it.url})"
+                    }.take(4_000),
+                    parsedResultJson = container.exaGeminiClient.json.encodeToString(trace),
+                    validationStatus = trace.status,
+                    failureCategory = trace.failureReason?.let { "EXA_GEMINI_REJECTED" },
+                    safeMessage = trace.failureReason,
+                    createdAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+    private suspend fun recordResearchFallback(
+        status: String,
+        error: Throwable? = null,
+        analysis: FoodAnalysis? = null,
+    ) {
+        if (!preferences.value.aiDebugEnabled) return
+        val selection = preferences.value.smartFallbackProvider
+        val sourceUrls = analysis?.items.orEmpty().flatMap { item ->
+            listOfNotNull(item.sourceUrl) + item.supportingSourceUrls
+        }.distinct()
+        runCatching {
+            repository.recordAiDebugEvent(
+                AiDebugEventEntity(
+                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
+                    providerId = selection.providerId,
+                    model = selection.model,
+                    durationMillis = 0,
+                    cacheHit = false,
+                    sourceSummary = sourceUrls.joinToString(" | ").take(4_000),
+                    validationStatus = status,
+                    failureCategory = error?.javaClass?.simpleName,
+                    safeMessage = error?.safeProviderFailureMessage()
+                        ?: if (analysis != null) {
+                            "The configured fallback provider returned validated nutrition."
+                        } else {
+                            "The primary research provider failed validation; using the configured fallback."
+                        },
+                    createdAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
     private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =
         OpenAiCompatibleProviders(
             client = container.openAiClient,
@@ -2280,7 +2443,7 @@ class AppViewModel(
     private fun mapSettings(
         prefs: AppPreferences,
         plan: NutritionPlanEntity?,
-        keys: Map<ProviderPipeline, Boolean>,
+        keys: Map<ProviderPipeline, ProviderKeyPresence>,
         health: HealthConnectUiState,
     ): SettingsUiState {
         val providers = ProviderPipeline.entries.map { pipeline ->
@@ -2291,7 +2454,10 @@ class AppViewModel(
                 model = selected.model,
                 endpoint = runCatching { selected.toRuntimeConfig().endpoint }
                     .getOrElse { selected.endpoint.orEmpty() },
-                hasApiKey = keys[pipeline] == true,
+                hasApiKey = keys[pipeline]?.complete == true,
+                hasPrimaryApiKey = keys[pipeline]?.primary == true,
+                hasSearchApiKey = keys[pipeline]?.search == true &&
+                    selected.providerId.equals("exa-gemini", true),
             )
         }
         val reminders = prefs.reminders
@@ -2653,6 +2819,7 @@ private fun ProviderSelection.resolvedEndpoint(): String {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
         AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
         AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
+        AiProviderKind.EXA_GEMINI -> OPENROUTER_GEMINI_ENDPOINT
         // Codex Easy publishes both a bare host and a /v1 base; Nomi appends OpenAI request
         // paths, so the versioned base is the one that resolves to /v1/chat/completions.
         AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
@@ -2665,7 +2832,6 @@ private fun ProviderSelection.resolvedEndpoint(): String {
     }
     return resolved
 }
-
 /**
  * [timeoutDisabled] comes from the user's "Never time out" setting: research that runs long is
  * then waited out instead of being cut off.
@@ -2688,26 +2854,26 @@ private fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.ROO
     "perplexity" -> AiProviderKind.PERPLEXITY
     "openrouter" -> AiProviderKind.OPEN_ROUTER
     "openai" -> AiProviderKind.OPEN_AI
+    "exa-gemini" -> AiProviderKind.EXA_GEMINI
     "codex-easy" -> AiProviderKind.CODEX_EASY
     else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
 }
-
 private fun AiProviderKind.toProviderId(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "perplexity"
     AiProviderKind.OPEN_ROUTER -> "openrouter"
     AiProviderKind.OPEN_AI -> "openai"
+    AiProviderKind.EXA_GEMINI -> "exa-gemini"
     AiProviderKind.CODEX_EASY -> "codex-easy"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
 }
-
 private fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)) {
     "perplexity" -> "Perplexity"
     "openrouter" -> "OpenRouter"
     "openai" -> "OpenAI"
+    "exa-gemini" -> "Exa + Gemini"
     "codex-easy" -> "Codex Easy"
     else -> "custom provider"
 }
-
 private fun ProviderPipeline.displayName(): String = when (this) {
     ProviderPipeline.FOOD_RESEARCH -> "Food research"
     ProviderPipeline.FOOD_INTERPRETATION -> "Food interpretation"
@@ -2736,13 +2902,16 @@ internal fun smartFallbackCredentialIds(
 internal suspend fun <T> runWithSmartFallback(
     primary: suspend () -> T,
     fallback: suspend () -> T,
+    onFallback: suspend (Throwable) -> Unit = {},
+    onFallbackSuccess: suspend (T) -> Unit = {},
 ): T = try {
     primary()
 } catch (cancelled: CancellationException) {
     throw cancelled
 } catch (primaryError: Throwable) {
+    onFallback(primaryError)
     try {
-        fallback()
+        fallback().also { onFallbackSuccess(it) }
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (fallbackError: Throwable) {
@@ -2774,9 +2943,15 @@ private fun ThemeMode.toPreference(): ThemePreference = when (this) {
  * pipelines run on the same OpenRouter key by default, so entering it once in any of them
  * configures the rest; a second provider still gets its own separate secret.
  */
-private fun secretId(selection: ProviderSelection): String {
-    val endpoint = selection.resolvedEndpoint().lowercase(Locale.ROOT)
-    val material = "${selection.providerId.lowercase(Locale.ROOT)}|$endpoint"
+private fun secretId(selection: ProviderSelection): String = providerSecretId(
+    providerId = selection.providerId,
+    endpoint = selection.resolvedEndpoint(),
+)
+
+private fun exaSecretId(): String = providerSecretId("exa", EXA_API_ENDPOINT)
+
+private fun providerSecretId(providerId: String, endpoint: String): String {
+    val material = "${providerId.lowercase(Locale.ROOT)}|${endpoint.lowercase(Locale.ROOT)}"
     val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
     val token = digest.take(16).joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
     return "provider:$token"

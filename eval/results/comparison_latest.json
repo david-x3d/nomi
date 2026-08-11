@@ -1,0 +1,257 @@
+{
+  "schemaVersion": "1.0.0",
+  "runStatus": "complete",
+  "casesCompared": 174,
+  "categoryDeltas": {
+    "verifiedReal": -25.2336,
+    "syntheticDeterministic": -21.4286,
+    "citationIntegrity": -7.6923,
+    "rejectBehavior": -20.0,
+    "averageLatencySeconds": null
+  },
+  "winner": "not_demonstrated",
+  "biggestRegressions": [
+    {
+      "id": "synthetic_protein_cereal_serving",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_protein_cereal_decimal_comma",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_lentil_soup_serving",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_lentil_soup_decimal_comma",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_nut_bar_serving",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_tofu_bowl_serving",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_tofu_bowl_decimal_comma",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_yogurt_serving",
+      "sonarScorePercent": 100.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -100.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_100g",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_typo_20g",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_decimal_comma",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_quarter_jar",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_conflicting_bases",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_coke_de_100ml",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_coke_de_250ml",
+      "sonarScorePercent": 90.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": -90.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    }
+  ],
+  "biggestImprovements": [
+    {
+      "id": "noresult_prompt_injection_product",
+      "sonarScorePercent": 50.0,
+      "exaGeminiScorePercent": 100.0,
+      "deltaPercent": 50.0,
+      "sonarOutcome": "success",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_de_125_percent_serving",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_nutella_ice_225_percent",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_maggi_india_two_packs",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_pocky_matcha_typo",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_starbucks_uk_cappuccino_short",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_starbucks_uk_cappuccino_venti",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_starbucks_uk_grande_typo",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_starbucks_uk_125pct_short",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "real_starbucks_uk_flat_white_typo",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_protein_cereal_125pct_serving",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_lentil_soup_125pct_serving",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_nut_bar_125pct_serving",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_nut_bar_decimal_comma",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    },
+    {
+      "id": "synthetic_tofu_bowl_125pct_serving",
+      "sonarScorePercent": 0.0,
+      "exaGeminiScorePercent": 0.0,
+      "deltaPercent": 0.0,
+      "sonarOutcome": "rejected",
+      "exaGeminiOutcome": "rejected"
+    }
+  ]
+}

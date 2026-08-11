@@ -5,6 +5,7 @@ import com.nomi.app.BuildConfig
 import com.nomi.app.data.backup.NomiBackupService
 import com.nomi.app.data.local.NomiDatabase
 import com.nomi.app.data.preferences.DataStoreAppPreferencesStore
+import com.nomi.app.data.remote.ai.ExaGeminiHttpClient
 import com.nomi.app.data.remote.ai.OpenAiCompatibleClient
 import com.nomi.app.data.remote.openfoodfacts.OpenFoodFactsClient
 import com.nomi.app.data.repository.NomiRepository
@@ -23,6 +24,7 @@ class AppContainer(context: Context) {
     val secretStore: SecureSecretStore by lazy { AndroidKeystoreSecureSecretStore(appContext) }
     val healthConnect: HealthConnectManager by lazy { HealthConnectManager(appContext) }
     val openAiClient: OpenAiCompatibleClient by lazy { OpenAiCompatibleClient() }
+    internal val exaGeminiClient: ExaGeminiHttpClient by lazy { ExaGeminiHttpClient() }
     val openFoodFacts: OpenFoodFactsClient by lazy { OpenFoodFactsClient() }
     val backupService: NomiBackupService by lazy { NomiBackupService(database, preferencesStore, BuildConfig.VERSION_NAME) }
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(appContext) }

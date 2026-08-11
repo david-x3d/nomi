@@ -1,0 +1,426 @@
+{
+  "schemaVersion": "1.0.0",
+  "provider": "exa_gemini",
+  "cacheNamespace": "exa_gemini-416199d9-2876-478e-b9ae-a93292df7a81",
+  "startedAt": "2026-08-11T03:20:14.256642600Z",
+  "completedAt": "2026-08-11T03:20:26.823566Z",
+  "approximateApiCostUsd": null,
+  "costNote": "Production provider responses do not expose token/search cost to this executor.",
+  "runStatus": "complete",
+  "suiteId": "nomi_android_calorie_tracker_hard_eval_v1",
+  "casesPlanned": 10,
+  "casesExecuted": 10,
+  "summary": {
+    "verifiedRealAccuracyPercent": 0.0,
+    "syntheticDeterministicPercent": 0.0,
+    "citationIntegrityPercent": 0.0,
+    "rejectBehaviorPercent": 0.0,
+    "kcalAccuracyPercent": 0.0,
+    "proteinAccuracyPercent": 0.0,
+    "carbsAccuracyPercent": 0.0,
+    "fatAccuracyPercent": 0.0,
+    "amountAccuracyPercent": 0.0,
+    "nutritionBasisAccuracyPercent": 0.0,
+    "entityMatchPercent": 0.0,
+    "averageLatencySeconds": 1.2551,
+    "providerFailures": 10,
+    "fallbackUsage": 0,
+    "failureCategories": {
+      "structured-output/schema failure": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "JSON decoding failure": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "quantity/parser validation failure": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "source-grounding validation failure": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "retrieval miss": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "genuinely wrong nutrition extraction": {
+        "count": 0,
+        "percent": 0.0
+      },
+      "other": {
+        "count": 10,
+        "percent": 100.0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "real_nutella_de_100g",
+      "dataClass": "verified_real",
+      "tags": [
+        "explicit_amount",
+        "per_100g",
+        "brand",
+        "germany"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1322,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "real_nutella_de_15g_serving",
+      "dataClass": "verified_real",
+      "tags": [
+        "serving",
+        "brand",
+        "serving_label",
+        "germany"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1268,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "real_nutella_de_typo_20g",
+      "dataClass": "verified_real",
+      "tags": [
+        "explicit_amount",
+        "per_100g",
+        "brand",
+        "typo"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 362,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "real_coke_zero_pg_250ml",
+      "dataClass": "verified_real",
+      "tags": [
+        "explicit_amount",
+        "per_100ml",
+        "brand",
+        "beverage",
+        "legitimate_all_zero",
+        "container_size"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 349,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "real_pocky_matcha_one_box",
+      "dataClass": "verified_real",
+      "tags": [
+        "serving",
+        "brand",
+        "international_japan_us"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1533,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "real_starbucks_uk_flat_white_short",
+      "dataClass": "verified_real",
+      "tags": [
+        "serving",
+        "restaurant",
+        "starbucks",
+        "similar_menu_name",
+        "milk_disambiguation"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1017,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "synthetic_protein_cereal_100g",
+      "dataClass": "synthetic_deterministic",
+      "tags": [
+        "explicit_amount",
+        "per_100g",
+        "synthetic",
+        "deterministic",
+        "inline_label"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1381,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": true,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "synthetic_combo_two_components",
+      "dataClass": "synthetic_deterministic",
+      "tags": [
+        "synthetic",
+        "deterministic",
+        "multi_component",
+        "arithmetic"
+      ],
+      "expectedOutcome": "success",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 2345,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": true,
+      "zeroResultRule": false,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 0.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "noresult_fake_product_1",
+      "dataClass": "synthetic_deterministic",
+      "tags": [
+        "synthetic",
+        "deterministic",
+        "no_result",
+        "all_zero_expected",
+        "unknown_product"
+      ],
+      "expectedOutcome": "no_result",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1358,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": true,
+      "zeroResultRule": true,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 50.0,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    },
+    {
+      "id": "fakecite_product_page",
+      "dataClass": "synthetic_deterministic",
+      "tags": [
+        "synthetic",
+        "deterministic",
+        "fake_citation",
+        "all_zero_expected",
+        "adversarial"
+      ],
+      "expectedOutcome": "reject_unverified",
+      "actualOutcome": "provider_failure",
+      "latencyMillis": 1616,
+      "actual": null,
+      "numeric": {
+        "calories": null,
+        "protein": null,
+        "carbs": null,
+        "fat": null
+      },
+      "amountAccuracy": null,
+      "nutritionBasisAccuracy": null,
+      "entityMatch": null,
+      "citationIntegrity": false,
+      "zeroResultRule": true,
+      "retrievalAccuracy": false,
+      "deterministicAccuracy": false,
+      "rejectBehavior": false,
+      "providerFailure": true,
+      "fallbackUsed": false,
+      "caseScorePercent": 33.3333,
+      "errorType": "ClientRequestException",
+      "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre",
+      "failureCategory": "other"
+    }
+  ],
+  "smokeGate": {
+    "selectedCaseIds": [
+      "real_nutella_de_100g",
+      "real_nutella_de_15g_serving",
+      "real_nutella_de_typo_20g",
+      "real_coke_zero_pg_250ml",
+      "real_pocky_matcha_one_box",
+      "real_starbucks_uk_flat_white_short",
+      "synthetic_protein_cereal_100g",
+      "synthetic_combo_two_components",
+      "noresult_fake_product_1",
+      "fakecite_product_page"
+    ],
+    "structuredContractValid": 0,
+    "structuredContractValidPercent": 0.0,
+    "expectedOutcomePasses": 0,
+    "expectedOutcomePassPercent": 0.0,
+    "gatePassed": false,
+    "fullRerunAllowed": false
+  }
+}

@@ -1,0 +1,80 @@
+{
+    "schemaVersion": "1.0.0",
+    "provider": "exa_gemini",
+    "cacheNamespace": "exa_gemini-416199d9-2876-478e-b9ae-a93292df7a81",
+    "startedAt": "2026-08-11T03:20:14.256642600Z",
+    "completedAt": "2026-08-11T03:20:26.823566Z",
+    "costNote": "Production provider responses do not expose token/search cost to this executor.",
+    "cases": [
+        {
+            "id": "real_nutella_de_100g",
+            "status": "provider_failure",
+            "latencyMillis": 1322,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "real_nutella_de_15g_serving",
+            "status": "provider_failure",
+            "latencyMillis": 1268,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "real_nutella_de_typo_20g",
+            "status": "provider_failure",
+            "latencyMillis": 362,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "real_coke_zero_pg_250ml",
+            "status": "provider_failure",
+            "latencyMillis": 349,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "real_pocky_matcha_one_box",
+            "status": "provider_failure",
+            "latencyMillis": 1533,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "real_starbucks_uk_flat_white_short",
+            "status": "provider_failure",
+            "latencyMillis": 1017,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "synthetic_protein_cereal_100g",
+            "status": "provider_failure",
+            "latencyMillis": 1381,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "synthetic_combo_two_components",
+            "status": "provider_failure",
+            "latencyMillis": 2345,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "noresult_fake_product_1",
+            "status": "provider_failure",
+            "latencyMillis": 1358,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        },
+        {
+            "id": "fakecite_product_page",
+            "status": "provider_failure",
+            "latencyMillis": 1616,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 4096 tokens, but can only afford 2664. To increase, visit https://openrouter.ai/settings/credits and add more cre"
+        }
+    ]
+}

@@ -11,3 +11,5 @@
 *.keystore
 secrets.properties
 *.apk
+/eval/.env
+__pycache__/

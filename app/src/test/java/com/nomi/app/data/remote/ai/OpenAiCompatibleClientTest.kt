@@ -431,6 +431,20 @@ class OpenAiCompatibleClientTest {
         assertTrue(encoded.contains("\"model\":\"perplexity/sonar\""))
     }
 
+    @Test
+    fun `bounded completions use model supported token field`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.EXA_GEMINI, "google/gemini-3.6-flash"),
+                listOf(ChatMessage("user", JsonPrimitive("Extract nutrition"))),
+                maxTokens = 4_096,
+            ),
+        )
+
+        assertTrue(encoded.contains("\"max_tokens\":4096"))
+        assertFalse(encoded.contains("\"max_completion_tokens\""))
+    }
+
     private fun config(kind: AiProviderKind, model: String) = AiProviderConfig(
         kind = kind,
         endpoint = when (kind) {

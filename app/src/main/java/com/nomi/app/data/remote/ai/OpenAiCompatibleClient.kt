@@ -57,7 +57,30 @@ class OpenAiCompatibleClient(
             ChatMessage("system", JsonPrimitive(systemPrompt)),
             ChatMessage("user", JsonPrimitive(userPrompt)),
         ),
+        maxTokens = 4_096,
     )
+
+    internal suspend fun completeStructuredJson(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+        schemaName: String,
+        schema: JsonObject,
+        maxTokens: Int = 4_096,
+    ): String = completeResponse(
+        config = config,
+        credential = credential,
+        messages = listOf(
+            ChatMessage("system", JsonPrimitive(systemPrompt)),
+            ChatMessage("user", JsonPrimitive(userPrompt)),
+        ),
+        forcedResponseFormat = ResponseFormat(
+            type = "json_schema",
+            jsonSchema = JsonSchemaDefinition(name = schemaName, schema = schema),
+        ),
+        maxTokens = maxTokens,
+    ).structuredContent()
 
     /**
      * Completes nutrition research only through a provider path with explicit live search.
@@ -126,20 +149,36 @@ class OpenAiCompatibleClient(
         config: AiProviderConfig,
         credential: AiRuntimeCredential,
         messages: List<ChatMessage>,
-    ): String = completeResponse(config, credential, messages).structuredContent()
+        maxTokens: Int? = null,
+    ): String = completeResponse(
+        config = config,
+        credential = credential,
+        messages = messages,
+        maxTokens = maxTokens,
+    ).structuredContent()
 
     private suspend fun completeResponse(
         config: AiProviderConfig,
         credential: AiRuntimeCredential,
         messages: List<ChatMessage>,
         requireWebSearch: Boolean = false,
+        forcedResponseFormat: ResponseFormat? = null,
+        maxTokens: Int? = null,
     ): ChatCompletionResponse {
         val endpoint = config.endpoint.trimEnd('/') + "/chat/completions"
         return httpClient.post(endpoint) {
             contentType(ContentType.Application.Json)
             bearerAuth(credential.revealForRequest())
             config.extraHeaders.forEach { (name, value) -> header(name, value) }
-            setBody(chatCompletionRequest(config, messages, requireWebSearch))
+            setBody(
+                chatCompletionRequest(
+                    config = config,
+                    messages = messages,
+                    requireWebSearch = requireWebSearch,
+                    forcedResponseFormat = forcedResponseFormat,
+                    maxTokens = maxTokens,
+                ),
+            )
             timeout {
                 requestTimeoutMillis = config.effectiveTimeoutMillis()
                 socketTimeoutMillis = config.effectiveTimeoutMillis()
@@ -218,6 +257,7 @@ internal data class ChatCompletionRequest(
     val temperature: Double? = null,
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
+    @SerialName("max_tokens") val maxTokens: Int? = null,
 )
 
 @Serializable
@@ -256,6 +296,7 @@ internal data class ResponseFormat(
 internal data class JsonSchemaDefinition(
     val name: String,
     val schema: JsonObject,
+    val strict: Boolean = true,
 )
 
 @Serializable
@@ -362,11 +403,13 @@ internal fun chatCompletionRequest(
     config: AiProviderConfig,
     messages: List<ChatMessage>,
     requireWebSearch: Boolean = false,
+    forcedResponseFormat: ResponseFormat? = null,
+    maxTokens: Int? = null,
 ): ChatCompletionRequest = ChatCompletionRequest(
     model = config.model,
     messages = messages,
     temperature = config.temperature.takeIf { config.supportsCustomTemperature() },
-    responseFormat = when {
+    responseFormat = forcedResponseFormat ?: when {
         // OpenRouter search spans providers with different structured-output constraints, so
         // its research path relies on the JSON-only prompt plus Nomi's app-side validation.
         requireWebSearch && config.kind == AiProviderKind.PERPLEXITY ->
@@ -378,6 +421,7 @@ internal fun chatCompletionRequest(
     webSearchOptions = WebSearchOptions().takeIf {
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
+    maxTokens = maxTokens,
 ).also {
     // OpenAI accepts web_search_options only on its search models and 400s otherwise.
     require(

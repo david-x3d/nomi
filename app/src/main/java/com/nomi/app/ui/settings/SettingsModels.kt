@@ -23,6 +23,8 @@ data class AiProviderSetting(
     val model: String,
     val endpoint: String,
     val hasApiKey: Boolean,
+    val hasPrimaryApiKey: Boolean = hasApiKey,
+    val hasSearchApiKey: Boolean = false,
     val connectionStatus: String? = null,
 )
 

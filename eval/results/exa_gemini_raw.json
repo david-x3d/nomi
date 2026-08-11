@@ -1,0 +1,1228 @@
+{
+    "schemaVersion": "1.0.0",
+    "provider": "exa_gemini",
+    "cacheNamespace": "exa_gemini-2aecdb6e-7108-4049-8b9f-df59a49aaeb5",
+    "startedAt": "2026-08-11T02:16:30.026826500Z",
+    "completedAt": "2026-08-11T02:41:13.606780400Z",
+    "costNote": "Production provider responses do not expose token/search cost to this executor.",
+    "cases": [
+        {
+            "id": "real_nutella_de_100g",
+            "status": "rejected",
+            "latencyMillis": 9528,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_de_15g_serving",
+            "status": "rejected",
+            "latencyMillis": 11438,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_de_30g_two_servings",
+            "status": "rejected",
+            "latencyMillis": 8364,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_de_half_serving",
+            "status": "rejected",
+            "latencyMillis": 8769,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_de_125_percent_serving",
+            "status": "rejected",
+            "latencyMillis": 971,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "real_nutella_de_typo_20g",
+            "status": "rejected",
+            "latencyMillis": 12730,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_de_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 16692,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_de_quarter_jar",
+            "status": "rejected",
+            "latencyMillis": 9023,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_de_third_jar",
+            "status": "rejected",
+            "latencyMillis": 663,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 210: Expected quotation mark '\"', but had 'g' instead at path: $.items[0].unit\nJSON input: .....250,\n      \"unit\": \"g\",\n      gramsEquivalent: 250,\n      \"p....."
+        },
+        {
+            "id": "real_nutella_de_point_two_jar",
+            "status": "rejected",
+            "latencyMillis": 9186,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_de_explicit_basis_32g",
+            "status": "rejected",
+            "latencyMillis": 9568,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_de_conflicting_bases",
+            "status": "rejected",
+            "latencyMillis": 11416,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_ice_100g",
+            "status": "rejected",
+            "latencyMillis": 5661,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_ice_150g",
+            "status": "rejected",
+            "latencyMillis": 9394,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [proteinGrams, carbohydrateGrams, fatGrams, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_ice_100ml",
+            "status": "rejected",
+            "latencyMillis": 7052,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_ice_200ml",
+            "status": "rejected",
+            "latencyMillis": 9292,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_ice_half_100ml",
+            "status": "rejected",
+            "latencyMillis": 11098,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nutella_ice_225_percent",
+            "status": "rejected",
+            "latencyMillis": 612,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "real_nutella_ice_typo_75ml",
+            "status": "rejected",
+            "latencyMillis": 11204,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, carbohydrateGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nutella_ice_conflict_489g_100ml",
+            "status": "rejected",
+            "latencyMillis": 12010,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_coke_de_100ml",
+            "status": "rejected",
+            "latencyMillis": 8282,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_de_250ml",
+            "status": "rejected",
+            "latencyMillis": 9299,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 570: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....      },\n      \"assumptions\": \"Selected standard Coca-Cola n....."
+        },
+        {
+            "id": "real_coke_de_330ml",
+            "status": "rejected",
+            "latencyMillis": 12517,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 692: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....s\": 0.0,\n      \"assumptions\": \"Selected official UK retailer....."
+        },
+        {
+            "id": "real_coke_de_500ml",
+            "status": "rejected",
+            "latencyMillis": 16783,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_de_1l",
+            "status": "rejected",
+            "latencyMillis": 10446,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_de_half_500ml",
+            "status": "rejected",
+            "latencyMillis": 12764,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_de_quarter_1l",
+            "status": "rejected",
+            "latencyMillis": 12532,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_coke_de_typo_375ml",
+            "status": "rejected",
+            "latencyMillis": 11872,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_de_conflict_pg_330ml",
+            "status": "rejected",
+            "latencyMillis": 10318,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_vanilla_de_100ml",
+            "status": "rejected",
+            "latencyMillis": 9081,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_vanilla_de_330ml",
+            "status": "rejected",
+            "latencyMillis": 16651,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_coke_vanilla_de_half_liter",
+            "status": "rejected",
+            "latencyMillis": 10814,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_vanilla_de_three_quarters_can",
+            "status": "rejected",
+            "latencyMillis": 7002,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_coke_zero_pg_100ml",
+            "status": "rejected",
+            "latencyMillis": 10862,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_zero_pg_250ml",
+            "status": "rejected",
+            "latencyMillis": 9956,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_zero_pg_500ml",
+            "status": "rejected",
+            "latencyMillis": 15582,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_coke_zero_pg_1l",
+            "status": "rejected",
+            "latencyMillis": 14606,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_coke_zero_pg_typo_330ml",
+            "status": "rejected",
+            "latencyMillis": 12864,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceId, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_weetabix_uk_two_biscuits",
+            "status": "rejected",
+            "latencyMillis": 17088,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 821: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....g\": 4.5,\n      \"assumptions\": \"Nutrition values are given pe....."
+        },
+        {
+            "id": "real_weetabix_uk_one_biscuit",
+            "status": "rejected",
+            "latencyMillis": 19122,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_weetabix_uk_three_biscuits",
+            "status": "rejected",
+            "latencyMillis": 17469,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 797: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....s\": 4.5,\n      \"assumptions\": \"Nährwerte entstammen den offi....."
+        },
+        {
+            "id": "real_weetabix_uk_four_biscuits",
+            "status": "rejected",
+            "latencyMillis": 15396,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 842: Expected start of the array '[', but had 'n' instead at path: $.items[0].assumptions\nJSON input: .....s\": 4.5,\n      \"assumptions\": null\n    }\n  ]\n}"
+        },
+        {
+            "id": "real_weetabix_uk_two_and_half",
+            "status": "rejected",
+            "latencyMillis": 21330,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_weetabix_uk_quarter_serving",
+            "status": "rejected",
+            "latencyMillis": 17736,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_weetabix_uk_100g",
+            "status": "rejected",
+            "latencyMillis": 10962,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_weetabix_uk_50g_typo",
+            "status": "rejected",
+            "latencyMillis": 9118,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_weetabix_uk_conflict_bases",
+            "status": "rejected",
+            "latencyMillis": 12999,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_vegemite_au_5g",
+            "status": "rejected",
+            "latencyMillis": 16386,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_vegemite_au_10g",
+            "status": "rejected",
+            "latencyMillis": 17283,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 832: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....      },\n      \"assumptions\": \"Selected official AU Vegemite....."
+        },
+        {
+            "id": "real_vegemite_au_half_serving",
+            "status": "rejected",
+            "latencyMillis": 17991,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_vegemite_au_20g",
+            "status": "rejected",
+            "latencyMillis": 16958,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_vegemite_au_100g",
+            "status": "rejected",
+            "latencyMillis": 14186,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_vegemite_au_typo_7g",
+            "status": "rejected",
+            "latencyMillis": 14128,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_vegemite_au_25pct_20g",
+            "status": "rejected",
+            "latencyMillis": 21243,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_100g",
+            "status": "rejected",
+            "latencyMillis": 1391,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 221: Expected quotation mark '\"', but had 'g' instead at path: $.items[0].unit\nJSON input: .....100,\n      \"unit\": \"g\",\n      gramsEquivalent: 100,\n      \"p....."
+        },
+        {
+            "id": "real_arla_skyr_150g",
+            "status": "rejected",
+            "latencyMillis": 8624,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_half_tub",
+            "status": "rejected",
+            "latencyMillis": 7753,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_whole_tub",
+            "status": "rejected",
+            "latencyMillis": 10075,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_third_tub",
+            "status": "rejected",
+            "latencyMillis": 10957,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_quarter_tub",
+            "status": "rejected",
+            "latencyMillis": 11372,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceId, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_typo_175g",
+            "status": "rejected",
+            "latencyMillis": 6891,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_arla_skyr_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 8465,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nissin_one_cup",
+            "status": "rejected",
+            "latencyMillis": 12132,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_nissin_half_cup",
+            "status": "rejected",
+            "latencyMillis": 11304,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nissin_two_cups",
+            "status": "rejected",
+            "latencyMillis": 11208,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nissin_quarter_cup",
+            "status": "rejected",
+            "latencyMillis": 9455,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceId, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_nissin_one_and_half",
+            "status": "rejected",
+            "latencyMillis": 12437,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 773: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....      },\n      \"assumptions\": \"Primary serving size (68g, 31....."
+        },
+        {
+            "id": "real_nissin_typo",
+            "status": "rejected",
+            "latencyMillis": 12853,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 672: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....D\": 0.0,\n      \"assumptions\": \"Used nutrition data for 1 pac....."
+        },
+        {
+            "id": "real_nissin_water_confusion",
+            "status": "rejected",
+            "latencyMillis": 10978,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 681: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....: 190.0,\n      \"assumptions\": \"Nutrition details are for 1 p....."
+        },
+        {
+            "id": "real_nissin_per100g_derived",
+            "status": "rejected",
+            "latencyMillis": 12694,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_maggi_india_one_pack",
+            "status": "rejected",
+            "latencyMillis": 11926,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_maggi_india_two_packs",
+            "status": "rejected",
+            "latencyMillis": 13409,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 630: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....\": 5.17,\n      \"assumptions\": \"Selected official Maggi India....."
+        },
+        {
+            "id": "real_maggi_india_half_pack",
+            "status": "rejected",
+            "latencyMillis": 10261,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_maggi_india_quarter_pack",
+            "status": "rejected",
+            "latencyMillis": 14569,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_maggi_india_third_pack",
+            "status": "rejected",
+            "latencyMillis": 9637,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_maggi_india_typo",
+            "status": "rejected",
+            "latencyMillis": 9281,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_maggi_india_100g",
+            "status": "rejected",
+            "latencyMillis": 10532,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_maggi_india_conflict_bases",
+            "status": "rejected",
+            "latencyMillis": 13759,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_pocky_matcha_one_box",
+            "status": "rejected",
+            "latencyMillis": 8689,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_pocky_matcha_half_box",
+            "status": "rejected",
+            "latencyMillis": 9966,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_pocky_matcha_two_boxes",
+            "status": "rejected",
+            "latencyMillis": 7963,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_pocky_matcha_quarter_box",
+            "status": "rejected",
+            "latencyMillis": 9379,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_pocky_matcha_one_half_boxes",
+            "status": "rejected",
+            "latencyMillis": 10925,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 817: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....      },\n      \"assumptions\": \"Selected official US manufact....."
+        },
+        {
+            "id": "real_pocky_matcha_typo",
+            "status": "rejected",
+            "latencyMillis": 7616,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_pocky_matcha_100g_derived",
+            "status": "rejected",
+            "latencyMillis": 10157,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_starbucks_uk_cappuccino_short",
+            "status": "rejected",
+            "latencyMillis": 15311,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_cappuccino_tall",
+            "status": "rejected",
+            "latencyMillis": 15948,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_cappuccino_grande",
+            "status": "rejected",
+            "latencyMillis": 12449,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_cappuccino_venti",
+            "status": "rejected",
+            "latencyMillis": 13266,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceId, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_grande_typo",
+            "status": "rejected",
+            "latencyMillis": 12650,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_starbucks_uk_two_tall",
+            "status": "rejected",
+            "latencyMillis": 11463,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_half_grande",
+            "status": "rejected",
+            "latencyMillis": 10051,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_125pct_short",
+            "status": "rejected",
+            "latencyMillis": 7197,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_size_conflict",
+            "status": "rejected",
+            "latencyMillis": 17196,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_flat_white_short",
+            "status": "rejected",
+            "latencyMillis": 8631,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_starbucks_uk_flat_white_typo",
+            "status": "rejected",
+            "latencyMillis": 6584,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No provided source contains exact nutritional values for a Starbucks Short Flat White with skim (nonfat) milk."
+        },
+        {
+            "id": "real_starbucks_uk_flat_white_two",
+            "status": "rejected",
+            "latencyMillis": 9678,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_au_big_mac",
+            "status": "rejected",
+            "latencyMillis": 9623,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "real_mcd_au_double_big_mac",
+            "status": "rejected",
+            "latencyMillis": 9722,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_nz_big_mac",
+            "status": "rejected",
+            "latencyMillis": 8775,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 467: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....      ],\n      \"assumptions\": \"Nutritional information is ta....."
+        },
+        {
+            "id": "real_mcd_nz_double_big_mac",
+            "status": "rejected",
+            "latencyMillis": 9864,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceId, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_au_big_mac_typo",
+            "status": "rejected",
+            "latencyMillis": 10963,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_nz_big_mac_typo",
+            "status": "rejected",
+            "latencyMillis": 8068,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_au_half_big_mac",
+            "status": "rejected",
+            "latencyMillis": 10386,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_nz_two_big_macs",
+            "status": "rejected",
+            "latencyMillis": 8610,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 432: Expected start of the array '[', but had '\"' instead at path: $.items[0].assumptions\nJSON input: .....\": 1060,\n      \"assumptions\": \"Nutritional values retrieved ....."
+        },
+        {
+            "id": "real_mcd_big_mac_country_conflict_au",
+            "status": "rejected",
+            "latencyMillis": 11002,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "real_mcd_big_mac_country_conflict_nz",
+            "status": "rejected",
+            "latencyMillis": 11664,
+            "errorType": "AiValidationException",
+            "errorMessage": "Gemini must return exactly one nutrition result for each logged item"
+        },
+        {
+            "id": "synthetic_protein_cereal_100g",
+            "status": "rejected",
+            "latencyMillis": 1048,
+            "errorType": "JsonDecodingException",
+            "errorMessage": "Unexpected JSON token at offset 303: Expected quotation mark '\"', but had 'g' instead at path: $.items[0].unit\nJSON input: .....100,\n      \"unit\": \"g\",\n      gramsEquivalent: 100,\n      \"p....."
+        },
+        {
+            "id": "synthetic_protein_cereal_serving",
+            "status": "rejected",
+            "latencyMillis": 16594,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_protein_cereal_half_serving",
+            "status": "rejected",
+            "latencyMillis": 8455,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching nutrition data found for NOMI-QA Protein Crunch in the retrieved search results."
+        },
+        {
+            "id": "synthetic_protein_cereal_125pct_serving",
+            "status": "rejected",
+            "latencyMillis": 1161,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "synthetic_protein_cereal_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 9408,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_lentil_soup_100g",
+            "status": "rejected",
+            "latencyMillis": 16014,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, carbohydrateGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_lentil_soup_serving",
+            "status": "rejected",
+            "latencyMillis": 17261,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_lentil_soup_half_serving",
+            "status": "rejected",
+            "latencyMillis": 9413,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No retrieved document contains nutrition information for 'NOMI-QA Linsensuppe'."
+        },
+        {
+            "id": "synthetic_lentil_soup_125pct_serving",
+            "status": "rejected",
+            "latencyMillis": 1005,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "synthetic_lentil_soup_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 13683,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, carbohydrateGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_nut_bar_100g",
+            "status": "rejected",
+            "latencyMillis": 7986,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching document found for 'NOMI-QA Nussriegel X7' in retrieved results."
+        },
+        {
+            "id": "synthetic_nut_bar_serving",
+            "status": "rejected",
+            "latencyMillis": 5052,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching product or nutrition data found for 'NOMI-QA Nussriegel X7' in the retrieved sources."
+        },
+        {
+            "id": "synthetic_nut_bar_half_serving",
+            "status": "rejected",
+            "latencyMillis": 7103,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching source found for NOMI-QA Nussriegel X7 in the retrieved evidence."
+        },
+        {
+            "id": "synthetic_nut_bar_125pct_serving",
+            "status": "rejected",
+            "latencyMillis": 1530,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "synthetic_nut_bar_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 5885,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching document found for NOMI-QA Nussriegel X7 in retrieved evidence."
+        },
+        {
+            "id": "synthetic_tofu_bowl_100g",
+            "status": "rejected",
+            "latencyMillis": 7534,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching source found for NOMI-QA Tofu Bowl in the provided search results."
+        },
+        {
+            "id": "synthetic_tofu_bowl_serving",
+            "status": "rejected",
+            "latencyMillis": 6250,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching document found for NOMI-QA Tofu Bowl in the provided search results."
+        },
+        {
+            "id": "synthetic_tofu_bowl_half_serving",
+            "status": "rejected",
+            "latencyMillis": 6549,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No listed document contains nutrition facts for NOMI-QA Tofu Bowl."
+        },
+        {
+            "id": "synthetic_tofu_bowl_125pct_serving",
+            "status": "rejected",
+            "latencyMillis": 898,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "synthetic_tofu_bowl_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 6585,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No listed document contains usable nutrition values for NOMI-QA Tofu Bowl."
+        },
+        {
+            "id": "synthetic_yogurt_100g",
+            "status": "rejected",
+            "latencyMillis": 12642,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No listed document contains nutrition values matching the requested Joghurt 0,2% label (64 kcal, 10.5 g protein, 5.1 g carbs, 0.2 g fat per 100 g)."
+        },
+        {
+            "id": "synthetic_yogurt_serving",
+            "status": "rejected",
+            "latencyMillis": 8035,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No matching source document found for NOMI-QA Joghurt 0,2%."
+        },
+        {
+            "id": "synthetic_yogurt_half_serving",
+            "status": "rejected",
+            "latencyMillis": 6794,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No listed document contains usable nutrition values for NOMI-QA Joghurt 0,2%."
+        },
+        {
+            "id": "synthetic_yogurt_125pct_serving",
+            "status": "rejected",
+            "latencyMillis": 1195,
+            "errorType": "AiValidationException",
+            "errorMessage": "Package percentage cannot exceed 100%"
+        },
+        {
+            "id": "synthetic_yogurt_decimal_comma",
+            "status": "rejected",
+            "latencyMillis": 11323,
+            "errorType": "MissingFieldException",
+            "errorMessage": "Fields [name, calories, proteinGrams, carbohydrateGrams, fatGrams, sourceServingQuantity, sourceServingUnit, isEstimate] are required for type with serial name 'com.nomi.app.data.remote.ai.GeminiNutritionItem', but they were missing at path: $.items[0]"
+        },
+        {
+            "id": "synthetic_restaurant_burger_haus",
+            "status": "rejected",
+            "latencyMillis": 6084,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: No listed document contains usable nutrition values for 'Power Burger' from 'Burger Haus Berlin'."
+        },
+        {
+            "id": "synthetic_restaurant_burgerhouse",
+            "status": "rejected",
+            "latencyMillis": 7182,
+            "errorType": "AiValidationException",
+            "errorMessage": "Exa and Gemini could not verify nutrition data: None of the provided documents contain nutrition information for the requested Power Burger from Burgerhouse Berlin."
+        },
+        {
+            "id": "synthetic_restaurant_burger_dash_haus",
+            "status": "provider_failure",
+            "latencyMillis": 2294,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 64978. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_restaurant_green_bowl",
+            "status": "provider_failure",
+            "latencyMillis": 2212,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 64978. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_restaurant_greens_bowl",
+            "status": "provider_failure",
+            "latencyMillis": 2498,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 63367. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_restaurant_burgerhouse_half",
+            "status": "provider_failure",
+            "latencyMillis": 2453,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 63367. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_restaurant_green_two_bowls",
+            "status": "provider_failure",
+            "latencyMillis": 2167,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 63160. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_conflict_manufacturer_over_blog",
+            "status": "provider_failure",
+            "latencyMillis": 2103,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 63160. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_conflict_country_match_over_other_market",
+            "status": "provider_failure",
+            "latencyMillis": 2048,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62973. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_conflict_latest_label_over_old",
+            "status": "provider_failure",
+            "latencyMillis": 2438,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62973. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_conflict_explicit_serving_over_per100_rounding",
+            "status": "provider_failure",
+            "latencyMillis": 2304,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62973. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_conflict_primary_over_search_snippet",
+            "status": "provider_failure",
+            "latencyMillis": 2344,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62796. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_combo_two_components",
+            "status": "provider_failure",
+            "latencyMillis": 2082,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62796. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_combo_fractional_components",
+            "status": "provider_failure",
+            "latencyMillis": 2127,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62590. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_combo_remove_component",
+            "status": "provider_failure",
+            "latencyMillis": 2248,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62590. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_combo_add_component",
+            "status": "provider_failure",
+            "latencyMillis": 2375,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62398. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "synthetic_combo_percentage_leftover",
+            "status": "provider_failure",
+            "latencyMillis": 2530,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62181. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_fake_product_1",
+            "status": "provider_failure",
+            "latencyMillis": 1906,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62181. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_fake_product_2",
+            "status": "provider_failure",
+            "latencyMillis": 1863,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62181. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_fake_restaurant",
+            "status": "provider_failure",
+            "latencyMillis": 1673,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 62181. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_empty_input",
+            "status": "rejected",
+            "latencyMillis": 0,
+            "errorType": "IllegalArgumentException",
+            "errorMessage": "Enter what you ate first"
+        },
+        {
+            "id": "noresult_only_brand",
+            "status": "provider_failure",
+            "latencyMillis": 1842,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61960. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_only_restaurant",
+            "status": "provider_failure",
+            "latencyMillis": 1931,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61814. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_missing_amount",
+            "status": "provider_failure",
+            "latencyMillis": 1942,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61814. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_image_unreadable",
+            "status": "rejected",
+            "latencyMillis": 843,
+            "errorType": "AiValidationException",
+            "errorMessage": "No food was recognized"
+        },
+        {
+            "id": "noresult_conflicting_no_authority",
+            "status": "provider_failure",
+            "latencyMillis": 1977,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61682. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_nonfood",
+            "status": "rejected",
+            "latencyMillis": 615,
+            "errorType": "AiValidationException",
+            "errorMessage": "No food was recognized"
+        },
+        {
+            "id": "noresult_prompt_injection_product",
+            "status": "rejected",
+            "latencyMillis": 892,
+            "errorType": "AiValidationException",
+            "errorMessage": "No food was recognized"
+        },
+        {
+            "id": "noresult_implausible_claim",
+            "status": "provider_failure",
+            "latencyMillis": 1987,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61562. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_ambiguous_fraction",
+            "status": "provider_failure",
+            "latencyMillis": 1865,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61562. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "noresult_ambiguous_percent",
+            "status": "rejected",
+            "latencyMillis": 943,
+            "errorType": "AiValidationException",
+            "errorMessage": "No food was recognized"
+        },
+        {
+            "id": "noresult_unitless_amount",
+            "status": "provider_failure",
+            "latencyMillis": 2002,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61363. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_product_page",
+            "status": "provider_failure",
+            "latencyMillis": 2529,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61160. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_pdf",
+            "status": "provider_failure",
+            "latencyMillis": 2122,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61160. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_restaurant",
+            "status": "provider_failure",
+            "latencyMillis": 2089,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61024. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_database",
+            "status": "provider_failure",
+            "latencyMillis": 1960,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 61024. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_doi",
+            "status": "provider_failure",
+            "latencyMillis": 1739,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60862. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_localhost",
+            "status": "provider_failure",
+            "latencyMillis": 2550,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60862. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_data_uri",
+            "status": "provider_failure",
+            "latencyMillis": 2631,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60677. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_javascript",
+            "status": "provider_failure",
+            "latencyMillis": 2319,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60500. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_search_only",
+            "status": "provider_failure",
+            "latencyMillis": 2106,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60500. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        },
+        {
+            "id": "fakecite_mismatched_real_domain",
+            "status": "provider_failure",
+            "latencyMillis": 2154,
+            "errorType": "ClientRequestException",
+            "errorMessage": "Client request(POST https://openrouter.ai/api/v1/chat/completions) invalid: 402 . Text: \"{\"error\":{\"message\":\"This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 60500. To increase, visit https://openrouter.ai/settings/credits and add more c"
+        }
+    ]
+}
