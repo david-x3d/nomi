@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 72
-        versionName = "1.1.14"
+        versionCode = 73
+        versionName = "1.1.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

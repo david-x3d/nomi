@@ -963,7 +963,7 @@ private fun NotesFoodRow(
     }
 }
 
-/** A fast one-shot colour sweep clipped to the glyphs, never painted across the row behind them. */
+/** A soft halo and brighter core, both clipped to the glyphs so no coloured bar hits the row. */
 private fun Modifier.oneShotTextGradient(
     active: Boolean,
     progress: Float,
@@ -974,12 +974,29 @@ private fun Modifier.oneShotTextGradient(
         .drawWithContent {
             drawContent()
             val center = size.width * progress
-            val halfBand = size.width * 0.34f
+            val glowHalfBand = size.width * 0.48f
             drawRect(
                 brush = Brush.horizontalGradient(
-                    colors = listOf(Color.Transparent) + colors + Color.Transparent,
-                    startX = center - halfBand,
-                    endX = center + halfBand,
+                    colors = listOf(Color.Transparent) +
+                        colors.map { it.copy(alpha = 0.20f) } +
+                        Color.Transparent,
+                    startX = center - glowHalfBand,
+                    endX = center + glowHalfBand,
+                ),
+                blendMode = BlendMode.SrcAtop,
+            )
+            val coreHalfBand = size.width * 0.30f
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        colors.first().copy(alpha = 0.88f),
+                        Color.White.copy(alpha = 0.30f),
+                        colors.last().copy(alpha = 0.88f),
+                        Color.Transparent,
+                    ),
+                    startX = center - coreHalfBand,
+                    endX = center + coreHalfBand,
                 ),
                 blendMode = BlendMode.SrcAtop,
             )
