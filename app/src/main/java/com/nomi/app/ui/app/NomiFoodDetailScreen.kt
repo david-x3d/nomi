@@ -2,12 +2,14 @@ package com.nomi.app.ui.app
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -57,11 +59,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nomi.app.domain.Micronutrient
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.WebsiteFavicon
@@ -69,6 +73,7 @@ import com.nomi.app.ui.components.WebsiteFaviconUrl
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import java.time.format.DateTimeFormatter
@@ -80,6 +85,7 @@ import kotlin.math.roundToInt
 @Composable
 fun NomiFoodDetailScreen(
     entry: TodayFoodEntry?,
+    enabledMicronutrients: List<Micronutrient>,
     onBack: () -> Unit,
     onFavorite: (Long) -> Unit,
     onDuplicate: (Long) -> Unit,
@@ -143,6 +149,7 @@ fun NomiFoodDetailScreen(
         } else {
             NutritionContent(
                 entry = entry,
+                enabledMicronutrients = enabledMicronutrients,
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
@@ -357,10 +364,19 @@ private fun LoadingNutrition(modifier: Modifier = Modifier) {
 @Composable
 private fun NutritionContent(
     entry: TodayFoodEntry,
+    enabledMicronutrients: List<Micronutrient>,
     contentPadding: PaddingValues,
 ) {
+    val backdrop = Brush.verticalGradient(
+        listOf(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
+            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.07f),
+            MaterialTheme.colorScheme.surface,
+        ),
+    )
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().background(backdrop),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -368,7 +384,10 @@ private fun NutritionContent(
             EntryHeading(entry)
         }
         item(key = "nutrition") {
-            NutritionSummaryCard(entry = entry)
+            NutritionSummaryCard(
+                entry = entry,
+                enabledMicronutrients = enabledMicronutrients,
+            )
         }
         item(key = "items") {
             ItemAndSourceCard(entry = entry)
@@ -424,15 +443,58 @@ private fun EntryHeading(entry: TodayFoodEntry) {
 }
 
 @Composable
-private fun NutritionSummaryCard(entry: TodayFoodEntry) {
+private fun NutritionSummaryCard(
+    entry: TodayFoodEntry,
+    enabledMicronutrients: List<Micronutrient>,
+) {
+    val metrics = buildList {
+        add(
+            NutritionMetric(
+                nomiString("Protein", "Eiweiß"),
+                entry.proteinGrams,
+                "g",
+                MaterialTheme.colorScheme.primary,
+            ),
+        )
+        add(
+            NutritionMetric(
+                nomiString("Carbs", "Kohlenhydrate"),
+                entry.carbohydrateGrams,
+                "g",
+                MaterialTheme.colorScheme.secondary,
+            ),
+        )
+        add(
+            NutritionMetric(
+                nomiString("Fat", "Fett"),
+                entry.fatGrams,
+                "g",
+                MaterialTheme.colorScheme.tertiary,
+            ),
+        )
+        enabledMicronutrients.distinct().forEach { nutrient ->
+            add(
+                NutritionMetric(
+                    label = nutrient.localizedName(),
+                    amount = nutrient.amountIn(entry),
+                    unit = nutrient.storageUnit.suffix,
+                    color = nutrient.metricColor(),
+                ),
+            )
+        }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
@@ -462,38 +524,45 @@ private fun NutritionSummaryCard(entry: TodayFoodEntry) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MacroMetric(
-                    label = nomiString("Protein", "Eiweiß"),
-                    grams = entry.proteinGrams,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                MacroMetric(
-                    label = nomiString("Carbs", "Kohlenhydrate"),
-                    grams = entry.carbohydrateGrams,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f),
-                )
-                MacroMetric(
-                    label = nomiString("Fat", "Fett"),
-                    grams = entry.fatGrams,
-                    color = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.weight(1f),
-                )
+            CenteredNutrientGrid(metrics)
+        }
+    }
+}
+
+private data class NutritionMetric(
+    val label: String,
+    val amount: Double?,
+    val unit: String,
+    val color: Color,
+)
+
+/** Three values fill a row; one or two remaining values form a centered group beneath it. */
+@Composable
+private fun CenteredNutrientGrid(metrics: List<NutritionMetric>) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val gap = 8.dp
+        val cellWidth = (maxWidth - gap * 2) / 3
+        Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            metrics.chunked(3).forEach { rowMetrics ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(
+                        space = gap,
+                        alignment = Alignment.CenterHorizontally,
+                    ),
+                ) {
+                    rowMetrics.forEach { metric ->
+                        NutrientMetric(metric = metric, modifier = Modifier.width(cellWidth))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun MacroMetric(
-    label: String,
-    grams: Double,
-    color: Color,
+private fun NutrientMetric(
+    metric: NutritionMetric,
     modifier: Modifier = Modifier,
 ) {
     val locale = nomiLocale()
@@ -503,7 +572,7 @@ private fun MacroMetric(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "${formatNumber(grams, locale)} g",
+            text = metric.amount?.let { "${formatNumber(it, locale)} ${metric.unit}" } ?: "—",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -515,15 +584,32 @@ private fun MacroMetric(
                 Modifier
                     .size(7.dp)
                     .clip(CircleShape)
-                    .background(color),
+                    .background(metric.color),
             )
             Text(
-                text = label,
+                text = metric.label,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
+}
+
+private fun Micronutrient.amountIn(entry: TodayFoodEntry): Double? = when (this) {
+    Micronutrient.FIBER -> entry.fiberGrams
+    Micronutrient.SUGAR -> entry.sugarGrams
+    Micronutrient.SATURATED_FAT -> entry.saturatedFatGrams
+    Micronutrient.SODIUM -> entry.sodiumMilligrams
+}
+
+@Composable
+private fun Micronutrient.metricColor(): Color = when (this) {
+    Micronutrient.FIBER -> MaterialTheme.colorScheme.primary
+    Micronutrient.SUGAR -> MaterialTheme.colorScheme.secondary
+    Micronutrient.SATURATED_FAT -> MaterialTheme.colorScheme.tertiary
+    Micronutrient.SODIUM -> MaterialTheme.colorScheme.error
 }
 
 @Composable
@@ -546,8 +632,14 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
             .fillMaxWidth()
             .animateContentSize(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column {
             Row(
@@ -613,8 +705,12 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                         )
                     }
                     Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f),
                         shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f),
+                        ),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -686,7 +782,14 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
+        ),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
@@ -720,14 +823,14 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
                             nomiString("Nutrition summary", "Nährwertübersicht")
                         },
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             Text(
                 text = explanation,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = nomiString(
@@ -735,7 +838,7 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
                     "Dies ist eine kurze Erklärung der verwendeten Menge und Quelle – kein schrittweises KI-Protokoll.",
                 ),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.72f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

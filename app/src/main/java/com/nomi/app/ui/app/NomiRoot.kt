@@ -65,6 +65,7 @@ import com.nomi.app.data.backup.BackupInspection
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.data.preferences.enabledMicronutrients
 import com.nomi.app.di.AppContainer
 import com.nomi.app.integration.camera.MealImagePreprocessor
 import com.nomi.app.integration.camera.deleteOwnedCameraCapture
@@ -471,11 +472,13 @@ private fun NomiMain(
             ) { entry ->
                 val todayState by viewModel.todayState.collectAsStateWithLifecycle()
                 val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+                val preferences by viewModel.preferences.collectAsStateWithLifecycle()
                 val id = entry.arguments?.getLong("id")
                 val food = (todayState.entries + historyState.visibleDays.flatMap { it.entries })
                     .firstOrNull { it.id == id }
                 NomiFoodDetailScreen(
                     entry = food,
+                    enabledMicronutrients = preferences.micronutrients.enabledMicronutrients(),
                     onBack = { navController.popBackStack() },
                     onDuplicate = viewModel::duplicateFoodLog,
                     onFavorite = viewModel::favoriteFoodLog,
