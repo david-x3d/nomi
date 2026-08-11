@@ -336,6 +336,39 @@ class ExaGeminiNutritionProviderTest {
     }
 
     @Test
+    fun `unverified restaurant size keeps the logged serving basis`() = runBlocking {
+        val case = SuccessCase(
+            text = "eine mittlere Pommes",
+            name = "Pommes mittel",
+            brand = "McDonald's",
+            quantity = 1.0,
+            unit = "medium",
+            grams = null,
+            sourceAmount = 100.0,
+            sourceUnit = "g",
+            calories = 337.0,
+            protein = 4.0,
+            carbs = 42.0,
+            fat = 16.0,
+            expectedCalories = 337.0,
+        )
+        val result = provider(
+            sources = listOf(
+                source(
+                    title = "McDonald's Pommes mittel",
+                    content = "McDonald's Pommes mittel nutrition page without a readable values table",
+                ),
+            ),
+            extraction = extraction(item(case)),
+        ).researchNutrition(case.intent()).items.single()
+
+        assertTrue(result.isEstimate)
+        assertEquals(1.0, result.sourceServingQuantity!!, 0.0)
+        assertEquals("medium", result.sourceServingUnit)
+        assertEquals(337.0, result.calories, 0.0)
+    }
+
+    @Test
     fun `adjacent Extra Sauce source id is corrected to grounded Cheeseburger source`() = runBlocking {
         val case = SuccessCase(
             text = "einen McDonald's Cheeseburger",

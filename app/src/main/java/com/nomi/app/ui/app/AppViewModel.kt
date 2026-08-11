@@ -2615,6 +2615,7 @@ class AppViewModel(
             "Exa source",
             "nutrition evidence",
             "support Gemini",
+            "not compatible",
         ).any { marker -> error.message?.contains(marker, ignoreCase = true) == true }
         if (!technicalEvidenceFailure) return error.safeAiMessage()
         return inUserLanguage(

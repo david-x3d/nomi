@@ -668,7 +668,9 @@ object ServingNutritionNormalizer {
             "l", "liter", "liters", "litre", "litres" -> Dimension.Volume to 1_000.0
             "fl oz", "us fl oz", "floz", "fluid ounce", "fluid ounces" ->
                 Dimension.Volume to US_FLUID_OUNCE_ML
-            "piece", "pieces", "pc", "pcs", "each", "stuck", "stucke" ->
+            "piece", "pieces", "pc", "pcs", "each", "stuck", "stucke",
+            "item", "items", "serving", "servings", "portion", "portions", "portionen",
+            "bar", "bars", "riegel" ->
                 Dimension.Piece to 1.0
             else -> Dimension.Custom(unit) to 1.0
         }

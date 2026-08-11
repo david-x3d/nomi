@@ -435,9 +435,10 @@ internal fun geminiNutritionPrompt(
         appendLine(document.content)
     }
     appendLine()
-    appendLine("Return one item per parsed item, in the same order. Choose only sourceId/supportingSourceIds listed above. Return an error with items=[] if no listed document contains usable nutrition values for an item.")
+    appendLine("Return one item per parsed item, in the same order. Choose only sourceId/supportingSourceIds listed above.")
     appendLine("Identify the exact brand, product, variant, restaurant item, and country. Prefer the current official manufacturer/restaurant source for the user's market, then official databases, then reliable nutrition databases. If sources conflict, select the official exact-market values and state the conflict in assumptions.")
     appendLine("The calories and nutrients must reproduce the selected source's basis exactly (per 100 g/ml, per serving, or per item). Do not scale them to what the user ate. Nomi performs final serving arithmetic in Kotlin.")
+    appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
     appendLine("Return every schema property. Use null for unavailable nullable values and [] for unavailable list values.")
@@ -445,7 +446,8 @@ internal fun geminiNutritionPrompt(
 
 private const val GEMINI_NUTRITION_SYSTEM_PROMPT =
     "You extract source-serving nutrition from Exa-retrieved evidence into strict JSON. " +
-        "You do not browse, rewrite queries, invent citations, or perform consumed-serving scaling."
+        "You do not browse, rewrite queries, or invent citations. Preserve a verified source basis; " +
+        "only an explicitly marked restaurant-size fallback may use the exact logged serving basis."
 
 @Serializable
 internal data class GeminiNutritionExtraction(
@@ -551,6 +553,12 @@ private fun groundGeminiExtraction(
                 sourceUrl = null,
                 supportingSourceUrls = emptyList(),
                 sourceProductName = null,
+                // The remaining values are an estimate for the requested restaurant/item
+                // portion. Keep its basis identical to the logged basis so the deterministic
+                // normalizer does not try to convert an unknown size through g/ml.
+                sourceServingQuantity = parsed.quantity,
+                sourceServingUnit = parsed.unit,
+                sourceServingGramsEquivalent = parsed.gramsEquivalent,
                 isEstimate = true,
                 assumptions = (extracted.assumptions +
                     "Live research ran for this item, but the retrieved page excerpt did not " +
