@@ -64,6 +64,7 @@ internal fun interface ExaNutritionSearchGateway {
         query: String,
         credential: AiRuntimeCredential,
         timeoutMillis: Long,
+        resultLimit: Int,
     ): ExaSearchResponse
 }
 
@@ -97,6 +98,7 @@ internal class ExaGeminiHttpClient(
         query: String,
         credential: AiRuntimeCredential,
         timeoutMillis: Long,
+        resultLimit: Int,
     ): ExaSearchResponse {
         val response = withTransientHttpRetry("Exa") {
             httpClient.post("$EXA_API_ENDPOINT/search") {
@@ -105,6 +107,7 @@ internal class ExaGeminiHttpClient(
                 setBody(
                     ExaSearchRequest(
                         query = query,
+                        numResults = resultLimit,
                         contents = ExaContentsRequest(
                             highlights = ExaHighlightsRequest(query = query),
                         ),
@@ -284,6 +287,7 @@ internal class ExaGeminiNutritionProvider(
                     query = searchQuery,
                     credential = exaCredential(),
                     timeoutMillis = geminiConfig.effectiveTimeoutMillis(),
+                    resultLimit = exaResultLimit(reconciledIntent.items.size),
                 )
             }
             documents = searchResponse.toNutritionDocuments()
@@ -367,6 +371,13 @@ internal fun nutritionSearchQuery(intent: ParsedFoodIntent): String =
             append(" weight per piece bar Stück Riegel grams")
         }
     }
+
+/** One query stays cheaper than one Exa request per food, but a meal needs room for each item. */
+internal fun exaResultLimit(itemCount: Int): Int = (itemCount.coerceAtLeast(1) * 2)
+    .coerceIn(MIN_EXA_RESULTS, MAX_EXA_RESULTS)
+
+private const val MIN_EXA_RESULTS = 4
+private const val MAX_EXA_RESULTS = 10
 
 private fun ParsedFoodItem.needsWeightPerPieceResearch(): Boolean =
     quantity != null && gramsEquivalent == null && unit?.trim()?.lowercase(Locale.ROOT) in setOf(
@@ -482,8 +493,24 @@ private fun groundGeminiExtraction(
             byId[sourceId]
                 ?: throw AiValidationException("Gemini selected a supporting source that Exa did not return")
         }.filter { it.sourceId != primary.sourceId }.take(5)
-        requireNutritionEvidence(extracted, parsed, listOf(primary) + supporting)
-        extracted.toAnalyzedItem(parsed, primary, supporting)
+        val declaredSources = listOf(primary) + supporting
+        val groundedPrimary = try {
+            requireNutritionEvidence(extracted, parsed, declaredSources)
+            primary
+        } catch (declaredFailure: AiValidationException) {
+            // Gemini occasionally returns the adjacent source ID in a multi-item order (for
+            // example an Extra Sauce page for a Cheeseburger). Correct only when another Exa
+            // document independently passes the same strict product, calorie and macro checks.
+            documents.firstOrNull { candidate ->
+                runCatching {
+                    requireNutritionEvidence(extracted, parsed, listOf(candidate))
+                }.isSuccess
+            } ?: throw declaredFailure
+        }
+        val groundedSupporting = supporting
+            .takeIf { groundedPrimary.sourceId == primary.sourceId }
+            .orEmpty()
+        extracted.toAnalyzedItem(parsed, groundedPrimary, groundedSupporting)
     }
     return FoodAnalysis(items = items, overallConfidence = extraction.overallConfidence)
 }
@@ -670,9 +697,7 @@ private fun debugTrace(
 private data class ExaSearchRequest(
     val query: String,
     val type: String = "fast",
-    // Four focused results keep Exa latency and Gemini input tokens down while still allowing an
-    // official source plus independent corroboration.
-    val numResults: Int = 4,
+    val numResults: Int,
     val contents: ExaContentsRequest,
 )
 

@@ -290,7 +290,7 @@ class ExaGeminiNutritionProviderTest {
     fun `no usable source rejects before Gemini is called`() {
         var geminiCalled = false
         val provider = ExaGeminiNutritionProvider(
-            exaSearch = ExaNutritionSearchGateway { _, _, _ -> ExaSearchResponse() },
+            exaSearch = ExaNutritionSearchGateway { _, _, _, _ -> ExaSearchResponse() },
             geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ ->
                 geminiCalled = true
                 GeminiNutritionExtraction()
@@ -336,6 +336,51 @@ class ExaGeminiNutritionProviderTest {
     }
 
     @Test
+    fun `adjacent Extra Sauce source id is corrected to grounded Cheeseburger source`() = runBlocking {
+        val case = SuccessCase(
+            text = "einen McDonald's Cheeseburger",
+            name = "Cheeseburger",
+            brand = "McDonald's",
+            quantity = 1.0,
+            unit = "item",
+            grams = null,
+            sourceAmount = 1.0,
+            sourceUnit = "item",
+            calories = 304.0,
+            protein = 15.0,
+            carbs = 31.0,
+            fat = 13.0,
+            expectedCalories = 304.0,
+        )
+        val burgerUrl = "https://mcdonalds.test/de-de/product/cheeseburger"
+        val result = provider(
+            sources = listOf(
+                source(
+                    title = "McDonald's Extra Sauce",
+                    url = "https://mcdonalds.test/de-de/product/extra-sauce",
+                    content = "McDonald's Extra Sauce: 45 kcal, Protein 0 g, Kohlenhydrate 5 g, Fett 2 g",
+                ),
+                source(
+                    title = "McDonald's Cheeseburger",
+                    url = burgerUrl,
+                    content = evidence(case),
+                ),
+            ),
+            extraction = extraction(item(case, sourceId = "exa-1")),
+        ).researchNutrition(case.intent())
+
+        assertEquals(burgerUrl, result.items.single().sourceUrl)
+        assertEquals(304.0, result.items.single().calories, 0.0)
+    }
+
+    @Test
+    fun `multi item meal receives two Exa result slots per item`() {
+        assertEquals(4, exaResultLimit(1))
+        assertEquals(6, exaResultLimit(3))
+        assertEquals(10, exaResultLimit(20))
+    }
+
+    @Test
     fun `legitimate zero calories require explicit retrieved zero calorie evidence`() {
         val zeroCase = SuccessCase(
             text = "500 ml Coca-Cola Zero Sugar",
@@ -377,7 +422,7 @@ class ExaGeminiNutritionProviderTest {
         onSources: (List<String>) -> Unit = {},
         beforeExtraction: () -> Unit = {},
     ) = ExaGeminiNutritionProvider(
-        exaSearch = ExaNutritionSearchGateway { query, _, _ ->
+        exaSearch = ExaNutritionSearchGateway { query, _, _, _ ->
             onQuery(query)
             ExaSearchResponse(requestId = "test", results = sources)
         },

@@ -31,6 +31,8 @@ class ExaGeminiHttpClientTest {
             requests += 1
             assertEquals("https://api.exa.ai/search", request.url.toString())
             assertEquals("exa-secret", request.headers["x-api-key"])
+            val body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+            assertTrue(body.contains("\"numResults\":4"))
             if (requests == 1) {
                 respond("{\"error\":\"temporarily unavailable\"}", HttpStatusCode.ServiceUnavailable, responseHeaders)
             } else {
@@ -46,6 +48,7 @@ class ExaGeminiHttpClientTest {
                 query = "test nutrition",
                 credential = AiRuntimeCredential.from("exa-secret"),
                 timeoutMillis = 5_000,
+                resultLimit = 4,
             )
 
             assertEquals("request-1", response.requestId)
