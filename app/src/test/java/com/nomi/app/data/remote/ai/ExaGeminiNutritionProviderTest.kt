@@ -134,7 +134,8 @@ class ExaGeminiNutritionProviderTest {
                 onQuery = { query = it },
             ).researchNutrition(case.intent())
 
-            assertEquals("nutrition calories macros ${case.text}", query)
+            assertTrue(query.startsWith("nutrition calories macros ${case.text}"))
+            if (case.unit == "item") assertTrue(query.contains("weight per piece"))
             assertEquals(case.quantity, result.items.single().quantity, 0.001)
             assertEquals(case.expectedCalories, result.items.single().calories, 0.001)
             assertEquals(case.country, result.items.single().sourceCountry)
@@ -180,6 +181,83 @@ class ExaGeminiNutritionProviderTest {
         ).researchNutrition(servingCase.intent())
         assertEquals(160.0, servingResult.items.single().calories, 0.001)
         assertEquals(17.2, servingResult.items.single().carbohydrateGrams, 0.001)
+    }
+
+    @Test
+    fun `one Duplo researches its bar weight and scales per 100 gram nutrition`() = runBlocking {
+        val intent = requireNotNull(
+            com.nomi.app.ai.parsing.LocalFoodIntentParser.parseOrNull("ein Duplo"),
+        )
+        var query = ""
+        val result = provider(
+            sources = listOf(
+                source(
+                    title = "Ferrero Duplo Deutschland",
+                    content = "Ferrero Duplo: ein Riegel wiegt 18,2 g. Nährwerte pro 100 g: " +
+                        "555 kcal, Protein 8 g, Kohlenhydrate 55 g, Fett 33 g",
+                ),
+            ),
+            extraction = extraction(
+                GeminiNutritionItem(
+                    name = "Duplo",
+                    brand = "Ferrero",
+                    calories = 555.0,
+                    proteinGrams = 8.0,
+                    carbohydrateGrams = 55.0,
+                    fatGrams = 33.0,
+                    sourceId = "exa-1",
+                    sourceProductName = "Ferrero Duplo",
+                    sourceServingQuantity = 100.0,
+                    sourceServingUnit = "g",
+                    sourceServingGramsEquivalent = 100.0,
+                    loggedServingGramsEquivalent = 18.2,
+                    sourceCountry = "DE",
+                    sourcePackageQuantity = 182.0,
+                    sourcePackageUnit = "g",
+                    isEstimate = false,
+                    confidence = 0.98,
+                ),
+            ),
+            onQuery = { query = it },
+        ).researchNutrition(intent)
+
+        assertTrue(query.contains("weight per piece"))
+        assertEquals(1.0, result.items.single().quantity, 0.0)
+        assertEquals("piece", result.items.single().unit)
+        assertEquals(18.2, result.items.single().gramsEquivalent!!, 0.0)
+        assertEquals(101.01, result.items.single().calories, 0.001)
+    }
+
+    @Test
+    fun `multiple bars use the sourced per bar weight for deterministic total`() = runBlocking {
+        val case = SuccessCase(
+            text = "2 Duplo",
+            name = "Duplo",
+            brand = "Ferrero",
+            quantity = 2.0,
+            unit = "pieces",
+            grams = null,
+            sourceAmount = 100.0,
+            sourceUnit = "g",
+            calories = 555.0,
+            protein = 8.0,
+            carbs = 55.0,
+            fat = 33.0,
+            expectedCalories = 202.02,
+        )
+        val result = provider(
+            sources = listOf(
+                source(
+                    title = "Ferrero Duplo Deutschland",
+                    content = "Ferrero Duplo: ein Riegel wiegt 18,2 g. Nährwerte pro 100 g: " +
+                        "555 kcal, Protein 8 g, Kohlenhydrate 55 g, Fett 33 g",
+                ),
+            ),
+            extraction = extraction(item(case).copy(loggedServingGramsEquivalent = 36.4)),
+        ).researchNutrition(case.intent())
+
+        assertEquals(36.4, result.items.single().gramsEquivalent!!, 0.0)
+        assertEquals(202.02, result.items.single().calories, 0.001)
     }
 
     @Test

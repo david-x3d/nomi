@@ -167,6 +167,12 @@ internal class ExaGeminiHttpClient(
                             contents = listOf(GeminiContent(parts = listOf(GeminiPart(userPrompt)))),
                             generationConfig = GeminiGenerationConfig(
                                 responseJsonSchema = responseJsonSchema,
+                                // Extraction is a grounded field-mapping task. Gemini 3.5 Flash
+                                // defaults to medium thinking, which adds latency and billed
+                                // thinking tokens without improving Nomi's deterministic math.
+                                thinkingConfig = GeminiThinkingConfig().takeIf {
+                                    model.startsWith("gemini-3", ignoreCase = true)
+                                },
                             ),
                         ),
                     )
@@ -354,7 +360,19 @@ internal class ExaGeminiNutritionProvider(
 }
 
 internal fun nutritionSearchQuery(intent: ParsedFoodIntent): String =
-    "nutrition calories macros ${intent.originalText.trim().replace(Regex("\\s+"), " ")}"
+    buildString {
+        append("nutrition calories macros ")
+        append(intent.originalText.trim().replace(Regex("\\s+"), " "))
+        if (intent.items.any { it.needsWeightPerPieceResearch() }) {
+            append(" weight per piece bar Stück Riegel grams")
+        }
+    }
+
+private fun ParsedFoodItem.needsWeightPerPieceResearch(): Boolean =
+    quantity != null && gramsEquivalent == null && unit?.trim()?.lowercase(Locale.ROOT) in setOf(
+        "piece", "pieces", "item", "items", "bar", "bars", "riegel", "stück", "stücke",
+        "stueck", "stuecke", "serving", "servings", "portion", "portionen",
+    )
 
 internal fun geminiNutritionPrompt(
     intent: ParsedFoodIntent,
@@ -378,6 +396,7 @@ internal fun geminiNutritionPrompt(
     appendLine("Return one item per parsed item, in the same order. Choose only sourceId/supportingSourceIds listed above. Return an error with items=[] if no listed document contains usable nutrition values for an item.")
     appendLine("Identify the exact brand, product, variant, restaurant item, and country. Prefer the current official manufacturer/restaurant source for the user's market, then official databases, then reliable nutrition databases. If sources conflict, select the official exact-market values and state the conflict in assumptions.")
     appendLine("The calories and nutrients must reproduce the selected source's basis exactly (per 100 g/ml, per serving, or per item). Do not scale them to what the user ate. Nomi performs final serving arithmetic in Kotlin.")
+    appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
     appendLine("Return every schema property. Use null for unavailable nullable values and [] for unavailable list values.")
 }
@@ -411,6 +430,8 @@ internal data class GeminiNutritionItem(
     val sourceServingQuantity: Double,
     val sourceServingUnit: String,
     val sourceServingGramsEquivalent: Double? = null,
+    /** Exact mass of the user's logged count, when Exa evidence states a weight per piece. */
+    val loggedServingGramsEquivalent: Double? = null,
     val sourceCountry: String? = null,
     val sourcePackageQuantity: Double? = null,
     val sourcePackageUnit: String? = null,
@@ -445,7 +466,7 @@ private fun ExaSearchResponse.toNutritionDocuments(): List<ExaNutritionDocument>
         )
     }.mapIndexed { index, document -> document.copy(sourceId = "exa-${index + 1}") }
 
-private const val MAX_EXA_DOCUMENT_CHARS = 10_000
+private const val MAX_EXA_DOCUMENT_CHARS = 4_500
 
 private fun groundGeminiExtraction(
     intent: ParsedFoodIntent,
@@ -461,7 +482,7 @@ private fun groundGeminiExtraction(
             byId[sourceId]
                 ?: throw AiValidationException("Gemini selected a supporting source that Exa did not return")
         }.filter { it.sourceId != primary.sourceId }.take(5)
-        requireNutritionEvidence(extracted, listOf(primary) + supporting)
+        requireNutritionEvidence(extracted, parsed, listOf(primary) + supporting)
         extracted.toAnalyzedItem(parsed, primary, supporting)
     }
     return FoodAnalysis(items = items, overallConfidence = extraction.overallConfidence)
@@ -478,7 +499,7 @@ private fun GeminiNutritionItem.toAnalyzedItem(
         ?: throw AiValidationException("The parsed logged quantity is missing"),
     unit = parsed.unit?.takeIf(String::isNotBlank)
         ?: throw AiValidationException("The parsed logged unit is missing"),
-    gramsEquivalent = parsed.gramsEquivalent,
+    gramsEquivalent = parsed.gramsEquivalent ?: loggedServingGramsEquivalent,
     calories = calories,
     proteinGrams = proteinGrams,
     carbohydrateGrams = carbohydrateGrams,
@@ -506,6 +527,7 @@ private fun GeminiNutritionItem.toAnalyzedItem(
 
 private fun requireNutritionEvidence(
     item: GeminiNutritionItem,
+    parsed: ParsedFoodItem,
     documents: List<ExaNutritionDocument>,
 ) {
     val corpus = documents.joinToString("\n") { document ->
@@ -520,6 +542,18 @@ private fun requireNutritionEvidence(
             EvidenceValue(value, match.groupValues[2].lowercase(Locale.ROOT))
         }
     }.toList()
+    item.loggedServingGramsEquivalent?.let { loggedGrams ->
+        val perLoggedPiece = parsed.quantity
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?.let { loggedGrams / it }
+        if (!values.matches(loggedGrams, "g") &&
+            (perLoggedPiece == null || !values.matches(perLoggedPiece, "g"))
+        ) {
+            throw AiValidationException(
+                "The selected Exa source does not support Gemini's weight per logged piece",
+            )
+        }
+    }
     if (!values.matches(item.calories, "kcal")) {
         throw AiValidationException("The selected Exa source does not support Gemini's calorie value")
     }
@@ -636,7 +670,9 @@ private fun debugTrace(
 private data class ExaSearchRequest(
     val query: String,
     val type: String = "fast",
-    val numResults: Int = 6,
+    // Four focused results keep Exa latency and Gemini input tokens down while still allowing an
+    // official source plus independent corroboration.
+    val numResults: Int = 4,
     val contents: ExaContentsRequest,
 )
 
@@ -644,7 +680,7 @@ private data class ExaSearchRequest(
 private data class ExaContentsRequest(val highlights: ExaHighlightsRequest)
 
 @Serializable
-private data class ExaHighlightsRequest(val query: String, val maxCharacters: Int = 8_000)
+private data class ExaHighlightsRequest(val query: String, val maxCharacters: Int = 4_000)
 
 @Serializable
 private data class ExaSearchApiResponse(
@@ -677,6 +713,12 @@ private data class GeminiPart(val text: String? = null)
 private data class GeminiGenerationConfig(
     val responseMimeType: String = "application/json",
     val responseJsonSchema: JsonObject? = null,
+    val thinkingConfig: GeminiThinkingConfig? = null,
+)
+
+@Serializable
+private data class GeminiThinkingConfig(
+    val thinkingLevel: String = "LOW",
 )
 
 @Serializable
@@ -711,6 +753,7 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
             "fiberGrams", "sugarGrams", "saturatedFatGrams", "sodiumMilligrams",
             "sourceId", "supportingSourceIds", "sourceProductName",
             "sourceServingQuantity", "sourceServingUnit", "sourceServingGramsEquivalent",
+            "loggedServingGramsEquivalent",
             "sourceCountry", "sourcePackageQuantity", "sourcePackageUnit", "isEstimate",
             "uncertaintyPercent", "confidence", "assumptions",
         ),
@@ -732,6 +775,7 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
         put("sourceServingQuantity", positiveNumber())
         put("sourceServingUnit", nonEmptyString())
         put("sourceServingGramsEquivalent", nullableNumber(exclusiveMinimum = 0.0))
+        put("loggedServingGramsEquivalent", nullableNumber(exclusiveMinimum = 0.0))
         put("sourceCountry", nullableString())
         put("sourcePackageQuantity", nullableNumber(exclusiveMinimum = 0.0))
         put("sourcePackageUnit", nullableString())

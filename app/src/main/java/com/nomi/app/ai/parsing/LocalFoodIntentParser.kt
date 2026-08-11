@@ -48,12 +48,22 @@ object LocalFoodIntentParser {
 
         val tokens = text.split(' ')
         if (tokens.any { it.lowercase(Locale.ROOT) in providerRequiredWords }) return null
-        val foodTokens = tokens.dropWhile { it.lowercase(Locale.ROOT) in articles }
+        val articleCount = tokens.takeWhile { it.lowercase(Locale.ROOT) in articles }.size
+        val foodTokens = tokens.drop(articleCount)
         if (foodTokens.size != 1 || !singleFoodToken.matches(foodTokens.single())) return null
 
         return ParsedFoodIntent(
             originalText = text,
-            items = listOf(ParsedFoodItem(name = foodTokens.single())),
+            items = listOf(
+                ParsedFoodItem(
+                    name = foodTokens.single(),
+                    // "ein Duplo" is an explicit count, even though it contains no metric unit.
+                    // Keeping that fact locally saves the interpretation-model round trip while
+                    // web research remains responsible for finding the product's grams per piece.
+                    quantity = 1.0.takeIf { articleCount > 0 },
+                    unit = "piece".takeIf { articleCount > 0 },
+                ),
+            ),
         )
     }
 

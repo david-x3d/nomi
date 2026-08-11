@@ -18,6 +18,8 @@ class LocalFoodIntentParserTest {
         val intent = requireNotNull(LocalFoodIntentParser.parseOrNull("ein Apfel"))
 
         assertEquals("Apfel", intent.items.single().name)
+        assertEquals(1.0, intent.items.single().quantity!!, 0.0)
+        assertEquals("piece", intent.items.single().unit)
     }
 
     @Test
