@@ -9,6 +9,7 @@ import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
@@ -81,6 +82,8 @@ import com.nomi.app.ui.history.HistoryDay
 import com.nomi.app.ui.history.HistoryUiState
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
+import com.nomi.app.ui.capture.MenuScanUiState
+import com.nomi.app.ui.capture.mergeMenuDishes
 import com.nomi.app.ui.library.LibraryItem
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryUiState
@@ -328,6 +331,9 @@ class AppViewModel(
     val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
     private var lastLoggingText = ""
     private var barcodeLookupRequestId = 0L
+    private val mutableMenuScanState = MutableStateFlow(MenuScanUiState())
+    val menuScanState = mutableMenuScanState.asStateFlow()
+    private var menuScanRequestId = 0L
     private val mutablePortionEditState = MutableStateFlow<PortionEditUiState?>(null)
     val portionEditState = mutablePortionEditState.asStateFlow()
     private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
@@ -467,6 +473,63 @@ class AppViewModel(
         mutableLoggingState.value = current.copy(
             analysis = current.analysis.copy(items = updated),
         )
+    }
+
+    fun beginMenuScan() {
+        menuScanRequestId += 1
+        mutableMenuScanState.value = MenuScanUiState()
+    }
+
+    fun updateMenuSearch(query: String) {
+        mutableMenuScanState.value = mutableMenuScanState.value.copy(query = query.take(200))
+    }
+
+    fun scanMenuPage(bytes: ByteArray, mediaType: String) {
+        if (bytes.isEmpty()) return
+        val requestId = ++menuScanRequestId
+        val before = mutableMenuScanState.value
+        mutableMenuScanState.value = before.copy(isProcessing = true, errorMessage = null)
+        viewModelScope.launch {
+            runCatching {
+                withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
+                    providerFor(config, key).scanMenu(bytes, mediaType)
+                }
+            }.onSuccess { result ->
+                if (requestId != menuScanRequestId) return@onSuccess
+                val current = mutableMenuScanState.value
+                mutableMenuScanState.value = current.copy(
+                    restaurantName = current.restaurantName
+                        ?: result.restaurantName?.trim()?.takeIf(String::isNotBlank),
+                    items = mergeMenuDishes(current.items, result.items),
+                    pageCount = current.pageCount + 1,
+                    isProcessing = false,
+                    errorMessage = null,
+                    notes = (current.notes + result.notes).distinct().takeLast(20),
+                )
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (requestId != menuScanRequestId) return@onFailure
+                mutableMenuScanState.value = mutableMenuScanState.value.copy(
+                    isProcessing = false,
+                    errorMessage = inUserLanguage(
+                        english = "Nomi couldn't read that menu page. Add a clearer photo.",
+                        german = "Nomi konnte diese Speisekartenseite nicht lesen. FÃ¼ge ein deutlicheres Foto hinzu.",
+                    ),
+                )
+            }
+        }.invokeOnCompletion { bytes.fill(0) }
+    }
+
+    fun selectMenuDish(dish: MenuDish) {
+        val restaurant = mutableMenuScanState.value.restaurantName
+        val text = buildString {
+            append("1 serving ").append(dish.name.trim())
+            restaurant?.takeIf(String::isNotBlank)?.let { append(" at ").append(it.trim()) }
+            dish.number?.takeIf(String::isNotBlank)?.let { append(" (menu number ").append(it.trim()).append(')') }
+            dish.description?.takeIf(String::isNotBlank)?.let { append(". Menu description: ").append(it.trim()) }
+        }.take(MAX_MENU_LOGGING_TEXT_CHARS)
+        beginLogging(AddFoodMethod.TYPE, text)
+        analyzeText()
     }
 
     /** Removes one component from a detected meal before it is saved. */
@@ -2667,6 +2730,7 @@ class AppViewModel(
 /** Room for a described plate without room for a pasted document. */
 private const val MAX_PHOTO_DESCRIPTION_CHARS = 1_000
 private const val MAX_PHOTO_PLACE_CHARS = 120
+private const val MAX_MENU_LOGGING_TEXT_CHARS = 1_500
 
 private operator fun NutritionValues.plus(other: NutritionValues) = NutritionValues(
     caloriesKcal = caloriesKcal + other.caloriesKcal,

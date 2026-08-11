@@ -618,4 +618,40 @@ object AiPrompts {
           "notes": [string]
         }
     """.trimIndent()
+
+    fun readRestaurantMenu(): String = """
+        Read every orderable food and drink that is visibly printed on this restaurant menu
+        page. This is transcription and organization, not nutrition research. Never invent an
+        item, ingredient, price, number, restaurant, or missing word.
+
+        Return a complete list, including starters, mains, sides, sauces, desserts, drinks,
+        variants, and numbered combination meals. Do not stop after a sample. Keep the printed
+        language. Ignore opening hours, addresses, legal text, allergens-only legends, decorative
+        slogans, and crossed-out items.
+
+        For every item return:
+        - number: the printed ordering number or code, otherwise null.
+        - name: the exact useful dish name, without repeating its number or price.
+        - description: the printed description and ingredients, combined into readable plain
+          text; null when none is printed. Do not add ingredients from general knowledge.
+        - category: the nearest visible menu heading, such as Pizza, Burgers, Drinks, or Desserts.
+        - price: the price exactly as printed, including currency; null when unreadable.
+
+        If one dish has separately orderable sizes or variants, return separate items when each
+        has its own price or number. Preserve accents and menu-specific names. Use notes for cut
+        off, blurred, or uncertain areas instead of guessing them.
+
+        Return only strict JSON in this shape:
+        {
+          "restaurantName": string|null,
+          "items": [{
+            "number": string|null,
+            "name": string,
+            "description": string|null,
+            "category": string|null,
+            "price": string|null
+          }],
+          "notes": [string]
+        }
+    """.trimIndent()
 }

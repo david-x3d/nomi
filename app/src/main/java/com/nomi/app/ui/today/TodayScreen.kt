@@ -399,6 +399,7 @@ private fun AddFoodSheet(
                             AddFoodMethod.TYPE -> "Describe your meal in German or English"
                             AddFoodMethod.VOICE -> "Say what you ate"
                             AddFoodMethod.PHOTO -> "Take or choose a meal photo"
+                            AddFoodMethod.MENU -> "Scan a restaurant menu and choose a dish"
                             AddFoodMethod.BARCODE -> "Scan packaged food"
                             AddFoodMethod.LABEL -> "Read a printed nutrition table"
                             AddFoodMethod.RECENT -> "Log something again"
@@ -424,6 +425,7 @@ private fun AddFoodMethod.icon(): ImageVector = when (this) {
     AddFoodMethod.TYPE -> Icons.Default.Keyboard
     AddFoodMethod.VOICE -> Icons.Default.Mic
     AddFoodMethod.PHOTO -> Icons.Default.CameraAlt
+    AddFoodMethod.MENU -> Icons.Default.RestaurantMenu
     AddFoodMethod.BARCODE -> Icons.Default.QrCodeScanner
     AddFoodMethod.LABEL -> Icons.Default.Article
     AddFoodMethod.RECENT -> Icons.Default.History

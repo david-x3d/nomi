@@ -196,6 +196,25 @@ data class VisionFoodResult(
     val notes: List<String> = emptyList(),
 )
 
+/** Structured text read from one photographed restaurant-menu page. */
+@Serializable
+data class MenuScanResult(
+    val restaurantName: String? = null,
+    val items: List<MenuDish>,
+    val notes: List<String> = emptyList(),
+)
+
+@Serializable
+data class MenuDish(
+    /** Printed ordering number/code, for example "23" or "B4". */
+    val number: String? = null,
+    val name: String,
+    val description: String? = null,
+    val category: String? = null,
+    /** Price is retained as printed because OCR must not silently convert currencies. */
+    val price: String? = null,
+)
+
 /**
  * A nutrition table read straight off a package.
  *

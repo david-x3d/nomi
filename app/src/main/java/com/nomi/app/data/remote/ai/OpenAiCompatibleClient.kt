@@ -125,6 +125,7 @@ class OpenAiCompatibleClient(
         prompt: String,
         base64Image: String,
         mediaType: String,
+        maxTokens: Int? = null,
     ): String {
         val content = buildJsonArray {
             add(buildJsonObject {
@@ -142,6 +143,7 @@ class OpenAiCompatibleClient(
             config = config,
             credential = credential,
             messages = listOf(ChatMessage("user", content)),
+            maxTokens = maxTokens,
         )
     }
 

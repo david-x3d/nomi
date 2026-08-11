@@ -2,6 +2,7 @@ package com.nomi.app.ai.provider
 
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.FoodEditClassification
+import com.nomi.app.ai.model.MenuScanResult
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
@@ -29,6 +30,10 @@ fun interface NutritionEstimateProvider {
 
 fun interface VisionFoodProvider {
     suspend fun identifyFood(imageBytes: ByteArray, mediaType: String): VisionFoodResult
+}
+
+fun interface MenuVisionProvider {
+    suspend fun scanMenu(imageBytes: ByteArray, mediaType: String): MenuScanResult
 }
 
 /** Reads a printed nutrition table. Separate from [VisionFoodProvider] because it estimates nothing. */
@@ -61,6 +66,7 @@ data class AiProviderRegistry(
     val foodParser: FoodParsingProvider,
     val nutritionResearcher: NutritionResearchProvider,
     val visionFoodProvider: VisionFoodProvider,
+    val menuVisionProvider: MenuVisionProvider,
     val nutritionLabelProvider: NutritionLabelProvider,
     val portionAdjustmentProvider: PortionAdjustmentProvider,
     val foodEditClassifier: FoodEditClassificationProvider,

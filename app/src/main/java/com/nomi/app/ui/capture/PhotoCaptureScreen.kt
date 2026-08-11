@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
  * plate and forgiving light, a nutrition table wants to fill the frame and be sharp, because
  * nothing downstream will second-guess a misread digit.
  */
-enum class PhotoCaptureSubject { MEAL, NUTRITION_LABEL }
+enum class PhotoCaptureSubject { MEAL, MENU, NUTRITION_LABEL }
 
 /** Captures a camera image or chooses one through the system picker, returning its URI and MIME type. */
 @Composable
@@ -174,12 +174,16 @@ fun PhotoCaptureScreen(
     val screenTitle = when (subject) {
         PhotoCaptureSubject.MEAL ->
             nomiString("Photograph your meal", "Fotografiere deine Mahlzeit")
+        PhotoCaptureSubject.MENU ->
+            nomiString("Photograph the menu", "Fotografiere die Speisekarte")
         PhotoCaptureSubject.NUTRITION_LABEL ->
             nomiString("Photograph the label", "Fotografiere das Etikett")
     }
     val guidanceHeadline = when (subject) {
         PhotoCaptureSubject.MEAL ->
             nomiString("Keep the whole meal in frame", "Halte die ganze Mahlzeit im Bild")
+        PhotoCaptureSubject.MENU ->
+            nomiString("Keep one complete page in frame", "Halte eine vollstÃ¤ndige Seite im Bild")
         PhotoCaptureSubject.NUTRITION_LABEL ->
             nomiString("Fill the frame with the table", "Die Tabelle formatfüllend aufnehmen")
     }
@@ -187,6 +191,10 @@ fun PhotoCaptureScreen(
         PhotoCaptureSubject.MEAL -> nomiString(
             "Good light and a clear view of portions help Nomi make a better estimate.",
             "Gutes Licht und klar erkennbare Portionen helfen Nomi bei einer besseren Schätzung.",
+        )
+        PhotoCaptureSubject.MENU -> nomiString(
+            "Straight on, sharp, and close enough to read every name, description, number and price.",
+            "Frontal, scharf und nah genug, damit Namen, Beschreibungen, Nummern und Preise lesbar sind.",
         )
         // Nothing is researched or estimated here, so the only thing that decides whether the
         // numbers are right is whether they can be read.

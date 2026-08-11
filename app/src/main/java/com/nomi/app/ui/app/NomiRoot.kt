@@ -72,6 +72,7 @@ import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.BarcodeAmountSheet
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
+import com.nomi.app.ui.capture.MenuScanScreen
 import com.nomi.app.ui.capture.VoiceCaptureScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
@@ -141,6 +142,7 @@ private fun NomiMain(
     var showWeightDialog by remember { mutableStateOf(false) }
     var backupInspection by remember { mutableStateOf<BackupInspection?>(null) }
     var pendingReminderIndex by remember { mutableStateOf<Int?>(null) }
+    var menuAddingPage by remember { mutableStateOf(false) }
 
     fun showMessage(message: String) {
         scope.launch { snackbarHostState.showSnackbar(message) }
@@ -236,6 +238,11 @@ private fun NomiMain(
                             }
                             AddFoodMethod.VOICE -> navController.navigate(Routes.VOICE)
                             AddFoodMethod.PHOTO -> navController.navigate(Routes.PHOTO)
+                            AddFoodMethod.MENU -> {
+                                viewModel.beginMenuScan()
+                                menuAddingPage = false
+                                navController.navigate(Routes.MENU_CAPTURE)
+                            }
                             AddFoodMethod.LABEL -> navController.navigate(Routes.LABEL)
                             AddFoodMethod.BARCODE -> navController.navigate(Routes.BARCODE)
                             AddFoodMethod.RECENT,
@@ -383,6 +390,60 @@ private fun NomiMain(
                     onManualEntry = {
                         viewModel.beginLogging(AddFoodMethod.TYPE)
                         navController.popBackStack(Routes.HOME, inclusive = false)
+                    },
+                )
+            }
+
+            composable(Routes.MENU_CAPTURE) {
+                PhotoCaptureScreen(
+                    subject = PhotoCaptureSubject.MENU,
+                    onBack = { navController.popBackStack() },
+                    onPhotoSelected = { uri, _ ->
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        resolver.openInputStream(uri)?.use(MealImagePreprocessor::prepare)
+                                            ?: error("The selected image could not be opened")
+                                    } finally {
+                                        deleteOwnedCameraCapture(context.applicationContext, uri)
+                                    }
+                                }
+                            }.onSuccess { prepared ->
+                                viewModel.scanMenuPage(prepared.bytes, prepared.mediaType)
+                                if (menuAddingPage) {
+                                    navController.popBackStack()
+                                } else {
+                                    navController.navigate(Routes.MENU_RESULTS) {
+                                        popUpTo(Routes.MENU_CAPTURE) { inclusive = true }
+                                    }
+                                }
+                                menuAddingPage = false
+                            }.onFailure { showMessage(it.message ?: "Nomi couldn't read that image") }
+                        }
+                    },
+                    onManualEntry = {
+                        viewModel.beginLogging(AddFoodMethod.TYPE)
+                        navController.popBackStack(Routes.HOME, inclusive = false)
+                    },
+                )
+            }
+
+            composable(Routes.MENU_RESULTS) {
+                val menuState by viewModel.menuScanState.collectAsStateWithLifecycle()
+                MenuScanScreen(
+                    state = menuState,
+                    onBack = { navController.popBackStack() },
+                    onQueryChanged = viewModel::updateMenuSearch,
+                    onAddPage = {
+                        menuAddingPage = true
+                        navController.navigate(Routes.MENU_CAPTURE)
+                    },
+                    onSelectDish = { dish ->
+                        viewModel.selectMenuDish(dish)
+                        navController.navigate(Routes.LOGGING) {
+                            popUpTo(Routes.MENU_RESULTS) { inclusive = true }
+                        }
                     },
                 )
             }
@@ -839,6 +900,8 @@ private object Routes {
     const val LOGGING = "logging"
     const val VOICE = "voice"
     const val PHOTO = "photo"
+    const val MENU_CAPTURE = "menu_capture"
+    const val MENU_RESULTS = "menu_results"
     const val LABEL = "label"
     const val BARCODE = "barcode"
     const val LIBRARY = "library"

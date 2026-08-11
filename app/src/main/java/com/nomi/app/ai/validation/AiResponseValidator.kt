@@ -4,6 +4,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.FoodEditClassification
 import com.nomi.app.ai.model.FoodEditType
+import com.nomi.app.ai.model.MenuScanResult
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
@@ -142,6 +143,21 @@ object AiResponseValidator {
             item.confidence?.let(::requireConfidence)
         }
         return vision
+    }
+
+    fun validate(menu: MenuScanResult): MenuScanResult {
+        if (menu.items.isEmpty()) throw AiValidationException("No menu items were readable in the photo")
+        if (menu.items.size > 250) throw AiValidationException("Too many menu items were returned")
+        validateText(menu.restaurantName, "restaurant name", maxChars = MAX_BRAND_CHARS)
+        validateTextList(menu.notes, "menu notes")
+        menu.items.forEach { item ->
+            validateText(item.number, "menu item number", maxChars = 64)
+            validateText(item.name, "menu item name", required = true, maxChars = MAX_NAME_CHARS)
+            validateText(item.description, "menu item description", maxChars = MAX_DETAIL_CHARS)
+            validateText(item.category, "menu category", maxChars = MAX_NAME_CHARS)
+            validateText(item.price, "menu price", maxChars = 64)
+        }
+        return menu
     }
 
     fun validate(

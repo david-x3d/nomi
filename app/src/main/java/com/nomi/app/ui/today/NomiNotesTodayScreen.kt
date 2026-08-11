@@ -1634,6 +1634,15 @@ private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Un
                 onClick = { onSelect(AddFoodMethod.PHOTO) },
             )
             QuickAddRow(
+                icon = Icons.Default.RestaurantMenu,
+                title = nomiString("Scan menu", "Speisekarte scannen"),
+                description = nomiString(
+                    "Photograph pages, search every dish, then log one",
+                    "Seiten fotografieren, alle Gerichte durchsuchen und eines eintragen",
+                ),
+                onClick = { onSelect(AddFoodMethod.MENU) },
+            )
+            QuickAddRow(
                 icon = Icons.Default.QrCodeScanner,
                 title = nomiString("Barcode", "Barcode"),
                 description = nomiString("Scan a packaged food", "Verpacktes Lebensmittel scannen"),

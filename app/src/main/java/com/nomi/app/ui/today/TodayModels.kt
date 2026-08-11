@@ -16,6 +16,7 @@ enum class AddFoodMethod(val displayName: String) {
     TYPE("Type"),
     VOICE("Voice"),
     PHOTO("Photo"),
+    MENU("Scan menu"),
     BARCODE("Barcode"),
     LABEL("Nutrition label"),
     RECENT("Recent"),

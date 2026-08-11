@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.FoodEditClassification
+import com.nomi.app.ai.model.MenuScanResult
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.PortionAdjustment
@@ -13,6 +14,7 @@ import com.nomi.app.ai.model.PortionContext
 import com.nomi.app.ai.model.VisionFoodResult
 import com.nomi.app.ai.prompt.AiPrompts
 import com.nomi.app.ai.provider.FoodEditClassificationProvider
+import com.nomi.app.ai.provider.MenuVisionProvider
 import com.nomi.app.ai.provider.FoodParsingProvider
 import com.nomi.app.ai.provider.NutritionEstimateProvider
 import com.nomi.app.ai.provider.NutritionLabelProvider
@@ -52,7 +54,8 @@ class OpenAiCompatibleProviders(
     PortionAdjustmentProvider,
     FoodEditClassificationProvider,
     NutritionLabelProvider,
-    VisionFoodProvider {
+    VisionFoodProvider,
+    MenuVisionProvider {
 
     override suspend fun parseFood(text: String): ParsedFoodIntent {
         require(text.isNotBlank()) { "Enter what you ate first" }
@@ -267,6 +270,20 @@ class OpenAiCompatibleProviders(
         )
         val visionResult: VisionFoodResult = client.json.decodeFromString(raw)
         return AiResponseValidator.validate(visionResult)
+    }
+
+    override suspend fun scanMenu(imageBytes: ByteArray, mediaType: String): MenuScanResult {
+        require(imageBytes.isNotEmpty()) { "The selected image is empty" }
+        val raw = client.completeVisionJson(
+            config = visionConfig,
+            credential = visionCredential(),
+            prompt = AiPrompts.readRestaurantMenu(),
+            base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
+            mediaType = mediaType,
+            maxTokens = 8_192,
+        )
+        val result: MenuScanResult = client.json.decodeFromString(raw)
+        return AiResponseValidator.validate(result)
     }
 }
 
