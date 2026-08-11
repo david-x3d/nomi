@@ -3,9 +3,15 @@ package com.nomi.app.ui.today
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,6 +36,8 @@ import kotlin.math.roundToInt
 fun LoggedAmountEditDialog(
     state: LoggedAmountEditUiState,
     onAmountChanged: (String) -> Unit,
+    onCorrectionChanged: (String) -> Unit,
+    onInterpretCorrection: () -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -58,6 +66,59 @@ fun LoggedAmountEditDialog(
                     ),
                     keyboardActions = KeyboardActions(onDone = { onConfirm() }),
                 )
+                Text(
+                    nomiString(
+                        "Or describe the change",
+                        "Oder beschreibe die \u00c4nderung",
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = state.correctionText,
+                    onValueChange = onCorrectionChanged,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isSaving && !state.isInterpreting,
+                    minLines = 2,
+                    maxLines = 3,
+                    isError = state.error == LoggedAmountEditError.INVALID_CORRECTION ||
+                        state.error == LoggedAmountEditError.INTERPRETATION_FAILED,
+                    label = { Text(nomiString("What changed?", "Was hat sich ge\u00e4ndert?")) },
+                    placeholder = {
+                        Text(
+                            nomiString(
+                                "For example: I ate 60 g less",
+                                "Zum Beispiel: Ich habe 60 g weniger gegessen",
+                            ),
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onInterpretCorrection() }),
+                )
+                FilledTonalButton(
+                    onClick = onInterpretCorrection,
+                    enabled = state.canInterpret,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (state.isInterpreting) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                    }
+                    Text(
+                        nomiString(
+                            if (state.isInterpreting) "Calculating..." else "Calculate amount",
+                            if (state.isInterpreting) "Wird berechnet..." else "Menge berechnen",
+                        ),
+                    )
+                }
+                state.interpretation?.let { interpretation ->
+                    Text(
+                        interpretation,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 val previewCalories = state.previewCalories
                 Text(
                     text = when {
@@ -102,6 +163,16 @@ fun LoggedAmountEditDialog(
 private fun LoggedAmountEditError.localizedMessage(unit: String): String = when (this) {
     LoggedAmountEditError.INVALID_AMOUNT ->
         nomiString("Enter an amount in $unit", "Gib eine Menge in $unit ein")
+    LoggedAmountEditError.INVALID_CORRECTION ->
+        nomiString(
+            "Describe only how the amount changed.",
+            "Beschreibe nur, wie sich die Menge ge\u00e4ndert hat.",
+        )
+    LoggedAmountEditError.INTERPRETATION_FAILED ->
+        nomiString(
+            "Nomi couldn't understand that amount change.",
+            "Nomi konnte diese Mengen\u00e4nderung nicht verstehen.",
+        )
     LoggedAmountEditError.ENTRY_GONE ->
         nomiString("That entry is no longer available", "Dieser Eintrag ist nicht mehr vorhanden")
     LoggedAmountEditError.SAVE_FAILED ->

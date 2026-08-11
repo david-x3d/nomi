@@ -54,6 +54,21 @@ class LoggedAmountEditTest {
     }
 
     @Test
+    fun `interpretation in progress blocks saving and a second interpretation`() {
+        val state = editState(
+            originalAmount = 300.0,
+            originalCalories = 600.0,
+            amountText = "240",
+        ).copy(
+            correctionText = "60 g weniger",
+            isInterpreting = true,
+        )
+
+        assertFalse(state.canSave)
+        assertFalse(state.canInterpret)
+    }
+
+    @Test
     fun `scaling a portion scales every present nutrient and keeps absent ones absent`() {
         val logged = NutritionValues(
             caloriesKcal = 600.0,
@@ -123,6 +138,7 @@ class LoggedAmountEditTest {
         amountText: String,
     ) = LoggedAmountEditUiState(
         entryId = 7L,
+        originalUnit = "g",
         name = "Rinderhüfte",
         unit = "g",
         originalAmount = originalAmount,

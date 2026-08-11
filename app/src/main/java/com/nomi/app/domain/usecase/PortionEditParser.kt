@@ -1,6 +1,7 @@
 package com.nomi.app.domain.usecase
 
 import com.nomi.app.ai.model.PortionEditInstruction
+import com.nomi.app.domain.PortionChangeValidator
 import java.util.Locale
 
 /**
@@ -17,6 +18,39 @@ import java.util.Locale
  * lets the classifier decide.
  */
 object PortionEditParser {
+
+    /**
+     * Resolves wording relative to an existing logged amount, such as "60 g less".
+     * Unit conversion and subtraction remain in Kotlin; incompatible dimensions return null.
+     */
+    fun parseAgainstCurrentOrNull(
+        correction: String,
+        currentQuantity: Double,
+        currentUnit: String,
+    ): PortionEditInstruction? {
+        parseOrNull(correction)?.let { return it }
+        if (!currentQuantity.isFinite() || currentQuantity <= 0.0 || currentUnit.isBlank()) return null
+        val core = stripFillerWords(normalize(correction))
+        val match = RELATIVE_AMOUNT.matchEntire(core) ?: return null
+        val deltaQuantity = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        val deltaUnit = CANONICAL_UNITS[match.groupValues[2]] ?: return null
+        val direction = match.groupValues[3]
+        val deltaFactor = PortionChangeValidator.calculateMultiplier(
+            originalQuantity = currentQuantity,
+            originalUnit = currentUnit,
+            newQuantity = deltaQuantity,
+            newUnit = deltaUnit,
+        ) ?: return null
+        val factor = if (direction == "less" || direction == "weniger") {
+            1.0 - deltaFactor
+        } else {
+            1.0 + deltaFactor
+        }
+        if (!factor.isFinite() || factor <= 0.0 || factor > PortionEditInstruction.MAX_SCALE_FACTOR) {
+            return null
+        }
+        return PortionEditInstruction.scale(factor)
+    }
 
     fun parseOrNull(correction: String): PortionEditInstruction? {
         val normalized = normalize(correction)
@@ -169,7 +203,7 @@ object PortionEditParser {
         // a count on its own here, because a bare "1" would be written as a digit.
         "one",
         "change", "to", "instead", "portion", "amount", "total", "nur", "etwa",
-        "ungefahr", "circa", "ca", "war", "waren", "habe", "gegessen", "davon",
+        "ungefahr", "circa", "ca", "war", "waren", "ich", "habe", "gegessen", "davon", "um",
         "die", "der", "das", "ein", "eine", "von", "nut", "bitte", "andere",
     )
 
@@ -178,6 +212,9 @@ object PortionEditParser {
     private val FRACTION_OF_COUNT = Regex("^(\\d+(?:\\.\\d+)?)\\s*(?:/|out)?\\s*(?:of)?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:pieces?|piece|slices?|stucke?|stuck|items?)$")
     private val FRACTION = Regex("^(\\d+)\\s*/\\s*(\\d+)$")
     private val EXPLICIT_AMOUNT = Regex("^(\\d+(?:[.,]\\d+)?)\\s*([a-z]+)$")
+    private val RELATIVE_AMOUNT = Regex(
+        "^(\\d+(?:[.,]\\d+)?)\\s*([a-z]+)\\s*(less|weniger|more|mehr)$",
+    )
     private val REPLACED_AMOUNT = Regex("\\s*\\d+(?:[.,]\\d+)?\\s*[a-z]*\\s*$")
 
     private val CANONICAL_UNITS: Map<String, String> = buildMap {

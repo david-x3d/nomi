@@ -341,6 +341,7 @@ class AppViewModel(
     val portionEditState = mutablePortionEditState.asStateFlow()
     private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
     val loggedAmountEditState = mutableLoggedAmountEditState.asStateFlow()
+    private var loggedAmountEditEntry: TodayFoodEntry? = null
     /** The logged entry currently being rewritten as text on the page, if any. */
     private val mutableEditedEntryId = MutableStateFlow<Long?>(null)
     val editedEntryId = mutableEditedEntryId.asStateFlow()
@@ -1379,9 +1380,11 @@ class AppViewModel(
 
     fun startLoggedAmountEdit(entry: TodayFoodEntry) {
         if (entry.id <= 0 || entry.amount <= 0.0) return
+        loggedAmountEditEntry = entry
         mutableLoggedAmountEditState.value = LoggedAmountEditUiState(
             entryId = entry.id,
             name = entry.name,
+            originalUnit = entry.unit,
             unit = entry.unit,
             originalAmount = entry.amount,
             originalCalories = entry.calories,
@@ -1392,11 +1395,76 @@ class AppViewModel(
     fun updateLoggedAmountInput(text: String) {
         mutableLoggedAmountEditState.value = mutableLoggedAmountEditState.value?.copy(
             amountText = text.take(12),
+            interpretation = null,
             error = null,
         )
     }
 
+    fun updateLoggedAmountCorrection(text: String) {
+        mutableLoggedAmountEditState.value = mutableLoggedAmountEditState.value?.copy(
+            correctionText = text.take(300),
+            interpretation = null,
+            error = null,
+        )
+    }
+
+    fun interpretLoggedAmountCorrection() {
+        val edit = mutableLoggedAmountEditState.value ?: return
+        val entry = loggedAmountEditEntry?.takeIf { it.id == edit.entryId } ?: run {
+            mutableLoggedAmountEditState.value = edit.copy(error = LoggedAmountEditError.ENTRY_GONE)
+            return
+        }
+        if (!edit.canInterpret) return
+        mutableLoggedAmountEditState.value = edit.copy(
+            isInterpreting = true,
+            interpretation = null,
+            error = null,
+        )
+        viewModelScope.launch {
+            runCatching {
+                editRouter().route(entry.toAmountEditItem(), edit.correctionText)
+            }.onSuccess { decision ->
+                val current = mutableLoggedAmountEditState.value
+                    ?.takeIf { it.entryId == edit.entryId } ?: return@onSuccess
+                when (decision) {
+                    is FoodEditRouter.Decision.Scale -> {
+                        val result = decision.result
+                        recordRoute(
+                            route = NutritionRoute.PORTION_SCALE,
+                            decision = decision.decidedBy,
+                            detail = result.description,
+                            confidence = decision.classification?.confidence,
+                        )
+                        mutableLoggedAmountEditState.value = current.copy(
+                            unit = result.item.unit,
+                            amountText = formatLoggedAmountInput(result.item.quantity),
+                            interpretation = result.description,
+                            isInterpreting = false,
+                            error = null,
+                        )
+                    }
+                    is FoodEditRouter.Decision.Research -> {
+                        // Saved-amount corrections are never allowed to trigger food research.
+                        mutableLoggedAmountEditState.value = current.copy(
+                            isInterpreting = false,
+                            error = LoggedAmountEditError.INVALID_CORRECTION,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                mutableLoggedAmountEditState.value = mutableLoggedAmountEditState.value
+                    ?.takeIf { it.entryId == edit.entryId }
+                    ?.copy(
+                        isInterpreting = false,
+                        error = LoggedAmountEditError.INTERPRETATION_FAILED,
+                    )
+            }
+        }
+    }
+
     fun dismissLoggedAmountEdit() {
+        loggedAmountEditEntry = null
         mutableLoggedAmountEditState.value = null
     }
 
@@ -1414,10 +1482,12 @@ class AppViewModel(
                 repository.updateLoggedAmount(
                     id = edit.entryId,
                     newAmount = amount,
+                    newUnit = edit.unit,
                     updatedAtEpochMillis = System.currentTimeMillis(),
                 )
             }.onSuccess { updated ->
                 mutableLoggedAmountEditState.value = if (updated) {
+                    loggedAmountEditEntry = null
                     null
                 } else {
                     mutableLoggedAmountEditState.value?.copy(
@@ -2795,6 +2865,22 @@ private fun String.toMealCategory(): MealCategory = runCatching {
 
 private fun Double.cleanNumber(): String = if (this == toLong().toDouble()) toLong().toString()
 else String.format(Locale.US, "%.1f", this)
+
+/** Minimal stored snapshot needed by the existing portion-only arithmetic/router. */
+private fun TodayFoodEntry.toAmountEditItem(): AnalyzedFoodItem = AnalyzedFoodItem(
+    name = name,
+    brand = brand,
+    quantity = amount,
+    unit = unit,
+    gramsEquivalent = grams,
+    calories = calories,
+    proteinGrams = proteinGrams,
+    carbohydrateGrams = carbohydrateGrams,
+    fatGrams = fatGrams,
+    sourceName = sourceName,
+    sourceUrl = sourceUrl,
+    isEstimate = isEstimated,
+)
 
 private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSelection = when (pipeline) {
     ProviderPipeline.FOOD_RESEARCH -> foodResearchProvider

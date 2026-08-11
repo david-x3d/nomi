@@ -40,7 +40,11 @@ class FoodEditRouter(
     suspend fun route(item: AnalyzedFoodItem, correction: String): Decision {
         require(correction.isNotBlank()) { "Describe what should change" }
 
-        PortionEditParser.parseOrNull(correction)
+        PortionEditParser.parseAgainstCurrentOrNull(
+            correction = correction,
+            currentQuantity = item.quantity,
+            currentUnit = item.unit,
+        )
             ?.let { PortionEditApplier.apply(item, it) }
             ?.let { return Decision.Scale(it, NutritionRoute.Decision.LOCAL) }
 

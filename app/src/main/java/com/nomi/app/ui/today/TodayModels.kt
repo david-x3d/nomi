@@ -2,6 +2,7 @@ package com.nomi.app.ui.today
 
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.Micronutrient
+import com.nomi.app.domain.PortionChangeValidator
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -63,28 +64,44 @@ data class MicronutrientProgress(
  * Nutrition scales linearly with the amount, so the preview and the saved result come from the
  * logged entry's own values. No new research runs and the recorded source stays untouched.
  */
-enum class LoggedAmountEditError { INVALID_AMOUNT, ENTRY_GONE, SAVE_FAILED }
+enum class LoggedAmountEditError {
+    INVALID_AMOUNT,
+    INVALID_CORRECTION,
+    INTERPRETATION_FAILED,
+    ENTRY_GONE,
+    SAVE_FAILED,
+}
 
 data class LoggedAmountEditUiState(
     val entryId: Long,
     val name: String,
+    val originalUnit: String,
     val unit: String,
     val originalAmount: Double,
     val originalCalories: Double,
     val amountText: String,
+    val correctionText: String = "",
+    val interpretation: String? = null,
     val error: LoggedAmountEditError? = null,
+    val isInterpreting: Boolean = false,
     val isSaving: Boolean = false,
 ) {
     val parsedAmount: Double? get() = parseLoggedAmount(amountText)
 
-    val canSave: Boolean get() = !isSaving && parsedAmount != null
+    val canSave: Boolean get() = !isSaving && !isInterpreting && parsedAmount != null
+    val canInterpret: Boolean get() = correctionText.isNotBlank() && !isSaving && !isInterpreting
 
     /** Calories the correction would store, so the dialog can show the result before saving. */
     val previewCalories: Double?
         get() {
             val amount = parsedAmount ?: return null
-            if (originalAmount <= 0.0) return null
-            return originalCalories * amount / originalAmount
+            val factor = PortionChangeValidator.calculateMultiplier(
+                originalQuantity = originalAmount,
+                originalUnit = originalUnit,
+                newQuantity = amount,
+                newUnit = unit,
+            ) ?: return null
+            return originalCalories * factor
         }
 }
 

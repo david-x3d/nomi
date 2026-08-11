@@ -66,6 +66,23 @@ class FoodEditRoutingTest {
         assertEquals(20.0, scale.result.item.proteinGrams, 1e-9)
     }
 
+    @Test
+    fun `German grams less is subtracted locally without consulting any model`() = runBlocking {
+        val classifier = neverCalledRouter()
+
+        val decision = classifier.asRouter().route(
+            researchedItem(quantity = 400.0),
+            "Ich habe 60 Gramm weniger gegessen",
+        )
+
+        val scale = decision as FoodEditRouter.Decision.Scale
+        assertEquals(NutritionRoute.Decision.LOCAL, scale.decidedBy)
+        assertEquals(0, classifier.calls)
+        assertEquals(0.85, scale.result.factor, 1e-12)
+        assertEquals(340.0, scale.result.item.quantity, 1e-9)
+        assertEquals(680.0, scale.result.item.calories, 1e-9)
+    }
+
     // 2. "2x" does not invoke Sonar.
     @Test
     fun `2x is scaled locally without consulting any model`() = runBlocking {

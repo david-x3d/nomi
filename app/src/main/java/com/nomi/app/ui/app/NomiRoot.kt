@@ -563,6 +563,8 @@ private fun NomiMain(
         LoggedAmountEditDialog(
             state = state,
             onAmountChanged = viewModel::updateLoggedAmountInput,
+            onCorrectionChanged = viewModel::updateLoggedAmountCorrection,
+            onInterpretCorrection = viewModel::interpretLoggedAmountCorrection,
             onConfirm = viewModel::applyLoggedAmountEdit,
             onDismiss = viewModel::dismissLoggedAmountEdit,
         )
