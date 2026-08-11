@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 62
-        versionName = "1.1.4"
+        versionCode = 63
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -27,7 +27,13 @@ android {
         }
         externalNativeBuild {
             cmake {
-                arguments += listOf("-DGGML_BUILD_EXAMPLES=OFF", "-DGGML_BUILD_TESTS=OFF")
+                arguments += listOf(
+                    "-DGGML_BUILD_EXAMPLES=OFF",
+                    "-DGGML_BUILD_TESTS=OFF",
+                    // Android does not provide libomp.so. Linking ggml against it makes the
+                    // packaged CPU backend unloadable unless the OpenMP runtime is also shipped.
+                    "-DGGML_OPENMP=OFF",
+                )
             }
         }
     }
