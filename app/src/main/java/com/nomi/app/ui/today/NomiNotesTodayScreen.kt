@@ -155,7 +155,9 @@ import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -825,23 +827,35 @@ private fun NotesFoodRow(
     var showOriginal by remember(entry.id, originalDescription) {
         mutableStateOf(originalDescription != null)
     }
-    val revealSweep = remember(entry.id) { Animatable(1.35f) }
+    val summarySweep = remember(entry.id) { Animatable(1.35f) }
+    val calorieSweep = remember(entry.id) { Animatable(1.35f) }
     LaunchedEffect(originalDescription) {
         if (originalDescription == null) {
             showOriginal = false
-            revealSweep.snapTo(1.35f)
+            summarySweep.snapTo(1.35f)
+            calorieSweep.snapTo(1.35f)
         } else {
             showOriginal = true
-            revealSweep.snapTo(-0.35f)
-            revealSweep.animateTo(
-                targetValue = 0.42f,
-                animationSpec = tween(durationMillis = 320, easing = LinearEasing),
-            )
-            showOriginal = false
-            revealSweep.animateTo(
-                targetValue = 1.35f,
-                animationSpec = tween(durationMillis = 500, easing = LinearEasing),
-            )
+            summarySweep.snapTo(-0.35f)
+            calorieSweep.snapTo(-0.35f)
+            coroutineScope {
+                launch {
+                    calorieSweep.animateTo(
+                        targetValue = 1.35f,
+                        animationSpec = tween(durationMillis = 720, easing = LinearEasing),
+                    )
+                }
+                launch {
+                    delay(320)
+                    // The warm sweep belongs to the AI's finished short label, never to the
+                    // longer sentence while it is being replaced.
+                    showOriginal = false
+                    summarySweep.animateTo(
+                        targetValue = 1.35f,
+                        animationSpec = tween(durationMillis = 620, easing = LinearEasing),
+                    )
+                }
+            }
         }
     }
     val description = if (showOriginal) originalDescription.orEmpty() else finalDescription
@@ -849,8 +863,10 @@ private fun NotesFoodRow(
     val amountDisplay = entry.quantityDisplay(locale).withContext
     val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
     val writeLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
-    val revealProgress = revealSweep.value
-    val revealActive = originalDescription != null && revealProgress < 1.34f
+    val summaryProgress = summarySweep.value
+    val summaryActive = originalDescription != null && !showOriginal && summaryProgress < 1.34f
+    val calorieProgress = calorieSweep.value
+    val calorieActive = originalDescription != null && calorieProgress < 1.34f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -878,8 +894,8 @@ private fun NotesFoodRow(
                 text = description,
                 modifier = Modifier
                     .oneShotTextGradient(
-                        active = revealActive,
-                        progress = revealProgress,
+                        active = summaryActive,
+                        progress = summaryProgress,
                         colors = listOf(
                             Color(0xFFFF9A45),
                             Color(0xFFB65CFF),
@@ -924,8 +940,8 @@ private fun NotesFoodRow(
             // the keyboard, so the figure carries a touch target rather than only its glyphs.
             modifier = Modifier
                 .oneShotTextGradient(
-                    active = revealActive,
-                    progress = revealProgress,
+                    active = calorieActive,
+                    progress = calorieProgress,
                     colors = listOf(
                         Color(0xFFA7E8FF),
                         Color(0xFF55AEFF),
