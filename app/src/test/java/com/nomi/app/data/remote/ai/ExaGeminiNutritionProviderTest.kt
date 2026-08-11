@@ -374,10 +374,99 @@ class ExaGeminiNutritionProviderTest {
     }
 
     @Test
-    fun `multi item meal receives two Exa result slots per item`() {
-        assertEquals(4, exaResultLimit(1))
-        assertEquals(6, exaResultLimit(3))
-        assertEquals(10, exaResultLimit(20))
+    fun `multi item meal receives a focused Exa query per item`() {
+        val intent = ParsedFoodIntent(
+            originalText = "McDonald's Cheeseburger mit mittleren Pommes und mittlerer Coca-Cola",
+            language = "de",
+            items = listOf(
+                ParsedFoodItem("Cheeseburger", brand = "McDonald's", quantity = 1.0, unit = "item"),
+                ParsedFoodItem("Pommes", brand = "McDonald's", quantity = 1.0, unit = "medium"),
+                ParsedFoodItem("Coca-Cola", brand = "Coca-Cola", quantity = 1.0, unit = "medium"),
+            ),
+        )
+
+        val queries = nutritionSearchQueries(intent)
+
+        assertEquals(3, queries.size)
+        assertTrue(queries[0].startsWith("nutrition calories macros exact item McDonald's Cheeseburger"))
+        assertTrue(queries[1].startsWith("nutrition calories macros exact item McDonald's Pommes"))
+        assertTrue(queries[2].startsWith("nutrition calories macros exact item Coca-Cola"))
+        assertFalse("Pommes" in queries[0])
+        assertFalse("Cheeseburger" in queries[1])
+        assertEquals(4, exaResultsPerItemQuery(1))
+        assertEquals(3, exaResultsPerItemQuery(3))
+    }
+
+    @Test
+    fun `McDonalds order searches every product separately before one extraction`() = runBlocking {
+        val intent = ParsedFoodIntent(
+            originalText = "einen McDonald's Cheeseburger eine mittlere Pommes und eine mittlere Coca-Cola",
+            language = "de",
+            items = listOf(
+                ParsedFoodItem("Cheeseburger", brand = "McDonald's", quantity = 1.0, unit = "serving"),
+                ParsedFoodItem(
+                    "Pommes",
+                    brand = "McDonald's",
+                    quantity = 1.0,
+                    unit = "serving",
+                    assumptions = listOf("mittlere Portion"),
+                ),
+                ParsedFoodItem(
+                    "Coca-Cola",
+                    brand = "Coca-Cola",
+                    quantity = 1.0,
+                    unit = "serving",
+                    assumptions = listOf("mittlere Größe"),
+                ),
+            ),
+        )
+        val calls = mutableListOf<Pair<String, Int>>()
+        val provider = ExaGeminiNutritionProvider(
+            exaSearch = ExaNutritionSearchGateway { query, _, _, limit ->
+                calls += query to limit
+                val result = when {
+                    "Cheeseburger" in query -> source(
+                        "McDonald's Cheeseburger",
+                        "https://mcdonalds.test/cheeseburger",
+                        "Official nutrition Cheeseburger per 1 serving: 304 kcal, protein 15 g, carbs 31 g, fat 13 g",
+                    )
+                    "Pommes" in query -> source(
+                        "McDonald's mittlere Pommes",
+                        "https://mcdonalds.test/pommes-mittel",
+                        "Official nutrition Pommes mittel per 1 serving: 337 kcal, protein 4 g, carbs 42 g, fat 16 g",
+                    )
+                    else -> source(
+                        "McDonald's Coca-Cola mittel",
+                        "https://mcdonalds.test/coca-cola-mittel",
+                        "Official nutrition Coca-Cola mittel per 1 serving: 170 kcal, protein 0 g, carbs 42 g, fat 0 g",
+                    )
+                }
+                ExaSearchResponse(results = listOf(result))
+            },
+            geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ ->
+                GeminiNutritionExtraction(
+                    items = listOf(
+                        restaurantItem("Cheeseburger", "McDonald's", 304.0, 15.0, 31.0, 13.0, "exa-1"),
+                        restaurantItem("Pommes", "McDonald's", 337.0, 4.0, 42.0, 16.0, "exa-2"),
+                        restaurantItem("Coca-Cola", "Coca-Cola", 170.0, 0.0, 42.0, 0.0, "exa-3"),
+                    ),
+                    overallConfidence = 0.98,
+                )
+            },
+            exaCredential = { credential },
+            geminiConfig = config,
+            geminiCredential = { credential },
+            localeCountryProvider = { "DE" },
+        )
+
+        val result = provider.researchNutrition(intent)
+
+        assertEquals(3, calls.size)
+        assertTrue(calls.all { it.second == 3 })
+        assertTrue(calls.any { "Cheeseburger" in it.first })
+        assertTrue(calls.any { "Pommes" in it.first })
+        assertTrue(calls.any { "Coca-Cola" in it.first })
+        assertEquals(listOf(304.0, 337.0, 170.0), result.items.map { it.calories })
     }
 
     @Test
@@ -477,6 +566,30 @@ class ExaGeminiNutritionProviderTest {
 
     private fun extraction(item: GeminiNutritionItem) =
         GeminiNutritionExtraction(items = listOf(item), overallConfidence = 0.98)
+
+    private fun restaurantItem(
+        name: String,
+        brand: String,
+        calories: Double,
+        protein: Double,
+        carbs: Double,
+        fat: Double,
+        sourceId: String,
+    ) = GeminiNutritionItem(
+        name = name,
+        brand = brand,
+        calories = calories,
+        proteinGrams = protein,
+        carbohydrateGrams = carbs,
+        fatGrams = fat,
+        sourceId = sourceId,
+        sourceProductName = name,
+        sourceServingQuantity = 1.0,
+        sourceServingUnit = "serving",
+        sourceCountry = "DE",
+        isEstimate = false,
+        confidence = 0.98,
+    )
 
     private fun item(
         case: SuccessCase,

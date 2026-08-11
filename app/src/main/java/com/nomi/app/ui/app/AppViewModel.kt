@@ -801,7 +801,7 @@ class AppViewModel(
                     if (error is CancellationException) throw error
                     if (requestId != analysisRequestId) return@onFailure
                     mutableLoggingState.value = FoodLoggingUiState.Error(
-                        error.safeAiMessage(),
+                        researchFailureMessage(error),
                         canRetry = true,
                         originalText = text,
                     )
@@ -2608,6 +2608,21 @@ class AppViewModel(
      */
     private fun inUserLanguage(english: String, german: String): String =
         if (preferences.value.germanTranslationEnabled) german else english
+
+    /** Research validation is actionable to developers, but raw source-ID language is not UI. */
+    private fun researchFailureMessage(error: Throwable): String {
+        val technicalEvidenceFailure = error is AiValidationException && listOf(
+            "Exa source",
+            "nutrition evidence",
+            "support Gemini",
+        ).any { marker -> error.message?.contains(marker, ignoreCase = true) == true }
+        if (!technicalEvidenceFailure) return error.safeAiMessage()
+        return inUserLanguage(
+            english = "Nomi couldn't verify nutrition for every product. Try again or edit the entry.",
+            german = "Nomi konnte nicht für alle Produkte passende Nährwerte belegen. " +
+                "Versuche es erneut oder bearbeite die Eingabe.",
+        )
+    }
 
     private fun defaultMealCategory(): MealCategory = when (LocalTime.now(zoneId).hour) {
         in 4..10 -> MealCategory.BREAKFAST

@@ -31,6 +31,9 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.system.measureTimeMillis
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -275,22 +278,32 @@ internal class ExaGeminiNutritionProvider(
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        val searchQuery = nutritionSearchQuery(reconciledIntent)
+        val searchQueries = nutritionSearchQueries(reconciledIntent)
+        val searchQuery = searchQueries.joinToString(" || ")
         var searchLatency = 0L
         var extractionLatency = 0L
         var documents = emptyList<ExaNutritionDocument>()
         var extraction: GeminiNutritionExtraction? = null
         return try {
-            lateinit var searchResponse: ExaSearchResponse
+            lateinit var searchResponses: List<ExaSearchResponse>
             searchLatency = measureTimeMillis {
-                searchResponse = exaSearch.search(
-                    query = searchQuery,
-                    credential = exaCredential(),
-                    timeoutMillis = geminiConfig.effectiveTimeoutMillis(),
-                    resultLimit = exaResultLimit(reconciledIntent.items.size),
-                )
+                val credential = exaCredential()
+                searchResponses = coroutineScope {
+                    searchQueries.map { query ->
+                        async {
+                            exaSearch.search(
+                                query = query,
+                                credential = credential,
+                                timeoutMillis = geminiConfig.effectiveTimeoutMillis(),
+                                resultLimit = exaResultsPerItemQuery(searchQueries.size),
+                            )
+                        }
+                    }.awaitAll()
+                }
             }
-            documents = searchResponse.toNutritionDocuments()
+            documents = ExaSearchResponse(
+                results = searchResponses.flatMap(ExaSearchResponse::results),
+            ).toNutritionDocuments()
             if (documents.isEmpty()) {
                 throw AiValidationException("Exa returned no usable nutrition sources")
             }
@@ -372,12 +385,30 @@ internal fun nutritionSearchQuery(intent: ParsedFoodIntent): String =
         }
     }
 
-/** One query stays cheaper than one Exa request per food, but a meal needs room for each item. */
-internal fun exaResultLimit(itemCount: Int): Int = (itemCount.coerceAtLeast(1) * 2)
-    .coerceIn(MIN_EXA_RESULTS, MAX_EXA_RESULTS)
+/**
+ * A combined restaurant-order query frequently returns adjacent menu items instead of evidence
+ * for every requested product. Single foods retain the cheapest one-query path; multi-item meals
+ * use focused searches in parallel and still share one Gemini extraction request.
+ */
+internal fun nutritionSearchQueries(intent: ParsedFoodIntent): List<String> {
+    if (intent.items.size <= 1) return listOf(nutritionSearchQuery(intent))
+    return intent.items.map { item ->
+        buildString {
+            append("nutrition calories macros exact item ")
+            val name = item.name.trim()
+            item.brand?.trim()?.takeIf { brand ->
+                brand.isNotBlank() && !name.contains(brand, ignoreCase = true)
+            }?.let { append(it).append(' ') }
+            append(name)
+            item.quantity?.let { append(' ').append(it) }
+            item.unit?.trim()?.takeIf(String::isNotBlank)?.let { append(' ').append(it) }
+            item.preparation?.trim()?.takeIf(String::isNotBlank)?.let { append(' ').append(it) }
+            item.assumptions.take(3).forEach { append(' ').append(it.trim()) }
+        }
+    }
+}
 
-private const val MIN_EXA_RESULTS = 4
-private const val MAX_EXA_RESULTS = 10
+internal fun exaResultsPerItemQuery(queryCount: Int): Int = if (queryCount <= 1) 4 else 3
 
 private fun ParsedFoodItem.needsWeightPerPieceResearch(): Boolean =
     quantity != null && gramsEquivalent == null && unit?.trim()?.lowercase(Locale.ROOT) in setOf(
