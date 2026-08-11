@@ -469,6 +469,21 @@ class AppViewModel(
         )
     }
 
+    /** Removes one component from a detected meal before it is saved. */
+    fun removePreviewItem(index: Int) {
+        val current = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
+        if (index !in current.analysis.items.indices) return
+        val updated = current.analysis.items.toMutableList().apply { removeAt(index) }
+        if (updated.isEmpty()) {
+            // Keep the preview actionable; the user can still edit the original meal text or
+            // dismiss the draft instead of reaching an empty meal that cannot be saved.
+            return
+        }
+        mutableLoggingState.value = current.copy(
+            analysis = current.analysis.copy(items = updated),
+        )
+    }
+
     fun beginPortionEdit(index: Int) {
         val preview = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
         val item = preview.analysis.items.getOrNull(index) ?: return
@@ -786,6 +801,13 @@ class AppViewModel(
                 .onSuccess { analysis ->
                     if (requestId != analysisRequestId) return@onSuccess
                     recentFoodAnalysisCache.put(cacheKey, analysis)
+                    // Persist trusted gram-based results as soon as research succeeds. This
+                    // means a retry, app restart, or abandoned preview can reuse the nutrition
+                    // without another Exa/Gemini request; estimates and size-only portions are
+                    // intentionally skipped by cacheAnalyzedFood's provenance/weight checks.
+                    analysis.items.forEach { item ->
+                        runCatching { cacheAnalyzedFood(item) }
+                    }
                     recordRoute(
                         route = NutritionRoute.NEW_RESEARCH,
                         decision = NutritionRoute.Decision.DIRECT,

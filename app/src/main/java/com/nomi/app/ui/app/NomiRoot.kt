@@ -304,6 +304,7 @@ private fun NomiMain(
                     onManualDraftChanged = viewModel::updateManualDraft,
                     onEditItem = { editedItemIndex = it },
                     onChangePortion = viewModel::beginPortionEdit,
+                    onRemoveItem = viewModel::removePreviewItem,
                     onConfirm = viewModel::confirmLogging,
                     onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
                     onPhotoPlaceChanged = viewModel::updatePhotoPlace,

@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Button
@@ -82,6 +83,7 @@ fun FoodLoggingScreen(
     onManualDraftChanged: (ManualFoodDraft) -> Unit,
     onEditItem: (Int) -> Unit,
     onChangePortion: (Int) -> Unit,
+    onRemoveItem: (Int) -> Unit,
     onConfirm: () -> Unit,
     onPhotoDescriptionChanged: (String) -> Unit = {},
     onPhotoPlaceChanged: (String) -> Unit = {},
@@ -135,6 +137,7 @@ fun FoodLoggingScreen(
                 onMealCategoryChanged = onMealCategoryChanged,
                 onEditItem = onEditItem,
                 onChangePortion = onChangePortion,
+                onRemoveItem = onRemoveItem,
                 onConfirm = onConfirm,
                 modifier = Modifier.padding(innerPadding),
             )
@@ -382,6 +385,7 @@ private fun PreviewContent(
     onMealCategoryChanged: (MealCategory) -> Unit,
     onEditItem: (Int) -> Unit,
     onChangePortion: (Int) -> Unit,
+    onRemoveItem: (Int) -> Unit,
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -453,6 +457,12 @@ private fun PreviewContent(
                                 Icon(
                                     Icons.Default.Edit,
                                     contentDescription = nomiString("Edit ${item.name} manually", "${item.name} manuell bearbeiten"),
+                                )
+                            }
+                            IconButton(onClick = { onRemoveItem(index) }) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = nomiString("Remove ${item.name} from meal", "${item.name} aus dem MenÃ¼ entfernen"),
                                 )
                             }
                         }
