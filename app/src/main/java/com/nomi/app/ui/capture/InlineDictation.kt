@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nomi.app.integration.voice.WhisperVoiceController
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import kotlinx.coroutines.delay
 
@@ -59,6 +60,7 @@ fun rememberInlineDictation(
     val downloadProgress by controller.downloadProgress.collectAsStateWithLifecycle()
     val level by controller.level.collectAsStateWithLifecycle()
     val currentOnTranscription by rememberUpdatedState(onTranscription)
+    val currentSpeechLocale by rememberUpdatedState(nomiLocale())
 
     // Set the moment the button is pressed, so the bar changes under the finger instead of
     // after the model has finished loading and the microphone has opened.
@@ -70,7 +72,7 @@ fun rememberInlineDictation(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            controller.start()
+            controller.start(currentSpeechLocale)
         } else {
             requested = false
             deniedMessage = permissionDenied
@@ -107,7 +109,11 @@ fun rememberInlineDictation(
         requested = true
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
-        if (granted) controller.start() else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        if (granted) {
+            controller.start(currentSpeechLocale)
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     fun cancel() {

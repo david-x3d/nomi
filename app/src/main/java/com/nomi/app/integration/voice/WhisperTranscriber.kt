@@ -36,15 +36,21 @@ class WhisperTranscriber(
      * Transcribes 16 kHz mono samples. Returns the recognized text with whisper's own timestamp
      * markers omitted, because what the food parser wants is the sentence.
      */
-    suspend fun transcribe(samples: FloatArray, language: String? = null): Result<String> =
+    suspend fun transcribe(samples: FloatArray, language: String): Result<String> =
         withContext(Dispatchers.Default) {
             runCatching {
                 require(samples.isNotEmpty()) { "Nothing was recorded" }
+                val whisperLanguage = language.trim().lowercase().substringBefore('-')
+                require(whisperLanguage.isNotBlank()) { "A speech language is required" }
                 val modelFile = store.modelFile
                 check(modelFile.isFile) { "The speech model has not been downloaded yet" }
                 lock.withLock {
                     val context = existingContext(modelFile)
-                    context.transcribeData(samples, printTimestamp = false)
+                    context.transcribeData(
+                        samples,
+                        language = whisperLanguage,
+                        printTimestamp = false,
+                    )
                 }.trim()
             }
         }

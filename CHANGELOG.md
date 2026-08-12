@@ -7,4 +7,5 @@
 - Protein, carbohydrates, fat, sugar, and other available micronutrients are displayed.
 - The AI provides a short, clear explanation of the main calorie sources for every product.
 - Meal groups remain intact when deleting an entry or undoing a deletion.
+- On-device dictation now follows the language selected in Nomi, including German recognition.
 - Added the PolyForm Noncommercial license and GitHub release badge.
