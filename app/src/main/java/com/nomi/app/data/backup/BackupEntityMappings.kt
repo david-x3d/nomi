@@ -72,6 +72,9 @@ internal fun NutritionSourceSnapshot.toBackup(): BackupNutritionSourceSnapshotV1
         url = url,
         citedUrls = citedUrls,
         confidence = confidence,
+        productName = productName,
+        servingQuantity = servingQuantity,
+        servingUnit = servingUnit,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )
@@ -85,6 +88,9 @@ internal fun BackupNutritionSourceSnapshotV1.toEntity(): NutritionSourceSnapshot
         url = url,
         citedUrls = citedUrls,
         confidence = confidence,
+        productName = productName,
+        servingQuantity = servingQuantity,
+        servingUnit = servingUnit,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )

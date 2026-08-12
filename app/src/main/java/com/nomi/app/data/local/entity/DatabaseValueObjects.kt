@@ -55,6 +55,17 @@ data class NutritionSourceSnapshot(
     @ColumnInfo(name = "cited_urls") val citedUrls: String? = null,
     /** How sure the provider was, 0..1. Null for manual entries, which make no claim. */
     @ColumnInfo(name = "confidence") val confidence: Double? = null,
+    /**
+     * The product title exactly as the cited page prints it, which is often not what the entry
+     * is called: "Apfel" is logged against "Äpfel, roh, mit Schale".
+     */
+    @ColumnInfo(name = "product_name") val productName: String? = null,
+    /**
+     * The amount the cited page's values describe, before Nomi scaled them to the eaten
+     * portion. Without it a reader cannot tell whether 52 kcal was per 100 g or per apple.
+     */
+    @ColumnInfo(name = "serving_quantity") val servingQuantity: Double? = null,
+    @ColumnInfo(name = "serving_unit") val servingUnit: String? = null,
     @ColumnInfo(name = "retrieved_at_epoch_millis") val retrievedAtEpochMillis: Long? = null,
     @ColumnInfo(name = "verified_at_epoch_millis") val verifiedAtEpochMillis: Long? = null,
 )

@@ -64,9 +64,14 @@ internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalys
                     .distinct()
                     .joinToString(" + ")
                     .takeIf(String::isNotBlank),
+                // The first researched page leads so the detail view still has a primary source
+                // to show; the rest stay behind it in the citation list.
+                sourceUrl = items.firstNotNullOfOrNull(AnalyzedFoodItem::sourceUrl),
                 supportingSourceUrls = items.flatMap { item ->
                     listOfNotNull(item.sourceUrl) + item.supportingSourceUrls
                 }.distinct(),
+                // A combined meal is only as trustworthy as its least certain part.
+                confidence = items.mapNotNull(AnalyzedFoodItem::confidence).minOrNull(),
                 verificationStatus = verification,
                 isEstimate = items.any(AnalyzedFoodItem::isEstimate),
                 uncertaintyPercent = items.mapNotNull(AnalyzedFoodItem::uncertaintyPercent).maxOrNull(),

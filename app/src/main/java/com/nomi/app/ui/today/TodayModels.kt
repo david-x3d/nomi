@@ -144,6 +144,11 @@ data class TodayFoodEntry(
     val citedSourceUrls: List<String> = emptyList(),
     /** Provider confidence, 0..1. Null when nothing claimed one, e.g. a manual entry. */
     val confidence: Double? = null,
+    /** The product title the cited page printed, which is often not what the entry is called. */
+    val sourceProductName: String? = null,
+    /** The amount the cited page's values describe, before scaling to the eaten portion. */
+    val sourceServingQuantity: Double? = null,
+    val sourceServingUnit: String? = null,
     /** Briefly present after auto-save so the written sentence can resolve into its short label. */
     val revealText: String? = null,
 )

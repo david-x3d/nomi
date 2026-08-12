@@ -2645,6 +2645,9 @@ class AppViewModel(
         sourceUrl = sourceSnapshot.url,
         citedSourceUrls = sourceSnapshot.citedUrlList(),
         confidence = sourceSnapshot.confidence,
+        sourceProductName = sourceSnapshot.productName,
+        sourceServingQuantity = sourceSnapshot.servingQuantity,
+        sourceServingUnit = sourceSnapshot.servingUnit,
         revealText = revealText,
     )
 
@@ -2680,6 +2683,9 @@ class AppViewModel(
                 // re-deriving which of the citations the numbers actually came from.
                 citedUrls = (listOfNotNull(sourceUrl) + supportingSourceUrls).toCitedUrlColumn(),
                 confidence = confidence,
+                productName = sourceProductName,
+                servingQuantity = sourceServingQuantity,
+                servingUnit = sourceServingUnit,
                 retrievedAtEpochMillis = now,
             ),
             isEstimated = isEstimate,

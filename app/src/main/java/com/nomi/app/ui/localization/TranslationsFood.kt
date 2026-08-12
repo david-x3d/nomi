@@ -251,6 +251,65 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         tr = "100 üzerinden {0} güven",
     ),
 
+    // What the cited page itself said
+    "Product on the page" to NomiTranslation(
+        de = "Produkt auf der Seite", es = "Producto en la página",
+        fr = "Produit sur la page", it = "Prodotto sulla pagina",
+        nl = "Product op de pagina", pt = "Produto na página",
+        sq = "Produkti në faqe", sv = "Produkt på sidan", tr = "Sayfadaki ürün",
+    ),
+    "Values are per" to NomiTranslation(
+        de = "Werte gelten für", es = "Valores por", fr = "Valeurs pour",
+        it = "Valori per", nl = "Waarden per", pt = "Valores por",
+        sq = "Vlerat për", sv = "Värden per", tr = "Değerler şu miktar için",
+    ),
+    "Nomi worked this out from your description rather than from a published table." to
+        NomiTranslation(
+            de = "Nomi hat das aus deiner Beschreibung abgeleitet, nicht aus einer " +
+                "veröffentlichten Tabelle.",
+            es = "Nomi lo ha deducido de tu descripción, no de una tabla publicada.",
+            fr = "Nomi a déduit cela de ta description, pas d’un tableau publié.",
+            it = "Nomi lo ha ricavato dalla tua descrizione, non da una tabella pubblicata.",
+            nl = "Nomi heeft dit afgeleid uit je omschrijving, niet uit een gepubliceerde tabel.",
+            pt = "A Nomi deduziu isto da tua descrição, não de uma tabela publicada.",
+            sq = "Nomi e nxori këtë nga përshkrimi yt, jo nga një tabelë e publikuar.",
+            sv = "Nomi räknade ut det här från din beskrivning, inte från en publicerad tabell.",
+            tr = "Nomi bunu yayımlanmış bir tablodan değil, senin açıklamandan çıkardı.",
+        ),
+    "No source page recorded these values." to NomiTranslation(
+        de = "Keine Quellseite hat diese Werte festgehalten.",
+        es = "Ninguna página de origen registró estos valores.",
+        fr = "Aucune page source n’a enregistré ces valeurs.",
+        it = "Nessuna pagina di origine ha registrato questi valori.",
+        nl = "Geen bronpagina heeft deze waarden vastgelegd.",
+        pt = "Nenhuma página de origem registou estes valores.",
+        sq = "Asnjë faqe burimore nuk i ka regjistruar këto vlera.",
+        sv = "Ingen källsida registrerade de här värdena.",
+        tr = "Bu değerleri kaydeden bir kaynak sayfa yok.",
+    ),
+    "No sources. Nomi estimated this from your description." to NomiTranslation(
+        de = "Keine Quellen. Nomi hat das aus deiner Beschreibung geschätzt.",
+        es = "Sin fuentes. Nomi lo ha estimado a partir de tu descripción.",
+        fr = "Aucune source. Nomi a estimé cela d’après ta description.",
+        it = "Nessuna fonte. Nomi lo ha stimato dalla tua descrizione.",
+        nl = "Geen bronnen. Nomi heeft dit geschat op basis van je omschrijving.",
+        pt = "Sem fontes. A Nomi estimou isto a partir da tua descrição.",
+        sq = "Pa burime. Nomi e vlerësoi këtë nga përshkrimi yt.",
+        sv = "Inga källor. Nomi uppskattade det här utifrån din beskrivning.",
+        tr = "Kaynak yok. Nomi bunu açıklamandan tahmin etti.",
+    ),
+    "No sources were recorded for this entry." to NomiTranslation(
+        de = "Für diesen Eintrag wurden keine Quellen erfasst.",
+        es = "No se registraron fuentes para esta entrada.",
+        fr = "Aucune source n’a été enregistrée pour cette entrée.",
+        it = "Per questa voce non è stata registrata alcuna fonte.",
+        nl = "Voor dit item zijn geen bronnen vastgelegd.",
+        pt = "Não foram registadas fontes para esta entrada.",
+        sq = "Për këtë regjistrim nuk u regjistrua asnjë burim.",
+        sv = "Inga källor registrerades för den här posten.",
+        tr = "Bu kayıt için kaynak kaydedilmedi.",
+    ),
+
     // References
     "References" to NomiTranslation(
         de = "Quellen", es = "Referencias", fr = "Références", it = "Riferimenti",

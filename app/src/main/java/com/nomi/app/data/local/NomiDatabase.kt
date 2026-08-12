@@ -42,7 +42,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         AiDebugEventEntity::class,
         FoodResearchCacheEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -93,13 +93,28 @@ abstract class NomiDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Records what the cited page itself said: its product title and the serving its values
+         * describe. Older rows keep NULL, which the detail view reads as "this entry predates
+         * the source breakdown" rather than as a source that published nothing.
+         */
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("food_logs", "saved_meal_items").forEach { table ->
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_product_name` TEXT")
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_serving_quantity` REAL")
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_serving_unit` TEXT")
+                }
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NomiDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
 
         /**
          * Process singleton. Intentionally has no destructive-migration fallback: unknown schema

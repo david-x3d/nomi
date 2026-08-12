@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -274,15 +275,23 @@ private fun FoodEntryActionRow(
     enabled: Boolean = true,
     destructive: Boolean = false,
 ) {
+    // A destructive row is a full errorContainer card with onErrorContainer text, which is the
+    // pairing those two roles are contrast-checked as. The previous mix - saturated error text
+    // on a 38%-alpha errorContainer - was neither red enough to warn nor legible enough to read.
     val contentColor = when {
         !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f)
-        destructive -> MaterialTheme.colorScheme.error
+        destructive -> MaterialTheme.colorScheme.onErrorContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
     val iconContainerColor = when {
         !enabled -> MaterialTheme.colorScheme.surfaceContainerHighest
-        destructive -> MaterialTheme.colorScheme.errorContainer
+        destructive -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+    val iconColor = when {
+        !enabled -> contentColor
+        destructive -> MaterialTheme.colorScheme.onError
+        else -> contentColor
     }
     Card(
         onClick = onClick,
@@ -293,7 +302,7 @@ private fun FoodEntryActionRow(
         shape = nomiCardShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (destructive) {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.38f)
+                MaterialTheme.colorScheme.errorContainer
             } else {
                 nomiCardContainerColor()
             },
@@ -302,7 +311,9 @@ private fun FoodEntryActionRow(
             disabledContentColor = contentColor,
         ),
         elevation = nomiCardElevation(),
-        border = nomiCardBorder(),
+        // The filled error surface carries its own edge; the neutral card border drawn over it
+        // is what made the row look like two overlapping shapes.
+        border = if (destructive) null else nomiCardBorder(),
     ) {
         Row(
             modifier = Modifier
@@ -315,7 +326,7 @@ private fun FoodEntryActionRow(
             Surface(
                 shape = CircleShape,
                 color = iconContainerColor,
-                contentColor = contentColor,
+                contentColor = iconColor,
             ) {
                 Box(
                     modifier = Modifier.size(48.dp),
@@ -762,6 +773,32 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                                     }
                                 }
                             }
+                            // What the page itself said, which is the part that makes the number
+                            // checkable: the product it names, and the amount its values describe.
+                            SourceFactLine(
+                                label = nomiString("Product on the page"),
+                                value = entry.sourceProductName?.takeIf { it.isNotBlank() },
+                            )
+                            SourceFactLine(
+                                label = nomiString("Values are per"),
+                                value = entry.sourceServingText(locale),
+                            )
+                            if (entry.sourceProductName.isNullOrBlank() &&
+                                entry.sourceServingText(locale) == null
+                            ) {
+                                Text(
+                                    text = if (entry.isEstimated) {
+                                        nomiString(
+                                            "Nomi worked this out from your description rather " +
+                                                "than from a published table.",
+                                        )
+                                    } else {
+                                        nomiString("No source page recorded these values.")
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -855,6 +892,37 @@ private fun CorrectionPrompt(onClick: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/**
+ * The serving the cited page's values describe, e.g. "100 g".
+ *
+ * Null when nothing recorded one, which is the case for estimates and for entries logged before
+ * the source breakdown existed. It is deliberately not defaulted to "100 g": a guessed basis is
+ * worse than an absent one, because it invites arithmetic that was never done.
+ */
+private fun TodayFoodEntry.sourceServingText(locale: Locale): String? {
+    val quantity = sourceServingQuantity?.takeIf { it.isFinite() && it > 0.0 } ?: return null
+    val unit = sourceServingUnit?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return "${formatNumber(quantity, locale)} $unit"
+}
+
+@Composable
+private fun SourceFactLine(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
@@ -992,7 +1060,15 @@ private fun ReferencesCard(entry: TodayFoodEntry) {
             }
             .distinctBy { (_, host) -> host }
     }
-    if (references.isEmpty()) return
+    // A manual entry never had sources and should not be asked about them. Anything Nomi
+    // produced does get the section, even with nothing to list, because "no sources" is an
+    // answer the reader needs and an empty space is not.
+    val nomiProduced = entry.isEstimated || !entry.sourceName.isNullOrBlank()
+    if (references.isEmpty() && !nomiProduced) return
+    if (references.isEmpty()) {
+        NoReferencesCard(isEstimated = entry.isEstimated)
+        return
+    }
 
     var expanded by rememberSaveable(entry.id) { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
@@ -1067,6 +1143,60 @@ private fun ReferencesCard(entry: TodayFoodEntry) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Says outright that nothing was cited.
+ *
+ * An estimate with no References section reads as a section that failed to load; saying Nomi did
+ * not read a page is both true and the thing that tells you how much to trust the number.
+ */
+@Composable
+private fun NoReferencesCard(isEstimated: Boolean) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = nomiString("References"),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = nomiCardShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
+            elevation = nomiCardElevation(),
+            border = nomiCardBorder(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    Box(modifier = Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.Public,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Text(
+                    text = if (isEstimated) {
+                        nomiString("No sources. Nomi estimated this from your description.")
+                    } else {
+                        nomiString("No sources were recorded for this entry.")
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

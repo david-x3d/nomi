@@ -95,6 +95,9 @@ data class BackupNutritionSourceSnapshotV1(
     /** Added after the first backups shipped, so it stays optional when reading an older file. */
     val citedUrls: String? = null,
     val confidence: Double? = null,
+    val productName: String? = null,
+    val servingQuantity: Double? = null,
+    val servingUnit: String? = null,
     val retrievedAtEpochMillis: Long? = null,
     val verifiedAtEpochMillis: Long? = null,
 )
