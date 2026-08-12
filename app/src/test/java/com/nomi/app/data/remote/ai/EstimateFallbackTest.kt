@@ -94,14 +94,48 @@ class EstimateFallbackTest {
         assertThrows(AiValidationException::class.java) { runEstimatePipeline(preScaled) }
     }
 
-    private fun runEstimatePipeline(payload: String): FoodAnalysis {
+    /**
+     * The pages a refused research attempt had already opened are what the user watched appear
+     * as site icons while the meal was being looked up. Dropping them made the saved entry claim
+     * it had no sources at all, contradicting what the screen had just shown.
+     */
+    @Test
+    fun `an estimate keeps the pages the refused research had already opened`() {
+        val consulted = listOf(
+            "https://www.subway.com/en-us/menunutrition",
+            "https://fddb.info/db/de/lebensmittel/subway_chicken_teriyaki/index.html",
+        )
+
+        val item = runEstimatePipeline(estimatePayload, consulted).items.single()
+
+        assertEquals(consulted, item.supportingSourceUrls)
+        // Still not a cited result: no page published these numbers.
+        assertNull(item.sourceUrl)
+        assertNull(item.sourceDomain)
+        assertTrue(item.isEstimate)
+    }
+
+    @Test
+    fun `consulted pages are capped and de-duplicated before they reach validation`() {
+        val many = (1..9).map { "https://example$it.test/page" } + "https://example1.test/page"
+
+        val item = runEstimatePipeline(estimatePayload, many).items.single()
+
+        assertEquals(5, item.supportingSourceUrls.size)
+        assertEquals(item.supportingSourceUrls.distinct(), item.supportingSourceUrls)
+    }
+
+    private fun runEstimatePipeline(
+        payload: String,
+        consultedUrls: List<String> = emptyList(),
+    ): FoodAnalysis {
         val decoded: FoodAnalysis = json.decodeFromString(payload)
         val labeled = decoded.copy(
             items = decoded.items.map {
                 it.copy(
                     isEstimate = true,
                     sourceUrl = null,
-                    supportingSourceUrls = emptyList(),
+                    supportingSourceUrls = consultedUrls.distinct().take(5),
                     sourceDomain = null,
                 )
             },

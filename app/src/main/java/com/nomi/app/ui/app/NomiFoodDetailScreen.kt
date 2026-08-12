@@ -1103,10 +1103,15 @@ private fun ReferencesCard(entry: TodayFoodEntry) {
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
-                            text = if (references.size == 1) {
-                                nomiFormat("{0} source", references.size)
-                            } else {
-                                nomiFormat("{0} sources", references.size)
+                            // Without a primary source the values were not read off any of
+                            // these pages, they were only consulted on the way to an estimate.
+                            // Calling them sources would credit them with a number they never
+                            // published.
+                            text = when {
+                                entry.sourceUrl.isNullOrBlank() ->
+                                    nomiFormat("{0} pages checked", references.size)
+                                references.size == 1 -> nomiFormat("{0} source", references.size)
+                                else -> nomiFormat("{0} sources", references.size)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

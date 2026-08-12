@@ -321,6 +321,13 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         nl = "{0} bron", pt = "{0} fonte", sq = "{0} burim", sv = "{0} källa",
         tr = "{0} kaynak",
     ),
+    "{0} pages checked" to NomiTranslation(
+        de = "{0} Seiten geprüft", es = "{0} páginas consultadas",
+        fr = "{0} pages consultées", it = "{0} pagine consultate",
+        nl = "{0} pagina’s bekeken", pt = "{0} páginas consultadas",
+        sq = "{0} faqe të kontrolluara", sv = "{0} sidor kontrollerade",
+        tr = "{0} sayfa incelendi",
+    ),
     "{0} sources" to NomiTranslation(
         de = "{0} Quellen", es = "{0} fuentes", fr = "{0} sources", it = "{0} fonti",
         nl = "{0} bronnen", pt = "{0} fontes", sq = "{0} burime", sv = "{0} källor",

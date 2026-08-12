@@ -338,6 +338,17 @@ class AppViewModel(
     private var analysisRequestId = 0L
     private var loggingSaveInProgress = false
 
+    /**
+     * Pages the running research actually opened, as the provider reports them.
+     *
+     * These are what the spinner shows as site icons. They used to exist only for that
+     * animation and were dropped on save, so an entry the provider had clearly researched could
+     * still end up claiming it had no sources. Written from the provider's callback thread and
+     * read once the request it belongs to has won, hence volatile.
+     */
+    @Volatile
+    private var consultedResearchUrls: List<String> = emptyList()
+
     private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
     val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
     private var lastLoggingText = ""
@@ -854,6 +865,8 @@ class AppViewModel(
 
         analysisJob?.cancel()
         val requestId = ++analysisRequestId
+        // A new lookup must not inherit the pages the previous one opened.
+        consultedResearchUrls = emptyList()
         // Claim the input synchronously so repeated taps cannot launch duplicate provider calls.
         mutableLoggingState.value = FoodLoggingUiState.Processing(
             AiProcessingStage.UNDERSTANDING_MEAL,
@@ -928,7 +941,12 @@ class AppViewModel(
                         decision = NutritionRoute.Decision.DIRECT,
                         detail = "New food entry researched before preview",
                     )
-                    saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
+                    saveTextAnalysisAutomatically(
+                        analysis,
+                        current.mealCategory,
+                        text,
+                        consultedUrls = consultedResearchUrls,
+                    )
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
@@ -954,6 +972,7 @@ class AppViewModel(
         analysis: FoodAnalysis,
         category: MealCategory,
         originalText: String,
+        consultedUrls: List<String> = emptyList(),
     ) {
         if (loggingSaveInProgress) return
         loggingSaveInProgress = true
@@ -973,7 +992,7 @@ class AppViewModel(
                     val validated = ServingNutritionNormalizer.validateBeforeSave(visibleAnalysis)
                     val logs = validated.items.map { item ->
                         val foodId = if (grouped) null else cacheAnalyzedFood(item)
-                        item.toLog(category, "ai").copy(
+                        item.toLog(category, "ai", consultedUrls).copy(
                             foodId = foodId,
                             entryGroupId = revealGroupId,
                         )
@@ -1184,6 +1203,8 @@ class AppViewModel(
 
         analysisJob?.cancel()
         val requestId = ++analysisRequestId
+        // A new lookup must not inherit the pages the previous one opened.
+        consultedResearchUrls = emptyList()
         val place = review.place.trim().takeIf(String::isNotBlank)
         lastLoggingText = description
         mutableLoggingState.value = FoodLoggingUiState.Processing(
@@ -1386,7 +1407,8 @@ class AppViewModel(
                         is FoodLoggingUiState.Preview -> {
                             val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
                             val logs = validated.items.map { item ->
-                                item.toLog(current.mealCategory, "ai").copy(foodId = cacheAnalyzedFood(item))
+                                item.toLog(current.mealCategory, "ai", consultedResearchUrls)
+                                    .copy(foodId = cacheAnalyzedFood(item))
                             }
                             repository.addLogs(logs)
                         }
@@ -2407,6 +2429,9 @@ class AppViewModel(
     )
 
     private fun showResearchSources(sourceUrls: List<String>) {
+        // Kept whatever the stage is: the save needs the full list, while the spinner only wants
+        // it while it is on screen.
+        consultedResearchUrls = sourceUrls.distinct()
         val current = mutableLoggingState.value
         if (current !is FoodLoggingUiState.Processing ||
             current.stage != AiProcessingStage.FINDING_NUTRITION
@@ -2651,7 +2676,11 @@ class AppViewModel(
         revealText = revealText,
     )
 
-    private fun AnalyzedFoodItem.toLog(category: MealCategory, inputMethod: String): FoodLogEntity {
+    private fun AnalyzedFoodItem.toLog(
+        category: MealCategory,
+        inputMethod: String,
+        consultedUrls: List<String> = emptyList(),
+    ): FoodLogEntity {
         val now = System.currentTimeMillis()
         val enteredServingUnit = quantityResolution?.enteredUnit
             ?.takeIf { it.isSpoonLoggingUnit() || it.isHouseholdCountLoggingUnit() }
@@ -2680,8 +2709,12 @@ class AppViewModel(
                 displayName = sourceName,
                 url = sourceUrl,
                 // The primary source leads so the detail view can show it first without
-                // re-deriving which of the citations the numbers actually came from.
-                citedUrls = (listOfNotNull(sourceUrl) + supportingSourceUrls).toCitedUrlColumn(),
+                // re-deriving which of the citations the numbers actually came from. An estimate
+                // cites nothing, but the research still opened pages to reach it, and those are
+                // recorded instead of leaving the entry looking unresearched.
+                citedUrls = (listOfNotNull(sourceUrl) + supportingSourceUrls)
+                    .ifEmpty { consultedUrls }
+                    .toCitedUrlColumn(),
                 confidence = confidence,
                 productName = sourceProductName,
                 servingQuantity = sourceServingQuantity,

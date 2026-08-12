@@ -85,13 +85,21 @@ class OpenAiCompatibleProviders(
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
+        // The pages the search surfaced before the result was rejected. They did not supply the
+        // numbers the estimate ends up with, but they are what Nomi read, and throwing them away
+        // is what made a researched-then-estimated entry claim it had no sources at all.
+        val consulted = linkedSetOf<String>()
         return try {
-            researchNutritionFromSources(reconciledIntent, localeCountry)
+            researchNutritionFromSources(reconciledIntent, localeCountry, consulted::addAll)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (researchFailure: Throwable) {
             try {
-                estimateReconciledNutrition(reconciledIntent, localeCountry)
+                estimateReconciledNutrition(
+                    reconciledIntent,
+                    localeCountry,
+                    consultedUrls = consulted.toList(),
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (estimateFailure: Throwable) {
@@ -104,6 +112,7 @@ class OpenAiCompatibleProviders(
     private suspend fun researchNutritionFromSources(
         reconciledIntent: ParsedFoodIntent,
         localeCountry: String?,
+        onPagesConsulted: (List<String>) -> Unit = {},
     ): FoodAnalysis {
         suspend fun research(prompt: String): FoodAnalysis {
             val completion = client.completeWebSearchJson(
@@ -113,6 +122,9 @@ class OpenAiCompatibleProviders(
                     "source-serving nutrition as validated JSON only; Nomi performs serving arithmetic.",
                 userPrompt = prompt,
             )
+            // Reported before the answer is judged, so a rejected result still leaves a record
+            // of where the search had been.
+            onPagesConsulted((completion.evidenceUrls + completion.fetchedUrls).toList())
             throwIfResearchRefusal(client.json, completion.content)
             val analysis: FoodAnalysis = client.json.decodeFromString(completion.content)
             val groundedAnalysis = groundWithWebSearchEvidence(
@@ -173,6 +185,7 @@ class OpenAiCompatibleProviders(
     private suspend fun estimateReconciledNutrition(
         reconciledIntent: ParsedFoodIntent,
         localeCountry: String?,
+        consultedUrls: List<String> = emptyList(),
     ): FoodAnalysis {
         val raw = client.completeJson(
             config = nutritionConfig,
@@ -182,12 +195,16 @@ class OpenAiCompatibleProviders(
             userPrompt = AiPrompts.estimateNutrition(reconciledIntent, client.json, localeCountry),
         )
         val analysis: FoodAnalysis = client.json.decodeFromString(raw)
+        // sourceUrl stays null on purpose: no single page published these numbers, and filling
+        // it would let SourceIntegrityVerifier read the estimate as a cited result. The pages
+        // the search had already reached ride along as supporting citations, capped at the
+        // validator's limit, so the entry can say what it looked at without claiming a source.
         val labeled = analysis.copy(
             items = analysis.items.map { item ->
                 item.copy(
                     isEstimate = true,
                     sourceUrl = null,
-                    supportingSourceUrls = emptyList(),
+                    supportingSourceUrls = consultedUrls.distinct().take(MAX_CONSULTED_URLS),
                     sourceDomain = null,
                 )
             },
@@ -503,6 +520,9 @@ internal fun rejectPlaceholderNutrition(analysis: FoodAnalysis): FoodAnalysis {
     }
     return analysis
 }
+
+/** Matches AiResponseValidator's ceiling on supporting citations. */
+private const val MAX_CONSULTED_URLS = 5
 
 private val CALORIE_FREE_HINTS = listOf(
     "wasser", "water", "mineral", "sprudel", "kaffee", "coffee", "espresso", "tee", "tea",
