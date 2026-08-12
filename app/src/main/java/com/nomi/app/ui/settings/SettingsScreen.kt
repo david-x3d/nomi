@@ -54,7 +54,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -102,6 +101,7 @@ fun SettingsScreen(
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and History, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val pageContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -110,20 +110,16 @@ fun SettingsScreen(
             LargeFlexibleTopAppBar(
                 title = { Text(nomiString("Settings")) },
                 scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = pageContainerColor,
+                    scrolledContainerColor = pageContainerColor,
+                ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = pageContainerColor,
     ) { innerPadding ->
-        val backdrop = Brush.verticalGradient(
-            listOf(
-                MaterialTheme.colorScheme.surface,
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
-                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.07f),
-                MaterialTheme.colorScheme.surface,
-            ),
-        )
         LazyColumn(
-            modifier = Modifier.fillMaxSize().background(backdrop),
+            modifier = Modifier.fillMaxSize().background(pageContainerColor),
             contentPadding = innerPadding,
         ) {
             item { SectionTitle(nomiString("You")) }

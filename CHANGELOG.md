@@ -1,5 +1,11 @@
 # Changelog
 
+## Nomi 1.4.3 — 2026-08-12
+
+- The Settings header and content now share one consistent Material You background color.
+- Bar-style goal cards now use uniform opaque grey-white Nomi surfaces.
+- Removed the contrasting inner-panel effect from calorie, macro, and micronutrient goal cards.
+
 ## Nomi 1.4.2 — 2026-08-12
 
 - Meal and item detail cards now respect the micronutrient tracking preferences.

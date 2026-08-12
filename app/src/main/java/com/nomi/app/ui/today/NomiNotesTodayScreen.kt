@@ -154,6 +154,7 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.components.nomiCardTonalElevation
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
@@ -2089,8 +2090,8 @@ private fun CalorieGoalCard(state: TodayUiState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
         shadowElevation = 1.dp,
         border = BorderStroke(
             1.dp,
@@ -2136,8 +2137,8 @@ private fun MacroGoalCard(state: TodayUiState) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
         shadowElevation = 1.dp,
         border = BorderStroke(
             1.dp,
@@ -2177,8 +2178,8 @@ private fun MicronutrientGoalCard(progress: List<MicronutrientProgress>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
         shadowElevation = 1.dp,
         border = BorderStroke(
             1.dp,
