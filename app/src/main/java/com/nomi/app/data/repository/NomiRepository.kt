@@ -389,7 +389,7 @@ class NomiRepository(
         require(id > 0) { "Only a persisted food log can be deleted" }
         val source = logDao.log(id) ?: return@withTransaction emptyList()
         val snapshots = source.entryGroupId
-            ?.let(logDao::logsByEntryGroupId)
+            ?.let { entryGroupId -> logDao.logsByEntryGroupId(entryGroupId) }
             ?.ifEmpty { listOf(source) }
             ?: listOf(source)
         snapshots.forEach { snapshot ->
