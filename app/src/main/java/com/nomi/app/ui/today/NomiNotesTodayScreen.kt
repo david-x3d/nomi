@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -107,6 +108,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -211,6 +214,34 @@ fun NomiNotesTodayScreen(
     var composerOpen by rememberSaveable { mutableStateOf(false) }
     // Where the line was touched, so the caret opens in that word instead of at the end.
     var caretInEditedEntry by rememberSaveable { mutableStateOf(0) }
+    val listState = rememberLazyListState()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    // The composer is the last row on the page, so focusing it scrolls the day out of sight.
+    // Where the page was standing at that moment is kept here and put back on send, because
+    // sending a meal is the end of writing it, not a reason to be left at the bottom.
+    var positionBeforeComposing by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+
+    /** Ends writing: no caret, no keyboard, and the page back where the user left it. */
+    fun closeComposer() {
+        composerOpen = false
+        keyboard?.hide()
+        focusManager.clearFocus(force = true)
+    }
+
+    LaunchedEffect(composerOpen) {
+        if (composerOpen) {
+            if (positionBeforeComposing == null) {
+                positionBeforeComposing =
+                    listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+            }
+        } else {
+            positionBeforeComposing?.let { (index, offset) ->
+                positionBeforeComposing = null
+                runCatching { listState.scrollToItem(index, offset) }
+            }
+        }
+    }
     val loggingDescription = when (loggingState) {
         is FoodLoggingUiState.Input -> loggingState.text
         is FoodLoggingUiState.Processing -> loggingState.originalText
@@ -291,7 +322,7 @@ fun NomiNotesTodayScreen(
                     onDictationDone = { haptics.sent(); dictation.stop() },
                     onMore = { showQuickAdd = true },
                     onWrite = { composerOpen = true },
-                    onSend = { haptics.sent(); onAnalyze() },
+                    onSend = { haptics.sent(); closeComposer(); onAnalyze() },
                 )
             }
         },
@@ -314,6 +345,7 @@ fun NomiNotesTodayScreen(
             contentAlignment = Alignment.TopCenter,
         ) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .widthIn(max = 760.dp),
@@ -377,7 +409,7 @@ fun NomiNotesTodayScreen(
                                 fillsPage = false,
                                 initialCaret = caretInEditedEntry,
                                 onTextChanged = onTextChanged,
-                                onAnalyze = { haptics.sent(); onAnalyze() },
+                                onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
@@ -427,7 +459,7 @@ fun NomiNotesTodayScreen(
                             suppressComposer = editedEntryId != null,
                             composerFocused = composerOpen,
                             onTextChanged = onTextChanged,
-                            onAnalyze = { haptics.sent(); onAnalyze() },
+                            onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
                             onConfirm = { haptics.confirmed(); onConfirm() },
                             onRetry = onRetry,
                             onPhotoDescriptionChanged = onPhotoDescriptionChanged,
