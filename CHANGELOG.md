@@ -1,5 +1,11 @@
 # Changelog
 
+## Nomi 1.4.1 — 2026-08-12
+
+- Grouped meal items now expand directly inside the meal details page.
+- Each item shows its calories, portion, macros, and available micronutrients in a compact Nomi-style card.
+- Opening an item no longer navigates to a separate detail page.
+
 ## Nomi v1.4 — 2026-08-12
 
 - Multiple dictated foods are grouped into one meal with a combined calorie total.

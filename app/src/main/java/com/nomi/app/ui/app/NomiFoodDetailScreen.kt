@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -116,7 +115,6 @@ fun NomiFoodDetailScreen(
     onDuplicate: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onEditAmount: (TodayFoodEntry) -> Unit,
-    onOpenItem: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -174,7 +172,6 @@ fun NomiFoodDetailScreen(
                 entry = entry,
                 enabledMicronutrients = enabledMicronutrients,
                 onEditAmount = { onEditAmount(entry) },
-                onOpenItem = onOpenItem,
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
@@ -391,7 +388,6 @@ private fun NutritionContent(
     entry: TodayFoodEntry,
     enabledMicronutrients: List<Micronutrient>,
     onEditAmount: () -> Unit,
-    onOpenItem: (Long) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val backdrop = Brush.verticalGradient(
@@ -417,7 +413,10 @@ private fun NutritionContent(
             )
         }
         item(key = "items") {
-            ItemAndSourceCard(entry = entry, onOpenItem = onOpenItem)
+            ItemAndSourceCard(
+                entry = entry,
+                enabledMicronutrients = enabledMicronutrients,
+            )
         }
         item(key = "explanation") {
             EstimateExplanationCard(entry = entry, onEditAmount = onEditAmount)
@@ -481,42 +480,7 @@ private fun NutritionSummaryCard(
     entry: TodayFoodEntry,
     enabledMicronutrients: List<Micronutrient>,
 ) {
-    val metrics = buildList {
-        add(
-            NutritionMetric(
-                nomiString("Protein"),
-                entry.proteinGrams,
-                "g",
-                MaterialTheme.colorScheme.primary,
-            ),
-        )
-        add(
-            NutritionMetric(
-                nomiString("Carbs"),
-                entry.carbohydrateGrams,
-                "g",
-                MaterialTheme.colorScheme.secondary,
-            ),
-        )
-        add(
-            NutritionMetric(
-                nomiString("Fat"),
-                entry.fatGrams,
-                "g",
-                MaterialTheme.colorScheme.tertiary,
-            ),
-        )
-        (Micronutrient.entries + enabledMicronutrients).distinct().forEach { nutrient ->
-            add(
-                NutritionMetric(
-                    label = nutrient.localizedName(),
-                    amount = nutrient.amountIn(entry),
-                    unit = nutrient.storageUnit.suffix,
-                    color = nutrient.metricColor(),
-                ),
-            )
-        }
-    }
+    val metrics = nutritionMetrics(entry, enabledMicronutrients)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = nomiCardShape(),
@@ -557,6 +521,47 @@ private fun NutritionSummaryCard(
             }
             CenteredNutrientGrid(metrics)
         }
+    }
+}
+
+@Composable
+private fun nutritionMetrics(
+    entry: TodayFoodEntry,
+    enabledMicronutrients: List<Micronutrient>,
+): List<NutritionMetric> = buildList {
+    add(
+        NutritionMetric(
+            nomiString("Protein"),
+            entry.proteinGrams,
+            "g",
+            MaterialTheme.colorScheme.primary,
+        ),
+    )
+    add(
+        NutritionMetric(
+            nomiString("Carbs"),
+            entry.carbohydrateGrams,
+            "g",
+            MaterialTheme.colorScheme.secondary,
+        ),
+    )
+    add(
+        NutritionMetric(
+            nomiString("Fat"),
+            entry.fatGrams,
+            "g",
+            MaterialTheme.colorScheme.tertiary,
+        ),
+    )
+    (Micronutrient.entries + enabledMicronutrients).distinct().forEach { nutrient ->
+        add(
+            NutritionMetric(
+                label = nutrient.localizedName(),
+                amount = nutrient.amountIn(entry),
+                unit = nutrient.storageUnit.suffix,
+                color = nutrient.metricColor(),
+            ),
+        )
     }
 }
 
@@ -647,67 +652,92 @@ private fun Micronutrient.metricColor(): Color = when (this) {
 @Composable
 private fun GroupedItemsCard(
     entry: TodayFoodEntry,
-    onOpenItem: (Long) -> Unit,
+    enabledMicronutrients: List<Micronutrient>,
 ) {
     val locale = nomiLocale()
-    Card(
+    val contentSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
+    val contentEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = nomiCardShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-        elevation = nomiCardElevation(),
-        border = nomiCardBorder(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 17.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(
-                text = nomiString("Items"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = nomiFormat("{0} items", entry.groupItems.size),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            entry.groupItems.forEach { item ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable { onOpenItem(item.id) }
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
+        Text(
+            text = nomiString("Items"),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = nomiFormat("{0} items", entry.groupItems.size),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        entry.groupItems.forEach { item ->
+            var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = nomiCardShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
+                elevation = nomiCardElevation(),
+                border = nomiCardBorder(),
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = !expanded }
+                            .padding(horizontal = 18.dp, vertical = 17.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                text = item.name,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = item.quantityDisplay(locale).withContext,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         Text(
-                            text = item.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                            text = "${item.calories.roundToInt()} kcal",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
                         )
-                        Text(
-                            text = item.quantityDisplay(locale).withContext,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Icon(
+                            imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (expanded) {
+                                nomiString("Collapse item details")
+                            } else {
+                                nomiString("Expand item details")
+                            },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(
-                        text = "${item.calories.roundToInt()} kcal",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Icon(
-                        imageVector = Icons.Default.ChevronRight,
-                        contentDescription = nomiFormat("Nutrition for {0}", item.name),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AnimatedVisibility(
+                        visible = expanded,
+                        enter = fadeIn(animationSpec = contentEffectsSpec) +
+                            expandVertically(animationSpec = contentSpatialSpec),
+                        exit = fadeOut(animationSpec = contentEffectsSpec) +
+                            shrinkVertically(animationSpec = contentSpatialSpec),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 20.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp),
+                        ) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            CenteredNutrientGrid(
+                                nutritionMetrics(item, enabledMicronutrients),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -718,10 +748,13 @@ private fun GroupedItemsCard(
 @Composable
 private fun ItemAndSourceCard(
     entry: TodayFoodEntry,
-    onOpenItem: (Long) -> Unit,
+    enabledMicronutrients: List<Micronutrient>,
 ) {
     if (entry.groupItems.size > 1) {
-        GroupedItemsCard(entry = entry, onOpenItem = onOpenItem)
+        GroupedItemsCard(
+            entry = entry,
+            enabledMicronutrients = enabledMicronutrients,
+        )
         return
     }
     var expanded by rememberSaveable(entry.id) { mutableStateOf(true) }

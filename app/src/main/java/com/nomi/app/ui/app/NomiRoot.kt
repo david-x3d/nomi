@@ -486,7 +486,6 @@ private fun NomiMain(
                     onFavorite = viewModel::favoriteFoodLog,
                     onDelete = viewModel::deleteFoodLog,
                     onEditAmount = viewModel::startLoggedAmountEdit,
-                    onOpenItem = { itemId -> navController.navigate(Routes.food(itemId)) },
                 )
             }
 
