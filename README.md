@@ -20,14 +20,29 @@
 
 ## 📸 Screenshots
 
-<div align="center">
-
-| Today | Nutrition details | Settings |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/today.png" alt="The Today page listing logged foods with their calories, and the calorie budget left for the day" height="520" /> | <img src="docs/screenshots/nutrition-details.jpg" alt="An entry's nutrition details showing macros, the nutrition source with the site Nomi mainly checked, a confidence ring, and the References section" height="520" /> | <img src="docs/screenshots/settings.png" alt="Settings showing profile, nutrition plan, micronutrients, theme, dynamic colors, and the language picker" height="520" /> |
-| Write a meal in plain language; every food lands as its own row. | Every number says where it came from and how sure Nomi is. | Ten languages, custom targets, and your own AI providers. |
-
-</div>
+<!--
+  Written as an explicit table with equal-width cells rather than a Markdown one. A Markdown
+  table sizes its columns from the text in them, and GitHub's mobile app then scales each image
+  to its own column, so the longer caption under one phone made the phone beside it render
+  smaller. Fixed cell widths keep all three at the same scale.
+-->
+<table width="100%">
+<tr align="center">
+<td width="33%"><b>Today</b></td>
+<td width="33%"><b>Nutrition details</b></td>
+<td width="33%"><b>Settings</b></td>
+</tr>
+<tr align="center" valign="bottom">
+<td width="33%"><img src="docs/screenshots/today.png" width="230" alt="The Today page listing logged foods with their calories, and the calorie budget left for the day" /></td>
+<td width="33%"><img src="docs/screenshots/nutrition-details.jpg" width="230" alt="An entry's nutrition details showing macros, the nutrition source with the site Nomi mainly checked, a confidence ring, and the References section" /></td>
+<td width="33%"><img src="docs/screenshots/settings.png" width="230" alt="Settings showing profile, nutrition plan, micronutrients, theme, dynamic colors, and the language picker" /></td>
+</tr>
+<tr align="center" valign="top">
+<td width="33%">Write a meal in plain language; every food lands as its own row.</td>
+<td width="33%">Every number says where it came from and how sure Nomi is.</td>
+<td width="33%">Ten languages, custom targets, and your own AI providers.</td>
+</tr>
+</table>
 
 ## ✨ Features
 
