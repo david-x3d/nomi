@@ -232,6 +232,17 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Niedrig", es = "Bajo", fr = "Faible", it = "Bassa", nl = "Laag",
         pt = "Baixo", sq = "I ulët", sv = "Låg", tr = "Düşük",
     ),
+    "Something off? Tap to edit" to NomiTranslation(
+        de = "Stimmt etwas nicht? Zum Bearbeiten tippen",
+        es = "¿Algo no cuadra? Toca para editarlo",
+        fr = "Quelque chose cloche ? Touche pour modifier",
+        it = "Qualcosa non torna? Tocca per modificare",
+        nl = "Klopt er iets niet? Tik om te bewerken",
+        pt = "Algo não bate certo? Toca para editar",
+        sq = "Diçka nuk përputhet? Prek për ta ndryshuar",
+        sv = "Stämmer något inte? Tryck för att ändra",
+        tr = "Bir şey mi yanlış? Düzenlemek için dokun",
+    ),
     "Confidence {0} out of 100" to NomiTranslation(
         de = "Konfidenz {0} von 100", es = "Confianza {0} sobre 100",
         fr = "Confiance {0} sur 100", it = "Affidabilità {0} su 100",

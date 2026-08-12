@@ -22,7 +22,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -167,6 +170,7 @@ fun NomiFoodDetailScreen(
             NutritionContent(
                 entry = entry,
                 enabledMicronutrients = enabledMicronutrients,
+                onEditAmount = { onEditAmount(entry) },
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
@@ -372,6 +376,7 @@ private fun LoadingNutrition(modifier: Modifier = Modifier) {
 private fun NutritionContent(
     entry: TodayFoodEntry,
     enabledMicronutrients: List<Micronutrient>,
+    onEditAmount: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     val backdrop = Brush.verticalGradient(
@@ -400,7 +405,7 @@ private fun NutritionContent(
             ItemAndSourceCard(entry = entry)
         }
         item(key = "explanation") {
-            EstimateExplanationCard(entry = entry)
+            EstimateExplanationCard(entry = entry, onEditAmount = onEditAmount)
         }
         item(key = "references") {
             ReferencesCard(entry = entry)
@@ -766,7 +771,7 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
 }
 
 @Composable
-private fun EstimateExplanationCard(entry: TodayFoodEntry) {
+private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> Unit) {
     val locale = nomiLocale()
     val amountDetail = entry.quantityDisplay(locale).withContext
     val sourceDetail = entry.sourceName?.takeIf { it.isNotBlank() }
@@ -791,28 +796,66 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = nomiCardShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = nomiCardContainerColor(),
-        ),
-        elevation = nomiCardElevation(),
-        border = nomiCardBorder(),
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+    // The section name sits above the card the way "References" does, so the card itself opens
+    // on the confidence ring instead of repeating its own title.
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = nomiString("Nomi’s thought process"),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .semantics { heading() },
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = nomiCardShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = nomiCardContainerColor(),
+            ),
+            elevation = nomiCardElevation(),
+            border = nomiCardBorder(),
         ) {
-            // The confidence ring replaces the old icon-and-subtitle header: how sure Nomi is
-            // says more about whether to trust the number than a restatement of the section name.
-            ConfidenceHeader(confidence = entry.confidence, isEstimated = entry.isEstimated)
-            Text(
-                text = explanation,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                ConfidenceHeader(confidence = entry.confidence, isEstimated = entry.isEstimated)
+                Text(
+                    text = explanation,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                CorrectionPrompt(onClick = onEditAmount)
+            }
         }
+    }
+}
+
+/** The way out of a wrong estimate: the amount editor, one tap from the reasoning that produced it. */
+@Composable
+private fun CorrectionPrompt(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.Edit,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = nomiString("Something off? Tap to edit"),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -864,15 +907,15 @@ private fun ConfidenceHeader(confidence: Double?, isEstimated: Boolean) {
             ConfidenceRing(percent = percent, color = confidenceBandFor(percent).color())
         }
         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text(
-                text = if (percent == null) {
-                    nomiString("Nomi’s thought process")
-                } else {
-                    nomiString("Confidence level")
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            // Without a score there is no level to label, and the section title above already
+            // names the card, so the entry-kind line stands on its own.
+            if (percent != null) {
+                Text(
+                    text = nomiString("Confidence level"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Text(
                 text = when {
                     percent != null -> when (confidenceBandFor(percent)) {
@@ -1008,12 +1051,15 @@ private fun ReferencesCard(entry: TodayFoodEntry) {
                     }
                 }
                 AnimatedVisibility(visible = expanded) {
-                    Column(
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    // A carousel rather than a stacked list: seven sources are a strip to skim
+                    // sideways, not seven rows pushing the rest of the page off screen.
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        references.forEach { (url, host) ->
-                            ReferenceRow(
+                        items(references, key = { (_, host) -> host }) { (url, host) ->
+                            SourceChip(
                                 host = host,
                                 url = url,
                                 onOpen = { runCatching { uriHandler.openUri(url) } },
@@ -1048,33 +1094,36 @@ private fun FaviconRow(hostUrls: List<String>, maxIcons: Int = 5) {
     }
 }
 
+/** One site in the carousel: its icon, its domain, and a tap that opens the page. */
 @Composable
-private fun ReferenceRow(host: String, url: String, onOpen: () -> Unit) {
+private fun SourceChip(host: String, url: String, onOpen: () -> Unit) {
+    val openDescription = nomiFormat("Open {0}", host)
     Surface(
         onClick = onOpen,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(100.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .widthIn(max = 220.dp)
+            .semantics { contentDescription = openDescription },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            WebsiteFavicon(sourceUrl = url, size = 26.dp)
+            WebsiteFavicon(sourceUrl = url, size = 24.dp)
             Text(
                 text = host,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
             )
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                contentDescription = nomiFormat("Open {0}", host),
+                contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(15.dp),
             )
         }
     }
