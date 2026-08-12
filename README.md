@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v1.3.1](https://img.shields.io/badge/release-v1.3.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.3.1)
+[![Release v1.3.5](https://img.shields.io/badge/release-v1.3.5-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.3.5)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
 [![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
@@ -17,6 +17,17 @@
 
 > [!IMPORTANT]
 > **Bring your own API key.** Nomi does not include hosted AI credits or a shared cloud account. AI-powered food research, interpretation, and image analysis require keys for the providers you choose in **Settings → AI providers**. Provider usage may incur charges on your own account.
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Today | Nutrition details | Settings |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/today.png" alt="The Today page listing logged foods with their calories, and the calorie budget left for the day" width="260" /> | <img src="docs/screenshots/nutrition-details.jpg" alt="An entry's nutrition details showing macros, the nutrition source with the site Nomi mainly checked, a confidence ring, and the References section" width="260" /> | <img src="docs/screenshots/settings.jpg" alt="Settings showing profile, nutrition plan, micronutrients, theme, dynamic colors, and the language picker" width="260" /> |
+| Write a meal in plain language; every food lands as its own row. | Every number says where it came from and how sure Nomi is. | Ten languages, custom targets, and your own AI providers. |
+
+</div>
 
 ## ✨ Features
 
