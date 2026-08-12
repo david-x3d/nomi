@@ -4,8 +4,9 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v1.2.1](https://img.shields.io/badge/release-v1.2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.2.1)
+[![Release v1.3.1](https://img.shields.io/badge/release-v1.3.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.3.1)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
+[![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
 [![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
 [![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#design)
 [![License](https://img.shields.io/badge/license-proprietary-263238?style=for-the-badge)](LICENSE)
@@ -27,8 +28,22 @@
 - ✏️ Correct a logged amount with phrases such as “I ate 60 g less” without repeating online research.
 - ⭐ Reuse recent foods, favorites, and saved meals.
 - 📊 Track calories, macros, micronutrients, weight, goals, and progress.
-- 🇩🇪 Use the app in German or English with metric and US customary quantities.
+- 🌍 Use the app in ten languages with metric and US customary quantities.
 - 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
+
+## 🌍 Languages
+
+Nomi's interface is fully translated into ten languages. On first launch it follows your system language and falls back to English; you can switch at any time in **Settings → Language**, where each language is listed under its own name.
+
+| Language | Code | Language | Code |
+|---|---|---|---|
+| English | `en` | Nederlands | `nl` |
+| Deutsch | `de` | Português | `pt` |
+| Español | `es` | Shqip | `sq` |
+| Français | `fr` | Svenska | `sv` |
+| Italiano | `it` | Türkçe | `tr` |
+
+Food logging speaks the same languages: you can write or dictate a meal in any of them, and the AI keeps the food's own language in the logged name — “Rührei mit Speck”, “Pollo alla cacciatora”, “Beurre” — instead of translating it into English. Numbers, times, and dates are formatted for the selected language, and an amount typed with a comma (`1,5`) is understood everywhere.
 
 ## 🔑 AI setup
 
