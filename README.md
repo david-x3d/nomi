@@ -1,13 +1,14 @@
 <div align="center">
 
-# 🦊 Nomi
+<img src="app/src/main/res/drawable-nodpi/nomi_logo.png" alt="Nomi — fox logo" width="220" />
 
 ### A fast, local-first nutrition journal for Android
 
-[![Latest release](https://img.shields.io/github/v/release/david-x3d/nomi?display_name=tag&style=for-the-badge)](https://github.com/david-x3d/nomi/releases/latest)
+[![Release v1.2.1](https://img.shields.io/badge/release-v1.2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.2.1)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
 [![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#design)
+[![License](https://img.shields.io/badge/license-proprietary-263238?style=for-the-badge)](LICENSE)
 
 [Download the latest APK](https://github.com/david-x3d/nomi/releases/latest) · [Report a bug](https://github.com/david-x3d/nomi/issues)
 
@@ -31,9 +32,12 @@
 
 ## 🔑 AI setup
 
+> [!TIP]
+> **Recommended: Exa + Gemini.** Exa retrieves focused web evidence and Gemini turns those sources into structured nutrition data. A Gemini Flash Lite model is the recommended cost-conscious choice when it is available for your Google API project.
+
 1. Install Nomi and open **Settings → AI providers**.
-2. Select a provider and model for each pipeline.
-3. Enter your own API key or keys.
+2. Select **Exa + Gemini** for food research, or choose another supported provider.
+3. Enter your own Gemini and Exa API keys.
 4. Tap **Test connection** before logging food.
 
 Supported configurations include Sonar, Exa + Gemini, Perplexity, OpenRouter, OpenAI, and compatible custom endpoints. Exa + Gemini requires both a Google Gemini API key and an Exa API key. Only the text or image needed for the selected action is sent to the configured provider.
@@ -105,4 +109,4 @@ Published historical tags are immutable so existing APK links and update paths r
 
 ## 📄 License
 
-No license has been granted. All rights reserved.
+Copyright © 2026 Nomi. All rights reserved. This is source-available proprietary software; no permission to copy, modify, redistribute, sublicense, or sell the software is granted. See [LICENSE](LICENSE) for the full notice.
