@@ -1,5 +1,12 @@
 # Changelog
 
+## Nomi 1.4.5 — 2026-08-12
+
+- The goals sheet header and content now use one continuous Material You background color.
+- Removed the remaining grey outlines and elevation frames from goal and Settings cards.
+- Completed localization of onboarding, plan results, provider credentials, backups, and app messages in all ten supported languages.
+- Added UTF-8 safeguards so umlauts and accented language names render correctly without mojibake.
+
 ## Nomi 1.4.4 — 2026-08-12
 
 - Removed the grey outlines and shadows around bar-style goal cards.

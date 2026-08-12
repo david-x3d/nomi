@@ -390,7 +390,7 @@ class AppViewModel(
             }.onSuccess {
                 mutableEvents.emit(AppEvent.OnboardingSaved)
             }.onFailure {
-                mutableEvents.emit(AppEvent.Message("Nomi couldn't save your plan. Please try again."))
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save your plan. Please try again.")))
             }
             mutableOnboardingSaving.value = false
         }
@@ -1359,7 +1359,9 @@ class AppViewModel(
     fun confirmBarcodeAmount() {
         val current = mutableBarcodeAmountState.value ?: return
         val quantity = current.parsedAmount ?: run {
-            mutableBarcodeAmountState.value = current.copy(errorMessage = "Enter an amount greater than zero")
+            mutableBarcodeAmountState.value = current.copy(
+                errorMessage = inUserLanguage("Enter an amount greater than zero"),
+            )
             return
         }
         runCatching {
@@ -1454,7 +1456,7 @@ class AppViewModel(
                     ),
                 )
             }.onFailure {
-                mutableEvents.emit(AppEvent.Message("Save this food again before favoriting it"))
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Save this food again before favoriting it")))
             }
         }
     }
@@ -1462,7 +1464,9 @@ class AppViewModel(
     fun deleteFoodLog(id: Long) {
         viewModelScope.launch {
             runCatching { repository.deleteLog(id) }
-                .onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't delete that food.")) }
+                .onFailure {
+                    mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't delete that food.")))
+                }
         }
     }
 
@@ -1610,7 +1614,9 @@ class AppViewModel(
             }.onFailure { error ->
                 earlyUndoDeleteRequests.remove(id)
                 earlyDiscardDeleteRequests.remove(id)
-                mutableEvents.emit(AppEvent.Message(error.message ?: "Nomi couldn't delete that food."))
+                mutableEvents.emit(
+                    AppEvent.Message(error.message ?: inUserLanguage("Nomi couldn't delete that food.")),
+                )
             }
         }
     }
@@ -1640,7 +1646,9 @@ class AppViewModel(
                 }
             }.onFailure { error ->
                 pendingDeletedLogs.remember(snapshots)
-                mutableEvents.emit(AppEvent.Message(error.message ?: "Nomi couldn't restore that food."))
+                mutableEvents.emit(
+                    AppEvent.Message(error.message ?: inUserLanguage("Nomi couldn't restore that food.")),
+                )
             }
         }
     }
@@ -1658,7 +1666,7 @@ class AppViewModel(
                     ),
                 )
             }.onFailure {
-                mutableEvents.emit(AppEvent.Message("Nomi couldn't save that meal"))
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save that meal")))
             }
         }
     }
@@ -1670,7 +1678,9 @@ class AppViewModel(
                 val source = requireNotNull(repository.foodLog(id))
                 val now = System.currentTimeMillis()
                 repository.addLog(source.copy(id = 0, loggedAtEpochMillis = now, createdAtEpochMillis = now, updatedAtEpochMillis = now))
-            }.onFailure { mutableEvents.emit(AppEvent.Message("That food is no longer available")) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("That food is no longer available")))
+            }
         }
     }
 
@@ -1678,7 +1688,9 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching {
                 repository.copyDay(source.toString(), today.toString(), System.currentTimeMillis(), zoneId.id)
-            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't copy that day.")) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't copy that day.")))
+            }
         }
     }
 
@@ -1698,7 +1710,7 @@ class AppViewModel(
                     ),
                 )
             }.getOrElse {
-                mutableEvents.emit(AppEvent.Message("Enter a valid weight."))
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Enter a valid weight.")))
                 return@launch
             }
 
@@ -1754,14 +1766,16 @@ class AppViewModel(
                 }
             }.onSuccess {
                 mutableEvents.emit(AppEvent.FoodSaved)
-            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't add that item.")) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't add that item.")))
+            }
         }
     }
 
     fun saveNutritionTargets(calories: Int, protein: Int, carbs: Int, fat: Int) {
         val plan = currentPlan.value ?: return
         if (calories !in 800..10_000 || protein !in 0..600 || carbs !in 0..900 || fat !in 0..300) {
-            mutableEvents.tryEmit(AppEvent.Message("Check the nutrition target values."))
+            mutableEvents.tryEmit(AppEvent.Message(inUserLanguage("Check the nutrition target values.")))
             return
         }
         viewModelScope.launch {
@@ -1783,7 +1797,9 @@ class AppViewModel(
                         createdAtEpochMillis = System.currentTimeMillis(),
                     ),
                 )
-            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't save those targets.")) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save those targets.")))
+            }
         }
     }
 
@@ -1841,7 +1857,9 @@ class AppViewModel(
                 }
                 check(repository.updateProfile(updatedProfile)) { "Profile update failed" }
                 repository.saveNewPlan(nextPlan)
-            }.onFailure { mutableEvents.emit(AppEvent.Message("Nomi couldn't recalculate that profile.")) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't recalculate that profile.")))
+            }
         }
     }
     fun setTheme(mode: ThemeMode) {
@@ -2993,7 +3011,7 @@ class AppViewModel(
             "support Gemini",
             "not compatible",
         ).any { marker -> error.message?.contains(marker, ignoreCase = true) == true }
-        if (!technicalEvidenceFailure) return error.safeAiMessage()
+        if (!technicalEvidenceFailure) return inUserLanguage(error.safeAiMessage())
         return inUserLanguage(
             "Nomi couldn't verify nutrition for every product. Try again or edit the entry.",
         )

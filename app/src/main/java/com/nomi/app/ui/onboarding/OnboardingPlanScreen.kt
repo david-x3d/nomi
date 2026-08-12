@@ -70,6 +70,9 @@ import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.localization.nomiString
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -86,7 +89,8 @@ internal fun PlanRevealScreen(
     if (plan == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                text = state.validationMessage ?: "Complete the previous steps to calculate your plan.",
+                text = state.validationMessage?.let { nomiString(it) }
+                    ?: nomiString("Complete the previous steps to calculate your plan."),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(24.dp),
@@ -116,20 +120,20 @@ internal fun PlanRevealScreen(
         item {
             Column {
                 Text(
-                    text = "YOUR STARTING PLAN",
+                    text = nomiString("YOUR STARTING PLAN"),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "A target built around you",
+                    text = nomiString("A target built around you"),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Start here, watch your real trend, and adjust when your body gives you better information.",
+                    text = nomiString("Start here, watch your real trend, and adjust when your body gives you better information."),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -166,13 +170,13 @@ internal fun PlanRevealScreen(
                         }
                     }
                     Spacer(Modifier.height(14.dp))
-                    Text("Daily energy target", style = MaterialTheme.typography.titleMedium)
+                    Text(nomiString("Daily energy target"), style = MaterialTheme.typography.titleMedium)
                     Text(
                         text = animatedCalories.value.roundToInt().toString(),
                         style = MaterialTheme.typography.displayLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                    Text("kcal / day", style = MaterialTheme.typography.titleMedium)
+                    Text(nomiString("kcal / day"), style = MaterialTheme.typography.titleMedium)
                     if (plan.isCalorieCustomized || plan.areMacrosCustomized) {
                         Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -182,7 +186,7 @@ internal fun PlanRevealScreen(
                                 modifier = Modifier.size(18.dp),
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text("Adjusted by you", style = MaterialTheme.typography.labelLarge)
+                            Text(nomiString("Adjusted by you"), style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
@@ -195,19 +199,19 @@ internal fun PlanRevealScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 MacroCard(
-                    label = "Protein",
+                    label = nomiString("Protein"),
                     grams = plan.proteinGrams,
                     modifier = Modifier.weight(1f),
                     testTag = "plan_protein",
                 )
                 MacroCard(
-                    label = "Carbs",
+                    label = nomiString("Carbs"),
                     grams = plan.carbohydrateGrams,
                     modifier = Modifier.weight(1f),
                     testTag = "plan_carbs",
                 )
                 MacroCard(
-                    label = "Fat",
+                    label = nomiString("Fat"),
                     grams = plan.fatGrams,
                     modifier = Modifier.weight(1f),
                     testTag = "plan_fat",
@@ -229,9 +233,9 @@ internal fun PlanRevealScreen(
                         Icon(Icons.Outlined.Info, contentDescription = null)
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("A safer starting point", style = MaterialTheme.typography.titleSmall)
+                            Text(nomiString("A safer starting point"), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "The requested rate would push calories beyond the calculator's safety boundary, so Nomi used a gentler target.",
+                                nomiString("The requested rate would push calories beyond the calculator's safety boundary, so Nomi used a gentler target."),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
@@ -240,25 +244,25 @@ internal fun PlanRevealScreen(
             }
         }
 
-        item { SectionLabel("USER INPUT") }
+        item { SectionLabel(nomiString("USER INPUT")) }
         item {
             DetailCard {
                 InputRows(state = state)
             }
         }
 
-        item { SectionLabel("CALCULATED RESULTS") }
+        item { SectionLabel(nomiString("CALCULATED RESULTS")) }
         item {
             DetailCard {
-                ResultRow("Age today", "${plan.ageYears} years")
-                plan.bmrKcal?.let { ResultRow("Resting energy", "${it.roundToInt()} kcal") }
-                plan.activityMultiplier?.let { ResultRow("Activity multiplier", "× ${it.oneOrTwoDecimals()}") }
-                plan.maintenanceKcal?.let { ResultRow("Estimated maintenance", "${it.roundToInt()} kcal") }
+                ResultRow(nomiString("Age today"), nomiFormat("{0} years", plan.ageYears))
+                plan.bmrKcal?.let { ResultRow(nomiString("Resting energy"), "${it.roundToInt()} kcal") }
+                plan.activityMultiplier?.let { ResultRow(nomiString("Activity multiplier"), "× ${it.oneOrTwoDecimals(nomiLocale())}") }
+                plan.maintenanceKcal?.let { ResultRow(nomiString("Estimated maintenance"), "${it.roundToInt()} kcal") }
                 ResultRow(
-                    label = "Goal adjustment",
+                    label = nomiString("Goal adjustment"),
                     value = signedCalories(plan.goalAdjustmentKcal),
                 )
-                ResultRow("Rounded target", "${plan.caloriesKcal} kcal/day", emphasized = true)
+                ResultRow(nomiString("Rounded target"), "${plan.caloriesKcal} kcal/day", emphasized = true)
             }
         }
 
@@ -271,7 +275,7 @@ internal fun PlanRevealScreen(
             ) {
                 Icon(Icons.Outlined.Calculate, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("How was this calculated?")
+                Text(nomiString("How was this calculated?"))
                 Spacer(Modifier.weight(1f))
                 Icon(
                     imageVector = if (state.isCalculationExpanded) {
@@ -279,7 +283,7 @@ internal fun PlanRevealScreen(
                     } else {
                         Icons.Outlined.ExpandMore
                     },
-                    contentDescription = if (state.isCalculationExpanded) "Collapse" else "Expand",
+                    contentDescription = nomiString(if (state.isCalculationExpanded) "Collapse" else "Expand"),
                 )
             }
         }
@@ -303,7 +307,7 @@ internal fun PlanRevealScreen(
             ) {
                 Icon(Icons.Outlined.Tune, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (state.isPlanEditorExpanded) "Close adjustments" else "Adjust plan")
+                Text(nomiString(if (state.isPlanEditorExpanded) "Close adjustments" else "Adjust plan"))
             }
         }
         item {
@@ -331,12 +335,12 @@ internal fun PlanRevealScreen(
                     .height(58.dp)
                     .testTag("start_tracking"),
             ) {
-                Text("Start tracking")
+                Text(nomiString("Start tracking"))
             }
         }
         item {
             Text(
-                text = "This estimate is for planning, not medical advice. Adjust based on your logged trend and professional guidance.",
+                text = nomiString("This estimate is for planning, not medical advice. Adjust based on your logged trend and professional guidance."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -376,15 +380,20 @@ private fun MacroCard(
 
 @Composable
 private fun TrajectoryCard(plan: NutritionPlan) {
+    val locale = nomiLocale()
     val magnitude = abs(plan.expectedWeeklyWeightChangeKg)
     val title = when (plan.goalType) {
-        GoalType.LOSE -> "About ${magnitude.oneOrTwoDecimals()} kg down per week"
-        GoalType.GAIN -> "About ${magnitude.oneOrTwoDecimals()} kg up per week"
-        GoalType.MAINTAIN -> "A steady-weight starting point"
+        GoalType.LOSE -> nomiFormat("About {0} kg down per week", magnitude.oneOrTwoDecimals(locale))
+        GoalType.GAIN -> nomiFormat("About {0} kg up per week", magnitude.oneOrTwoDecimals(locale))
+        GoalType.MAINTAIN -> nomiString("A steady-weight starting point")
     }
     val detail = plan.estimatedWeeksToGoal?.let { weeks ->
-        "Roughly ${weeks.roundToInt().coerceAtLeast(1)} weeks to ${plan.targetWeightKg?.oneDecimal()} kg if the trend holds."
-    } ?: "Use your multi-week weight trend to decide whether this target needs a small adjustment."
+        nomiFormat(
+            "Roughly {0} weeks to {1} kg if the trend holds.",
+            weeks.roundToInt().coerceAtLeast(1),
+            plan.targetWeightKg?.oneDecimal(locale),
+        )
+    } ?: nomiString("Use your multi-week weight trend to decide whether this target needs a small adjustment.")
 
     Card(
         shape = nomiCardShape(),
@@ -411,18 +420,19 @@ private fun TrajectoryCard(plan: NutritionPlan) {
 @Composable
 private fun InputRows(state: OnboardingUiState) {
     val draft = state.draft
-    val dateFormatter = remember {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+    val locale = nomiLocale()
+    val dateFormatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
     }
-    ResultRow("Date of birth", draft.dateOfBirth?.format(dateFormatter).orEmpty())
-    ResultRow("Energy setup", draft.energySex.energyLabel(draft.customCalorieTarget))
-    ResultRow("Height", "${draft.heightCm?.oneDecimal()} cm")
-    ResultRow("Starting weight", "${draft.currentWeightKg?.oneDecimal()} kg")
-    ResultRow("Goal", draft.goalType.goalLabel())
-    draft.targetWeightKg?.let { ResultRow("Target weight", "${it.oneDecimal()} kg") }
-    ResultRow("Activity", draft.activityLevel.activityLabel())
+    ResultRow(nomiString("Date of birth"), draft.dateOfBirth?.format(dateFormatter).orEmpty())
+    ResultRow(nomiString("Energy setup"), draft.energySex.energyLabel(draft.customCalorieTarget))
+    ResultRow(nomiString("Height"), "${draft.heightCm?.oneDecimal(locale)} cm")
+    ResultRow(nomiString("Starting weight"), "${draft.currentWeightKg?.oneDecimal(locale)} kg")
+    ResultRow(nomiString("Goal"), draft.goalType.goalLabel())
+    draft.targetWeightKg?.let { ResultRow(nomiString("Target weight"), "${it.oneDecimal(locale)} kg") }
+    ResultRow(nomiString("Activity"), draft.activityLevel.activityLabel())
     if (draft.goalType != GoalType.MAINTAIN) {
-        ResultRow("Chosen pace", draft.progressRate.rateLabel(draft.customWeeklyChangeKg, draft.goalType))
+        ResultRow(nomiString("Chosen pace"), draft.progressRate.rateLabel(draft.customWeeklyChangeKg, draft.goalType))
     }
 }
 
@@ -431,42 +441,46 @@ private fun CalculationBreakdown(plan: NutritionPlan) {
     DetailCard {
         if (plan.isManualTarget) {
             Text(
-                text = "You chose a manual calorie target, so the resting-energy and activity equations were skipped.",
+                text = nomiString("You chose a manual calorie target, so the resting-energy and activity equations were skipped."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(12.dp))
-            ResultRow("Manual energy target", "${plan.caloriesKcal} kcal/day", emphasized = true)
+            ResultRow(nomiString("Manual energy target"), "${plan.caloriesKcal} kcal/day", emphasized = true)
         } else {
             BreakdownStep(
                 icon = Icons.Outlined.Calculate,
-                title = "1 · Resting energy",
-                detail = "Age, sex equation, height, and weight",
+                title = nomiString("1 · Resting energy"),
+                detail = nomiString("Age, sex equation, height, and weight"),
                 value = "${plan.bmrKcal?.roundToInt()} kcal",
             )
             BreakdownStep(
                 icon = Icons.Outlined.Scale,
-                title = "2 · Activity",
-                detail = "Resting energy × ${plan.activityMultiplier?.oneOrTwoDecimals()}",
+                title = nomiString("2 · Activity"),
+                detail = nomiFormat("Resting energy × {0}", plan.activityMultiplier?.oneOrTwoDecimals(nomiLocale())),
                 value = "${plan.maintenanceKcal?.roundToInt()} kcal",
             )
             BreakdownStep(
                 icon = Icons.Outlined.AutoGraph,
-                title = "3 · Goal direction",
-                detail = "Requested ${signedCalories(plan.requestedGoalAdjustmentKcal)}; applied ${signedCalories(plan.goalAdjustmentKcal)}",
+                title = nomiString("3 · Goal direction"),
+                detail = nomiFormat(
+                    "Requested {0}; applied {1}",
+                    signedCalories(plan.requestedGoalAdjustmentKcal),
+                    signedCalories(plan.goalAdjustmentKcal),
+                ),
                 value = "${plan.exactCaloriesKcal.roundToInt()} kcal",
             )
             BreakdownStep(
                 icon = Icons.Outlined.Restaurant,
-                title = "4 · Practical target",
-                detail = "Rounded for a usable daily goal",
+                title = nomiString("4 · Practical target"),
+                detail = nomiString("Rounded for a usable daily goal"),
                 value = "${plan.caloriesKcal} kcal",
                 last = true,
             )
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 14.dp))
         Text(
-            text = "Macros are a balanced starting split within the calorie target. You can edit all four targets below.",
+            text = nomiString("Macros are a balanced starting split within the calorie target. You can edit all four targets below."),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -520,16 +534,16 @@ private fun PlanEditor(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Adjust your starting targets", style = MaterialTheme.typography.titleLarge)
+            Text(nomiString("Adjust your starting targets"), style = MaterialTheme.typography.titleLarge)
             Text(
-                "Changes apply immediately to the plan you save. You don't need to restart onboarding.",
+                nomiString("Changes apply immediately to the plan you save. You don't need to restart onboarding."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             PlanNumberField(
                 value = state.planEditor.calories,
                 onValueChange = actions::updatePlanCalories,
-                label = "Calories",
+                label = nomiString("Calories"),
                 suffix = "kcal",
                 testTag = "edit_plan_calories",
             )
@@ -537,7 +551,7 @@ private fun PlanEditor(
                 PlanNumberField(
                     value = state.planEditor.proteinGrams,
                     onValueChange = actions::updatePlanProtein,
-                    label = "Protein",
+                    label = nomiString("Protein"),
                     suffix = "g",
                     testTag = "edit_plan_protein",
                     modifier = Modifier.weight(1f),
@@ -545,7 +559,7 @@ private fun PlanEditor(
                 PlanNumberField(
                     value = state.planEditor.carbohydrateGrams,
                     onValueChange = actions::updatePlanCarbohydrates,
-                    label = "Carbs",
+                    label = nomiString("Carbs"),
                     suffix = "g",
                     testTag = "edit_plan_carbs",
                     modifier = Modifier.weight(1f),
@@ -553,7 +567,7 @@ private fun PlanEditor(
                 PlanNumberField(
                     value = state.planEditor.fatGrams,
                     onValueChange = actions::updatePlanFat,
-                    label = "Fat",
+                    label = nomiString("Fat"),
                     suffix = "g",
                     testTag = "edit_plan_fat",
                     modifier = Modifier.weight(1f),
@@ -563,7 +577,7 @@ private fun PlanEditor(
                 PlanNumberField(
                     value = state.planEditor.weeklyChangeKg,
                     onValueChange = actions::updatePlanWeeklyChange,
-                    label = "Weekly change",
+                    label = nomiString("Weekly change"),
                     suffix = "kg/week",
                     testTag = "edit_plan_rate",
                     decimal = true,
@@ -571,7 +585,7 @@ private fun PlanEditor(
             }
             state.planEditor.validationMessage?.let { message ->
                 Text(
-                    text = message,
+                    text = nomiString(message),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
@@ -583,7 +597,7 @@ private fun PlanEditor(
                     .fillMaxWidth()
                     .testTag("apply_plan_adjustments"),
             ) {
-                Text("Apply changes")
+                Text(nomiString("Apply changes"))
             }
         }
     }
@@ -662,36 +676,40 @@ private fun ResultRow(
     }
 }
 
+@Composable
 private fun EnergySex?.energyLabel(manualCalories: Int?): String = when (this) {
-    EnergySex.FEMALE -> "Female equation"
-    EnergySex.MALE -> "Male equation"
-    EnergySex.MANUAL -> "Manual · ${manualCalories ?: 0} kcal/day"
+    EnergySex.FEMALE -> nomiString("Female equation")
+    EnergySex.MALE -> nomiString("Male equation")
+    EnergySex.MANUAL -> nomiFormat("Manual · {0} kcal/day", manualCalories ?: 0)
     null -> "—"
 }
 
+@Composable
 private fun GoalType?.goalLabel(): String = when (this) {
-    GoalType.LOSE -> "Lose weight"
-    GoalType.MAINTAIN -> "Maintain weight"
-    GoalType.GAIN -> "Gain weight"
+    GoalType.LOSE -> nomiString("Lose weight")
+    GoalType.MAINTAIN -> nomiString("Maintain weight")
+    GoalType.GAIN -> nomiString("Gain weight")
     null -> "—"
 }
 
+@Composable
 private fun ActivityLevel?.activityLabel(): String = when (this) {
-    ActivityLevel.SEDENTARY -> "Mostly seated"
-    ActivityLevel.LIGHTLY_ACTIVE -> "Lightly active"
-    ActivityLevel.ACTIVE -> "Active"
-    ActivityLevel.VERY_ACTIVE -> "Very active"
+    ActivityLevel.SEDENTARY -> nomiString("Mostly seated")
+    ActivityLevel.LIGHTLY_ACTIVE -> nomiString("Lightly active")
+    ActivityLevel.ACTIVE -> nomiString("Active")
+    ActivityLevel.VERY_ACTIVE -> nomiString("Very active")
     null -> "—"
 }
 
+@Composable
 private fun ProgressRate?.rateLabel(
     custom: Double?,
     goal: GoalType?,
 ): String = when (this) {
-    ProgressRate.GENTLE -> if (goal == GoalType.GAIN) "Gentle gain" else "Gentle"
-    ProgressRate.MODERATE -> if (goal == GoalType.GAIN) "Moderate gain" else "Moderate"
-    ProgressRate.FASTER -> "Faster"
-    ProgressRate.CUSTOM -> "Custom · ${custom?.oneOrTwoDecimals()} kg/week"
+    ProgressRate.GENTLE -> nomiString(if (goal == GoalType.GAIN) "Gentle gain" else "Gentle")
+    ProgressRate.MODERATE -> nomiString(if (goal == GoalType.GAIN) "Moderate gain" else "Moderate")
+    ProgressRate.FASTER -> nomiString("Faster")
+    ProgressRate.CUSTOM -> nomiFormat("Custom · {0} kg/week", custom?.oneOrTwoDecimals(nomiLocale()))
     null -> "—"
 }
 
@@ -701,8 +719,8 @@ private fun signedCalories(value: Double): String = when {
     else -> "0 kcal"
 }
 
-private fun Double.oneDecimal(): String = String.format(Locale.US, "%.1f", this)
+private fun Double.oneDecimal(locale: Locale): String = String.format(locale, "%.1f", this)
 
-private fun Double.oneOrTwoDecimals(): String = String.format(Locale.US, "%.2f", this)
+private fun Double.oneOrTwoDecimals(locale: Locale): String = String.format(locale, "%.2f", this)
     .trimEnd('0')
-    .trimEnd('.')
+    .trimEnd('.', ',')

@@ -137,12 +137,38 @@ class NomiTranslationCatalogTest {
     }
 
     @Test
+    fun `catalogue text is valid UTF-8 without mojibake`() {
+        // Plain Â/â are valid letters in French, Portuguese and Turkish; only broken byte patterns
+        // are rejected here.
+        val suspicious = listOf("Ã", "Â ", "Â€", "â€", "â‚", "ï¿½", "\uFFFD")
+        val broken = buildList {
+            NomiLanguage.entries.forEach { language ->
+                if (suspicious.any(language.nativeName::contains)) {
+                    add("native name ${language.tag}: ${language.nativeName}")
+                }
+            }
+            NomiTranslations.catalogue.forEach { (english, translation) ->
+                translatedLanguages.forEach { language ->
+                    val value = translation.forLanguage(language).orEmpty()
+                    if (suspicious.any(value::contains)) add("${language.tag}: $english -> $value")
+                }
+            }
+        }
+        assertEquals("mojibake in translations: $broken", emptyList<String>(), broken)
+        assertEquals("Frühstück", NomiTranslations.translate("Breakfast", NomiLanguage.GERMAN))
+        assertEquals("Español", NomiLanguage.SPANISH.nativeName)
+        assertEquals("Français", NomiLanguage.FRENCH.nativeName)
+        assertEquals("Português", NomiLanguage.PORTUGUESE.nativeName)
+        assertEquals("Türkçe", NomiLanguage.TURKISH.nativeName)
+    }
+
+    @Test
     fun `the catalogue covers the whole interface`() {
         // A floor, not an exact count: it fails loudly if a catalogue file stops being merged
         // into the map, which would otherwise only show up as English leaking into the UI.
         assertTrue(
             "catalogue shrank to ${NomiTranslations.catalogue.size} entries",
-            NomiTranslations.catalogue.size >= 450,
+            NomiTranslations.catalogue.size >= 590,
         )
         assertFalse(NomiTranslations.catalogue.containsKey(""))
     }

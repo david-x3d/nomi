@@ -137,6 +137,13 @@ private fun NomiMain(
     val snackbarHostState = remember { SnackbarHostState() }
     val barcodeAmountState by viewModel.barcodeAmountState.collectAsStateWithLifecycle()
     val loggedAmountEditState by viewModel.loggedAmountEditState.collectAsStateWithLifecycle()
+    val selectedDocumentOpenError = nomiString("The selected document could not be opened")
+    val backupExportedMessage = nomiString("Backup exported")
+    val backupExportFailedMessage = nomiString("Nomi couldn't export the backup")
+    val invalidBackupMessage = nomiString("That isn't a valid Nomi backup")
+    val notificationPermissionMessage = nomiString("Notification permission is needed for reminders")
+    val backupRestoredMessage = nomiString("Backup restored")
+    val backupRestoreFailedMessage = nomiString("Nomi couldn't restore that backup")
 
     var libraryKind by remember { mutableStateOf(LibraryItemKind.RECENT) }
     var selectedProviderIndex by remember { mutableIntStateOf(-1) }
@@ -157,9 +164,9 @@ private fun NomiMain(
         if (uri != null) scope.launch {
             runCatching {
                 resolver.openOutputStream(uri, "wt")?.use { container.backupService.exportTo(it) }
-                    ?: error("The selected document could not be opened")
-            }.onSuccess { showMessage("Backup exported") }
-                .onFailure { showMessage(it.message ?: "Nomi couldn't export the backup") }
+                    ?: error(selectedDocumentOpenError)
+            }.onSuccess { showMessage(backupExportedMessage) }
+                .onFailure { showMessage(it.message ?: backupExportFailedMessage) }
         }
     }
     val importLauncher = rememberLauncherForActivityResult(
@@ -168,9 +175,9 @@ private fun NomiMain(
         if (uri != null) scope.launch {
             runCatching {
                 resolver.openInputStream(uri)?.use { container.backupService.inspect(it) }
-                    ?: error("The selected document could not be opened")
+                    ?: error(selectedDocumentOpenError)
             }.onSuccess { backupInspection = it }
-                .onFailure { showMessage(it.message ?: "That isn't a valid Nomi backup") }
+                .onFailure { showMessage(it.message ?: invalidBackupMessage) }
         }
     }
 
@@ -179,7 +186,7 @@ private fun NomiMain(
     ) { granted ->
         pendingReminderIndex?.let { index ->
             if (granted) viewModel.toggleReminder(index, true)
-            else showMessage("Notification permission is needed for reminders")
+            else showMessage(notificationPermissionMessage)
         }
         pendingReminderIndex = null
     }
@@ -641,10 +648,10 @@ private fun NomiMain(
         val summary = inspection.summary
         NomiDialog(
             onDismissRequest = { backupInspection = null },
-            title = "Replace local Nomi data?",
+            title = nomiString("Replace local Nomi data?"),
             icon = Icons.Default.SettingsBackupRestore,
-            subtitle = "API keys stay on this device and are never imported.",
-            confirmLabel = "Replace data",
+            subtitle = nomiString("API keys stay on this device and are never imported."),
+            confirmLabel = nomiString("Replace data"),
             destructive = true,
             onConfirm = {
                 val confirmed = inspection
@@ -654,20 +661,20 @@ private fun NomiMain(
                         .onSuccess {
                             container.reminderScheduler.reconcileFrom(container.preferencesStore)
                             viewModel.refreshProviderAndHealthStatus()
-                            showMessage("Backup restored")
+                            showMessage(backupRestoredMessage)
                         }
-                        .onFailure { showMessage(it.message ?: "Nomi couldn't restore that backup") }
+                        .onFailure { showMessage(it.message ?: backupRestoreFailedMessage) }
                 }
             },
-            dismissLabel = "Cancel",
+            dismissLabel = nomiString("Cancel"),
         ) {
             // The counts are what the decision turns on, so they are a readable list rather
             // than a comma-separated sentence to parse under a destructive button.
-            BackupSummaryLine("Food logs", summary.foodLogCount)
-            BackupSummaryLine("Foods", summary.foodCount)
-            BackupSummaryLine("Saved meals", summary.savedMealCount)
-            BackupSummaryLine("Weights", summary.weightEntryCount)
-            BackupSummaryLine("Plans", summary.nutritionPlanCount)
+            BackupSummaryLine(nomiString("Food logs"), summary.foodLogCount)
+            BackupSummaryLine(nomiString("Foods"), summary.foodCount)
+            BackupSummaryLine(nomiString("Saved meals"), summary.savedMealCount)
+            BackupSummaryLine(nomiString("Weights"), summary.weightEntryCount)
+            BackupSummaryLine(nomiString("Plans"), summary.nutritionPlanCount)
         }
     }
 }

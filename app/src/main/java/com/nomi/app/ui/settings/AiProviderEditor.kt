@@ -36,6 +36,7 @@ import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.localization.nomiFormat
 import java.net.URI
 
 data class AiProviderEditorState(
@@ -152,7 +153,7 @@ fun AiProviderEditorDialog(
             isError = state.model.isBlank(),
         )
         val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
-            "Google Gemini API key"
+            nomiString("Google Gemini API key")
         } else {
             nomiString("API key")
         }
@@ -163,7 +164,7 @@ fun AiProviderEditorDialog(
                     state.copy(apiKeyInput = it, testResult = null, errorMessage = null),
                 )
             },
-            label = if (state.hasStoredApiKey) "$keyName (stored securely)" else keyName,
+            label = if (state.hasStoredApiKey) nomiFormat("{0} (stored securely)", keyName) else keyName,
             placeholder = if (state.hasStoredApiKey) {
                 nomiString("Leave blank to keep existing key")
             } else {
@@ -179,14 +180,22 @@ fun AiProviderEditorDialog(
                 onValueChange = {
                     onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
                 },
-                label = if (state.hasStoredSearchApiKey) "Exa API key (stored securely)" else "Exa API key",
-                placeholder = if (state.hasStoredSearchApiKey) "Leave blank to keep existing key" else null,
+                label = if (state.hasStoredSearchApiKey) {
+                    nomiFormat("{0} (stored securely)", nomiString("Exa API key"))
+                } else {
+                    nomiString("Exa API key")
+                },
+                placeholder = if (state.hasStoredSearchApiKey) {
+                    nomiString("Leave blank to keep existing key")
+                } else {
+                    null
+                },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 enabled = !busy,
             )
             Text(
-                "Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device.",
+                nomiString("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

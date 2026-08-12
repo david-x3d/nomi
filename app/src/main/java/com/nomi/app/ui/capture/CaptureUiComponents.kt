@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +55,7 @@ internal fun CaptureScaffold(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = nomiString("Back"),
                         )
                     }
                 },

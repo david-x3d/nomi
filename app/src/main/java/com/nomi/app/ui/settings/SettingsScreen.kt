@@ -55,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
@@ -101,7 +102,11 @@ fun SettingsScreen(
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and History, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val pageContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val pageContainerColor = lerp(
+        MaterialTheme.colorScheme.surfaceContainerLow,
+        MaterialTheme.colorScheme.primaryContainer,
+        0.12f,
+    )
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -494,10 +499,6 @@ private fun SettingsInfo(
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
         },
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f),
-        ),
     ) {
         ListItem(
             headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
@@ -526,12 +527,6 @@ private fun GlassSettingSurface(
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
         },
-        tonalElevation = if (lightMode) 0.dp else 2.dp,
-        shadowElevation = 1.dp,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
         content = content,
     )
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.localization.nomiString
 
 @Composable
 fun AnalyzedItemEditDialog(
@@ -39,8 +40,8 @@ fun AnalyzedItemEditDialog(
         onDismissRequest = onDismiss,
         title = item.name,
         icon = Icons.Default.Tune,
-        subtitle = "Values are saved as an immutable snapshot for this log entry.",
-        confirmLabel = "Apply",
+        subtitle = nomiString("Values are saved as an immutable snapshot for this log entry."),
+        confirmLabel = nomiString("Apply"),
         onConfirm = {
             onSave(
                 item.copy(
@@ -57,28 +58,28 @@ fun AnalyzedItemEditDialog(
             onDismiss()
         },
         confirmEnabled = valid,
-        dismissLabel = "Cancel",
+        dismissLabel = nomiString("Cancel"),
         contentSpacing = 10.dp,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DecimalField(quantity, { quantity = it }, "Amount", Modifier.weight(1f))
+            DecimalField(quantity, { quantity = it }, nomiString("Amount"), Modifier.weight(1f))
             NomiTextField(
                 value = unit,
                 onValueChange = { unit = it.take(24) },
-                label = "Unit",
+                label = nomiString("Unit"),
                 modifier = Modifier.weight(1f),
             )
         }
-        DecimalField(calories, { calories = it }, "Calories", Modifier.fillMaxWidth())
+        DecimalField(calories, { calories = it }, nomiString("Calories"), Modifier.fillMaxWidth())
         Text(
-            text = "Macros in grams",
+            text = nomiString("Macros in grams"),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DecimalField(protein, { protein = it }, "Protein", Modifier.weight(1f))
-            DecimalField(carbs, { carbs = it }, "Carbs", Modifier.weight(1f))
-            DecimalField(fat, { fat = it }, "Fat", Modifier.weight(1f))
+            DecimalField(protein, { protein = it }, nomiString("Protein"), Modifier.weight(1f))
+            DecimalField(carbs, { carbs = it }, nomiString("Carbs"), Modifier.weight(1f))
+            DecimalField(fat, { fat = it }, nomiString("Fat"), Modifier.weight(1f))
         }
     }
 }

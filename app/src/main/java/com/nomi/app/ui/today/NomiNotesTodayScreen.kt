@@ -117,6 +117,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -2011,19 +2012,19 @@ private fun QuickAddRow(
  */
 @Composable
 private fun GoalsSheet(state: TodayUiState, onDismiss: () -> Unit) {
-    NomiSheet(onDismissRequest = onDismiss) {
+    val sheetColor = lerp(
+        MaterialTheme.colorScheme.surfaceContainerLow,
+        MaterialTheme.colorScheme.primaryContainer,
+        0.10f,
+    )
+    NomiSheet(
+        onDismissRequest = onDismiss,
+        containerColor = sheetColor,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
-                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.06f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
+                .background(sheetColor),
         ) {
             GoalsSheetHeader()
             Column(

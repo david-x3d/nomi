@@ -41,8 +41,10 @@ internal class NomiTranslation(
  */
 internal object NomiTranslations {
 
-    val catalogue: Map<String, NomiTranslation> = buildMap(560) {
+    val catalogue: Map<String, NomiTranslation> = buildMap(680) {
         putAll(commonTranslations)
+        putAll(onboardingTranslations)
+        putAll(messageTranslations)
         putAll(todayTranslations)
         putAll(foodTranslations)
         putAll(captureTranslations)

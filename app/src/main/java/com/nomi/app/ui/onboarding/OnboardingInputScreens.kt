@@ -91,6 +91,9 @@ import com.nomi.app.ui.components.NomiPickerField
 import com.nomi.app.ui.components.NomiSelectionRow
 import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.NomiTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -132,7 +135,7 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
         ) {
             Image(
                 painter = painterResource(R.drawable.nomi_logo),
-                contentDescription = "Nomi, smiling fox logo",
+                contentDescription = nomiString("Nomi, smiling fox logo"),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
@@ -141,13 +144,15 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
         }
         Spacer(Modifier.height(24.dp))
         Text(
-            text = "Nutrition that starts with you",
+            text = nomiString("Nutrition that starts with you"),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "Answer a few questions and we'll create a daily energy and macro plan you can adjust at any time.",
+            text = nomiString(
+                "Answer a few questions and we'll create a daily energy and macro plan you can adjust at any time.",
+            ),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -160,11 +165,11 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
                 .height(64.dp)
                 .testTag("onboarding_get_started"),
         ) {
-            Text("Get started", style = MaterialTheme.typography.titleMedium)
+            Text(nomiString("Get started"), style = MaterialTheme.typography.titleMedium)
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            text = "About 2 minutes · You stay in control",
+            text = nomiString("About 2 minutes · You stay in control"),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -180,27 +185,30 @@ internal fun DateOfBirthScreen(
 ) {
     val today = remember { LocalDate.now() }
     var showPicker by remember { mutableStateOf(false) }
-    val formatter = remember {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.getDefault())
+    val locale = nomiLocale()
+    val formatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale)
     }
 
     QuestionPage(
-        title = "When were you born?",
-        supportingText = "We store your date of birth—not a fixed age—so your energy estimate stays accurate over time.",
+        title = nomiString("When were you born?"),
+        supportingText = nomiString(
+            "We store your date of birth—not a fixed age—so your energy estimate stays accurate over time.",
+        ),
         error = error,
         onContinue = onContinue,
     ) {
         NomiPickerField(
-            label = "Date of birth",
+            label = nomiString("Date of birth"),
             value = dateOfBirth?.format(formatter),
-            placeholder = "Choose date of birth",
+            placeholder = nomiString("Choose date of birth"),
             onClick = { showPicker = true },
             leadingIcon = Icons.Outlined.CalendarMonth,
             modifier = Modifier.testTag("date_of_birth_picker"),
         )
         dateOfBirth?.let { selected ->
             Text(
-                text = "Age ${Period.between(selected, today).years} today",
+                text = nomiFormat("Age {0} today", Period.between(selected, today).years),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp),
@@ -225,9 +233,9 @@ internal fun DateOfBirthScreen(
                 }
                 showPicker = false
             },
-            confirmLabel = "Save",
-            dismissLabel = "Cancel",
-            title = "Date of birth",
+            confirmLabel = nomiString("Save"),
+            dismissLabel = nomiString("Cancel"),
+            title = nomiString("Date of birth"),
         )
     }
 }
@@ -240,30 +248,32 @@ internal fun EnergySexScreen(
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     QuestionPage(
-        title = "Choose an energy calculation",
-        supportingText = "Metabolic equations use sex-specific averages. Choose the equation that fits you, or set calories yourself.",
+        title = nomiString("Choose an energy calculation"),
+        supportingText = nomiString(
+            "Metabolic equations use sex-specific averages. Choose the equation that fits you, or set calories yourself.",
+        ),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         SelectionCard(
-            title = "Female",
-            description = "Use the female energy equation.",
+            title = nomiString("Female"),
+            description = nomiString("Use the female energy equation."),
             icon = Icons.Outlined.Female,
             selected = state.draft.energySex == EnergySex.FEMALE,
             onClick = { actions.selectEnergySex(EnergySex.FEMALE) },
             testTag = "energy_female",
         )
         SelectionCard(
-            title = "Male",
-            description = "Use the male energy equation.",
+            title = nomiString("Male"),
+            description = nomiString("Use the male energy equation."),
             icon = Icons.Outlined.Male,
             selected = state.draft.energySex == EnergySex.MALE,
             onClick = { actions.selectEnergySex(EnergySex.MALE) },
             testTag = "energy_male",
         )
         SelectionCard(
-            title = "Set calories manually instead",
-            description = "Skip the equation and enter a daily calorie target you already use.",
+            title = nomiString("Set calories manually instead"),
+            description = nomiString("Skip the equation and enter a daily calorie target you already use."),
             icon = Icons.Outlined.Edit,
             selected = state.draft.energySex == EnergySex.MANUAL,
             onClick = { actions.selectEnergySex(EnergySex.MANUAL) },
@@ -278,9 +288,9 @@ internal fun EnergySexScreen(
                 value = state.manualCaloriesText,
                 onValueChange = actions::updateManualCalories,
                 modifier = Modifier.testTag("manual_calories"),
-                label = "Daily calorie target",
-                suffix = "kcal/day",
-                supportingText = "You can fine-tune calories and macros before saving.",
+                label = nomiString("Daily calorie target"),
+                suffix = nomiString("kcal/day"),
+                supportingText = nomiString("You can fine-tune calories and macros before saving."),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
                     imeAction = ImeAction.Done,
@@ -294,23 +304,23 @@ internal fun EnergySexScreen(
 @Composable
 internal fun HeightScreen(state: OnboardingUiState, actions: OnboardingActions) {
     QuestionPage(
-        title = "What's your height?",
-        supportingText = "Height helps estimate your resting energy needs.",
+        title = nomiString("What's your height?"),
+        supportingText = nomiString("Height helps estimate your resting energy needs."),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         MeasurementSystemPicker(
             selected = state.heightSystem,
             onSelected = actions::selectHeightSystem,
-            metricLabel = "Centimeters",
-            imperialLabel = "Feet & inches",
+            metricLabel = nomiString("Centimeters"),
+            imperialLabel = nomiString("Feet & inches"),
             testTagPrefix = "height_unit",
         )
         if (state.heightSystem == MeasurementSystem.METRIC) {
             DecimalField(
                 value = state.heightCentimetersText,
                 onValueChange = actions::updateHeightCentimeters,
-                label = "Height",
+                label = nomiString("Height"),
                 suffix = "cm",
                 testTag = "height_cm",
                 onDone = actions::goNext,
@@ -323,7 +333,7 @@ internal fun HeightScreen(state: OnboardingUiState, actions: OnboardingActions) 
                 DecimalField(
                     value = state.heightFeetText,
                     onValueChange = actions::updateHeightFeet,
-                    label = "Feet",
+                    label = nomiString("Feet"),
                     suffix = "ft",
                     testTag = "height_ft",
                     onDone = {},
@@ -333,7 +343,7 @@ internal fun HeightScreen(state: OnboardingUiState, actions: OnboardingActions) 
                 DecimalField(
                     value = state.heightInchesText,
                     onValueChange = actions::updateHeightInches,
-                    label = "Inches",
+                    label = nomiString("Inches"),
                     suffix = "in",
                     testTag = "height_in",
                     onDone = actions::goNext,
@@ -347,23 +357,23 @@ internal fun HeightScreen(state: OnboardingUiState, actions: OnboardingActions) 
 @Composable
 internal fun WeightScreen(state: OnboardingUiState, actions: OnboardingActions) {
     QuestionPage(
-        title = "What's your current weight?",
-        supportingText = "Use a recent, typical measurement. Day-to-day changes are normal.",
+        title = nomiString("What's your current weight?"),
+        supportingText = nomiString("Use a recent, typical measurement. Day-to-day changes are normal."),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         MeasurementSystemPicker(
             selected = state.weightSystem,
             onSelected = actions::selectWeightSystem,
-            metricLabel = "Kilograms",
-            imperialLabel = "Pounds",
+            metricLabel = nomiString("Kilograms"),
+            imperialLabel = nomiString("Pounds"),
             testTagPrefix = "weight_unit",
         )
         if (state.weightSystem == MeasurementSystem.METRIC) {
             DecimalField(
                 value = state.currentWeightKilogramsText,
                 onValueChange = actions::updateCurrentWeightKilograms,
-                label = "Current weight",
+                label = nomiString("Current weight"),
                 suffix = "kg",
                 testTag = "current_weight_kg",
                 onDone = actions::goNext,
@@ -372,7 +382,7 @@ internal fun WeightScreen(state: OnboardingUiState, actions: OnboardingActions) 
             DecimalField(
                 value = state.currentWeightPoundsText,
                 onValueChange = actions::updateCurrentWeightPounds,
-                label = "Current weight",
+                label = nomiString("Current weight"),
                 suffix = "lb",
                 testTag = "current_weight_lb",
                 onDone = actions::goNext,
@@ -384,30 +394,30 @@ internal fun WeightScreen(state: OnboardingUiState, actions: OnboardingActions) 
 @Composable
 internal fun GoalScreen(state: OnboardingUiState, actions: OnboardingActions) {
     QuestionPage(
-        title = "What would you like to do?",
-        supportingText = "Your choice sets the direction of your daily energy plan.",
+        title = nomiString("What would you like to do?"),
+        supportingText = nomiString("Your choice sets the direction of your daily energy plan."),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         SelectionCard(
-            title = "Lose weight",
-            description = "Eat below your estimated maintenance.",
+            title = nomiString("Lose weight"),
+            description = nomiString("Eat below your estimated maintenance."),
             icon = Icons.Outlined.TrendingDown,
             selected = state.draft.goalType == GoalType.LOSE,
             onClick = { actions.selectGoal(GoalType.LOSE) },
             testTag = "goal_lose",
         )
         SelectionCard(
-            title = "Maintain weight",
-            description = "Stay around your estimated maintenance.",
+            title = nomiString("Maintain weight"),
+            description = nomiString("Stay around your estimated maintenance."),
             icon = Icons.Outlined.TrendingFlat,
             selected = state.draft.goalType == GoalType.MAINTAIN,
             onClick = { actions.selectGoal(GoalType.MAINTAIN) },
             testTag = "goal_maintain",
         )
         SelectionCard(
-            title = "Gain weight",
-            description = "Eat above your estimated maintenance.",
+            title = nomiString("Gain weight"),
+            description = nomiString("Eat above your estimated maintenance."),
             icon = Icons.Outlined.TrendingUp,
             selected = state.draft.goalType == GoalType.GAIN,
             onClick = { actions.selectGoal(GoalType.GAIN) },
@@ -420,11 +430,17 @@ internal fun GoalScreen(state: OnboardingUiState, actions: OnboardingActions) {
 internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingActions) {
     val losing = state.draft.goalType == GoalType.LOSE
     QuestionPage(
-        title = if (losing) "What's your target weight?" else "What weight are you aiming for?",
-        supportingText = if (losing) {
-            "Choose a target below your current weight. You can update it whenever your goal changes."
+        title = if (losing) {
+            nomiString("What's your target weight?")
         } else {
-            "Choose a target above your current weight. We'll use it to estimate a trajectory."
+            nomiString("What weight are you aiming for?")
+        },
+        supportingText = if (losing) {
+            nomiString(
+                "Choose a target below your current weight. You can update it whenever your goal changes.",
+            )
+        } else {
+            nomiString("Choose a target above your current weight. We'll use it to estimate a trajectory.")
         },
         error = state.validationMessage,
         onContinue = actions::goNext,
@@ -433,7 +449,7 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
             DecimalField(
                 value = state.targetWeightKilogramsText,
                 onValueChange = actions::updateTargetWeightKilograms,
-                label = "Target weight",
+                label = nomiString("Target weight"),
                 suffix = "kg",
                 testTag = "target_weight_kg",
                 onDone = actions::goNext,
@@ -442,7 +458,7 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
             DecimalField(
                 value = state.targetWeightPoundsText,
                 onValueChange = actions::updateTargetWeightPounds,
-                label = "Target weight",
+                label = nomiString("Target weight"),
                 suffix = "lb",
                 testTag = "target_weight_lb",
                 onDone = actions::goNext,
@@ -457,7 +473,13 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
                 },
             )
         }) {
-            Text(if (state.weightSystem == MeasurementSystem.METRIC) "Use pounds" else "Use kilograms")
+            Text(
+                if (state.weightSystem == MeasurementSystem.METRIC) {
+                    nomiString("Use pounds")
+                } else {
+                    nomiString("Use kilograms")
+                },
+            )
         }
     }
 }
@@ -465,39 +487,41 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
 @Composable
 internal fun ActivityScreen(state: OnboardingUiState, actions: OnboardingActions) {
     QuestionPage(
-        title = "How active is a normal week?",
-        supportingText = "Include both planned exercise and how much you move during work and daily life.",
+        title = nomiString("How active is a normal week?"),
+        supportingText = nomiString(
+            "Include both planned exercise and how much you move during work and daily life.",
+        ),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         ActivityOption(
             level = ActivityLevel.SEDENTARY,
-            title = "Mostly seated",
-            description = "Desk-based days with little planned exercise.",
+            title = nomiString("Mostly seated"),
+            description = nomiString("Desk-based days with little planned exercise."),
             icon = Icons.Outlined.SelfImprovement,
             state = state,
             actions = actions,
         )
         ActivityOption(
             level = ActivityLevel.LIGHTLY_ACTIVE,
-            title = "Lightly active",
-            description = "Light exercise 1–3 days a week or regular casual walking.",
+            title = nomiString("Lightly active"),
+            description = nomiString("Light exercise 1–3 days a week or regular casual walking."),
             icon = Icons.Outlined.DirectionsWalk,
             state = state,
             actions = actions,
         )
         ActivityOption(
             level = ActivityLevel.ACTIVE,
-            title = "Active",
-            description = "Moderate exercise 3–5 days a week or frequent movement through the day.",
+            title = nomiString("Active"),
+            description = nomiString("Moderate exercise 3–5 days a week or frequent movement through the day."),
             icon = Icons.Outlined.DirectionsRun,
             state = state,
             actions = actions,
         )
         ActivityOption(
             level = ActivityLevel.VERY_ACTIVE,
-            title = "Very active",
-            description = "Hard training most days, a physical job, or both.",
+            title = nomiString("Very active"),
+            description = nomiString("Hard training most days, a physical job, or both."),
             icon = Icons.Outlined.FitnessCenter,
             state = state,
             actions = actions,
@@ -529,24 +553,26 @@ internal fun ProgressRateScreen(state: OnboardingUiState, actions: OnboardingAct
     val gaining = state.draft.goalType == GoalType.GAIN
     val options = if (gaining) {
         listOf(
-            RateOption(ProgressRate.GENTLE, "Gentle gain", "About 0.15 kg per week"),
-            RateOption(ProgressRate.MODERATE, "Moderate gain", "About 0.25 kg per week"),
-            RateOption(ProgressRate.CUSTOM, "Custom", "Choose your own weekly change"),
+            RateOption(ProgressRate.GENTLE, nomiString("Gentle gain"), nomiString("About 0.15 kg per week")),
+            RateOption(ProgressRate.MODERATE, nomiString("Moderate gain"), nomiString("About 0.25 kg per week")),
+            RateOption(ProgressRate.CUSTOM, nomiString("Custom"), nomiString("Choose your own weekly change")),
         )
     } else {
         listOf(
-            RateOption(ProgressRate.GENTLE, "Gentle", "About 0.25 kg per week"),
-            RateOption(ProgressRate.MODERATE, "Moderate", "About 0.5 kg per week"),
-            RateOption(ProgressRate.FASTER, "Faster", "About 0.75 kg per week"),
-            RateOption(ProgressRate.CUSTOM, "Custom", "Choose your own weekly change"),
+            RateOption(ProgressRate.GENTLE, nomiString("Gentle"), nomiString("About 0.25 kg per week")),
+            RateOption(ProgressRate.MODERATE, nomiString("Moderate"), nomiString("About 0.5 kg per week")),
+            RateOption(ProgressRate.FASTER, nomiString("Faster"), nomiString("About 0.75 kg per week")),
+            RateOption(ProgressRate.CUSTOM, nomiString("Custom"), nomiString("Choose your own weekly change")),
         )
     }
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
 
     QuestionPage(
-        title = if (gaining) "Choose a gain rate" else "Choose a loss rate",
-        supportingText = "This is a planning estimate, not a promise. Real progress varies and you can adjust the plan anytime.",
+        title = if (gaining) nomiString("Choose a gain rate") else nomiString("Choose a loss rate"),
+        supportingText = nomiString(
+            "This is a planning estimate, not a promise. Real progress varies and you can adjust the plan anytime.",
+        ),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
@@ -568,8 +594,8 @@ internal fun ProgressRateScreen(state: OnboardingUiState, actions: OnboardingAct
             DecimalField(
                 value = state.customWeeklyChangeText,
                 onValueChange = actions::updateCustomWeeklyChange,
-                label = "Weekly change",
-                suffix = "kg/week",
+                label = nomiString("Weekly change"),
+                suffix = nomiString("kg/week"),
                 testTag = "custom_weekly_change",
                 onDone = actions::goNext,
             )
@@ -593,41 +619,42 @@ private data class RateOption(
 @Composable
 internal fun MicronutrientsScreen(state: OnboardingUiState, actions: OnboardingActions) {
     QuestionPage(
-        title = "Want to track anything beyond calories?",
-        supportingText = "Nomi records these for every food you log. Turn on the ones you care " +
-            "about and they get their own daily goal, or skip this - you can change it any time " +
-            "in Settings.",
+        title = nomiString("Want to track anything beyond calories?"),
+        supportingText = nomiString(
+            "Nomi records these for every food you log. Turn on the ones you care about and they " +
+                "get their own daily goal, or skip this - you can change it any time in Settings.",
+        ),
         error = state.validationMessage,
         onContinue = actions::goNext,
     ) {
         MicronutrientOption(
             micronutrient = Micronutrient.FIBER,
-            title = "Fiber",
-            description = "Most people get less than half the 30 g a day that's recommended.",
+            title = nomiString("Fiber"),
+            description = nomiString("Most people get less than half the 30 g a day that's recommended."),
             icon = Icons.Outlined.Grass,
             state = state,
             actions = actions,
         )
         MicronutrientOption(
             micronutrient = Micronutrient.SUGAR,
-            title = "Sugar",
-            description = "Drinks are where a day's 25 g adds up fastest, usually unnoticed.",
+            title = nomiString("Sugar"),
+            description = nomiString("Drinks are where a day's 25 g adds up fastest, usually unnoticed."),
             icon = Icons.Outlined.Cookie,
             state = state,
             actions = actions,
         )
         MicronutrientOption(
             micronutrient = Micronutrient.SATURATED_FAT,
-            title = "Saturated fat",
-            description = "About 20 g a day, roughly a tenth of a 2,000 kcal day.",
+            title = nomiString("Saturated fat"),
+            description = nomiString("About 20 g a day, roughly a tenth of a 2,000 kcal day."),
             icon = Icons.Outlined.WaterDrop,
             state = state,
             actions = actions,
         )
         MicronutrientOption(
             micronutrient = Micronutrient.SODIUM,
-            title = "Sodium",
-            description = "Under 2,000 mg a day, which is about 5 g of salt.",
+            title = nomiString("Sodium"),
+            description = nomiString("Under 2,000 mg a day, which is about 5 g of salt."),
             icon = Icons.Outlined.Grain,
             state = state,
             actions = actions,
@@ -692,7 +719,7 @@ private fun QuestionPage(
         error?.let { message ->
             item {
                 NomiInlineError(
-                    message = message,
+                    message = nomiString(message),
                     modifier = Modifier
                         .semantics { liveRegion = LiveRegionMode.Polite }
                         .testTag("onboarding_error"),
@@ -712,7 +739,7 @@ private fun QuestionPage(
                     .height(60.dp)
                     .testTag("onboarding_continue"),
             ) {
-                Text("Continue", style = MaterialTheme.typography.titleMedium)
+                Text(nomiString("Continue"), style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowForward,

@@ -10,9 +10,9 @@ import org.junit.Test
 
 class MenuScanTest {
     private val dishes = listOf(
-        MenuDish("12", "Cheeseburger", "Beef, cheese and pickles", "Burgers", "5,90 â‚¬"),
-        MenuDish("24", "Caesar Salad", "Chicken, lettuce and parmesan", "Salads", "9,50 â‚¬"),
-        MenuDish("D3", "Cola Zero", "500 ml", "Drinks", "3,20 â‚¬"),
+        MenuDish("12", "Cheeseburger", "Beef, cheese and pickles", "Burgers", "5,90 €"),
+        MenuDish("24", "Caesar Salad", "Chicken, lettuce and parmesan", "Salads", "9,50 €"),
+        MenuDish("D3", "Cola Zero", "500 ml", "Drinks", "3,20 €"),
     )
 
     @Test

@@ -41,6 +41,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiString
 
 @Composable
 fun OnboardingRoute(
@@ -181,12 +183,12 @@ private fun OnboardingTopBar(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = nomiString("Back"),
                 )
             }
             Spacer(Modifier.weight(1f))
             Text(
-                text = "Step $stepNumber of ${journey.lastIndex}",
+                text = nomiFormat("Step {0} of {1}", stepNumber, journey.lastIndex),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
