@@ -24,7 +24,7 @@
 
 | Today | Nutrition details | Settings |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/today.png" alt="The Today page listing logged foods with their calories, and the calorie budget left for the day" width="260" /> | <img src="docs/screenshots/nutrition-details.jpg" alt="An entry's nutrition details showing macros, the nutrition source with the site Nomi mainly checked, a confidence ring, and the References section" width="260" /> | <img src="docs/screenshots/settings.jpg" alt="Settings showing profile, nutrition plan, micronutrients, theme, dynamic colors, and the language picker" width="260" /> |
+| <img src="docs/screenshots/today.png" alt="The Today page listing logged foods with their calories, and the calorie budget left for the day" width="260" /> | <img src="docs/screenshots/nutrition-details.jpg" alt="An entry's nutrition details showing macros, the nutrition source with the site Nomi mainly checked, a confidence ring, and the References section" width="260" /> | <img src="docs/screenshots/settings.png" alt="Settings showing profile, nutrition plan, micronutrients, theme, dynamic colors, and the language picker" width="260" /> |
 | Write a meal in plain language; every food lands as its own row. | Every number says where it came from and how sure Nomi is. | Ten languages, custom targets, and your own AI providers. |
 
 </div>
