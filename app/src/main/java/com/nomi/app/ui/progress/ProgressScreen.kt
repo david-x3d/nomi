@@ -3,9 +3,7 @@ package com.nomi.app.ui.progress
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -60,6 +58,10 @@ import com.nomi.app.ui.components.NomiCard
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.theme.nomiFadeMotionSpec
+import com.nomi.app.ui.theme.nomiLayoutMotionSpec
+import com.nomi.app.ui.theme.nomiPageMotionSpec
+import com.nomi.app.ui.theme.nomiProgressMotionSpec
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -111,14 +113,14 @@ fun ProgressScreen(
                     transitionSpec = {
                         val direction = if (targetState.range.ordinal > initialState.range.ordinal) 1 else -1
                         (
-                            fadeIn(animationSpec = tween(220)) +
-                                slideInVertically(animationSpec = tween(340)) { height ->
-                                    direction * (height / 12)
+                            fadeIn(animationSpec = nomiFadeMotionSpec()) +
+                                slideInVertically(animationSpec = nomiPageMotionSpec()) { height ->
+                                    direction * (height / 20)
                                 }
                             ).togetherWith(
-                            fadeOut(animationSpec = tween(150)) +
-                                slideOutVertically(animationSpec = tween(260)) { height ->
-                                    -direction * (height / 16)
+                            fadeOut(animationSpec = nomiFadeMotionSpec()) +
+                                slideOutVertically(animationSpec = nomiPageMotionSpec()) { height ->
+                                    -direction * (height / 24)
                                 },
                         )
                     },
@@ -133,8 +135,12 @@ fun ProgressScreen(
                         ConsistencySection(animatedState, Modifier.padding(horizontal = 16.dp))
                         AnimatedVisibility(
                             visible = animatedState.nutrition.isNotEmpty(),
-                            enter = fadeIn(animationSpec = tween(220)) + expandVertically(),
-                            exit = fadeOut(animationSpec = tween(150)) + shrinkVertically(),
+                            enter = fadeIn(animationSpec = nomiFadeMotionSpec()) + expandVertically(
+                                animationSpec = nomiLayoutMotionSpec(),
+                            ),
+                            exit = fadeOut(animationSpec = nomiFadeMotionSpec()) + shrinkVertically(
+                                animationSpec = nomiLayoutMotionSpec(),
+                            ),
                         ) {
                             NutritionAverages(animatedState, Modifier.padding(horizontal = 16.dp))
                         }
@@ -165,7 +171,7 @@ private fun WeightSection(
     val locale = nomiLocale()
     NomiCard(
         modifier = modifier.animateContentSize(
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            animationSpec = nomiLayoutMotionSpec(),
         ),
     ) {
         Row(
@@ -329,15 +335,12 @@ private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modi
     val fraction = if (state.totalDays == 0) 0f else state.loggingDays.toFloat() / state.totalDays
     val animatedFraction by animateFloatAsState(
         targetValue = fraction.coerceIn(0f, 1f),
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessLow,
-        ),
+        animationSpec = nomiProgressMotionSpec(),
         label = "Logging consistency",
     )
     NomiCard(
         modifier = modifier.animateContentSize(
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            animationSpec = nomiLayoutMotionSpec(),
         ),
         spacing = 14.dp,
     ) {
@@ -381,7 +384,7 @@ private fun NutritionAverages(state: ProgressUiState, modifier: Modifier = Modif
     val days = state.nutrition.size.coerceAtLeast(1)
     NomiCard(
         modifier = modifier.animateContentSize(
-            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            animationSpec = nomiLayoutMotionSpec(),
         ),
         spacing = 12.dp,
     ) {

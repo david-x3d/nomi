@@ -12,10 +12,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,11 +26,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddAPhoto
 import androidx.compose.material.icons.outlined.BrokenImage
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -78,6 +82,7 @@ fun PhotoCaptureScreen(
     onManualEntry: () -> Unit,
     modifier: Modifier = Modifier,
     subject: PhotoCaptureSubject = PhotoCaptureSubject.MEAL,
+    inline: Boolean = false,
     controllerFactory: (Context) -> CameraCaptureController = ::CameraCaptureController,
 ) {
     val context = LocalContext.current
@@ -194,6 +199,30 @@ fun PhotoCaptureScreen(
         // Nothing is researched or estimated here, so the only thing that decides whether the
         // numbers are right is whether they can be read.
         PhotoCaptureSubject.NUTRITION_LABEL -> nomiString("Straight on and in focus. Nomi reads the printed values and researches nothing.")
+    }
+
+    if (inline) {
+        InlineCameraSurface(
+            previewView = previewView,
+            cameraAvailable = cameraAvailable,
+            cameraPermissionGranted = cameraPermissionGranted,
+            cameraReady = cameraReady,
+            isBinding = isBinding,
+            isCapturing = isCapturing,
+            cameraPermissionDenied = cameraPermissionDenied,
+            cameraError = cameraError,
+            previewDescription = cameraPreviewDescription,
+            subject = subject,
+            onClose = onBack,
+            onCapture = ::requestCameraOrCapture,
+            onChoosePhoto = ::openPhotoPicker,
+            onRequestPermission = {
+                cameraPermissionDenied = false
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            },
+            modifier = modifier,
+        )
+        return
     }
 
     CaptureScaffold(
@@ -321,6 +350,121 @@ fun PhotoCaptureScreen(
                 Icon(Icons.Outlined.Keyboard, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text(nomiString("Enter manually"))
+            }
+        }
+    }
+}
+
+/**
+ * The camera lives inside Today rather than taking the user to a temporary destination. Controls
+ * float over the preview so opening it only adds one compact surface to the current page.
+ */
+@Composable
+private fun InlineCameraSurface(
+    previewView: PreviewView,
+    cameraAvailable: Boolean,
+    cameraPermissionGranted: Boolean,
+    cameraReady: Boolean,
+    isBinding: Boolean,
+    isCapturing: Boolean,
+    cameraPermissionDenied: Boolean,
+    cameraError: String?,
+    previewDescription: String,
+    subject: PhotoCaptureSubject,
+    onClose: () -> Unit,
+    onCapture: () -> Unit,
+    onChoosePhoto: () -> Unit,
+    onRequestPermission: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val subjectLabel = when (subject) {
+        PhotoCaptureSubject.MEAL -> nomiString("Photo")
+        PhotoCaptureSubject.MENU -> nomiString("Scan menu")
+        PhotoCaptureSubject.NUTRITION_LABEL -> nomiString("Nutrition label")
+    }
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 360.dp, max = 520.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color.Black)
+            .testTag("inline_photo_camera"),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (cameraPermissionGranted && cameraAvailable) {
+            AndroidView(
+                factory = { previewView },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .semantics { contentDescription = previewDescription },
+            )
+        }
+
+        when {
+            !cameraAvailable -> CameraPlaceholder(
+                icon = Icons.Outlined.BrokenImage,
+                title = nomiString("No camera found"),
+                message = nomiString("Choose an existing photo or enter the meal manually."),
+            )
+            !cameraPermissionGranted -> CameraPlaceholder(
+                icon = Icons.Outlined.CameraAlt,
+                title = nomiString("Camera access is off"),
+                message = if (cameraPermissionDenied) {
+                    nomiString("You can try again, choose a photo, or enter the meal manually.")
+                } else {
+                    nomiString("Allow access only when you're ready to take a photo.")
+                },
+                action = {
+                    FilledTonalButton(onClick = onRequestPermission) {
+                        Text(nomiString("Allow camera"))
+                    }
+                },
+            )
+            isBinding -> CircularProgressIndicator(color = Color.White)
+            cameraError != null -> CameraPlaceholder(
+                icon = Icons.Outlined.BrokenImage,
+                title = nomiString("Camera unavailable"),
+                message = cameraError,
+            )
+        }
+
+        FilledTonalButton(
+            onClick = {},
+            enabled = false,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 14.dp),
+        ) {
+            Text(subjectLabel)
+        }
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilledTonalIconButton(onClick = onClose) {
+                Icon(Icons.Outlined.Close, contentDescription = nomiString("Cancel"))
+            }
+            Button(
+                onClick = onCapture,
+                enabled = cameraAvailable && !isCapturing && (!cameraPermissionGranted || cameraReady),
+                modifier = Modifier.size(72.dp),
+                shape = RoundedCornerShape(36.dp),
+            ) {
+                if (isCapturing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(Icons.Outlined.AddAPhoto, contentDescription = nomiString("Take photo"))
+                }
+            }
+            FilledTonalIconButton(onClick = onChoosePhoto) {
+                Icon(Icons.Outlined.Image, contentDescription = nomiString("Choose a photo"))
             }
         }
     }

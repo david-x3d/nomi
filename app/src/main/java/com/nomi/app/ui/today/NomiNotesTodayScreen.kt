@@ -1,6 +1,10 @@
 package com.nomi.app.ui.today
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -68,18 +72,21 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,6 +108,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -109,6 +117,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.BlendMode
@@ -137,11 +146,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.ui.capture.InlineDictationState
+import com.nomi.app.ui.capture.BarcodeCaptureScreen
+import com.nomi.app.ui.capture.PhotoCaptureScreen
+import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.capture.rememberInlineDictation
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.DictationWaveform
@@ -164,6 +177,10 @@ import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
+import com.nomi.app.ui.theme.nomiFadeMotionSpec
+import com.nomi.app.ui.theme.nomiLayoutMotionSpec
+import com.nomi.app.ui.theme.nomiPageMotionSpec
+import com.nomi.app.ui.theme.nomiProgressMotionSpec
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -200,6 +217,8 @@ fun NomiNotesTodayScreen(
     onEditPreview: () -> Unit,
     onDismissDraft: () -> Unit,
     onQuickMethod: (AddFoodMethod) -> Unit,
+    onInlinePhotoSelected: (Uri, String, PhotoCaptureSubject) -> Unit = { _, _, _ -> },
+    onInlineBarcodeDetected: (String) -> Unit = {},
     onVoiceTranscription: (String) -> Unit = {},
     onPhotoDescriptionChanged: (String) -> Unit = {},
     onPhotoPlaceChanged: (String) -> Unit = {},
@@ -210,12 +229,23 @@ fun NomiNotesTodayScreen(
     // Dictation stays on this page: the row at the bottom becomes the microphone rather than
     // handing the page over to a screen whose only job is to listen.
     val dictation = rememberInlineDictation(onTranscription = onVoiceTranscription)
-    var showQuickAdd by rememberSaveable { mutableStateOf(false) }
+    var inlineCaptureSubject by rememberSaveable { mutableStateOf<PhotoCaptureSubject?>(null) }
+    var showInlineBarcode by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
     var composerOpen by rememberSaveable { mutableStateOf(false) }
     // Where the line was touched, so the caret opens in that word instead of at the end.
     var caretInEditedEntry by rememberSaveable { mutableStateOf(0) }
     val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val currentOnInlinePhotoSelected by rememberUpdatedState(onInlinePhotoSelected)
+    val photoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        uri?.let { selected ->
+            val mimeType = context.contentResolver.getType(selected) ?: "image/*"
+            currentOnInlinePhotoSelected(selected, mimeType, PhotoCaptureSubject.MEAL)
+        }
+    }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     // The composer is the last row on the page, so focusing it scrolls the day out of sight.
@@ -284,6 +314,16 @@ fun NomiNotesTodayScreen(
     }
     // Back means "forget what I just said" while the bar is listening, not "leave the day".
     BackHandler(enabled = dictation.isActive) { dictation.cancel() }
+    BackHandler(enabled = inlineCaptureSubject != null || showInlineBarcode) {
+        inlineCaptureSubject = null
+        showInlineBarcode = false
+    }
+
+    LaunchedEffect(inlineCaptureSubject, showInlineBarcode) {
+        if (inlineCaptureSubject != null || showInlineBarcode) {
+            listState.animateScrollToItem(1)
+        }
+    }
 
     val pendingEntries = pendingDeletedFoods.values.map(PendingDeletedFood::entry)
     val displayedEntries = remember(state.entries, pendingEntries) {
@@ -307,24 +347,51 @@ fun NomiNotesTodayScreen(
             )
         },
         bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                contentAlignment = Alignment.Center,
+            AnimatedVisibility(
+                visible = inlineCaptureSubject == null && !showInlineBarcode,
+                enter = fadeIn(nomiFadeMotionSpec()) + expandVertically(
+                    animationSpec = nomiLayoutMotionSpec(),
+                    expandFrom = Alignment.Bottom,
+                ),
+                exit = fadeOut(nomiFadeMotionSpec()) + shrinkVertically(
+                    animationSpec = nomiLayoutMotionSpec(),
+                    shrinkTowards = Alignment.Bottom,
+                ),
             ) {
-                NotesFloatingActionRow(
-                    state = state,
-                    canSend = (loggingState as? FoodLoggingUiState.Input)
-                        ?.text?.isNotBlank() == true,
-                    dictation = dictation,
-                    onGoals = { showGoals = true },
-                    onVoice = dictation.start,
-                    onDictationDone = { haptics.sent(); dictation.stop() },
-                    onMore = { showQuickAdd = true },
-                    onWrite = { composerOpen = true },
-                    onSend = { haptics.sent(); closeComposer(); onAnalyze() },
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    NotesFloatingActionRow(
+                        state = state,
+                        canSend = (loggingState as? FoodLoggingUiState.Input)
+                            ?.text?.isNotBlank() == true,
+                        dictation = dictation,
+                        onGoals = { showGoals = true },
+                        onVoice = dictation.start,
+                        onDictationDone = { haptics.sent(); dictation.stop() },
+                        onCameraMethod = { method ->
+                            when (method) {
+                                AddFoodMethod.PHOTO -> inlineCaptureSubject = PhotoCaptureSubject.MEAL
+                                AddFoodMethod.MENU -> {
+                                    onQuickMethod(method)
+                                    inlineCaptureSubject = PhotoCaptureSubject.MENU
+                                }
+                                AddFoodMethod.BARCODE -> showInlineBarcode = true
+                                else -> onQuickMethod(method)
+                            }
+                        },
+                        onChoosePhoto = {
+                            photoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        },
+                        onLibraryMethod = onQuickMethod,
+                        onSend = { haptics.sent(); closeComposer(); onAnalyze() },
+                    )
+                }
             }
         },
     ) { contentPadding ->
@@ -371,6 +438,80 @@ fun NomiNotesTodayScreen(
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         )
+                    }
+                }
+
+                item(key = "inline-camera") {
+                    AnimatedVisibility(
+                        visible = inlineCaptureSubject != null || showInlineBarcode,
+                        enter = fadeIn(nomiFadeMotionSpec()) + expandVertically(
+                            animationSpec = nomiLayoutMotionSpec(),
+                            expandFrom = Alignment.Top,
+                        ),
+                        exit = fadeOut(nomiFadeMotionSpec()) + shrinkVertically(
+                            animationSpec = nomiLayoutMotionSpec(),
+                            shrinkTowards = Alignment.Top,
+                        ),
+                    ) {
+                        if (showInlineBarcode) {
+                            BarcodeCaptureScreen(
+                                inline = true,
+                                onBack = { showInlineBarcode = false },
+                                onBarcodeDetected = { barcode ->
+                                    showInlineBarcode = false
+                                    onInlineBarcodeDetected(barcode)
+                                },
+                                onManualEntry = {
+                                    showInlineBarcode = false
+                                    onQuickMethod(AddFoodMethod.TYPE)
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        } else inlineCaptureSubject?.let { subject ->
+                            Column(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                if (subject != PhotoCaptureSubject.MENU) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        FilterChip(
+                                            selected = subject == PhotoCaptureSubject.MEAL,
+                                            onClick = { inlineCaptureSubject = PhotoCaptureSubject.MEAL },
+                                            label = { Text(nomiString("Photo")) },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.CameraAlt, contentDescription = null)
+                                            },
+                                        )
+                                        FilterChip(
+                                            selected = subject == PhotoCaptureSubject.NUTRITION_LABEL,
+                                            onClick = {
+                                                inlineCaptureSubject = PhotoCaptureSubject.NUTRITION_LABEL
+                                            },
+                                            label = { Text(nomiString("Nutrition label")) },
+                                            leadingIcon = {
+                                                Icon(Icons.Default.Article, contentDescription = null)
+                                            },
+                                        )
+                                    }
+                                }
+                                PhotoCaptureScreen(
+                                    subject = subject,
+                                    inline = true,
+                                    onBack = { inlineCaptureSubject = null },
+                                    onPhotoSelected = { uri, mimeType ->
+                                        inlineCaptureSubject = null
+                                        onInlinePhotoSelected(uri, mimeType, subject)
+                                    },
+                                    onManualEntry = {
+                                        inlineCaptureSubject = null
+                                        onQuickMethod(AddFoodMethod.TYPE)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -479,16 +620,6 @@ fun NomiNotesTodayScreen(
         }
     }
 
-    if (showQuickAdd) {
-        QuickAddSheet(
-            onDismiss = { showQuickAdd = false },
-            onSelect = { method ->
-                showQuickAdd = false
-                onQuickMethod(method)
-            },
-        )
-    }
-
     if (showGoals) {
         GoalsSheet(state = state, onDismiss = { showGoals = false })
     }
@@ -504,8 +635,8 @@ private fun NotesHeader(
 ) {
     val locale = nomiLocale()
     val datePattern = nomiString("EEEE, MMMM d")
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val spatialSpec = nomiPageMotionSpec<IntOffset>()
+    val effectsSpec = nomiFadeMotionSpec<Float>()
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         tonalElevation = 0.dp,
@@ -599,9 +730,9 @@ private fun NotesHeader(
                             .weight(1f)
                             .padding(horizontal = 8.dp),
                         transitionSpec = {
-                            (slideInHorizontally(animationSpec = spatialSpec) { width -> width / 5 } +
+                            (slideInHorizontally(animationSpec = spatialSpec) { width -> width / 10 } +
                                 fadeIn(animationSpec = effectsSpec)).togetherWith(
-                                slideOutHorizontally(animationSpec = spatialSpec) { width -> -width / 5 } +
+                                slideOutHorizontally(animationSpec = spatialSpec) { width -> -width / 12 } +
                                     fadeOut(animationSpec = effectsSpec),
                             )
                         },
@@ -1627,7 +1758,7 @@ private fun ManualDraftNote(
 }
 
 /**
- * The resting state of the page: one floating row holding the remaining calories and the ways
+ * The resting state of the page: one floating row holding today's calories and the ways
  * to add food. Nothing else competes with the writing surface above it.
  *
  * While Nomi is listening the same row is the dictation: the calorie pill becomes the waveform
@@ -1642,25 +1773,23 @@ private fun NotesFloatingActionRow(
     onGoals: () -> Unit,
     onVoice: () -> Unit,
     onDictationDone: () -> Unit,
-    onMore: () -> Unit,
-    onWrite: () -> Unit,
+    onCameraMethod: (AddFoodMethod) -> Unit,
+    onChoosePhoto: () -> Unit,
+    onLibraryMethod: (AddFoodMethod) -> Unit,
     onSend: () -> Unit,
 ) {
     val locale = nomiLocale()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    // The remaining calories settle into their new value instead of snapping when an entry
+    var showCameraMenu by rememberSaveable { mutableStateOf(false) }
+    var showLibraryMenu by rememberSaveable { mutableStateOf(false) }
+    val effectsSpec = nomiFadeMotionSpec<Float>()
+    // Today's calories settle into their new value instead of snapping when an entry
     // is added, removed, or rescaled.
-    val animatedDifference by animateFloatAsState(
-        targetValue = state.caloriesDifference.toFloat(),
-        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(),
-        label = "calories left",
+    val animatedCalories by animateFloatAsState(
+        targetValue = state.caloriesConsumed.toFloat(),
+        animationSpec = nomiProgressMotionSpec(),
+        label = "calories consumed",
     )
-    val difference = animatedDifference.roundToInt()
-    val calorieText = if (difference >= 0) {
-        nomiFormat("{0} left", difference.formatted(locale))
-    } else {
-        nomiFormat("{0} over", abs(difference).formatted(locale))
-    }
+    val calorieText = "${animatedCalories.roundToInt().formatted(locale)} kcal"
     AnimatedContent(
         targetState = dictation.isActive,
         modifier = Modifier
@@ -1723,13 +1852,58 @@ private fun NotesFloatingActionRow(
                     description = nomiString("Describe food by voice"),
                     onClick = onVoice,
                 )
-                NotesCircleAction(
-                    icon = Icons.Default.Add,
-                    description = nomiString("More ways to add food"),
-                    onClick = onMore,
-                )
-                // Once there is something written, the same slot becomes the way to send it, and
-                // it trades places rather than blinking.
+                Box {
+                    NotesCircleAction(
+                        icon = Icons.Default.CameraAlt,
+                        description = nomiString("Photo"),
+                        onClick = {
+                            showLibraryMenu = false
+                            showCameraMenu = true
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = showCameraMenu,
+                        onDismissRequest = { showCameraMenu = false },
+                        offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        CompactActionMenuItem(
+                            icon = Icons.Default.CameraAlt,
+                            label = nomiString("Photo"),
+                            onClick = {
+                                showCameraMenu = false
+                                onCameraMethod(AddFoodMethod.PHOTO)
+                            },
+                        )
+                        CompactActionMenuItem(
+                            icon = Icons.Default.QrCodeScanner,
+                            label = nomiString("Barcode"),
+                            onClick = {
+                                showCameraMenu = false
+                                onCameraMethod(AddFoodMethod.BARCODE)
+                            },
+                        )
+                        CompactActionMenuItem(
+                            icon = Icons.Default.RestaurantMenu,
+                            label = nomiString("Scan menu"),
+                            onClick = {
+                                showCameraMenu = false
+                                onCameraMethod(AddFoodMethod.MENU)
+                            },
+                        )
+                        CompactActionMenuItem(
+                            icon = Icons.Default.PhotoLibrary,
+                            label = nomiString("Choose a photo"),
+                            onClick = {
+                                showCameraMenu = false
+                                onChoosePhoto()
+                            },
+                        )
+                    }
+                }
+                // Once there is something written, the plus becomes the way to send it, and it
+                // trades places instead of adding a fifth action to the compact row.
                 AnimatedContent(
                     targetState = canSend,
                     transitionSpec = {
@@ -1750,16 +1924,67 @@ private fun NotesFloatingActionRow(
                             emphasized = true,
                         )
                     } else {
-                        NotesCircleAction(
-                            icon = Icons.Default.Keyboard,
-                            description = nomiString("Write what you ate"),
-                            onClick = onWrite,
-                        )
+                        Box {
+                            NotesCircleAction(
+                                icon = Icons.Default.Add,
+                                description = nomiString("More ways to add food"),
+                                onClick = {
+                                    showCameraMenu = false
+                                    showLibraryMenu = true
+                                },
+                            )
+                            DropdownMenu(
+                                expanded = showLibraryMenu,
+                                onDismissRequest = { showLibraryMenu = false },
+                                offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                                shape = RoundedCornerShape(24.dp),
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ) {
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.History,
+                                    label = nomiString("Recent"),
+                                    onClick = {
+                                        showLibraryMenu = false
+                                        onLibraryMethod(AddFoodMethod.RECENT)
+                                    },
+                                )
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.FavoriteBorder,
+                                    label = nomiString("Favorites"),
+                                    onClick = {
+                                        showLibraryMenu = false
+                                        onLibraryMethod(AddFoodMethod.FAVORITES)
+                                    },
+                                )
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.RestaurantMenu,
+                                    label = nomiString("Saved meals"),
+                                    onClick = {
+                                        showLibraryMenu = false
+                                        onLibraryMethod(AddFoodMethod.SAVED_MEALS)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CompactActionMenuItem(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = { Text(label, maxLines = 1) },
+        onClick = onClick,
+        leadingIcon = { Icon(icon, contentDescription = null) },
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
+    )
 }
 
 /** The rounded slot on the left of the floating row, whatever happens to be inside it. */
@@ -1879,127 +2104,6 @@ private fun NotesCircleAction(
 }
 
 
-
-@Composable
-private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Unit) {
-    NomiSheet(onDismissRequest = onDismiss) {
-        NomiSheetHeader(
-            title = nomiString("Add food another way"),
-            icon = Icons.Default.Add,
-        )
-        // Seven rows is more than a phone shows at once, so the list scrolls; the gutter and gap
-        // match the entry-actions sheet, which is the same stack of tappable cards.
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            QuickAddRow(
-                icon = Icons.Default.CameraAlt,
-                title = nomiString("Photo"),
-                description = nomiString("Recognize a meal from a photo"),
-                onClick = { onSelect(AddFoodMethod.PHOTO) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.RestaurantMenu,
-                title = nomiString("Scan menu"),
-                description = nomiString("Photograph pages, search every dish, then log one"),
-                onClick = { onSelect(AddFoodMethod.MENU) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.QrCodeScanner,
-                title = nomiString("Barcode"),
-                description = nomiString("Scan a packaged food"),
-                onClick = { onSelect(AddFoodMethod.BARCODE) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.Article,
-                title = nomiString("Nutrition label"),
-                description = nomiString("Read the printed values, no research"),
-                onClick = { onSelect(AddFoodMethod.LABEL) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.History,
-                title = nomiString("Recent"),
-                description = nomiString("Log something again"),
-                onClick = { onSelect(AddFoodMethod.RECENT) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.FavoriteBorder,
-                title = nomiString("Favorites"),
-                description = nomiString("Choose one of your starred foods"),
-                onClick = { onSelect(AddFoodMethod.FAVORITES) },
-            )
-            QuickAddRow(
-                icon = Icons.Default.RestaurantMenu,
-                title = nomiString("Saved meals"),
-                description = nomiString("Reuse a complete meal"),
-                onClick = { onSelect(AddFoodMethod.SAVED_MEALS) },
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuickAddRow(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = nomiCardShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-        elevation = nomiCardElevation(),
-        border = nomiCardBorder(),
-    ) {
-        // Laid out by hand rather than with ListItem so the row keeps the same height, gutter and
-        // icon size as the entry-actions sheet instead of ListItem's tighter defaults.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 76.dp)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
 
 /**
  * The day's goals.

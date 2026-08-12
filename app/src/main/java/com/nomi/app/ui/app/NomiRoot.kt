@@ -7,14 +7,13 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -46,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,6 +88,8 @@ import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.progress.ProgressScreen
+import com.nomi.app.ui.theme.nomiFadeMotionSpec
+import com.nomi.app.ui.theme.nomiPageMotionSpec
 import com.nomi.app.ui.settings.AiProviderEditorDialog
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.SettingsScreen
@@ -215,20 +217,18 @@ private fun NomiMain(
             navController = navController,
             startDestination = Routes.HOME,
             enterTransition = {
-                fadeIn(animationSpec = tween(220)) +
-                    slideInHorizontally(animationSpec = tween(320)) { width -> width / 10 }
+                fadeIn(animationSpec = nomiFadeMotionSpec()) +
+                    slideInHorizontally(animationSpec = nomiPageMotionSpec()) { width -> width / 16 }
             },
             exitTransition = {
-                fadeOut(animationSpec = tween(150)) +
-                    scaleOut(animationSpec = tween(220), targetScale = 0.985f)
+                fadeOut(animationSpec = nomiFadeMotionSpec())
             },
             popEnterTransition = {
-                fadeIn(animationSpec = tween(220)) +
-                    scaleIn(animationSpec = tween(260), initialScale = 0.985f)
+                fadeIn(animationSpec = nomiFadeMotionSpec())
             },
             popExitTransition = {
-                fadeOut(animationSpec = tween(160)) +
-                    slideOutHorizontally(animationSpec = tween(280)) { width -> width / 10 }
+                fadeOut(animationSpec = nomiFadeMotionSpec()) +
+                    slideOutHorizontally(animationSpec = nomiPageMotionSpec()) { width -> width / 16 }
             },
         ) {
             composable(Routes.HOME) {
@@ -257,7 +257,6 @@ private fun NomiMain(
                             AddFoodMethod.MENU -> {
                                 viewModel.beginMenuScan()
                                 menuAddingPage = false
-                                navController.navigate(Routes.MENU_CAPTURE)
                             }
                             AddFoodMethod.LABEL -> navController.navigate(Routes.LABEL)
                             AddFoodMethod.BARCODE -> navController.navigate(Routes.BARCODE)
@@ -275,6 +274,34 @@ private fun NomiMain(
                         }
                     },
                     onLoggingTextChanged = viewModel::updateLoggingText,
+                    onInlinePhotoSelected = { uri, _, subject ->
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        resolver.openInputStream(uri)?.use(MealImagePreprocessor::prepare)
+                                            ?: error("The selected image could not be opened")
+                                    } finally {
+                                        deleteOwnedCameraCapture(context.applicationContext, uri)
+                                    }
+                                }
+                            }.onSuccess { prepared ->
+                                when (subject) {
+                                    PhotoCaptureSubject.MEAL ->
+                                        viewModel.analyzePhoto(prepared.bytes, prepared.mediaType)
+                                    PhotoCaptureSubject.NUTRITION_LABEL ->
+                                        viewModel.analyzeNutritionLabel(prepared.bytes, prepared.mediaType)
+                                    PhotoCaptureSubject.MENU -> {
+                                        viewModel.scanMenuPage(prepared.bytes, prepared.mediaType)
+                                        navController.navigate(Routes.MENU_RESULTS)
+                                    }
+                                }
+                            }.onFailure {
+                                showMessage(it.message ?: "Nomi couldn't read that image")
+                            }
+                        }
+                    },
+                    onInlineBarcodeDetected = viewModel::lookupBarcode,
                     onAnalyzeLogging = viewModel::analyzeText,
                     onConfirmLogging = viewModel::confirmLogging,
                     onRetryLogging = viewModel::retryAnalysis,
@@ -436,9 +463,25 @@ private fun NomiMain(
                     state = menuState,
                     onBack = { navController.popBackStack() },
                     onQueryChanged = viewModel::updateMenuSearch,
-                    onAddPage = {
-                        menuAddingPage = true
-                        navController.navigate(Routes.MENU_CAPTURE)
+                    onPhotoSelected = { uri, _ ->
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    try {
+                                        resolver.openInputStream(uri)?.use(MealImagePreprocessor::prepare)
+                                            ?: error("The selected image could not be opened")
+                                    } finally {
+                                        deleteOwnedCameraCapture(context.applicationContext, uri)
+                                    }
+                                }
+                            }.onSuccess { prepared ->
+                                viewModel.scanMenuPage(prepared.bytes, prepared.mediaType)
+                                menuAddingPage = false
+                            }.onFailure {
+                                menuAddingPage = false
+                                showMessage(it.message ?: "Nomi couldn't read that image")
+                            }
+                        }
                     },
                     onToggleDish = viewModel::toggleMenuDish,
                     onAddSelected = {
@@ -738,6 +781,8 @@ private fun MainNavigationSuite(
     onDiscardDeletedFood: (Long) -> Unit,
     onAddFood: (AddFoodMethod) -> Unit,
     onVoiceTranscription: (String) -> Unit,
+    onInlinePhotoSelected: (android.net.Uri, String, PhotoCaptureSubject) -> Unit,
+    onInlineBarcodeDetected: (String) -> Unit,
     onLoggingTextChanged: (String) -> Unit,
     onAnalyzeLogging: () -> Unit,
     onConfirmLogging: () -> Unit,
@@ -767,8 +812,9 @@ private fun MainNavigationSuite(
     onDeveloper: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableStateOf(MainDestination.TODAY) }
-    val destinationSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>()
-    val destinationEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val destinationStateHolder = rememberSaveableStateHolder()
+    val destinationSpatialSpec = nomiPageMotionSpec<IntOffset>()
+    val destinationEffectsSpec = nomiFadeMotionSpec<Float>()
     // Keeping the navigation suite measured under the IME makes child imePadding count both
     // heights and leaves a navigation-bar-sized gap above the keyboard.
     val isImeVisible = WindowInsets.isImeVisible
@@ -817,20 +863,26 @@ private fun MainNavigationSuite(
                 (
                     fadeIn(animationSpec = destinationEffectsSpec) +
                         slideInHorizontally(animationSpec = destinationSpatialSpec) { width ->
-                            direction * (width / 24)
+                            direction * (width / 32)
                         }
                     ).togetherWith(
                     fadeOut(animationSpec = destinationEffectsSpec) +
                         slideOutHorizontally(animationSpec = destinationSpatialSpec) { width ->
-                            -direction * (width / 32)
+                            -direction * (width / 40)
                         },
+                ).using(
+                    SizeTransform(
+                        clip = false,
+                        sizeAnimationSpec = { _, _ -> snap() },
+                    ),
                 )
             },
             contentKey = { it },
             contentAlignment = Alignment.Center,
             label = "Main destination",
         ) { destination ->
-        when (destination) {
+            destinationStateHolder.SaveableStateProvider(destination.name) {
+                when (destination) {
             MainDestination.TODAY -> {
                 val todayState by viewModel.todayState.collectAsStateWithLifecycle()
                 val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
@@ -855,13 +907,15 @@ private fun MainNavigationSuite(
                     onEditPreview = onEditLoggingPreview,
                     onDismissDraft = onDismissLoggingDraft,
                     onQuickMethod = onAddFood,
+                    onInlinePhotoSelected = onInlinePhotoSelected,
+                    onInlineBarcodeDetected = onInlineBarcodeDetected,
                     onVoiceTranscription = onVoiceTranscription,
                     onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
                     onPhotoPlaceChanged = viewModel::updatePhotoPlace,
                     onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
                 )
             }
-            MainDestination.PROGRESS -> {
+                    MainDestination.PROGRESS -> {
                 val progressState by viewModel.progressState.collectAsStateWithLifecycle()
                 ProgressScreen(
                     state = progressState,
@@ -869,7 +923,7 @@ private fun MainNavigationSuite(
                     onAddWeight = onAddWeight,
                 )
             }
-            MainDestination.SETTINGS -> {
+                    MainDestination.SETTINGS -> {
                 val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
                 SettingsScreen(
                     state = settingsState,
@@ -892,8 +946,9 @@ private fun MainNavigationSuite(
                     onImport = onImport,
                     onDeveloper = onDeveloper,
                 )
+                    }
+                }
             }
-        }
         }
     }
 }

@@ -1,5 +1,12 @@
 package com.nomi.app.ui.capture
 
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,13 +21,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,8 +38,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
@@ -43,11 +55,11 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiTextField
-import com.nomi.app.ui.components.nomiCardBorder
-import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.theme.nomiFadeMotionSpec
+import com.nomi.app.ui.theme.nomiLayoutMotionSpec
 import java.util.Locale
 
 data class MenuScanUiState(
@@ -102,11 +114,13 @@ fun MenuScanScreen(
     state: MenuScanUiState,
     onBack: () -> Unit,
     onQueryChanged: (String) -> Unit,
-    onAddPage: () -> Unit,
+    onPhotoSelected: (Uri, String) -> Unit = { _, _ -> },
     onToggleDish: (MenuDish) -> Unit,
     onAddSelected: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showPageCamera by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = showPageCamera) { showPageCamera = false }
     val filtered = filteredMenuDishes(state.items, state.query)
     val defaultCategory = nomiString("Menu")
     val grouped = filtered.groupBy { dish ->
@@ -116,22 +130,48 @@ fun MenuScanScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = { Text(nomiString("Menu")) },
+            CenterAlignedTopAppBar(
+                title = { Text(nomiString("Scan menu"), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back"))
+                    TextButton(onClick = onBack) {
+                        Text(nomiString("Cancel"))
                     }
                 },
                 actions = {
-                    IconButton(onClick = onAddPage, enabled = !state.isProcessing) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = nomiString("Add another menu page"))
+                    TextButton(
+                        onClick = onAddSelected,
+                        enabled = state.selectedDishKeys.isNotEmpty() && !state.isProcessing,
+                    ) {
+                        Text("${nomiString("Add")} (${state.selectedDishKeys.size})")
                     }
                 },
             )
         },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            AnimatedVisibility(
+                visible = showPageCamera,
+                enter = fadeIn(nomiFadeMotionSpec()) + expandVertically(
+                    animationSpec = nomiLayoutMotionSpec(),
+                    expandFrom = Alignment.Top,
+                ),
+                exit = fadeOut(nomiFadeMotionSpec()) + shrinkVertically(
+                    animationSpec = nomiLayoutMotionSpec(),
+                    shrinkTowards = Alignment.Top,
+                ),
+            ) {
+                PhotoCaptureScreen(
+                    subject = PhotoCaptureSubject.MENU,
+                    inline = true,
+                    onBack = { showPageCamera = false },
+                    onPhotoSelected = { uri, mimeType ->
+                        showPageCamera = false
+                        onPhotoSelected(uri, mimeType)
+                    },
+                    onManualEntry = { showPageCamera = false },
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             if (state.isProcessing) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             if (state.items.isEmpty() && state.isProcessing) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -182,6 +222,17 @@ fun MenuScanScreen(
                             leadingIcon = Icons.Default.Search,
                             label = nomiString("Search dishes, ingredients or numbers"),
                         )
+                        if (state.items.isNotEmpty()) {
+                            TextButton(
+                                onClick = { showPageCamera = true },
+                                enabled = !state.isProcessing,
+                                modifier = Modifier.align(Alignment.End),
+                            ) {
+                                Icon(Icons.Default.AddAPhoto, contentDescription = null)
+                                Spacer(Modifier.size(8.dp))
+                                Text(nomiString("Add another menu page"))
+                            }
+                        }
                         state.errorMessage?.let { NomiInlineError(it) }
                     }
                 }
@@ -201,7 +252,7 @@ fun MenuScanScreen(
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                             )
-                            Button(onClick = onAddPage) {
+                            Button(onClick = { showPageCamera = true }) {
                                 Icon(Icons.Default.AddAPhoto, contentDescription = null)
                                 Spacer(Modifier.size(8.dp))
                                 Text(nomiString("Add a clearer page"))
@@ -232,36 +283,7 @@ fun MenuScanScreen(
                     }
                 }
 
-                if (state.items.isNotEmpty()) {
-                    item {
-                        Button(
-                            onClick = onAddPage,
-                            enabled = !state.isProcessing,
-                            modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        ) {
-                            Icon(Icons.Default.AddAPhoto, contentDescription = null)
-                            Spacer(Modifier.size(8.dp))
-                            Text(nomiString("Photograph another page"))
-                        }
-                    }
-                }
-            }
-            if (state.selectedDishKeys.isNotEmpty()) {
-                Button(
-                    onClick = onAddSelected,
-                    enabled = !state.isProcessing,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                ) {
-                    val count = state.selectedDishKeys.size
-                    Text(
-                        // Singular and plural are separate catalogue entries so each language
-                        // can pick its own wording rather than bolting an "s" onto a noun.
-                        nomiFormat(
-                            if (count == 1) "Add {0} selected dish" else "Add {0} selected dishes",
-                            count,
-                        ),
-                    )
-                }
+                item { Spacer(Modifier.size(24.dp)) }
             }
         }
     }
@@ -271,9 +293,11 @@ fun MenuScanScreen(
 private fun MenuDishCard(dish: MenuDish, selected: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable(onClick = onClick),
-        shape = nomiCardShape(24.dp),
-        elevation = nomiCardElevation(),
-        border = nomiCardBorder(),
+        shape = nomiCardShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         ListItem(
             leadingContent = dish.number?.takeIf(String::isNotBlank)?.let { number ->

@@ -1,5 +1,14 @@
 # Changelog
 
+## Nomi v1.5 — 2026-08-12
+
+- Added a compact Today action bar with calories consumed, microphone, camera, and add actions.
+- Added small animated Material menus for photo capture, barcode scanning, menu scanning, gallery import, recent foods, favorites, and saved meals.
+- Photo, nutrition-label, barcode, and restaurant-menu capture now open inline instead of taking over the entire app.
+- Redesigned scanned-menu results with a centered action bar, search, grouped dishes, compact selection cards, and a live selected-item count.
+- Reworked page, date, onboarding, and progress transitions with shorter non-bouncy motion for smoother navigation.
+- Preserved destination state while switching between Today, Progress, and Settings.
+
 ## Nomi 1.4.5 — 2026-08-12
 
 - The goals sheet header and content now use one continuous Material You background color.

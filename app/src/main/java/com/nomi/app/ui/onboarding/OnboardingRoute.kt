@@ -43,6 +43,9 @@ import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.theme.nomiFadeMotionSpec
+import com.nomi.app.ui.theme.nomiPageMotionSpec
+import com.nomi.app.ui.theme.nomiProgressMotionSpec
 
 @Composable
 fun OnboardingRoute(
@@ -85,8 +88,8 @@ internal fun OnboardingFlow(
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val spatialSpec = nomiPageMotionSpec<IntOffset>()
+    val effectsSpec = nomiFadeMotionSpec<Float>()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -161,7 +164,7 @@ private fun OnboardingTopBar(
     val stepNumber = journey.indexOf(state.currentStep).coerceAtLeast(1)
     val progress by animateFloatAsState(
         targetValue = state.progress,
-        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+        animationSpec = nomiProgressMotionSpec(),
         label = "onboarding_progress_value",
     )
 
@@ -215,10 +218,10 @@ private fun onboardingTransition(
 ): ContentTransform {
     val direction = if (forward) 1 else -1
     return (
-        slideInHorizontally(animationSpec = spatialSpec) { width -> direction * width / 4 } +
+        slideInHorizontally(animationSpec = spatialSpec) { width -> direction * width / 10 } +
             fadeIn(animationSpec = effectsSpec)
         ).togetherWith(
-        slideOutHorizontally(animationSpec = spatialSpec) { width -> -direction * width / 5 } +
+        slideOutHorizontally(animationSpec = spatialSpec) { width -> -direction * width / 12 } +
             fadeOut(animationSpec = effectsSpec),
     )
 }

@@ -155,7 +155,9 @@ fun NomiTheme(
     CompositionLocalProvider(LocalPitchBlackSurfaces provides pitchBlack) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
-            motionScheme = MotionScheme.expressive(),
+            // Standard motion settles without the bounce of the expressive spring scheme. This
+            // keeps sheets, controls, and destination changes responsive on lower-end devices.
+            motionScheme = MotionScheme.standard(),
             content = content,
         )
     }

@@ -20,17 +20,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.NoPhotography
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -77,6 +80,7 @@ fun BarcodeCaptureScreen(
     onBarcodeDetected: (String) -> Unit,
     onManualEntry: () -> Unit,
     modifier: Modifier = Modifier,
+    inline: Boolean = false,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -184,6 +188,77 @@ fun BarcodeCaptureScreen(
             analyzer.close()
             analysisExecutor.shutdown()
         }
+    }
+
+    if (inline) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = nomiString("Line up the product barcode"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 360.dp, max = 520.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black)
+                    .testTag("inline_barcode_camera"),
+                contentAlignment = Alignment.Center,
+            ) {
+                BarcodePreviewContent(
+                    previewView = previewView,
+                    cameraAvailable = cameraAvailable,
+                    cameraPermissionGranted = cameraPermissionGranted,
+                    cameraReady = cameraReady,
+                    isBinding = isBinding,
+                    deliveredValue = deliveredValue,
+                    previewDescription = cameraPreviewDescription,
+                    scanAreaDescription = scanAreaDescription,
+                    onRequestPermission = {
+                        permissionDenied = false
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    },
+                )
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(20.dp),
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = nomiString("Cancel"))
+                }
+            }
+            if (permissionDenied) {
+                CaptureMessageCard(
+                    title = nomiString("Camera permission not granted"),
+                    message = nomiString("Try again when you're ready, or use manual entry."),
+                    icon = Icons.Outlined.NoPhotography,
+                    isError = true,
+                )
+            }
+            cameraError?.let { message ->
+                CaptureMessageCard(
+                    title = nomiString("Scanner unavailable"),
+                    message = message,
+                    icon = Icons.Outlined.NoPhotography,
+                    isError = true,
+                )
+                Button(
+                    onClick = { bindRequest += 1 },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(nomiString("Try camera again"))
+                }
+            }
+            OutlinedButton(onClick = onManualEntry, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Outlined.Keyboard, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text(nomiString("Enter manually"))
+            }
+        }
+        return
     }
 
     CaptureScaffold(
@@ -321,6 +396,63 @@ fun BarcodeCaptureScreen(
                 Spacer(Modifier.size(8.dp))
                 Text(nomiString("Enter manually"))
             }
+        }
+    }
+}
+
+@Composable
+private fun BarcodePreviewContent(
+    previewView: PreviewView,
+    cameraAvailable: Boolean,
+    cameraPermissionGranted: Boolean,
+    cameraReady: Boolean,
+    isBinding: Boolean,
+    deliveredValue: String?,
+    previewDescription: String,
+    scanAreaDescription: String,
+    onRequestPermission: () -> Unit,
+) {
+    if (cameraPermissionGranted && cameraAvailable) {
+        AndroidView(
+            factory = { previewView },
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = previewDescription },
+        )
+    }
+    if (cameraReady && deliveredValue == null) {
+        Box(
+            modifier = Modifier
+                .size(width = 280.dp, height = 170.dp)
+                .border(
+                    width = 3.dp,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(22.dp),
+                )
+                .semantics { contentDescription = scanAreaDescription },
+        )
+    }
+    when {
+        !cameraAvailable -> ScannerPlaceholder(
+            icon = Icons.Outlined.NoPhotography,
+            title = nomiString("No camera found"),
+            message = nomiString("Enter the barcode or food manually instead."),
+        )
+        !cameraPermissionGranted -> ScannerPlaceholder(
+            icon = Icons.Outlined.QrCodeScanner,
+            title = nomiString("Camera access is off"),
+            message = nomiString("Nomi asks only when you choose to scan."),
+            actionLabel = nomiString("Allow camera"),
+            onAction = onRequestPermission,
+        )
+        isBinding -> CircularProgressIndicator(color = Color.White)
+        cameraReady && deliveredValue == null -> Column(
+            modifier = Modifier.fillMaxSize().padding(bottom = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            Icon(Icons.Outlined.CenterFocusStrong, contentDescription = null, tint = Color.White)
+            Text(nomiString("Scanningâ€¦"), color = Color.White)
         }
     }
 }
