@@ -216,7 +216,7 @@ fun SettingsScreen(
                     title = nomiString("Goals view", "Ziele-Ansicht"),
                     supporting = state.goalsCardStyle.localizedDisplayName(),
                     onClick = { picker = SettingPicker.GoalsStyle },
-                    iconColor = MaterialTheme.colorScheme.error,
+                    iconColor = MaterialTheme.colorScheme.onSurface,
                 )
             }
             item { SectionTitle(nomiString("AI providers", "KI-Anbieter")) }

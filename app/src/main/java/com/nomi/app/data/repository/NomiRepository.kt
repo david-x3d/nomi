@@ -2,12 +2,14 @@ package com.nomi.app.data.repository
 
 import android.content.Context
 import androidx.room.withTransaction
+import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.data.local.NomiDatabase
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
 import com.nomi.app.data.local.entity.FoodLogEntity
+import com.nomi.app.data.local.entity.FoodResearchCacheEntity
 import com.nomi.app.data.local.entity.FoodServingEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.data.local.entity.NutritionSourceEntity
@@ -26,7 +28,13 @@ import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.AppPreferencesStore
 import com.nomi.app.data.preferences.DataStoreAppPreferencesStore
 import com.nomi.app.domain.PortionChangeValidator
+import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
+import com.nomi.app.domain.usecase.canPersistForResearchReuse
+import com.nomi.app.domain.usecase.foodResearchExpiry
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Locale
@@ -84,6 +92,10 @@ class NomiRepository(
     private val mealDao = database.savedMealDao()
     private val weightDao = database.weightDao()
     private val debugDao = database.aiDebugEventDao()
+    private val researchCacheJson = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+    }
 
     val profile: Flow<UserProfileEntity?> = profileDao.observeProfile()
     val currentPlan: Flow<NutritionPlanEntity?> = profileDao.observeCurrentPlan()
@@ -244,6 +256,39 @@ class NomiRepository(
             normalizedName = normalize(normalizedName),
             normalizedBrand = normalizedBrand?.let(::normalize),
         )
+
+    /** Returns only validated web research that has not reached its 21-day refresh point. */
+    suspend fun cachedFoodResearch(
+        key: FoodAnalysisCacheKey,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): FoodAnalysis? {
+        catalogDao.deleteExpiredResearchCache(nowEpochMillis)
+        val stored = catalogDao.freshResearchCache(key.storageKey(), nowEpochMillis) ?: return null
+        return runCatching {
+            researchCacheJson.decodeFromString<FoodAnalysis>(stored.analysisJson)
+        }.getOrElse {
+            catalogDao.deleteResearchCache(stored.cacheKey)
+            null
+        }
+    }
+
+    /** Estimates never enter this cache: only a successfully sourced web result can bypass search. */
+    suspend fun cacheFoodResearch(
+        key: FoodAnalysisCacheKey,
+        analysis: FoodAnalysis,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean {
+        if (!analysis.canPersistForResearchReuse()) return false
+        catalogDao.upsertResearchCache(
+            FoodResearchCacheEntity(
+                cacheKey = key.storageKey(),
+                analysisJson = researchCacheJson.encodeToString(analysis),
+                storedAtEpochMillis = nowEpochMillis,
+                expiresAtEpochMillis = foodResearchExpiry(nowEpochMillis),
+            ),
+        )
+        return true
+    }
 
     suspend fun addServing(serving: FoodServingEntity): Long {
         require(serving.amount > 0.0 && serving.grams > 0.0) { "Serving values must be positive" }

@@ -11,6 +11,7 @@ import androidx.room.Upsert
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
+import com.nomi.app.data.local.entity.FoodResearchCacheEntity
 import com.nomi.app.data.local.entity.FoodServingEntity
 import com.nomi.app.data.local.entity.NutritionSourceEntity
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
@@ -19,6 +20,24 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FoodCatalogDao {
+    @Query(
+        "SELECT * FROM food_research_cache " +
+            "WHERE cache_key = :cacheKey AND expires_at_epoch_millis > :nowEpochMillis LIMIT 1",
+    )
+    suspend fun freshResearchCache(
+        cacheKey: String,
+        nowEpochMillis: Long,
+    ): FoodResearchCacheEntity?
+
+    @Upsert
+    suspend fun upsertResearchCache(entry: FoodResearchCacheEntity)
+
+    @Query("DELETE FROM food_research_cache WHERE cache_key = :cacheKey")
+    suspend fun deleteResearchCache(cacheKey: String): Int
+
+    @Query("DELETE FROM food_research_cache WHERE expires_at_epoch_millis <= :nowEpochMillis")
+    suspend fun deleteExpiredResearchCache(nowEpochMillis: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertNutritionSource(source: NutritionSourceEntity): Long
 

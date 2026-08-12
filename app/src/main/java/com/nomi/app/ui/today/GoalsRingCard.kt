@@ -119,7 +119,7 @@ private fun RingGrid(state: TodayUiState) {
                 target = state.carbohydrates.targetGrams,
                 unit = "g",
                 fraction = state.carbohydrates.fraction,
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.onSurface,
             ),
         )
         add(

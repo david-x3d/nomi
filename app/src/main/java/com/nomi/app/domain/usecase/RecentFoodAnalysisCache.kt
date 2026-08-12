@@ -3,12 +3,28 @@ package com.nomi.app.domain.usecase
 import com.nomi.app.ai.model.FoodAnalysis
 import java.util.Locale
 
+internal const val FOOD_RESEARCH_CACHE_TTL_MILLIS = 21L * 24L * 60L * 60L * 1_000L
+
+internal fun FoodAnalysis.canPersistForResearchReuse(): Boolean =
+    items.isNotEmpty() && items.all { item -> !item.isEstimate && !item.sourceUrl.isNullOrBlank() }
+
+internal fun foodResearchExpiry(storedAtEpochMillis: Long): Long =
+    storedAtEpochMillis + FOOD_RESEARCH_CACHE_TTL_MILLIS
+
 data class FoodAnalysisCacheKey(
     val normalizedInput: String,
     val localeCountry: String,
     val interpretationProviderIdentity: String,
     val researchProviderIdentity: String,
 ) {
+    /** Stable Room primary key; the separators cannot occur in normalized UI/provider fields. */
+    fun storageKey(): String = listOf(
+        normalizedInput,
+        localeCountry,
+        interpretationProviderIdentity,
+        researchProviderIdentity,
+    ).joinToString("\u001f")
+
     companion object {
         fun create(
             input: String,

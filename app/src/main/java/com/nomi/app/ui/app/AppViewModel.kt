@@ -884,6 +884,20 @@ class AppViewModel(
                 return@launch
             }
 
+            if (menuDishes == null) {
+                repository.cachedFoodResearch(cacheKey)?.let { cached ->
+                    if (requestId == analysisRequestId) {
+                        recordRoute(
+                            route = NutritionRoute.NEW_RESEARCH,
+                            decision = NutritionRoute.Decision.LOCAL,
+                            detail = "Validated 21-day food research cache hit",
+                        )
+                        saveTextAnalysisAutomatically(cached, current.mealCategory, text)
+                    }
+                    return@launch
+                }
+            }
+
             cachedNutritionAnalysis(intent)?.let { cached ->
                 if (requestId == analysisRequestId) {
                     saveTextAnalysisAutomatically(cached, current.mealCategory, text)
@@ -901,6 +915,9 @@ class AppViewModel(
                 .onSuccess { analysis ->
                     if (requestId != analysisRequestId) return@onSuccess
                     recentFoodAnalysisCache.put(cacheKey, analysis)
+                    if (menuDishes == null) {
+                        repository.cacheFoodResearch(cacheKey, analysis)
+                    }
                     // Persist trusted gram-based results as soon as research succeeds. This
                     // means a retry, app restart, or abandoned preview can reuse the nutrition
                     // without another Exa/Gemini request; estimates and size-only portions are
@@ -974,10 +991,10 @@ class AppViewModel(
                     dismissPortionEdit()
                     mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
                     mutableEvents.emit(AppEvent.FoodSaved)
-                    // The UI has enough time to finish its 850 ms reveal, then this transient
+                    // The UI has enough time to finish its longer shimmer, then this transient
                     // wording is discarded so old rows never replay the effect.
                     viewModelScope.launch {
-                        delay(1_200L)
+                        delay(1_600L)
                         recentlySavedInputs.update { current -> current - revealGroupId }
                     }
                 }.onFailure { error ->

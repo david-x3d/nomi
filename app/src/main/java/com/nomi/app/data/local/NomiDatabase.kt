@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.nomi.app.data.local.dao.AiDebugEventDao
 import com.nomi.app.data.local.dao.FoodCatalogDao
 import com.nomi.app.data.local.dao.FoodLogDao
@@ -15,6 +17,7 @@ import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
 import com.nomi.app.data.local.entity.FoodLogEntity
+import com.nomi.app.data.local.entity.FoodResearchCacheEntity
 import com.nomi.app.data.local.entity.FoodServingEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.data.local.entity.NutritionSourceEntity
@@ -37,8 +40,9 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         SavedMealItemEntity::class,
         WeightEntryEntity::class,
         AiDebugEventEntity::class,
+        FoodResearchCacheEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -55,13 +59,33 @@ abstract class NomiDatabase : RoomDatabase() {
         @Volatile
         private var instance: NomiDatabase? = null
 
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `food_research_cache` (
+                        `cache_key` TEXT NOT NULL,
+                        `analysis_json` TEXT NOT NULL,
+                        `stored_at_epoch_millis` INTEGER NOT NULL,
+                        `expires_at_epoch_millis` INTEGER NOT NULL,
+                        PRIMARY KEY(`cache_key`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_food_research_cache_expires_at_epoch_millis` " +
+                        "ON `food_research_cache` (`expires_at_epoch_millis`)",
+                )
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NomiDatabase::class.java,
                 name,
-            ).build()
+            ).addMigrations(MIGRATION_1_2).build()
 
         /**
          * Process singleton. Intentionally has no destructive-migration fallback: unknown schema

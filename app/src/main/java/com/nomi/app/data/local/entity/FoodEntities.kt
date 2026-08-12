@@ -146,3 +146,16 @@ data class FavoriteFoodEntity(
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
     @ColumnInfo(name = "last_used_at_epoch_millis") val lastUsedAtEpochMillis: Long? = null,
 )
+
+/** A validated web-research result that can be reused until its deliberate refresh date. */
+@Entity(
+    tableName = "food_research_cache",
+    indices = [Index(value = ["expires_at_epoch_millis"])],
+)
+data class FoodResearchCacheEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "cache_key") val cacheKey: String,
+    @ColumnInfo(name = "analysis_json") val analysisJson: String,
+    @ColumnInfo(name = "stored_at_epoch_millis") val storedAtEpochMillis: Long,
+    @ColumnInfo(name = "expires_at_epoch_millis") val expiresAtEpochMillis: Long,
+)
