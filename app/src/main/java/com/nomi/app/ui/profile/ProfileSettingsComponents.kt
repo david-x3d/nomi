@@ -40,6 +40,9 @@ import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiMenu
 import com.nomi.app.ui.components.NomiMenuItem
 import com.nomi.app.ui.components.NomiPickerField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,6 +83,9 @@ internal fun SettingsNoticeCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = nomiCardShape(24.dp),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,

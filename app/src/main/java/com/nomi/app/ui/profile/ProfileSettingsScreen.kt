@@ -61,6 +61,9 @@ import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.components.NomiDatePickerDialog
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 import java.time.Instant
 import java.time.LocalDate
@@ -334,6 +337,9 @@ fun ProfileSettingsScreen(
                             onValueChange = { keepCustomTargets = it },
                         )
                         .testTag("profile_keep_custom_targets"),
+                    shape = nomiCardShape(),
+                    elevation = nomiCardElevation(),
+                    border = nomiCardBorder(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -364,6 +370,9 @@ fun ProfileSettingsScreen(
             if (submitted && !validation.isValid) {
                 item {
                     Card(
+                        shape = nomiCardShape(),
+                        elevation = nomiCardElevation(),
+                        border = nomiCardBorder(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,

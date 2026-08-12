@@ -40,6 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiTextField
@@ -263,6 +266,9 @@ fun MenuScanScreen(
 private fun MenuDishCard(dish: MenuDish, selected: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable(onClick = onClick),
+        shape = nomiCardShape(24.dp),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
     ) {
         ListItem(
             leadingContent = dish.number?.takeIf(String::isNotBlank)?.let { number ->

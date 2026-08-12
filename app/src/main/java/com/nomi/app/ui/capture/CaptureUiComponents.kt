@@ -30,6 +30,9 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +77,9 @@ internal fun CaptureMessageCard(
             .fillMaxWidth()
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag(if (isError) "capture_error" else "capture_message"),
+        shape = nomiCardShape(24.dp),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(
             containerColor = if (isError) {
                 MaterialTheme.colorScheme.errorContainer

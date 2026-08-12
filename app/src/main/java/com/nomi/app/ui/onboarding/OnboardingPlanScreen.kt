@@ -67,6 +67,9 @@ import com.nomi.app.domain.model.GoalType
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.ProgressRate
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -138,6 +141,9 @@ internal fun PlanRevealScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("daily_calorie_target"),
+                shape = nomiCardShape(),
+                elevation = nomiCardElevation(),
+                border = nomiCardBorder(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -347,6 +353,9 @@ private fun MacroCard(
 ) {
     Card(
         modifier = modifier.testTag(testTag),
+        shape = nomiCardShape(24.dp),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
@@ -377,7 +386,12 @@ private fun TrajectoryCard(plan: NutritionPlan) {
         "Roughly ${weeks.roundToInt().coerceAtLeast(1)} weeks to ${plan.targetWeightKg?.oneDecimal()} kg if the trend holds."
     } ?: "Use your multi-week weight trend to decide whether this target needs a small adjustment."
 
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+    Card(
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
         Row(modifier = Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Outlined.AutoGraph,
@@ -496,6 +510,9 @@ private fun PlanEditor(
     onApply: () -> Unit,
 ) {
     Card(
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -599,6 +616,9 @@ private fun PlanNumberField(
 private fun DetailCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)

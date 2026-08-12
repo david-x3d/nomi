@@ -45,6 +45,9 @@ import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.settings.HealthConnectUiState
 import com.nomi.app.ui.today.MealCategory
@@ -134,7 +137,12 @@ fun FoodEntryDetailScreen(
                     }
                 }
                 item {
-                    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        shape = nomiCardShape(),
+                        elevation = nomiCardElevation(),
+                        border = nomiCardBorder(),
+                    ) {
                         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(nomiString("Nutrition", "Nährwerte"), style = MaterialTheme.typography.titleLarge)
                             NutritionLine(nomiString("Calories", "Kalorien"), "${entry.calories.roundToInt()} kcal")
@@ -280,7 +288,12 @@ fun HealthConnectScreen(
             }
 
             if (health.status == HealthConnectPermissionStatus.CONNECTED) {
-                Card(Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = nomiCardShape(),
+                    elevation = nomiCardElevation(),
+                    border = nomiCardBorder(),
+                ) {
                     Column(
                         modifier = Modifier.padding(18.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),

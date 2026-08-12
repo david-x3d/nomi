@@ -2,7 +2,6 @@ package com.nomi.app.ui.today
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,6 +28,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.NomiCardShadowElevation
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardContainerColor
+import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.components.nomiCardTonalElevation
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
 import kotlin.math.roundToInt
@@ -52,14 +55,11 @@ fun GoalsRingCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
-        tonalElevation = 2.dp,
-        shadowElevation = 1.dp,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
+        shape = nomiCardShape(),
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
+        shadowElevation = NomiCardShadowElevation,
+        border = nomiCardBorder(),
     ) {
         Column(
             modifier = Modifier.padding(24.dp),

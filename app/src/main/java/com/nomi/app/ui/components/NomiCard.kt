@@ -9,9 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CardElevation
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
@@ -33,9 +38,11 @@ fun NomiCard(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = hairlineOnPitchBlack(),
+        shape = nomiCardShape(),
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
+        shadowElevation = NomiCardShadowElevation,
+        border = nomiCardBorder(),
     ) {
         Column(
             modifier = Modifier.padding(contentPadding),
@@ -44,6 +51,43 @@ fun NomiCard(
         )
     }
 }
+
+/** Shared spatial treatment for all large content cards. */
+val NomiCardShadowElevation: Dp = 1.dp
+
+fun nomiCardShape(cornerRadius: Dp = 28.dp): Shape = RoundedCornerShape(cornerRadius)
+
+@Composable
+fun nomiCardElevation(): CardElevation = CardDefaults.cardElevation(
+    defaultElevation = NomiCardShadowElevation,
+    pressedElevation = 3.dp,
+    focusedElevation = 2.dp,
+    hoveredElevation = 3.dp,
+    draggedElevation = 6.dp,
+    disabledElevation = 0.dp,
+)
+
+@Composable
+fun nomiCardContainerColor(): Color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+    MaterialTheme.colorScheme.surfaceContainerHigh
+} else {
+    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
+}
+
+@Composable
+fun nomiCardTonalElevation(): Dp = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
+    0.dp
+} else {
+    2.dp
+}
+
+@Composable
+fun nomiCardBorder(): BorderStroke = BorderStroke(
+    1.dp,
+    MaterialTheme.colorScheme.outlineVariant.copy(
+        alpha = if (LocalPitchBlackSurfaces.current) 0.72f else 0.42f,
+    ),
+)
 
 /**
  * On true-black themes the surface tones are flattened toward the canvas, so a hairline

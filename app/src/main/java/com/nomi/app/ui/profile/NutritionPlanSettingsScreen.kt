@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -194,6 +197,9 @@ fun NutritionPlanSettingsScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
+                    shape = nomiCardShape(),
+                    elevation = nomiCardElevation(),
+                    border = nomiCardBorder(),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -304,6 +310,9 @@ fun NutritionPlanSettingsScreen(
                     val difference = macroCalories - calories
                     Card(
                         modifier = Modifier.fillMaxWidth(),
+                        shape = nomiCardShape(),
+                        elevation = nomiCardElevation(),
+                        border = nomiCardBorder(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         ),
@@ -342,6 +351,9 @@ fun NutritionPlanSettingsScreen(
             if (submitted && !validation.isValid) {
                 item {
                     Card(
+                        shape = nomiCardShape(),
+                        elevation = nomiCardElevation(),
+                        border = nomiCardBorder(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,

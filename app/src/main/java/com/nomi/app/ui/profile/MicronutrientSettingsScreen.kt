@@ -48,6 +48,9 @@ import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.data.preferences.with
 import com.nomi.app.domain.Micronutrient
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 
 /**
@@ -173,6 +176,9 @@ fun MicronutrientSettingsScreen(
             if (submitted && !isValid) {
                 item {
                     Card(
+                        shape = nomiCardShape(),
+                        elevation = nomiCardElevation(),
+                        border = nomiCardBorder(),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer,
                             contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -219,6 +225,9 @@ private fun MicronutrientCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),

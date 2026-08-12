@@ -30,8 +30,8 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -64,6 +64,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.theme.NomiTheme
 import java.time.LocalDate
@@ -238,8 +241,11 @@ private fun CalorieHero(
     } else {
         MaterialTheme.colorScheme.tertiary
     }
-    ElevatedCard(
+    Card(
         modifier = modifier.fillMaxWidth().animateContentSize(),
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
@@ -294,7 +300,12 @@ private fun MacroSection(
     fat: MacroProgress,
     modifier: Modifier = Modifier,
 ) {
-    ElevatedCard(modifier = modifier.fillMaxWidth()) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = nomiCardShape(),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
+    ) {
         Column(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
