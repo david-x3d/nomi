@@ -1,5 +1,10 @@
 # Changelog
 
+## Nomi 1.4.4 — 2026-08-12
+
+- Removed the grey outlines and shadows around bar-style goal cards.
+- Goal cards now use clean, flat grey-white surfaces without a surrounding frame.
+
 ## Nomi 1.4.3 — 2026-08-12
 
 - The Settings header and content now share one consistent Material You background color.
