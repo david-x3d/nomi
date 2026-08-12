@@ -204,6 +204,7 @@ fun NomiNotesTodayScreen(
     onToday: () -> Unit,
     onFoodClick: (Long) -> Unit,
     onDeleteFood: (Long) -> Unit = {},
+    onDeleteFoodImmediately: (Long) -> Unit = {},
     onUndoDeleteFood: (Long) -> Unit = {},
     onDiscardDeletedFood: (Long) -> Unit = {},
     editedEntryId: Long? = null,
@@ -560,9 +561,8 @@ fun NomiNotesTodayScreen(
                                 onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
                                 onEmptied = {
                                     haptics.removed()
-                                    pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
                                     onDismissDraft()
-                                    onDeleteFood(entry.id)
+                                    onDeleteFoodImmediately(entry.id)
                                 },
                             )
                             pending == null -> SwipeToDeleteFoodRow(
@@ -801,11 +801,10 @@ private fun NotesEmptyState() {
  * How long a deleted row stays on the page offering to come back.
  *
  * The row still occupies its place while it waits, so the page does not settle until it goes:
- * a long window reads as the list being stuck rather than as a generous offer. Three seconds
- * is enough to catch a swipe you did not mean, and short enough that deleting on purpose feels
- * finished. A deletion is recoverable anyway - the entry can simply be written again.
+ * a long window reads as the list being stuck rather than as a generous offer. Two seconds
+ * still catch an accidental swipe without holding the deleted line on screen for long.
  */
-private const val UNDO_WINDOW_MILLIS = 3_000L
+private const val UNDO_WINDOW_MILLIS = 2_000L
 
 private data class PendingDeletedFood(
     val entry: TodayFoodEntry,

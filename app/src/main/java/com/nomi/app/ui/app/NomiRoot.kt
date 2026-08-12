@@ -239,6 +239,7 @@ private fun NomiMain(
                     onToday = viewModel::selectToday,
                     onFoodClick = { navController.navigate(Routes.food(it)) },
                     onDeleteFood = viewModel::deleteFoodLogForUndo,
+                    onDeleteFoodImmediately = viewModel::deleteFoodLog,
                     onUndoDeleteFood = viewModel::undoDeletedFoodLog,
                     onDiscardDeletedFood = viewModel::discardDeletedFoodLog,
                     onVoiceTranscription = { text ->
@@ -777,6 +778,7 @@ private fun MainNavigationSuite(
     onToday: () -> Unit,
     onFoodClick: (Long) -> Unit,
     onDeleteFood: (Long) -> Unit,
+    onDeleteFoodImmediately: (Long) -> Unit,
     onUndoDeleteFood: (Long) -> Unit,
     onDiscardDeletedFood: (Long) -> Unit,
     onAddFood: (AddFoodMethod) -> Unit,
@@ -895,6 +897,7 @@ private fun MainNavigationSuite(
                     onToday = onToday,
                     onFoodClick = onFoodClick,
                     onDeleteFood = onDeleteFood,
+                    onDeleteFoodImmediately = onDeleteFoodImmediately,
                     onUndoDeleteFood = onUndoDeleteFood,
                     onDiscardDeletedFood = onDiscardDeletedFood,
                     editedEntryId = editedEntryId,

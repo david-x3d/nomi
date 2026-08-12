@@ -1,5 +1,11 @@
 # Changelog
 
+## Nomi v1.5.3 — 2026-08-12
+
+- Shortened the swipe-to-delete Undo window from three seconds to two seconds.
+- Kept the red inline Undo row exclusively for right-to-left swipe deletion.
+- Clearing all text from an opened food entry now deletes it immediately without showing Undo.
+
 ## Nomi v1.5.2 — 2026-08-12
 
 - Removed the send button from typed food logging and its keyboard action.
