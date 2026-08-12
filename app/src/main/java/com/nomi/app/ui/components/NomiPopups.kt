@@ -1,8 +1,5 @@
 package com.nomi.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,11 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,7 +43,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 
@@ -296,8 +287,8 @@ fun NomiDatePickerDialog(
  * One bottom sheet, used everywhere.
  *
  * The half-open stop is skipped for the same reason everywhere: it made every sheet look like it
- * hesitated on the way up. The content rides in on the theme's own spatial spec a beat behind the
- * container, which is the expressive entrance - the surface arrives, then what is on it does.
+ * hesitated on the way up. Material's sheet motion owns the entrance so the content is available
+ * on the first frame instead of running a second, overlapping animation.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -307,11 +298,6 @@ fun NomiSheet(
     skipPartiallyExpanded: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    var contentVisible by remember { mutableStateOf(false) }
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    LaunchedEffect(Unit) { contentVisible = true }
-
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
@@ -319,19 +305,13 @@ fun NomiSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = NomiShapes.Sheet,
     ) {
-        AnimatedVisibility(
-            visible = contentVisible,
-            enter = fadeIn(animationSpec = effectsSpec) +
-                slideInVertically(animationSpec = spatialSpec) { height -> height / 8 },
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(bottom = 20.dp),
-                content = content,
-            )
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 20.dp),
+            content = content,
+        )
     }
 }
 

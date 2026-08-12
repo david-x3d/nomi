@@ -1,12 +1,12 @@
 package com.nomi.app.ui.app
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -39,6 +39,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,11 +66,16 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.nomi.app.domain.Micronutrient
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.components.WebsiteFaviconUrl
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardContainerColor
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
@@ -204,7 +210,7 @@ private fun FoodEntryActionsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FoodEntryActionRow(
                 icon = Icons.Default.Edit,
@@ -268,8 +274,6 @@ private fun FoodEntryActionRow(
     enabled: Boolean = true,
     destructive: Boolean = false,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
     val contentColor = when {
         !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.46f)
         destructive -> MaterialTheme.colorScheme.error
@@ -280,63 +284,70 @@ private fun FoodEntryActionRow(
         destructive -> MaterialTheme.colorScheme.errorContainer
         else -> MaterialTheme.colorScheme.secondaryContainer
     }
-    val pressedColor = when {
-        destructive -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.68f)
-        else -> MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-
-    Row(
+    Card(
+        onClick = onClick,
+        enabled = enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(if (isPressed) pressedColor else Color.Transparent)
-            .clickable(
-                enabled = enabled,
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            )
-            .heightIn(min = 76.dp)
-            .alpha(if (enabled) 1f else 0.78f)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = iconContainerColor,
+            .alpha(if (enabled) 1f else 0.72f),
+        shape = nomiCardShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (destructive) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.38f)
+            } else {
+                nomiCardContainerColor()
+            },
             contentColor = contentColor,
+            disabledContainerColor = nomiCardContainerColor(),
+            disabledContentColor = contentColor,
+        ),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 76.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center,
+            Surface(
+                shape = CircleShape,
+                color = iconContainerColor,
+                contentColor = contentColor,
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                Box(
+                    modifier = Modifier.size(48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = contentColor,
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (destructive && enabled) {
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.78f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.62f)
+                    },
                 )
             }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                color = contentColor,
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (destructive && enabled) {
-                    MaterialTheme.colorScheme.error.copy(alpha = 0.78f)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.62f)
-                },
-            )
         }
     }
 }
@@ -485,16 +496,13 @@ private fun NutritionSummaryCard(
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = nomiCardShape(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+            containerColor = nomiCardContainerColor(),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp),
@@ -612,11 +620,14 @@ private fun Micronutrient.metricColor(): Color = when (this) {
     Micronutrient.SODIUM -> MaterialTheme.colorScheme.error
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ItemAndSourceCard(entry: TodayFoodEntry) {
     var expanded by rememberSaveable(entry.id) { mutableStateOf(true) }
     val locale = nomiLocale()
     val quantityText = entry.quantityDisplay(locale).withContext
+    val contentSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
+    val contentEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val sourceHostname = remember(entry.sourceUrl) {
         WebsiteFaviconUrl.normalizePublicHttpsHostname(entry.sourceUrl)
     }
@@ -629,17 +640,13 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(),
-        shape = RoundedCornerShape(24.dp),
+            .fillMaxWidth(),
+        shape = nomiCardShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+            containerColor = nomiCardContainerColor(),
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
     ) {
         Column {
             Row(
@@ -671,7 +678,13 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                     },
                 )
             }
-            AnimatedVisibility(visible = expanded) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn(animationSpec = contentEffectsSpec) +
+                    expandVertically(animationSpec = contentSpatialSpec),
+                exit = fadeOut(animationSpec = contentEffectsSpec) +
+                    shrinkVertically(animationSpec = contentSpatialSpec),
+            ) {
                 Column(
                     modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -705,12 +718,8 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                         )
                     }
                     Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.42f),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.52f),
                         shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f),
-                        ),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -781,15 +790,12 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = nomiCardShape(24.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f),
+            containerColor = nomiCardContainerColor(),
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
     ) {
         Column(
             modifier = Modifier.padding(18.dp),

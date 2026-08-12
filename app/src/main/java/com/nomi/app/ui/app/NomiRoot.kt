@@ -758,8 +758,8 @@ private fun MainNavigationSuite(
     onDeveloper: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableStateOf(MainDestination.TODAY) }
-    val destinationSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val destinationEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val destinationSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>()
+    val destinationEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     // Keeping the navigation suite measured under the IME makes child imePadding count both
     // heights and leaves a navigation-bar-sized gap above the keyboard.
     val isImeVisible = WindowInsets.isImeVisible

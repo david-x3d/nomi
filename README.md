@@ -1,110 +1,108 @@
-# Nomi
+<div align="center">
 
-Nomi is a native Android nutrition journal built around low-friction, natural-language food logging and official Material 3 Expressive components.
+# 🦊 Nomi
 
-## Highlights
+### A fast, local-first nutrition journal for Android
 
-- Type, dictate, photograph, or scan a meal.
-- Review researched calories and macros before saving.
-- Deterministic portion scaling that preserves explicit user quantities.
-- Research finishes before a meal can be previewed or saved, so calories never change silently in the background.
-- Quantity support for mg, g, kg, ml, l, US fl oz, tablespoons/Esslöffel, and teaspoons/Teelöffel.
-- Germany-aware product sourcing and German/English UI support.
-- Offline Room history, recents, favorites, saved meals, weight tracking, and progress.
-- Configurable Sonar, Exa + Gemini, Perplexity, OpenRouter, OpenAI, and OpenAI-compatible providers.
-- API keys stored with Android Keystore-backed encryption and excluded from backups.
-- Light, dark, dynamic color, edge-to-edge layout, and Material 3 Expressive motion.
+[![Latest release](https://img.shields.io/github/v/release/david-x3d/nomi?display_name=tag&style=for-the-badge)](https://github.com/david-x3d/nomi/releases/latest)
+[![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
+[![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
+[![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#design)
 
-## Requirements
+[Download the latest APK](https://github.com/david-x3d/nomi/releases/latest) · [Report a bug](https://github.com/david-x3d/nomi/issues)
 
-- Android Studio with JDK 17
-- Android SDK 37
-- Android 8.0 (API 26) or newer device
+</div>
 
-## Build
+> [!IMPORTANT]
+> **Bring your own API key.** Nomi does not include hosted AI credits or a shared cloud account. AI-powered food research, interpretation, and image analysis require keys for the providers you choose in **Settings → AI providers**. Provider usage may incur charges on your own account.
 
-On Windows:
+## ✨ Features
+
+- 🗣️ Log food with natural language by typing or on-device dictation.
+- 📷 Recognize meals and nutrition labels from photos.
+- 🍽️ Scan full restaurant menus, search the extracted dishes, and select multiple items.
+- 🔎 Research branded products and restaurant meals using configurable AI providers.
+- ⚖️ Preserve explicit quantities and scale nutrition deterministically.
+- ✏️ Correct a logged amount with phrases such as “I ate 60 g less” without repeating online research.
+- ⭐ Reuse recent foods, favorites, and saved meals.
+- 📊 Track calories, macros, micronutrients, weight, goals, and progress.
+- 🇩🇪 Use the app in German or English with metric and US customary quantities.
+- 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
+
+## 🔑 AI setup
+
+1. Install Nomi and open **Settings → AI providers**.
+2. Select a provider and model for each pipeline.
+3. Enter your own API key or keys.
+4. Tap **Test connection** before logging food.
+
+Supported configurations include Sonar, Exa + Gemini, Perplexity, OpenRouter, OpenAI, and compatible custom endpoints. Exa + Gemini requires both a Google Gemini API key and an Exa API key. Only the text or image needed for the selected action is sent to the configured provider.
+
+API keys are stored on the device, excluded from app backups, and never committed to this repository. Nomi cannot provide, recover, or pay for third-party API credentials.
+
+## 📱 Installation
+
+1. Open the [latest GitHub release](https://github.com/david-x3d/nomi/releases/latest).
+2. Download the `Nomi-…-release.apk` asset.
+3. Allow installation from your browser or file manager when Android asks.
+4. Install the APK, then configure your own AI provider keys.
+
+GitHub releases are the official distribution channel for this repository. Verify the SHA-256 digest shown by GitHub when integrity matters.
+
+## 🎨 Design
+
+Nomi is a native Jetpack Compose app built with Material 3 Expressive. It supports light, dark, dynamic-color, and pitch-black surfaces; spatial cards; responsive motion; edge-to-edge layouts; and phone/tablet navigation patterns.
+
+## 🛡️ Privacy
+
+- Nutrition history, saved meals, favorites, goals, and weight records are local-first.
+- API credentials use Android Keystore-backed encryption and are excluded from exports and backups.
+- Meal text or a selected image is sent only when an AI-powered action needs it.
+- The configured provider's own privacy policy and pricing apply to those requests.
+- Exported backups do not contain API keys or diagnostic events.
+
+## 🧰 Requirements
+
+| Purpose | Requirement |
+|---|---|
+| Install | Android 8.0 (API 26) or newer |
+| Build | JDK 17 and Android SDK 37 |
+| AI features | Your own supported provider API key(s) |
+
+## 🏗️ Build from source
+
+Windows:
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
 ```
 
-On macOS or Linux:
+macOS or Linux:
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 
-## AI setup
-
-Open **Settings → AI providers**, select a provider and model for each pipeline, enter the API key, then use **Test connection**. Credentials stay on-device and are never included in Room, DataStore backups, logs, or repository files.
-
-Nomi's existing default research provider remains OpenRouter `perplexity/sonar`. Food research
-can instead select **Exa + Gemini**, which makes one request to Exa's official Search API and then
-one structured-extraction request directly to Google's Gemini API. Configure both fields in that
-provider dialog: the primary key is a Google Gemini API key and the second key is an Exa API key.
-The default direct Google model identifier is `gemini-2.5-flash`, a stable structured-output model
-suited to extraction. Transient 429/5xx responses from Exa or Google are retried with bounded
-exponential backoff. A configured `gemini-3.6-flash` call that remains unavailable falls back to
-`gemini-2.5-flash` before Nomi uses the separately configured smart fallback.
-
-Exa receives a simple query built from the original food text. Gemini receives only that exact
-input, Nomi's parsed quantity context, and the returned Exa documents. It selects opaque Exa source
-IDs; Nomi maps those IDs back to retrieved URLs, verifies that the selected document supports the
-product and values, then runs the existing Kotlin quantity reconciliation, serving normalizer,
-all-zero rejection, and source-integrity checks. A validation failure can use the separately
-configured smart fallback (normally Sonar). Only transient transport failures are retried; Nomi
-does not retry rejected or unsupported nutrition results.
-
-While Exa research is running, Nomi shows three restrained shimmering source slots. As soon as Exa
-returns pages, those slots become the real website favicons while Gemini checks the product,
-serving basis, and requested amount. The preview appears only after that pipeline has settled.
-
-For OpenRouter-hosted Perplexity models, use the full model identifier, for example
-`perplexity/sonar`.
-
-## Privacy
-
-Nutrition history is local-first. Nomi sends meal text or a user-selected image only to the provider configured for that action. Exported backups exclude API keys and diagnostic events.
-
-## Tests
+Run unit tests with:
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest
 ```
 
-The nutrition benchmark validates all cases and writes machine-readable preflight results without
-spending API credits:
+The optional nutrition evaluation tools live in `eval/`. Place live-evaluation credentials in `eval/.env`, which is ignored by Git, and run `python eval/run_eval.py --smoke` before a full `--live` evaluation.
 
-```powershell
-python eval/run_eval.py
-```
+## 🏷️ Versioning
 
-To classify and rescore already-saved full raw runs without API calls:
+Nomi follows semantic versioning for new releases:
 
-```powershell
-python eval/run_eval.py --score-existing
-```
+- **Patch** (`1.2.0 → 1.2.1`): fixes, polish, and small performance improvements.
+- **Minor** (`1.2.1 → 1.3.0`): substantial backward-compatible features or redesigns.
+- **Major** (`1.x → 2.0.0`): incompatible storage, behavior, or platform changes.
 
-For live evaluation, put `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, and `EXA_API_KEY` in `eval/.env`
-(which is ignored by Git). OpenRouter is needed only for the separate Sonar comparison; the Exa +
-Gemini provider calls Exa and Google directly. Run the isolated, fresh-cache 10-case smoke first:
+Published historical tags are immutable so existing APK links and update paths remain valid. Release notes are maintained in English.
 
-```powershell
-python eval/run_eval.py --smoke
-```
-
-The full isolated Sonar and Exa + Gemini run is accepted only after the latest smoke gate passes:
-
-```powershell
-python eval/run_eval.py --live
-```
-
-Results are written under `eval/results/`. Provider responses currently do not expose reliable
-per-request cost data, so cost stays null with an explanatory note rather than being guessed.
-
-## License
+## 📄 License
 
 No license has been granted. All rights reserved.

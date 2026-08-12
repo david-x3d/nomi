@@ -72,6 +72,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -144,6 +146,10 @@ import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.hairlineOnPitchBlack
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardContainerColor
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
@@ -214,9 +220,9 @@ fun NomiNotesTodayScreen(
         is FoodLoggingUiState.Error -> loggingState.originalText
         is FoodLoggingUiState.Manual -> loggingState.draft.name
     }
-    val itemSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-    val itemFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val contentSizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    val itemSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>()
+    val itemFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val contentSizeSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
     val pendingDeletedFoods = remember { mutableStateMapOf<Long, PendingDeletedFood>() }
 
     val liveEntryIds = remember(state.entries) {
@@ -1180,7 +1186,10 @@ private fun ProcessingNote(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1910,38 +1919,40 @@ private fun QuickAddRow(
     description: String,
     onClick: () -> Unit,
 ) {
-    // A real ListItem rather than a hand-built row, so it inherits Material's own heights,
-    // spacing and text colours and stays right when the theme or the font scale changes. The
-    // rounded clip is what makes the press highlight a pill instead of a full-bleed band.
-    ListItem(
-        modifier = Modifier
-            .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        leadingContent = {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = nomiCardShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
+    ) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            leadingContent = {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                 }
-            }
-        },
-        headlineContent = {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-            )
-        },
-        supportingContent = { Text(description) },
-        trailingContent = {
-            Icon(Icons.Default.ChevronRight, contentDescription = null)
-        },
-    )
+            },
+            headlineContent = {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            },
+            supportingContent = { Text(description) },
+            trailingContent = {
+                Icon(Icons.Default.ChevronRight, contentDescription = null)
+            },
+        )
+    }
 }
 
 /**
