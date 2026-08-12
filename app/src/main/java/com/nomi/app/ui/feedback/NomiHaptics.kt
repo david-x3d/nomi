@@ -18,6 +18,9 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  */
 @Immutable
 class NomiHaptics(private val feedback: HapticFeedback) {
+    /** A writing surface or compact action was deliberately opened. */
+    fun selected() = feedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+
     /** A meal was handed over to be researched. */
     fun sent() = feedback.performHapticFeedback(HapticFeedbackType.SegmentTick)
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Nomi v1.5.1 — 2026-08-12
+
+- Food descriptions now start researching automatically after 1.5 seconds without further typing.
+- Added a three-dot typing animation in place of the calorie total while composing.
+- Logged entries can now be deleted like a line in a notes app by opening and clearing their text.
+- Kept swipe-to-delete and its inline Undo flow alongside keyboard deletion.
+- Added more tactile feedback when opening, editing, submitting, and deleting entries or choosing capture actions.
+
 ## Nomi v1.5 — 2026-08-12
 
 - Added a compact Today action bar with calories consumed, microphone, camera, and add actions.

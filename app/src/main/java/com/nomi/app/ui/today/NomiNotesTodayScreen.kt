@@ -369,10 +369,11 @@ fun NomiNotesTodayScreen(
                         canSend = (loggingState as? FoodLoggingUiState.Input)
                             ?.text?.isNotBlank() == true,
                         dictation = dictation,
-                        onGoals = { showGoals = true },
-                        onVoice = dictation.start,
+                        onGoals = { haptics.selected(); showGoals = true },
+                        onVoice = { haptics.selected(); dictation.start() },
                         onDictationDone = { haptics.sent(); dictation.stop() },
                         onCameraMethod = { method ->
+                            haptics.selected()
                             when (method) {
                                 AddFoodMethod.PHOTO -> inlineCaptureSubject = PhotoCaptureSubject.MEAL
                                 AddFoodMethod.MENU -> {
@@ -384,11 +385,15 @@ fun NomiNotesTodayScreen(
                             }
                         },
                         onChoosePhoto = {
+                            haptics.selected()
                             photoPicker.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                             )
                         },
-                        onLibraryMethod = onQuickMethod,
+                        onLibraryMethod = { method ->
+                            haptics.selected()
+                            onQuickMethod(method)
+                        },
                         onSend = { haptics.sent(); closeComposer(); onAnalyze() },
                     )
                 }
@@ -407,7 +412,12 @@ fun NomiNotesTodayScreen(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {
-                        if (editedEntryId != null) onDismissDraft() else composerOpen = true
+                        if (editedEntryId != null) {
+                            onDismissDraft()
+                        } else {
+                            haptics.selected()
+                            composerOpen = true
+                        }
                     },
                 ),
             contentAlignment = Alignment.TopCenter,
@@ -552,11 +562,21 @@ fun NomiNotesTodayScreen(
                                 initialCaret = caretInEditedEntry,
                                 onTextChanged = onTextChanged,
                                 onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
+                                onEmptied = {
+                                    haptics.removed()
+                                    pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
+                                    onDismissDraft()
+                                    onDeleteFood(entry.id)
+                                },
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
-                                onOpenDetails = { onFoodClick(entry.id) },
+                                onOpenDetails = {
+                                    haptics.selected()
+                                    onFoodClick(entry.id)
+                                },
                                 onEditText = { caret ->
+                                    haptics.selected()
                                     caretInEditedEntry = caret
                                     onEditEntryText(entry)
                                 },
@@ -1276,6 +1296,7 @@ private fun InlineComposerCanvas(
     onTextChanged: (String) -> Unit,
     onAnalyze: () -> Unit,
     initialCaret: Int? = null,
+    onEmptied: (() -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(autoFocus) {
@@ -1285,9 +1306,18 @@ private fun InlineComposerCanvas(
         val caret = (initialCaret ?: text.length).coerceIn(0, text.length)
         mutableStateOf(TextFieldValue(text, TextRange(caret)))
     }
+    var userHasTyped by remember { mutableStateOf(false) }
     // Text can also change from outside - a draft reopened for correction, a cleared page -
     // and then the field follows it with the caret at the end.
     val value = if (typed.text == text) typed else TextFieldValue(text, TextRange(text.length))
+    // A pause means the sentence is finished. The flag matters for reopened rows: merely
+    // placing the caret must never research the unchanged entry after 1.5 seconds.
+    LaunchedEffect(value.text, userHasTyped) {
+        if (userHasTyped && value.text.isNotBlank()) {
+            delay(AUTO_ANALYZE_DELAY_MILLIS)
+            onAnalyze()
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1299,7 +1329,14 @@ private fun InlineComposerCanvas(
             value = value,
             onValueChange = { updated ->
                 typed = updated
-                if (updated.text != text) onTextChanged(updated.text)
+                if (updated.text != text) {
+                    userHasTyped = true
+                    if (updated.text.isBlank() && text.isNotBlank() && onEmptied != null) {
+                        onEmptied()
+                    } else {
+                        onTextChanged(updated.text)
+                    }
+                }
             },
             modifier = Modifier
                 .weight(1f)
@@ -1828,23 +1865,36 @@ private fun NotesFloatingActionRow(
                 )
             } else {
                 NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = calorieText,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    AnimatedContent(
+                        targetState = canSend,
+                        transitionSpec = {
+                            fadeIn(animationSpec = effectsSpec)
+                                .togetherWith(fadeOut(animationSpec = effectsSpec))
+                        },
+                        label = "typing calories",
+                    ) { typing ->
+                        if (typing) {
+                            TypingDots()
+                        } else {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocalFireDepartment,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                                Text(
+                                    text = calorieText,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                     }
                 }
                 NotesCircleAction(
@@ -1972,6 +2022,41 @@ private fun NotesFloatingActionRow(
         }
     }
 }
+
+/** Three quiet rising dots replace the calorie total while a sentence is being written. */
+@Composable
+private fun TypingDots() {
+    val dots = remember { List(3) { Animatable(0f) } }
+    LaunchedEffect(Unit) {
+        dots.forEachIndexed { index, dot ->
+            launch {
+                delay(index * 120L)
+                while (true) {
+                    dot.animateTo(-5f, animationSpec = tween(260))
+                    dot.animateTo(0f, animationSpec = tween(260))
+                    delay(220L)
+                }
+            }
+        }
+    }
+    Row(
+        modifier = Modifier.semantics { contentDescription = "Nomi is waiting for you to finish typing" },
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        dots.forEach { dot ->
+            Box(
+                modifier = Modifier
+                    .graphicsLayer { translationY = dot.value }
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+    }
+}
+
+private const val AUTO_ANALYZE_DELAY_MILLIS = 1_500L
 
 @Composable
 private fun CompactActionMenuItem(
