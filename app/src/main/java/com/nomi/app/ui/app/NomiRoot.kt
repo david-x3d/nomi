@@ -476,6 +476,7 @@ private fun NomiMain(
                 val preferences by viewModel.preferences.collectAsStateWithLifecycle()
                 val id = entry.arguments?.getLong("id")
                 val food = (todayState.entries + historyState.visibleDays.flatMap { it.entries })
+                    .flatMap { entry -> listOf(entry) + entry.groupItems }
                     .firstOrNull { it.id == id }
                 NomiFoodDetailScreen(
                     entry = food,
@@ -485,6 +486,7 @@ private fun NomiMain(
                     onFavorite = viewModel::favoriteFoodLog,
                     onDelete = viewModel::deleteFoodLog,
                     onEditAmount = viewModel::startLoggedAmountEdit,
+                    onOpenItem = { itemId -> navController.navigate(Routes.food(itemId)) },
                 )
             }
 

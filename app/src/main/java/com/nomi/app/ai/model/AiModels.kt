@@ -86,6 +86,8 @@ data class AnalyzedFoodItem(
     val proteinGrams: Double,
     val carbohydrateGrams: Double,
     val fatGrams: Double,
+    /** A short user-facing summary of the main calorie drivers, not hidden chain-of-thought. */
+    val calorieExplanation: String? = null,
     val fiberGrams: Double? = null,
     /**
      * Micronutrients stay nullable all the way through: a source that does not print sugar is

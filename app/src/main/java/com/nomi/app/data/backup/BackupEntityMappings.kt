@@ -75,6 +75,7 @@ internal fun NutritionSourceSnapshot.toBackup(): BackupNutritionSourceSnapshotV1
         productName = productName,
         servingQuantity = servingQuantity,
         servingUnit = servingUnit,
+        calorieExplanation = calorieExplanation,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )
@@ -91,6 +92,7 @@ internal fun BackupNutritionSourceSnapshotV1.toEntity(): NutritionSourceSnapshot
         productName = productName,
         servingQuantity = servingQuantity,
         servingUnit = servingUnit,
+        calorieExplanation = calorieExplanation,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )

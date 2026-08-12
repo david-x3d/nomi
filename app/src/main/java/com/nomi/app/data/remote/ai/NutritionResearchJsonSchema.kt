@@ -47,6 +47,7 @@ private fun nutritionItemSchema(): JsonObject = buildJsonObject {
             "proteinGrams",
             "carbohydrateGrams",
             "fatGrams",
+            "calorieExplanation",
             "sourceServingQuantity",
             "sourceServingUnit",
             "isEstimate",
@@ -62,6 +63,7 @@ private fun nutritionItemSchema(): JsonObject = buildJsonObject {
         put("proteinGrams", nonNegativeNumberSchema())
         put("carbohydrateGrams", nonNegativeNumberSchema())
         put("fatGrams", nonNegativeNumberSchema())
+        put("calorieExplanation", stringSchema())
         put("fiberGrams", nullable(nonNegativeNumberSchema()))
         // Micronutrients stay optional and nullable: a source that does not publish them must
         // say so with null rather than inventing a zero.

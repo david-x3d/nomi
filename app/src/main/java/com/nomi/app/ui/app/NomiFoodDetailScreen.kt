@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -115,6 +116,7 @@ fun NomiFoodDetailScreen(
     onDuplicate: (Long) -> Unit,
     onDelete: (Long) -> Unit,
     onEditAmount: (TodayFoodEntry) -> Unit,
+    onOpenItem: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by rememberSaveable { mutableStateOf(false) }
@@ -142,7 +144,7 @@ fun NomiFoodDetailScreen(
                 actions = {
                     IconButton(
                         onClick = { entry?.let(onEditAmount) },
-                        enabled = entry != null,
+                        enabled = entry != null && entry.groupItems.isEmpty(),
                     ) {
                         Icon(
                             Icons.Default.Edit,
@@ -153,7 +155,7 @@ fun NomiFoodDetailScreen(
                     // explanation each, which a menu row has no room for.
                     IconButton(
                         onClick = { menuExpanded = true },
-                        enabled = entry != null,
+                        enabled = entry != null && entry.groupItems.isEmpty(),
                     ) {
                         Icon(
                             Icons.Default.MoreVert,
@@ -172,6 +174,7 @@ fun NomiFoodDetailScreen(
                 entry = entry,
                 enabledMicronutrients = enabledMicronutrients,
                 onEditAmount = { onEditAmount(entry) },
+                onOpenItem = onOpenItem,
                 contentPadding = PaddingValues(
                     start = 20.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
@@ -388,6 +391,7 @@ private fun NutritionContent(
     entry: TodayFoodEntry,
     enabledMicronutrients: List<Micronutrient>,
     onEditAmount: () -> Unit,
+    onOpenItem: (Long) -> Unit,
     contentPadding: PaddingValues,
 ) {
     val backdrop = Brush.verticalGradient(
@@ -413,7 +417,7 @@ private fun NutritionContent(
             )
         }
         item(key = "items") {
-            ItemAndSourceCard(entry = entry)
+            ItemAndSourceCard(entry = entry, onOpenItem = onOpenItem)
         }
         item(key = "explanation") {
             EstimateExplanationCard(entry = entry, onEditAmount = onEditAmount)
@@ -433,7 +437,11 @@ private fun EntryHeading(entry: TodayFoodEntry) {
         MealCategory.SNACKS -> nomiString("Snacks")
     }
     val locale = nomiLocale()
-    val quantityText = entry.quantityDisplay(locale).withContext
+    val quantityText = if (entry.groupItems.size > 1) {
+        nomiFormat("{0} items", entry.groupItems.size)
+    } else {
+        entry.quantityDisplay(locale).withContext
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -498,7 +506,7 @@ private fun NutritionSummaryCard(
                 MaterialTheme.colorScheme.tertiary,
             ),
         )
-        enabledMicronutrients.distinct().forEach { nutrient ->
+        (Micronutrient.entries + enabledMicronutrients).distinct().forEach { nutrient ->
             add(
                 NutritionMetric(
                     label = nutrient.localizedName(),
@@ -595,7 +603,7 @@ private fun NutrientMetric(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = "${formatNumber(metric.amount ?: 0.0, locale)} ${metric.unit}",
+            text = metric.amount?.let { "${formatNumber(it, locale)} ${metric.unit}" } ?: "—",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
         )
@@ -637,7 +645,85 @@ private fun Micronutrient.metricColor(): Color = when (this) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ItemAndSourceCard(entry: TodayFoodEntry) {
+private fun GroupedItemsCard(
+    entry: TodayFoodEntry,
+    onOpenItem: (Long) -> Unit,
+) {
+    val locale = nomiLocale()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = nomiCardShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
+        elevation = nomiCardElevation(),
+        border = nomiCardBorder(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 17.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = nomiString("Items"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = nomiFormat("{0} items", entry.groupItems.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            entry.groupItems.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onOpenItem(item.id) }
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = item.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = item.quantityDisplay(locale).withContext,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "${item.calories.roundToInt()} kcal",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = nomiFormat("Nutrition for {0}", item.name),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ItemAndSourceCard(
+    entry: TodayFoodEntry,
+    onOpenItem: (Long) -> Unit,
+) {
+    if (entry.groupItems.size > 1) {
+        GroupedItemsCard(entry = entry, onOpenItem = onOpenItem)
+        return
+    }
     var expanded by rememberSaveable(entry.id) { mutableStateOf(true) }
     val locale = nomiLocale()
     val quantityText = entry.quantityDisplay(locale).withContext
@@ -828,7 +914,11 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
 @Composable
 private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> Unit) {
     val locale = nomiLocale()
-    val amountDetail = entry.quantityDisplay(locale).withContext
+    val amountDetail = if (entry.groupItems.size > 1) {
+        nomiFormat("{0} items", entry.groupItems.size)
+    } else {
+        entry.quantityDisplay(locale).withContext
+    }
     val sourceDetail = entry.sourceName?.takeIf { it.isNotBlank() }
         ?: if (entry.isEstimated) {
             nomiString("the food description you entered")
@@ -850,6 +940,10 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
             amountDetail,
         )
     }
+    val calorieExplanation = entry.calorieExplanation
+        ?.trim()
+        ?.takeIf(String::isNotBlank)
+        ?: fallbackCalorieExplanation(entry)
 
     // The section name sits above the card the way "References" does, so the card itself opens
     // on the confidence ring instead of repeating its own title.
@@ -881,10 +975,46 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                CorrectionPrompt(onClick = onEditAmount)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = nomiString("Why this calorie total"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = calorieExplanation,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                if (entry.groupItems.isEmpty()) {
+                    CorrectionPrompt(onClick = onEditAmount)
+                }
             }
         }
     }
+}
+
+/** Fallback for older, manual, barcode, and library entries that predate the AI explanation. */
+private fun fallbackCalorieExplanation(entry: TodayFoodEntry): String {
+    val contributors = listOf(
+        "fat" to entry.fatGrams.coerceAtLeast(0.0) * 9.0,
+        "carbohydrates" to entry.carbohydrateGrams.coerceAtLeast(0.0) * 4.0,
+        "protein" to entry.proteinGrams.coerceAtLeast(0.0) * 4.0,
+    )
+    val dominant = contributors.maxByOrNull { it.second }
+    if (dominant == null || dominant.second <= 0.0) {
+        return "The calorie total follows the logged portion and the available nutrition data."
+    }
+    val grams = when (dominant.first) {
+        "fat" -> entry.fatGrams
+        "carbohydrates" -> entry.carbohydrateGrams
+        else -> entry.proteinGrams
+    }
+    val kcalPerGram = if (dominant.first == "fat") 9 else 4
+    return "Most of the energy comes from ${dominant.first} (${formatNumber(grams, Locale.getDefault())} g, " +
+        "about ${dominant.second.roundToInt()} kcal). At $kcalPerGram kcal per gram, it is the " +
+        "main calorie driver for this portion."
 }
 
 /** The way out of a wrong estimate: the amount editor, one tap from the reasoning that produced it. */

@@ -384,6 +384,22 @@ class NomiRepository(
         snapshot
     }
 
+    /** Deletes every product in the visible menu row and returns all snapshots for Undo. */
+    suspend fun deleteLogsForUndo(id: Long): List<FoodLogEntity> = database.withTransaction {
+        require(id > 0) { "Only a persisted food log can be deleted" }
+        val source = logDao.log(id) ?: return@withTransaction emptyList()
+        val snapshots = source.entryGroupId
+            ?.let(logDao::logsByEntryGroupId)
+            ?.ifEmpty { listOf(source) }
+            ?: listOf(source)
+        snapshots.forEach { snapshot ->
+            check(logDao.deleteLogById(snapshot.id) == 1) {
+                "Food log changed before it could be deleted"
+            }
+        }
+        snapshots
+    }
+
     /** Restores an Undo snapshot with its original primary key and timestamps intact. */
     suspend fun restoreDeletedLog(log: FoodLogEntity): Boolean = database.withTransaction {
         require(log.id > 0) { "Only a persisted food log can be restored" }
@@ -391,6 +407,24 @@ class NomiRepository(
         val existing = logDao.log(log.id)
         if (existing != null) return@withTransaction existing == log
         logDao.insertLog(log) == log.id
+    }
+
+    /** Restores a complete menu snapshot atomically, preserving every original primary key. */
+    suspend fun restoreDeletedLogs(logs: List<FoodLogEntity>): Boolean = database.withTransaction {
+        if (logs.isEmpty()) return@withTransaction false
+        logs.forEach { log ->
+            require(log.id > 0) { "Only persisted food logs can be restored" }
+            validateLog(log)
+        }
+        val existing = logs.mapNotNull { logDao.log(it.id) }
+        if (existing.isNotEmpty()) {
+            return@withTransaction existing.size == logs.size &&
+                logs.all { log -> logDao.log(log.id) == log }
+        }
+        logs.forEach { log ->
+            check(logDao.insertLog(log) == log.id) { "The deleted food could not be restored" }
+        }
+        true
     }
 
 

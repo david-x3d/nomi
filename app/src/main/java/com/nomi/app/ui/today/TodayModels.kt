@@ -149,6 +149,10 @@ data class TodayFoodEntry(
     /** The amount the cited page's values describe, before scaling to the eaten portion. */
     val sourceServingQuantity: Double? = null,
     val sourceServingUnit: String? = null,
+    /** Short AI-generated explanation of the main calorie contributors for this entry. */
+    val calorieExplanation: String? = null,
+    /** Individual logs that make up a combined meal shown as one row on the Today page. */
+    val groupItems: List<TodayFoodEntry> = emptyList(),
     /** Briefly present after auto-save so the written sentence can resolve into its short label. */
     val revealText: String? = null,
 )

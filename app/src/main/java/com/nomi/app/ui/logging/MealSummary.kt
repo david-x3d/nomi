@@ -56,6 +56,11 @@ internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalys
                 proteinGrams = items.sumOf(AnalyzedFoodItem::proteinGrams),
                 carbohydrateGrams = items.sumOf(AnalyzedFoodItem::carbohydrateGrams),
                 fatGrams = items.sumOf(AnalyzedFoodItem::fatGrams),
+                calorieExplanation = items.mapNotNull { item ->
+                    item.calorieExplanation?.trim()?.takeIf(String::isNotBlank)?.let { explanation ->
+                        "${item.name}: $explanation"
+                    }
+                }.joinToString(" ").takeIf(String::isNotBlank),
                 fiberGrams = items.sumOptional(AnalyzedFoodItem::fiberGrams),
                 sugarGrams = items.sumOptional(AnalyzedFoodItem::sugarGrams),
                 saturatedFatGrams = items.sumOptional(AnalyzedFoodItem::saturatedFatGrams),

@@ -168,6 +168,14 @@ object AiPrompts {
         modify a verified value. Only when no exact value can be confirmed and an estimate is
         unavoidable, set isEstimate=true and choose the slightly higher plausible calorie and
         macro values rather than underestimating, so tracking errs against under-counting.
+        CALORIE EXPLANATION IS REQUIRED FOR EVERY ITEM: return a short, user-facing
+        `calorieExplanation` in the language of the user's input. Explain the main reason for
+        this item's calorie total using only the returned macros and portion: compare the energy
+        contribution of fat (9 kcal/g), carbohydrates (4 kcal/g), and protein (4 kcal/g), and
+        mention the logged portion when it materially increases the total. Say, for example,
+        that a cheese is calorie-dense mainly because it contains a lot of fat. Do not invent
+        ingredients, health claims, or unsupported causes. This is a concise result summary, not
+        hidden chain-of-thought; keep it to one or two sentences and provide it for every item.
         Research nutrition for the structured meal below. For branded and restaurant foods,
         prefer official manufacturer or restaurant sources, then reliable food databases and Open
         Food Facts. Supermarket, grocery, retailer, and reseller product pages are explicitly allowed
@@ -291,6 +299,7 @@ object AiPrompts {
             "proteinGrams": non-negative number,
             "carbohydrateGrams": non-negative number,
             "fatGrams": non-negative number,
+            "calorieExplanation": non-empty string,
             "fiberGrams": non-negative number|null,
             "sugarGrams": non-negative number|null,
             "saturatedFatGrams": non-negative number|null,
@@ -392,6 +401,12 @@ object AiPrompts {
         Nomi uses it only to honour the user's own over- or under-estimate preference, so report
         it honestly rather than defensively.
 
+        For every item, also return a concise `calorieExplanation` in the language of the input.
+        Explain whether fat, carbohydrates, protein, or the logged portion contributes most to
+        the calories, using only the nutrition values you returned. Fat provides 9 kcal/g;
+        carbohydrates and protein provide 4 kcal/g. This is a user-facing summary, not hidden
+        chain-of-thought, and it must never invent ingredients or unsupported health claims.
+
         Set `isEstimate` to true for every item. Set `sourceName` to "Estimate" and leave
         `sourceUrl`, `sourceProductName`, and `sourceDomain` out. Report `sugarGrams`,
         `saturatedFatGrams`, and `sodiumMilligrams` only when you are reasonably confident,
@@ -410,6 +425,7 @@ object AiPrompts {
             "proteinGrams": non-negative number,
             "carbohydrateGrams": non-negative number,
             "fatGrams": non-negative number,
+            "calorieExplanation": non-empty string,
             "fiberGrams": non-negative number|null,
             "sugarGrams": non-negative number|null,
             "saturatedFatGrams": non-negative number|null,

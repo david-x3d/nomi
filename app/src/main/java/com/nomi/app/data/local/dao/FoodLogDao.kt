@@ -34,6 +34,15 @@ interface FoodLogDao {
     @Query("SELECT * FROM food_logs WHERE id = :id LIMIT 1")
     suspend fun log(id: Long): FoodLogEntity?
 
+    @Query(
+        """
+        SELECT * FROM food_logs
+        WHERE entry_group_id = :entryGroupId
+        ORDER BY logged_at_epoch_millis, id
+        """,
+    )
+    suspend fun logsByEntryGroupId(entryGroupId: String): List<FoodLogEntity>
+
     @Transaction
     @Query("SELECT * FROM food_logs WHERE id = :id LIMIT 1")
     suspend fun logWithCatalogReference(id: Long): FoodLogWithCatalogReference?

@@ -269,6 +269,7 @@ private fun Cursor.readSourceSnapshot(prefix: String): BackupNutritionSourceSnap
         productName = nullableString(prefix + "product_name"),
         servingQuantity = nullableDouble(prefix + "serving_quantity"),
         servingUnit = nullableString(prefix + "serving_unit"),
+        calorieExplanation = nullableString(prefix + "calorie_explanation"),
         retrievedAtEpochMillis = nullableLong(prefix + "retrieved_at_epoch_millis"),
         verifiedAtEpochMillis = nullableLong(prefix + "verified_at_epoch_millis"),
     )

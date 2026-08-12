@@ -98,6 +98,7 @@ data class BackupNutritionSourceSnapshotV1(
     val productName: String? = null,
     val servingQuantity: Double? = null,
     val servingUnit: String? = null,
+    val calorieExplanation: String? = null,
     val retrievedAtEpochMillis: Long? = null,
     val verifiedAtEpochMillis: Long? = null,
 )

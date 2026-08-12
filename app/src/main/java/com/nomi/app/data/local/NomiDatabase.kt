@@ -42,7 +42,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         AiDebugEventEntity::class,
         FoodResearchCacheEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -108,13 +108,22 @@ abstract class NomiDatabase : RoomDatabase() {
             }
         }
 
+        /** Stores the short AI calorie explanation alongside the historical source snapshot. */
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("food_logs", "saved_meal_items").forEach { table ->
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_calorie_explanation` TEXT")
+                }
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NomiDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
 
         /**
          * Process singleton. Intentionally has no destructive-migration fallback: unknown schema

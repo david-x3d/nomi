@@ -66,6 +66,8 @@ data class NutritionSourceSnapshot(
      */
     @ColumnInfo(name = "serving_quantity") val servingQuantity: Double? = null,
     @ColumnInfo(name = "serving_unit") val servingUnit: String? = null,
+    /** AI-generated, user-facing explanation of the main calorie contributors. */
+    @ColumnInfo(name = "calorie_explanation") val calorieExplanation: String? = null,
     @ColumnInfo(name = "retrieved_at_epoch_millis") val retrievedAtEpochMillis: Long? = null,
     @ColumnInfo(name = "verified_at_epoch_millis") val verifiedAtEpochMillis: Long? = null,
 )

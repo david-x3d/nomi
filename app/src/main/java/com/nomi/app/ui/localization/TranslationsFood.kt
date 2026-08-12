@@ -163,6 +163,15 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         it = "Voci e fonte", nl = "Items en bron", pt = "Itens e fonte",
         sq = "Artikujt dhe burimi", sv = "Poster och källa", tr = "Öğeler ve kaynak",
     ),
+    "Items" to NomiTranslation(
+        de = "Artikel", es = "Elementos", fr = "Articles", it = "Articoli", nl = "Items",
+        pt = "Itens", sq = "Artikuj", sv = "Artiklar", tr = "Öğeler",
+    ),
+    "{0} items" to NomiTranslation(
+        de = "{0} Artikel", es = "{0} elementos", fr = "{0} articles", it = "{0} articoli",
+        nl = "{0} items", pt = "{0} itens", sq = "{0} artikuj", sv = "{0} artiklar",
+        tr = "{0} öğe",
+    ),
     "Collapse item details" to NomiTranslation(
         de = "Eintragsdetails einklappen", es = "Contraer los detalles del elemento",
         fr = "Réduire les détails de l’élément", it = "Comprimi i dettagli della voce",
@@ -205,6 +214,12 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         fr = "Le raisonnement de Nomi", it = "Il ragionamento di Nomi",
         nl = "De redenering van Nomi", pt = "O raciocínio da Nomi",
         sq = "Arsyetimi i Nomit", sv = "Nomis resonemang", tr = "Nomi’nin düşünce süreci",
+    ),
+    "Why this calorie total" to NomiTranslation(
+        de = "Warum diese Kalorienmenge", es = "Por qué este total de calorías",
+        fr = "Pourquoi ce total de calories", it = "Perché questo totale di calorie",
+        nl = "Waarom dit calorietotaal", pt = "Porque este total de calorias",
+        sq = "Pse ky total kalorish", sv = "Varför detta kaloritotal", tr = "Bu kalori toplamının nedeni",
     ),
     "Estimate summary" to NomiTranslation(
         de = "Zusammenfassung der Schätzung", es = "Resumen de la estimación",

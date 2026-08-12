@@ -229,6 +229,7 @@ object AiResponseValidator {
         validateText(item.brand, "brand", maxChars = MAX_BRAND_CHARS)
         validateText(item.unit, "food unit", required = true, maxChars = MAX_UNIT_CHARS)
         validateText(item.sourceName, "source name", maxChars = MAX_SOURCE_NAME_CHARS)
+        validateText(item.calorieExplanation, "calorie explanation", maxChars = MAX_DETAIL_CHARS)
         rejectFailureMessage(item.name, "food name")
         rejectFailureMessage(item.sourceName, "source name")
         rejectFailureMessage(item.sourceProductName, "source product name")

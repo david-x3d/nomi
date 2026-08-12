@@ -96,7 +96,6 @@ import com.nomi.app.ui.localization.NomiTranslations
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.logging.PortionEditUiState
-import com.nomi.app.ui.logging.asSingleLoggedMeal
 import com.nomi.app.ui.profile.ProfileEdit
 import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
@@ -986,10 +985,10 @@ class AppViewModel(
             try {
                 runCatching {
                     val grouped = analysis.items.size > 1
-                    val visibleAnalysis = analysis.asSingleLoggedMeal(
-                        language = currentLanguage(),
-                    )
-                    val validated = ServingNutritionNormalizer.validateBeforeSave(visibleAnalysis)
+                    // Keep every researched product as its own immutable log row. The Today
+                    // page groups rows with the same entryGroupId into one menu summary, so the
+                    // total stays compact without throwing away the per-product nutrition.
+                    val validated = ServingNutritionNormalizer.validateBeforeSave(analysis)
                     val logs = validated.items.map { item ->
                         val foodId = if (grouped) null else cacheAnalyzedFood(item)
                         item.toLog(category, "ai", consultedUrls).copy(
@@ -1598,14 +1597,15 @@ class AppViewModel(
         if (id <= 0 || pendingDeletedLogs.peek(id) != null) return
         viewModelScope.launch {
             runCatching {
-                repository.deleteLogForUndo(id)
+                repository.deleteLogsForUndo(id)
+                    .takeIf(List<FoodLogEntity>::isNotEmpty)
                     ?: error("That food is no longer available")
-            }.onSuccess { snapshot ->
+            }.onSuccess { snapshots ->
                 if (earlyDiscardDeleteRequests.remove(id)) {
                     earlyUndoDeleteRequests.remove(id)
                     return@onSuccess
                 }
-                pendingDeletedLogs.remember(snapshot)
+                pendingDeletedLogs.remember(snapshots)
                 if (earlyUndoDeleteRequests.remove(id)) restoreDeletedFoodLog(id)
             }.onFailure { error ->
                 earlyUndoDeleteRequests.remove(id)
@@ -1632,12 +1632,14 @@ class AppViewModel(
     }
 
     private fun restoreDeletedFoodLog(id: Long) {
-        val snapshot = pendingDeletedLogs.take(id) ?: return
+        val snapshots = pendingDeletedLogs.takeAll(id) ?: return
         viewModelScope.launch {
             runCatching {
-                check(repository.restoreDeletedLog(snapshot)) { "The deleted food could not be restored" }
+                check(repository.restoreDeletedLogs(snapshots)) {
+                    "The deleted food could not be restored"
+                }
             }.onFailure { error ->
-                pendingDeletedLogs.remember(snapshot)
+                pendingDeletedLogs.remember(snapshots)
                 mutableEvents.emit(AppEvent.Message(error.message ?: "Nomi couldn't restore that food."))
             }
         }
@@ -2526,9 +2528,7 @@ class AppViewModel(
             carbohydrates = MacroProgress(totals.carbohydrateGrams, plan?.carbohydrateTargetGrams ?: 240.0),
             fat = MacroProgress(totals.fatGrams, plan?.fatTargetGrams ?: 65.0),
             micronutrients = micronutrients.toProgress(logs, totals),
-            entries = logs.map { log ->
-                log.toTodayEntry(revealText = log.entryGroupId?.let(freshInputs::get))
-            },
+            entries = logs.toGroupedTodayEntries(freshInputs),
             goalsCardStyle = goalsCardStyle,
         )
     }
@@ -2584,11 +2584,67 @@ class AppViewModel(
                     proteinGrams = nutrition.proteinGrams,
                     carbohydrateGrams = nutrition.carbohydrateGrams,
                     fatGrams = nutrition.fatGrams,
-                    entries = entries.map { it.toTodayEntry() },
+                    entries = entries.toGroupedTodayEntries(),
                 )
             }
         return HistoryUiState(query, selected, days, isSearching = false)
     }
+
+    /** Keeps one compact Today row per meal group while retaining every product for drill-down. */
+    private fun List<FoodLogEntity>.toGroupedTodayEntries(
+        freshInputs: Map<String, String> = emptyMap(),
+    ): List<TodayFoodEntry> = groupBy { log -> log.entryGroupId ?: "single:${log.id}" }
+        .values
+        .sortedBy { group -> group.minOf(FoodLogEntity::loggedAtEpochMillis) }
+        .map { group ->
+            val items = group
+                .sortedWith(compareBy<FoodLogEntity> { it.loggedAtEpochMillis }.thenBy { it.id })
+                .map { log ->
+                    log.toTodayEntry(revealText = log.entryGroupId?.let(freshInputs::get))
+                }
+            if (items.size == 1) return@map items.single()
+
+            val first = items.first()
+            val mealWord = NomiTranslations.translate("meal", currentLanguage())
+            val commonBrand = items.mapNotNull { it.brand?.trim()?.takeIf(String::isNotBlank) }
+                .groupingBy { it.lowercase(Locale.ROOT) }
+                .eachCount()
+                .maxByOrNull(Map.Entry<String, Int>::value)
+                ?.key
+                ?.let { normalized ->
+                    items.firstNotNullOfOrNull {
+                        it.brand?.takeIf { brand -> brand.lowercase(Locale.ROOT) == normalized }
+                    }
+                }
+            val baseName = commonBrand ?: first.name
+            val alreadyNamedAsMeal = listOf(mealWord, "menu", "meal", "menü")
+                .any { word -> baseName.endsWith(word, ignoreCase = true) }
+            val title = if (alreadyNamedAsMeal) baseName else "$baseName $mealWord"
+            TodayFoodEntry(
+                id = first.id,
+                name = title,
+                amountText = "",
+                calories = items.sumOf(TodayFoodEntry::calories),
+                proteinGrams = items.sumOf(TodayFoodEntry::proteinGrams),
+                carbohydrateGrams = items.sumOf(TodayFoodEntry::carbohydrateGrams),
+                fatGrams = items.sumOf(TodayFoodEntry::fatGrams),
+                fiberGrams = items.mapNotNull(TodayFoodEntry::fiberGrams)
+                    .takeIf(List<Double>::isNotEmpty)?.sum(),
+                sugarGrams = items.mapNotNull(TodayFoodEntry::sugarGrams)
+                    .takeIf(List<Double>::isNotEmpty)?.sum(),
+                saturatedFatGrams = items.mapNotNull(TodayFoodEntry::saturatedFatGrams)
+                    .takeIf(List<Double>::isNotEmpty)?.sum(),
+                sodiumMilligrams = items.mapNotNull(TodayFoodEntry::sodiumMilligrams)
+                    .takeIf(List<Double>::isNotEmpty)?.sum(),
+                mealCategory = first.mealCategory,
+                time = first.time,
+                isEstimated = items.any(TodayFoodEntry::isEstimated),
+                citedSourceUrls = items.flatMap(TodayFoodEntry::citedSourceUrls).distinct(),
+                confidence = items.mapNotNull(TodayFoodEntry::confidence).minOrNull(),
+                groupItems = items,
+                revealText = first.revealText,
+            )
+        }
 
     private fun mapSettings(
         prefs: AppPreferences,
@@ -2673,6 +2729,7 @@ class AppViewModel(
         sourceProductName = sourceSnapshot.productName,
         sourceServingQuantity = sourceSnapshot.servingQuantity,
         sourceServingUnit = sourceSnapshot.servingUnit,
+        calorieExplanation = sourceSnapshot.calorieExplanation,
         revealText = revealText,
     )
 
@@ -2719,6 +2776,7 @@ class AppViewModel(
                 productName = sourceProductName,
                 servingQuantity = sourceServingQuantity,
                 servingUnit = sourceServingUnit,
+                calorieExplanation = calorieExplanation,
                 retrievedAtEpochMillis = now,
             ),
             isEstimated = isEstimate,
@@ -3002,6 +3060,7 @@ private fun TodayFoodEntry.toAmountEditItem(): AnalyzedFoodItem = AnalyzedFoodIt
     fatGrams = fatGrams,
     sourceName = sourceName,
     sourceUrl = sourceUrl,
+    calorieExplanation = calorieExplanation,
     isEstimate = isEstimated,
 )
 

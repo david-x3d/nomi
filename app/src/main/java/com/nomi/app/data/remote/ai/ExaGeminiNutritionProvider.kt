@@ -438,6 +438,7 @@ internal fun geminiNutritionPrompt(
     appendLine("Return one item per parsed item, in the same order. Choose only sourceId/supportingSourceIds listed above.")
     appendLine("Identify the exact brand, product, variant, restaurant item, and country. Prefer the current official manufacturer/restaurant source for the user's market, then official databases, then reliable nutrition databases. If sources conflict, select the official exact-market values and state the conflict in assumptions.")
     appendLine("The calories and nutrients must reproduce the selected source's basis exactly (per 100 g/ml, per serving, or per item). Do not scale them to what the user ate. Nomi performs final serving arithmetic in Kotlin.")
+    appendLine("For every item, return calorieExplanation as a concise user-facing sentence in the user's input language. Explain the main calorie drivers from the returned macros and portion: fat contributes 9 kcal/g, carbohydrates and protein 4 kcal/g. Mention a large portion when it materially raises the total. This is a result summary, not hidden chain-of-thought; do not invent ingredients or health claims.")
     appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
@@ -464,6 +465,7 @@ internal data class GeminiNutritionItem(
     val proteinGrams: Double,
     val carbohydrateGrams: Double,
     val fatGrams: Double,
+    val calorieExplanation: String? = null,
     val fiberGrams: Double? = null,
     val sugarGrams: Double? = null,
     val saturatedFatGrams: Double? = null,
@@ -591,6 +593,7 @@ private fun GeminiNutritionItem.toAnalyzedItem(
     proteinGrams = proteinGrams,
     carbohydrateGrams = carbohydrateGrams,
     fatGrams = fatGrams,
+    calorieExplanation = calorieExplanation,
     fiberGrams = fiberGrams,
     sugarGrams = sugarGrams,
     saturatedFatGrams = saturatedFatGrams,
@@ -835,6 +838,7 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
         "required",
         stringArray(
             "name", "brand", "calories", "proteinGrams", "carbohydrateGrams", "fatGrams",
+            "calorieExplanation",
             "fiberGrams", "sugarGrams", "saturatedFatGrams", "sodiumMilligrams",
             "sourceId", "supportingSourceIds", "sourceProductName",
             "sourceServingQuantity", "sourceServingUnit", "sourceServingGramsEquivalent",
@@ -850,6 +854,7 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
         put("proteinGrams", nonNegativeNumber())
         put("carbohydrateGrams", nonNegativeNumber())
         put("fatGrams", nonNegativeNumber())
+        put("calorieExplanation", nonEmptyString())
         put("fiberGrams", nullableNumber())
         put("sugarGrams", nullableNumber())
         put("saturatedFatGrams", nullableNumber())

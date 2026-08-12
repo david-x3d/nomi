@@ -674,8 +674,9 @@ private fun SwipeToDeleteFoodRow(
     onDelete: () -> Unit,
 ) {
     val deleteLabel = nomiFormat("Delete {0}", entry.name)
-    val editLabel = nomiFormat("Rewrite {0}", entry.name)
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
+    val isGrouped = entry.groupItems.size > 1
+    val editLabel = if (isGrouped) detailsLabel else nomiFormat("Rewrite {0}", entry.name)
     val haptics = rememberNomiHaptics()
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
@@ -741,7 +742,8 @@ private fun SwipeToDeleteFoodRow(
         modifier = Modifier.semantics {
             customActions = listOf(
                 CustomAccessibilityAction(label = editLabel) {
-                    onEditText(entry.reeditableText().length)
+                    if (isGrouped) onOpenDetails()
+                    else onEditText(entry.reeditableText().length)
                     true
                 },
                 CustomAccessibilityAction(label = detailsLabel) {
@@ -894,9 +896,11 @@ private fun NotesFoodRow(
     }
     val description = if (showOriginal) originalDescription.orEmpty() else finalDescription
     val locale = nomiLocale()
+    val isGrouped = entry.groupItems.size > 1
     val amountDisplay = entry.quantityDisplay(locale).withContext
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
     val writeLabel = nomiFormat("Rewrite {0}", entry.name)
+    val primaryClickLabel = if (isGrouped) detailsLabel else writeLabel
     val summaryProgress = summarySweep.value
     val summaryActive = originalDescription != null && !showOriginal && summaryProgress < 1.34f
     val calorieProgress = calorieSweep.value
@@ -909,8 +913,11 @@ private fun NotesFoodRow(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClickLabel = writeLabel,
-                onClick = { onEditText(entry.reeditableText().length) },
+                onClickLabel = primaryClickLabel,
+                onClick = {
+                    if (isGrouped) onOpenDetails()
+                    else onEditText(entry.reeditableText().length)
+                },
             )
             .heightIn(min = 64.dp)
             .padding(horizontal = 24.dp, vertical = 14.dp),
@@ -939,9 +946,13 @@ private fun NotesFoodRow(
                         detectTapGestures(
                             onLongPress = { onOpenDetails() },
                             onTap = { position ->
-                                val tapped = descriptionLayout?.getOffsetForPosition(position)
-                                    ?: description.length
-                                onEditText(entry.reeditableCaretForDescription(tapped))
+                                if (isGrouped) {
+                                    onOpenDetails()
+                                } else {
+                                    val tapped = descriptionLayout?.getOffsetForPosition(position)
+                                        ?: description.length
+                                    onEditText(entry.reeditableCaretForDescription(tapped))
+                                }
                             },
                         )
                     },
@@ -957,8 +968,12 @@ private fun NotesFoodRow(
                         detectTapGestures(
                             onLongPress = { onOpenDetails() },
                             onTap = { position ->
-                                val tapped = amountLayout?.getOffsetForPosition(position) ?: 0
-                                onEditText(entry.reeditableCaretForAmount(tapped))
+                                if (isGrouped) {
+                                    onOpenDetails()
+                                } else {
+                                    val tapped = amountLayout?.getOffsetForPosition(position) ?: 0
+                                    onEditText(entry.reeditableCaretForAmount(tapped))
+                                }
                             },
                         )
                     },
