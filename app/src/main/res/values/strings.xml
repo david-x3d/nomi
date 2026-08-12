@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Nomi</string>
-    <string name="tagline">Nutrition tracking without the homework.</string>
-    <string name="welcome_supporting_text">Tell Nomi what you ate. We’ll handle the numbers.</string>
+    <!-- The product name is the same in every language. -->
+    <string name="app_name" translatable="false">Nomi</string>
 </resources>

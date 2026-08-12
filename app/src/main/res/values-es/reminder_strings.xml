@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Recordatorios de Nomi</string>
+    <string name="reminder_channel_description">Comidas, resumen diario y control de peso</string>
+    <string name="reminder_breakfast_title">Desayuno</string>
+    <string name="reminder_breakfast_body">¿Listo para registrar el desayuno?</string>
+    <string name="reminder_lunch_title">Almuerzo</string>
+    <string name="reminder_lunch_body">Registrar el almuerzo mantiene el día encarrilado.</string>
+    <string name="reminder_dinner_title">Cena</string>
+    <string name="reminder_dinner_body">Registra la cena mientras recuerdas los detalles.</string>
+    <string name="reminder_summary_title">¿Qué tal ha ido el día?</string>
+    <string name="reminder_summary_body">Revisa la nutrición de hoy y completa lo que falte.</string>
+    <string name="reminder_weight_title">Control de peso</string>
+    <string name="reminder_weight_body">Añade un peso cuando te venga bien.</string>
+</resources>

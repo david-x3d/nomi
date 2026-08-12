@@ -2,6 +2,7 @@ package com.nomi.app.ui.logging
 
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ui.localization.NomiLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -18,7 +19,7 @@ class MealSummaryTest {
             ),
         )
 
-        val summarized = analysis.asSingleLoggedMeal(useGerman = true)
+        val summarized = analysis.asSingleLoggedMeal(NomiLanguage.GERMAN)
 
         assertEquals(1, summarized.items.size)
         with(summarized.items.single()) {
@@ -35,7 +36,7 @@ class MealSummaryTest {
     fun `single food remains the researched food`() {
         val analysis = FoodAnalysis(items = listOf(item("Cheeseburger", "McDonald's", 300.0, 15.0)))
 
-        assertSame(analysis, analysis.asSingleLoggedMeal(useGerman = true))
+        assertSame(analysis, analysis.asSingleLoggedMeal(NomiLanguage.GERMAN))
     }
 
     private fun item(

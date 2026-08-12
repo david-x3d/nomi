@@ -48,7 +48,12 @@ data class BackupPayloadV1(
 data class BackupPreferencesV1(
     val theme: ThemePreference,
     val dynamicColorEnabled: Boolean,
+    /**
+     * Kept so a backup written before the language picker still restores its language: the old
+     * boolean is the only record such a file has, and [languageTag] wins when both are present.
+     */
     val germanTranslationEnabled: Boolean = false,
+    val languageTag: String? = null,
     val weightUnit: WeightUnitPreference,
     val heightUnit: HeightUnitPreference,
     val foodResearchProvider: BackupProviderSelectionV1,
@@ -87,6 +92,9 @@ data class BackupNutritionSourceSnapshotV1(
     val displayName: String? = null,
     val externalId: String? = null,
     val url: String? = null,
+    /** Added after the first backups shipped, so it stays optional when reading an older file. */
+    val citedUrls: String? = null,
+    val confidence: Double? = null,
     val retrievedAtEpochMillis: Long? = null,
     val verifiedAtEpochMillis: Long? = null,
 )

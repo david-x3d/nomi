@@ -44,11 +44,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.NutritionPlanEntity
-import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -86,35 +87,23 @@ fun NutritionPlanSettingsScreen(
     val fat = fatText.toIntOrNull()
     val validation = NutritionTargetValidation(
         calorieError = when {
-            calories == null -> nomiString("Enter a calorie target.", "Gib ein Kalorienziel ein.")
-            calories !in 800..6000 -> nomiString(
-                "Calories must be between 800 and 6,000 kcal.",
-                "Das Kalorienziel muss zwischen 800 und 6.000 kcal liegen.",
-            )
+            calories == null -> nomiString("Enter a calorie target.")
+            calories !in 800..6000 -> nomiString("Calories must be between 800 and 6,000 kcal.")
             else -> null
         },
         proteinError = when {
-            protein == null -> nomiString("Enter a protein target.", "Gib ein Eiweißziel ein.")
-            protein !in 0..600 -> nomiString(
-                "Protein must be between 0 and 600 g.",
-                "Das Eiweißziel muss zwischen 0 und 600 g liegen.",
-            )
+            protein == null -> nomiString("Enter a protein target.")
+            protein !in 0..600 -> nomiString("Protein must be between 0 and 600 g.")
             else -> null
         },
         carbsError = when {
-            carbs == null -> nomiString("Enter a carbohydrate target.", "Gib ein Kohlenhydratziel ein.")
-            carbs !in 0..900 -> nomiString(
-                "Carbohydrates must be between 0 and 900 g.",
-                "Das Kohlenhydratziel muss zwischen 0 und 900 g liegen.",
-            )
+            carbs == null -> nomiString("Enter a carbohydrate target.")
+            carbs !in 0..900 -> nomiString("Carbohydrates must be between 0 and 900 g.")
             else -> null
         },
         fatError = when {
-            fat == null -> nomiString("Enter a fat target.", "Gib ein Fettziel ein.")
-            fat !in 0..300 -> nomiString(
-                "Fat must be between 0 and 300 g.",
-                "Das Fettziel muss zwischen 0 und 300 g liegen.",
-            )
+            fat == null -> nomiString("Enter a fat target.")
+            fat !in 0..300 -> nomiString("Fat must be between 0 and 300 g.")
             else -> null
         },
     )
@@ -130,7 +119,7 @@ fun NutritionPlanSettingsScreen(
         )
     }.getOrDefault(plan.effectiveFromLocalDate)
     val calculationMethodLabel = when (plan.calculationMethod.lowercase()) {
-        "manual" -> nomiString("Manual", "Manuell")
+        "manual" -> nomiString("Manual")
         "mifflin_st_jeor" -> "Mifflin-St Jeor"
         else -> plan.calculationMethod.toReadableLabel()
     }
@@ -149,7 +138,7 @@ fun NutritionPlanSettingsScreen(
     }
 
     SettingsEditorScaffold(
-        title = nomiString("Nutrition targets", "Ernährungsziele"),
+        title = nomiString("Nutrition targets"),
         onBack = onBack,
         modifier = modifier,
     ) { innerPadding ->
@@ -167,16 +156,13 @@ fun NutritionPlanSettingsScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = nomiString("Set your daily targets", "Lege deine Tagesziele fest"),
+                        text = nomiString("Set your daily targets"),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = nomiString(
-                            "These values become the goals used by Today, History, and progress summaries.",
-                            "Diese Werte werden als Ziele für Heute, Verlauf und Fortschrittsübersichten verwendet.",
-                        ),
+                        text = nomiString("These values become the goals used by Today, History, and progress summaries."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -184,14 +170,8 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 SettingsNoticeCard(
-                    title = nomiString(
-                        "A new target version starts when you save",
-                        "Beim Speichern beginnt eine neue Zielversion",
-                    ),
-                    message = nomiString(
-                        "Earlier days keep their original targets, so historical comparisons remain meaningful. All values saved here are marked as custom.",
-                        "Frühere Tage behalten ihre ursprünglichen Ziele, damit historische Vergleiche aussagekräftig bleiben. Alle hier gespeicherten Werte werden als benutzerdefiniert markiert.",
-                    ),
+                    title = nomiString("A new target version starts when you save"),
+                    message = nomiString("Earlier days keep their original targets, so historical comparisons remain meaningful. All values saved here are marked as custom."),
                 )
             }
             item {
@@ -212,13 +192,14 @@ fun NutritionPlanSettingsScreen(
                         Icon(Icons.Outlined.Tune, contentDescription = null)
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                nomiString("Plan version ${plan.version}", "Planversion ${plan.version}"),
+                                nomiFormat("Plan version {0}", plan.version),
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(
-                                nomiString(
-                                    "Effective $effectiveDate · $calculationMethodLabel",
-                                    "Gültig ab $effectiveDate · $calculationMethodLabel",
+                                nomiFormat(
+                                    "Effective {0} · {1}",
+                                    effectiveDate,
+                                    calculationMethodLabel,
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -234,9 +215,9 @@ fun NutritionPlanSettingsScreen(
                         ) {
                             Text(
                                 text = if (hasExistingCustomTargets) {
-                                    nomiString("Custom", "Benutzerdefiniert")
+                                    nomiString("Custom")
                                 } else {
-                                    nomiString("Calculated", "Berechnet")
+                                    nomiString("Calculated")
                                 },
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                 style = MaterialTheme.typography.labelMedium,
@@ -247,10 +228,10 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 TargetTextField(
-                    label = nomiString("Calories", "Kalorien"),
+                    label = nomiString("Calories"),
                     value = caloriesText,
                     onValueChanged = { caloriesText = it.digitsOnly(4) },
-                    suffix = nomiString("kcal/day", "kcal/Tag"),
+                    suffix = nomiString("kcal/day"),
                     errorMessage = validation.calorieError.takeIf { submitted },
                     testTag = "plan_target_calories",
                     imeAction = ImeAction.Next,
@@ -259,7 +240,7 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 Text(
-                    text = nomiString("Macronutrients", "Makronährstoffe"),
+                    text = nomiString("Macronutrients"),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.semantics { heading() },
@@ -267,10 +248,10 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 TargetTextField(
-                    label = nomiString("Protein", "Eiweiß"),
+                    label = nomiString("Protein"),
                     value = proteinText,
                     onValueChanged = { proteinText = it.digitsOnly(3) },
-                    suffix = nomiString("g/day", "g/Tag"),
+                    suffix = nomiString("g/day"),
                     errorMessage = validation.proteinError.takeIf { submitted },
                     testTag = "plan_target_protein",
                     imeAction = ImeAction.Next,
@@ -280,10 +261,10 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 TargetTextField(
-                    label = nomiString("Carbohydrates", "Kohlenhydrate"),
+                    label = nomiString("Carbohydrates"),
                     value = carbsText,
                     onValueChanged = { carbsText = it.digitsOnly(3) },
-                    suffix = nomiString("g/day", "g/Tag"),
+                    suffix = nomiString("g/day"),
                     errorMessage = validation.carbsError.takeIf { submitted },
                     testTag = "plan_target_carbs",
                     imeAction = ImeAction.Next,
@@ -293,10 +274,10 @@ fun NutritionPlanSettingsScreen(
             }
             item {
                 TargetTextField(
-                    label = nomiString("Fat", "Fett"),
+                    label = nomiString("Fat"),
                     value = fatText,
                     onValueChanged = { fatText = it.digitsOnly(3) },
-                    suffix = nomiString("g/day", "g/Tag"),
+                    suffix = nomiString("g/day"),
                     errorMessage = validation.fatError.takeIf { submitted },
                     testTag = "plan_target_fat",
                     imeAction = ImeAction.Done,
@@ -323,14 +304,11 @@ fun NutritionPlanSettingsScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    nomiString("Energy represented by macros", "Durch Makros abgedeckte Energie"),
+                                    nomiString("Energy represented by macros"),
                                     style = MaterialTheme.typography.titleSmall,
                                 )
                                 Text(
-                                    nomiString(
-                                        "Protein and carbs use 4 kcal/g; fat uses 9 kcal/g.",
-                                        "Eiweiß und Kohlenhydrate liefern 4 kcal/g, Fett liefert 9 kcal/g.",
-                                    ),
+                                    nomiString("Protein and carbs use 4 kcal/g; fat uses 9 kcal/g."),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -365,7 +343,7 @@ fun NutritionPlanSettingsScreen(
                     ) {
                         Text(
                             text = validation.firstError
-                                ?: nomiString("Check the highlighted targets.", "Prüfe die markierten Ziele."),
+                                ?: nomiString("Check the highlighted targets."),
                             modifier = Modifier.padding(16.dp),
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -382,7 +360,7 @@ fun NutritionPlanSettingsScreen(
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text(nomiString("Save custom targets", "Benutzerdefinierte Ziele speichern"))
+                    Text(nomiString("Save custom targets"))
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }

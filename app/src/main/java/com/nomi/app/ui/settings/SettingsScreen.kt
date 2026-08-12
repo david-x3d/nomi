@@ -34,18 +34,18 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -67,6 +67,8 @@ import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiSelectionRow
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
 import kotlin.math.roundToInt
@@ -77,7 +79,7 @@ fun SettingsScreen(
     state: SettingsUiState,
     onThemeModeChanged: (ThemeMode) -> Unit,
     onDynamicColorChanged: (Boolean) -> Unit,
-    onGermanTranslationChanged: (Boolean) -> Unit,
+    onLanguageChanged: (NomiLanguage) -> Unit,
     onUnitSystemChanged: (UnitSystem) -> Unit,
     onActivityTargetAdjustmentChanged: (Boolean) -> Unit,
     onProfile: () -> Unit,
@@ -106,7 +108,7 @@ fun SettingsScreen(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(nomiString("Settings", "Einstellungen")) },
+                title = { Text(nomiString("Settings")) },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -124,15 +126,12 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().background(backdrop),
             contentPadding = innerPadding,
         ) {
-            item { SectionTitle(nomiString("You", "Du")) }
+            item { SectionTitle(nomiString("You")) }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    title = nomiString("Profile & goal", "Profil & Ziel"),
-                    supporting = nomiString(
-                        "Birthday, height, weight, activity and goal",
-                        "Geburtstag, Größe, Gewicht, Aktivität und Ziel",
-                    ),
+                    title = nomiString("Profile & goal"),
+                    supporting = nomiString("Birthday, height, weight, activity and goal"),
                     onClick = onProfile,
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
@@ -140,11 +139,11 @@ fun SettingsScreen(
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.RestaurantMenu, contentDescription = null) },
-                    title = nomiString("Nutrition plan", "Ernährungsplan"),
+                    title = nomiString("Nutrition plan"),
                     supporting = if (state.nutritionTargets.isCustom) {
-                        nomiString("Custom targets", "Benutzerdefinierte Ziele")
+                        nomiString("Custom targets")
                     } else {
-                        nomiString("Recommended targets", "Empfohlene Ziele")
+                        nomiString("Recommended targets")
                     },
                     onClick = onNutrition,
                     iconColor = MaterialTheme.colorScheme.tertiary,
@@ -153,12 +152,9 @@ fun SettingsScreen(
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Science, contentDescription = null) },
-                    title = nomiString("Micronutrients", "Mikronährstoffe"),
+                    title = nomiString("Micronutrients"),
                     supporting = if (state.trackedMicronutrients.isEmpty()) {
-                        nomiString(
-                            "Track fiber, sugar, saturated fat or sodium",
-                            "Ballaststoffe, Zucker, gesättigte Fettsäuren oder Natrium verfolgen",
-                        )
+                        nomiString("Track fiber, sugar, saturated fat or sodium")
                     } else {
                         state.trackedMicronutrients
                             .map { nutrient -> nutrient.localizedName() }
@@ -168,11 +164,11 @@ fun SettingsScreen(
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
-            item { SectionTitle(nomiString("Appearance & units", "Darstellung & Einheiten")) }
+            item { SectionTitle(nomiString("Appearance & units")) }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
-                    title = nomiString("Theme", "Design"),
+                    title = nomiString("Theme"),
                     supporting = state.themeMode.localizedDisplayName(),
                     onClick = { picker = SettingPicker.Theme },
                     iconColor = MaterialTheme.colorScheme.tertiary,
@@ -181,30 +177,28 @@ fun SettingsScreen(
             item {
                 ToggleSetting(
                     icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
-                    title = nomiString("Dynamic colors", "Dynamische Farben"),
-                    supporting = nomiString(
-                        "Use colors from your Android wallpaper",
-                        "Farben deines Android-Hintergrundbilds verwenden",
-                    ),
+                    title = nomiString("Dynamic colors"),
+                    supporting = nomiString("Use colors from your Android wallpaper"),
                     checked = state.dynamicColor,
                     onCheckedChange = onDynamicColorChanged,
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
             }
             item {
-                ToggleSetting(
+                SettingsLink(
                     icon = { Icon(Icons.Default.Translate, contentDescription = null) },
-                    title = nomiString("German translation", "Deutsch"),
-                    supporting = nomiString("Translate Nomi’s interface into German", "Nomis Oberfläche auf Deutsch anzeigen"),
-                    checked = state.germanTranslationEnabled,
-                    onCheckedChange = onGermanTranslationChanged,
+                    title = nomiString("Language"),
+                    // The current language names itself, so it stays recognizable to someone who
+                    // has landed in a language they do not read and is looking for the way back.
+                    supporting = state.language.nativeName,
+                    onClick = { picker = SettingPicker.Language },
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Straighten, contentDescription = null) },
-                    title = nomiString("Units", "Einheiten"),
+                    title = nomiString("Units"),
                     supporting = state.unitSystem.localizedDisplayName(),
                     onClick = { picker = SettingPicker.Units },
                     iconColor = MaterialTheme.colorScheme.primary,
@@ -213,22 +207,20 @@ fun SettingsScreen(
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
-                    title = nomiString("Goals view", "Ziele-Ansicht"),
+                    title = nomiString("Goals view"),
                     supporting = state.goalsCardStyle.localizedDisplayName(),
                     onClick = { picker = SettingPicker.GoalsStyle },
                     iconColor = MaterialTheme.colorScheme.onSurface,
                 )
             }
-            item { SectionTitle(nomiString("AI providers", "KI-Anbieter")) }
+            item { SectionTitle(nomiString("AI providers")) }
             item {
                 SettingsInfo(
                     icon = { Icon(Icons.Default.Key, contentDescription = null) },
-                    title = nomiString("One key for everything", "Ein Schlüssel für alles"),
+                    title = nomiString("One key for everything"),
                     supporting = nomiString(
-                        "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API " +
-                            "key in any pipeline below and all of them use it.",
-                        "Nomi ist für OpenRouter vorkonfiguriert. Gib deinen OpenRouter-" +
-                            "API-Schlüssel unten bei einem Bereich ein, alle nutzen ihn.",
+                        "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API key " +
+                            "in any pipeline below and all of them use it.",
                     ),
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
@@ -237,11 +229,8 @@ fun SettingsScreen(
                 item {
                     SettingsInfo(
                         icon = { Icon(Icons.Default.Key, contentDescription = null) },
-                        title = nomiString("No provider configured", "Kein Anbieter eingerichtet"),
-                        supporting = nomiString(
-                            "Configure a provider to analyze text, photos and portions.",
-                            "Richte einen Anbieter ein, um Text, Fotos und Portionen zu analysieren.",
-                        ),
+                        title = nomiString("No provider configured"),
+                        supporting = nomiString("Configure a provider to analyze text, photos and portions."),
                         iconColor = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -261,30 +250,27 @@ fun SettingsScreen(
             item {
                 ToggleSetting(
                     icon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
-                    title = nomiString("Never time out", "Kein Zeitlimit"),
-                    supporting = nomiString(
-                        "Wait as long as the provider needs instead of giving up after 45 seconds",
-                        "So lange warten, wie der Anbieter braucht, statt nach 45 Sekunden abzubrechen",
-                    ),
+                    title = nomiString("Never time out"),
+                    supporting = nomiString("Wait as long as the provider needs instead of giving up after 45 seconds"),
                     checked = state.aiRequestTimeoutDisabled,
                     onCheckedChange = onAiRequestTimeoutDisabledChanged,
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
-            item { SectionTitle(nomiString("Health & activity", "Gesundheit & Aktivität")) }
+            item { SectionTitle(nomiString("Health & activity")) }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null) },
                     title = "Health Connect",
                     supporting = when (state.healthConnect.status) {
                         HealthConnectPermissionStatus.UNAVAILABLE ->
-                            nomiString("Not available on this device", "Auf diesem Gerät nicht verfügbar")
+                            nomiString("Not available on this device")
                         HealthConnectPermissionStatus.UPDATE_REQUIRED ->
-                            nomiString("Update required", "Aktualisierung erforderlich")
+                            nomiString("Update required")
                         HealthConnectPermissionStatus.PARTIAL ->
-                            nomiString("Permissions missing", "Berechtigungen fehlen")
-                        HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected", "Verbunden")
-                        HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Optional", "Optional")
+                            nomiString("Permissions missing")
+                        HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected")
+                        HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Optional")
                     },
                     enabled = state.healthConnect.status != HealthConnectPermissionStatus.UNAVAILABLE,
                     onClick = onHealthConnect,
@@ -294,11 +280,8 @@ fun SettingsScreen(
             item {
                 ToggleSetting(
                     icon = { Icon(Icons.Default.CloudSync, contentDescription = null) },
-                    title = nomiString("Adjust target from activity", "Ziel an Aktivität anpassen"),
-                    supporting = nomiString(
-                        "Off by default. When on, changes are shown transparently.",
-                        "Standardmäßig aus. Änderungen werden transparent angezeigt.",
-                    ),
+                    title = nomiString("Adjust target from activity"),
+                    supporting = nomiString("Off by default. When on, changes are shown transparently."),
                     checked = state.activityTargetAdjustment,
                     onCheckedChange = onActivityTargetAdjustmentChanged,
                     iconColor = MaterialTheme.colorScheme.primary,
@@ -310,7 +293,7 @@ fun SettingsScreen(
                     onBiasChanged = onCalorieEstimateBiasChanged,
                 )
             }
-            item { SectionTitle(nomiString("Reminders", "Erinnerungen")) }
+            item { SectionTitle(nomiString("Reminders")) }
             state.reminders.forEachIndexed { index, reminder ->
                 item(key = "reminder-$index") {
                     ToggleSetting(
@@ -318,7 +301,7 @@ fun SettingsScreen(
                         title = reminder.name.localizedReminderName(),
                         // Tapping the row edits the time; the switch stays for on and off.
                         supporting = reminder.timeText + " · " +
-                            nomiString("tap to change", "tippen zum Ändern"),
+                            nomiString("tap to change"),
                         checked = reminder.enabled,
                         onCheckedChange = { onReminderChanged(index, it) },
                         onClick = { editingReminder = index },
@@ -326,12 +309,12 @@ fun SettingsScreen(
                     )
                 }
             }
-            item { SectionTitle(nomiString("Your data", "Deine Daten")) }
+            item { SectionTitle(nomiString("Your data")) }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Upload, contentDescription = null) },
-                    title = nomiString("Export backup", "Sicherung exportieren"),
-                    supporting = nomiString("Versioned JSON without API keys", "Versioniertes JSON ohne API-Schlüssel"),
+                    title = nomiString("Export backup"),
+                    supporting = nomiString("Versioned JSON without API keys"),
                     onClick = onExport,
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
@@ -339,18 +322,18 @@ fun SettingsScreen(
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
-                    title = nomiString("Import backup", "Sicherung importieren"),
-                    supporting = nomiString("Validated before existing data changes", "Wird vor Änderungen an vorhandenen Daten geprüft"),
+                    title = nomiString("Import backup"),
+                    supporting = nomiString("Validated before existing data changes"),
                     onClick = onImport,
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
-            item { SectionTitle(nomiString("Developer", "Entwicklung")) }
+            item { SectionTitle(nomiString("Developer")) }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                    title = nomiString("AI debug", "KI-Debug"),
-                    supporting = nomiString("Provider, timing, source and validation — never keys", "Anbieter, Dauer, Quelle und Prüfung – niemals Schlüssel"),
+                    title = nomiString("AI debug"),
+                    supporting = nomiString("Provider, timing, source and validation — never keys"),
                     onClick = onDeveloper,
                     iconColor = MaterialTheme.colorScheme.error,
                 )
@@ -386,7 +369,7 @@ fun SettingsScreen(
 
     when (picker) {
         SettingPicker.Theme -> ChoiceSheet(
-            title = nomiString("Theme", "Design"),
+            title = nomiString("Theme"),
             choices = ThemeMode.entries.map { it.localizedDisplayName() },
             selectedIndex = ThemeMode.entries.indexOf(state.themeMode),
             onSelect = { onThemeModeChanged(ThemeMode.entries[it]); picker = null },
@@ -394,7 +377,7 @@ fun SettingsScreen(
         )
 
         SettingPicker.Units -> ChoiceSheet(
-            title = nomiString("Units", "Einheiten"),
+            title = nomiString("Units"),
             choices = UnitSystem.entries.map { it.localizedDisplayName() },
             selectedIndex = UnitSystem.entries.indexOf(state.unitSystem),
             onSelect = { onUnitSystemChanged(UnitSystem.entries[it]); picker = null },
@@ -402,10 +385,20 @@ fun SettingsScreen(
         )
 
         SettingPicker.GoalsStyle -> ChoiceSheet(
-            title = nomiString("Goals view", "Ziele-Ansicht"),
+            title = nomiString("Goals view"),
             choices = GoalsCardStyle.entries.map { it.localizedDisplayName() },
             selectedIndex = GoalsCardStyle.entries.indexOf(state.goalsCardStyle),
             onSelect = { onGoalsCardStyleChanged(GoalsCardStyle.entries[it]); picker = null },
+            onDismiss = { picker = null },
+        )
+
+        // Each language is listed in its own name and never translated, which is how someone
+        // finds their language in a list they cannot otherwise read.
+        SettingPicker.Language -> ChoiceSheet(
+            title = nomiString("Language"),
+            choices = NomiLanguage.entries.map { it.nativeName },
+            selectedIndex = NomiLanguage.entries.indexOf(state.language),
+            onSelect = { onLanguageChanged(NomiLanguage.entries[it]); picker = null },
             onDismiss = { picker = null },
         )
 
@@ -586,9 +579,9 @@ private fun ReminderTimeDialog(
         onDismissRequest = onDismiss,
         title = title,
         icon = Icons.Default.Schedule,
-        confirmLabel = nomiString("Save", "Speichern"),
+        confirmLabel = nomiString("Save"),
         onConfirm = { onConfirm(state.hour, state.minute) },
-        dismissLabel = nomiString("Cancel", "Abbrechen"),
+        dismissLabel = nomiString("Cancel"),
     ) {
         // The picker is wider than the dialog's text column, so it centres in the body
         // instead of hanging off the left edge.
@@ -634,19 +627,20 @@ private sealed interface SettingPicker {
     data object Theme : SettingPicker
     data object Units : SettingPicker
     data object GoalsStyle : SettingPicker
+    data object Language : SettingPicker
 }
 
 @Composable
 private fun ThemeMode.localizedDisplayName(): String = when (this) {
-    ThemeMode.SYSTEM -> nomiString("System", "System")
-    ThemeMode.LIGHT -> nomiString("Light", "Hell")
-    ThemeMode.DARK -> nomiString("Dark", "Dunkel")
+    ThemeMode.SYSTEM -> nomiString("System")
+    ThemeMode.LIGHT -> nomiString("Light")
+    ThemeMode.DARK -> nomiString("Dark")
 }
 
 @Composable
 private fun UnitSystem.localizedDisplayName(): String = when (this) {
-    UnitSystem.METRIC -> nomiString("Metric", "Metrisch")
-    UnitSystem.IMPERIAL -> nomiString("Imperial", "Imperial")
+    UnitSystem.METRIC -> nomiString("Metric")
+    UnitSystem.IMPERIAL -> nomiString("Imperial")
 }
 
 /**
@@ -693,7 +687,7 @@ private fun CalorieBiasSetting(
                 }
                 Column {
                     Text(
-                        nomiString("Calorie estimate bias", "Kalorienschätzung"),
+                        nomiString("Calorie estimate bias"),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
@@ -713,13 +707,13 @@ private fun CalorieBiasSetting(
             )
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = nomiString("Lower", "Niedriger"),
+                    text = nomiString("Lower"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    text = nomiString("Higher", "Höher"),
+                    text = nomiString("Higher"),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -742,32 +736,30 @@ private fun CalorieEstimateBias.localizedSupportingText(): String {
     val example = CalorieBiasAdjuster.scaleFor(uncertaintyPercent = 16.7, bias = this) * 600.0
     val rounded = example.roundToInt()
     return when (this) {
-        CalorieEstimateBias.NONE -> nomiString(
-            "Estimates are logged as given. A 500-700 kcal meal counts as 600.",
-            "Schätzungen werden unverändert übernommen. 500-700 kcal zählen als 600.",
-        )
-        else -> nomiString(
-            "${localizedDisplayName()} - a 500-700 kcal meal counts as $rounded.",
-            "${localizedDisplayName()} - 500-700 kcal zählen als $rounded.",
+        CalorieEstimateBias.NONE -> nomiString("Estimates are logged as given. A 500-700 kcal meal counts as 600.")
+        else -> nomiFormat(
+            "{0} - a 500-700 kcal meal counts as {1}.",
+            localizedDisplayName(),
+            rounded,
         )
     }
 }
 
 @Composable
 private fun GoalsCardStyle.localizedDisplayName(): String = when (this) {
-    GoalsCardStyle.BARS -> nomiString("Calories and bars", "Kalorien und Balken")
-    GoalsCardStyle.RINGS -> nomiString("One card with rings", "Eine Karte mit Ringen")
+    GoalsCardStyle.BARS -> nomiString("Calories and bars")
+    GoalsCardStyle.RINGS -> nomiString("One card with rings")
 }
 
 @Composable
 private fun CalorieEstimateBias.localizedDisplayName(): String = when (this) {
     CalorieEstimateBias.STRONGLY_UNDERESTIMATE ->
-        nomiString("Underestimate more", "Stärker unterschätzen")
-    CalorieEstimateBias.UNDERESTIMATE -> nomiString("Underestimate", "Unterschätzen")
-    CalorieEstimateBias.NONE -> nomiString("No bias", "Keine Verzerrung")
-    CalorieEstimateBias.OVERESTIMATE -> nomiString("Overestimate", "Überschätzen")
+        nomiString("Underestimate more")
+    CalorieEstimateBias.UNDERESTIMATE -> nomiString("Underestimate")
+    CalorieEstimateBias.NONE -> nomiString("No bias")
+    CalorieEstimateBias.OVERESTIMATE -> nomiString("Overestimate")
     CalorieEstimateBias.STRONGLY_OVERESTIMATE ->
-        nomiString("Overestimate more", "Stärker überschätzen")
+        nomiString("Overestimate more")
 }
 
 @Composable
@@ -777,25 +769,25 @@ private fun com.nomi.app.ai.model.AiProviderKind.localizedDisplayName(): String 
     com.nomi.app.ai.model.AiProviderKind.OPEN_AI -> "OpenAI"
     com.nomi.app.ai.model.AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
     com.nomi.app.ai.model.AiProviderKind.CODEX_EASY -> "Codex Easy"
-    com.nomi.app.ai.model.AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom endpoint", "Benutzerdefinierter Endpunkt")
+    com.nomi.app.ai.model.AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom endpoint")
 }
 
 @Composable
 private fun String.localizedPurpose(): String = when (this) {
-    "Food research" -> nomiString("Food research", "Lebensmittelrecherche")
-    "Food interpretation" -> nomiString("Food interpretation", "Lebensmittelinterpretation")
-    "Portion changes" -> nomiString("Portion changes", "Portionsänderungen")
-    "Photo recognition" -> nomiString("Photo recognition", "Fotoerkennung")
-    "Fallback" -> nomiString("Fallback", "Intelligenter Fallback")
+    "Food research" -> nomiString("Food research")
+    "Food interpretation" -> nomiString("Food interpretation")
+    "Portion changes" -> nomiString("Portion changes")
+    "Photo recognition" -> nomiString("Photo recognition")
+    "Fallback" -> nomiString("Fallback")
     else -> this
 }
 
 @Composable
 private fun String.localizedReminderName(): String = when (this) {
-    "Breakfast" -> nomiString("Breakfast", "Frühstück")
-    "Lunch" -> nomiString("Lunch", "Mittagessen")
-    "Dinner" -> nomiString("Dinner", "Abendessen")
-    "Daily summary" -> nomiString("Daily summary", "Tagesübersicht")
-    "Weight" -> nomiString("Weight", "Gewicht")
+    "Breakfast" -> nomiString("Breakfast")
+    "Lunch" -> nomiString("Lunch")
+    "Dinner" -> nomiString("Dinner")
+    "Daily summary" -> nomiString("Daily summary")
+    "Weight" -> nomiString("Weight")
     else -> this
 }

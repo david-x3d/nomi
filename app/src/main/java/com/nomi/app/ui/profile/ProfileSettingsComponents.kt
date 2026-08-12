@@ -33,8 +33,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiMenu
@@ -43,6 +43,7 @@ import com.nomi.app.ui.components.NomiPickerField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +66,7 @@ internal fun SettingsEditorScaffold(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = nomiString("Back", "Zurück"),
+                            contentDescription = nomiString("Back"),
                         )
                     }
                 },
@@ -117,8 +118,8 @@ internal fun StringSelector(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selectedLabel = options.firstOrNull { it.first == selectedValue }?.second
-        ?: selectedValue.toReadableLabel().ifBlank { nomiString("Choose an option", "Option auswählen") }
-    val showOptionsDescription = nomiString("Show $label options", "Optionen für $label anzeigen")
+        ?: selectedValue.toReadableLabel().ifBlank { nomiString("Choose an option") }
+    val showOptionsDescription = nomiFormat("Show {0} options", label)
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(modifier = Modifier.fillMaxWidth()) {

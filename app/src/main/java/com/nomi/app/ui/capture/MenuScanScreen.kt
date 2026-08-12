@@ -40,12 +40,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.nomi.app.ui.components.nomiCardBorder
-import com.nomi.app.ui.components.nomiCardElevation
-import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 import java.util.Locale
 
@@ -107,7 +108,7 @@ fun MenuScanScreen(
     modifier: Modifier = Modifier,
 ) {
     val filtered = filteredMenuDishes(state.items, state.query)
-    val defaultCategory = nomiString("Menu", "Speisekarte")
+    val defaultCategory = nomiString("Menu")
     val grouped = filtered.groupBy { dish ->
         dish.category?.trim()?.takeIf(String::isNotBlank)
             ?: defaultCategory
@@ -116,15 +117,15 @@ fun MenuScanScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(nomiString("Menu", "Speisekarte")) },
+                title = { Text(nomiString("Menu")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back", "Zur\u00fcck"))
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back"))
                     }
                 },
                 actions = {
                     IconButton(onClick = onAddPage, enabled = !state.isProcessing) {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = nomiString("Add another menu page", "Weitere Men\u00fcseite hinzuf\u00fcgen"))
+                        Icon(Icons.Default.AddAPhoto, contentDescription = nomiString("Add another menu page"))
                     }
                 },
             )
@@ -142,12 +143,12 @@ fun MenuScanScreen(
                     ) {
                         Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(48.dp))
                         Text(
-                            nomiString("Reading the complete menu...", "Vollst\u00e4ndige Speisekarte wird gelesen..."),
+                            nomiString("Reading the complete menu..."),
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center,
                         )
                         Text(
-                            nomiString("Gemini is extracting names, descriptions, numbers and prices.", "Gemini \u00fcbernimmt Namen, Beschreibungen, Nummern und Preise."),
+                            nomiString("Gemini is extracting names, descriptions, numbers and prices."),
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -167,9 +168,11 @@ fun MenuScanScreen(
                             Text(restaurant, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         }
                         Text(
-                            nomiString(
-                                "${filtered.size} of ${state.items.size} dishes \u00b7 ${state.pageCount} page(s)",
-                                "${filtered.size} von ${state.items.size} Gerichten \u00b7 ${state.pageCount} Seite(n)",
+                            nomiFormat(
+                                "{0} of {1} dishes \u00b7 {2} page(s)",
+                                filtered.size,
+                                state.items.size,
+                                state.pageCount,
                             ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -177,7 +180,7 @@ fun MenuScanScreen(
                             value = state.query,
                             onValueChange = onQueryChanged,
                             leadingIcon = Icons.Default.Search,
-                            label = nomiString("Search dishes, ingredients or numbers", "Gerichte, Zutaten oder Nummern suchen"),
+                            label = nomiString("Search dishes, ingredients or numbers"),
                         )
                         state.errorMessage?.let { NomiInlineError(it) }
                     }
@@ -192,16 +195,16 @@ fun MenuScanScreen(
                         ) {
                             Text(
                                 if (state.query.isBlank()) {
-                                    nomiString("No dishes were readable.", "Keine Gerichte waren lesbar.")
+                                    nomiString("No dishes were readable.")
                                 } else {
-                                    nomiString("No matching dishes", "Keine passenden Gerichte")
+                                    nomiString("No matching dishes")
                                 },
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Button(onClick = onAddPage) {
                                 Icon(Icons.Default.AddAPhoto, contentDescription = null)
                                 Spacer(Modifier.size(8.dp))
-                                Text(nomiString("Add a clearer page", "Bessere Seite hinzuf\u00fcgen"))
+                                Text(nomiString("Add a clearer page"))
                             }
                         }
                     }
@@ -238,7 +241,7 @@ fun MenuScanScreen(
                         ) {
                             Icon(Icons.Default.AddAPhoto, contentDescription = null)
                             Spacer(Modifier.size(8.dp))
-                            Text(nomiString("Photograph another page", "Weitere Seite fotografieren"))
+                            Text(nomiString("Photograph another page"))
                         }
                     }
                 }
@@ -251,9 +254,11 @@ fun MenuScanScreen(
                 ) {
                     val count = state.selectedDishKeys.size
                     Text(
-                        nomiString(
-                            "Add $count selected dish${if (count == 1) "" else "es"}",
-                            "$count ausgew\u00e4hlte ${if (count == 1) "Position" else "Positionen"} hinzuf\u00fcgen",
+                        // Singular and plural are separate catalogue entries so each language
+                        // can pick its own wording rather than bolting an "s" onto a noun.
+                        nomiFormat(
+                            if (count == 1) "Add {0} selected dish" else "Add {0} selected dishes",
+                            count,
                         ),
                     )
                 }

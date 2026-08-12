@@ -58,8 +58,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.integration.camera.CameraCaptureController
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiString
 import kotlinx.coroutines.launch
 
 /**
@@ -105,9 +106,9 @@ fun PhotoCaptureScreen(
     var cameraError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val currentOnPhotoSelected by rememberUpdatedState(onPhotoSelected)
-    val cameraStartError = nomiString("The camera couldn't be started.", "Die Kamera konnte nicht gestartet werden.")
-    val photoSaveError = nomiString("Nomi couldn't save that photo. Try again.", "Nomi konnte das Foto nicht speichern. Versuch es erneut.")
-    val cameraPreviewDescription = nomiString("Camera preview", "Kameravorschau")
+    val cameraStartError = nomiString("The camera couldn't be started.")
+    val photoSaveError = nomiString("Nomi couldn't save that photo. Try again.")
+    val cameraPreviewDescription = nomiString("Camera preview")
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -173,35 +174,26 @@ fun PhotoCaptureScreen(
 
     val screenTitle = when (subject) {
         PhotoCaptureSubject.MEAL ->
-            nomiString("Photograph your meal", "Fotografiere deine Mahlzeit")
+            nomiString("Photograph your meal")
         PhotoCaptureSubject.MENU ->
-            nomiString("Photograph the menu", "Fotografiere die Speisekarte")
+            nomiString("Photograph the menu")
         PhotoCaptureSubject.NUTRITION_LABEL ->
-            nomiString("Photograph the label", "Fotografiere das Etikett")
+            nomiString("Photograph the label")
     }
     val guidanceHeadline = when (subject) {
         PhotoCaptureSubject.MEAL ->
-            nomiString("Keep the whole meal in frame", "Halte die ganze Mahlzeit im Bild")
+            nomiString("Keep the whole meal in frame")
         PhotoCaptureSubject.MENU ->
-            nomiString("Keep one complete page in frame", "Halte eine vollst\u00e4ndige Seite im Bild")
+            nomiString("Keep one complete page in frame")
         PhotoCaptureSubject.NUTRITION_LABEL ->
-            nomiString("Fill the frame with the table", "Die Tabelle formatfüllend aufnehmen")
+            nomiString("Fill the frame with the table")
     }
     val guidanceDetail = when (subject) {
-        PhotoCaptureSubject.MEAL -> nomiString(
-            "Good light and a clear view of portions help Nomi make a better estimate.",
-            "Gutes Licht und klar erkennbare Portionen helfen Nomi bei einer besseren Schätzung.",
-        )
-        PhotoCaptureSubject.MENU -> nomiString(
-            "Straight on, sharp, and close enough to read every name, description, number and price.",
-            "Frontal, scharf und nah genug, damit Namen, Beschreibungen, Nummern und Preise lesbar sind.",
-        )
+        PhotoCaptureSubject.MEAL -> nomiString("Good light and a clear view of portions help Nomi make a better estimate.")
+        PhotoCaptureSubject.MENU -> nomiString("Straight on, sharp, and close enough to read every name, description, number and price.")
         // Nothing is researched or estimated here, so the only thing that decides whether the
         // numbers are right is whether they can be read.
-        PhotoCaptureSubject.NUTRITION_LABEL -> nomiString(
-            "Straight on and in focus. Nomi reads the printed values and researches nothing.",
-            "Frontal und scharf. Nomi liest die gedruckten Werte ab und recherchiert nichts.",
-        )
+        PhotoCaptureSubject.NUTRITION_LABEL -> nomiString("Straight on and in focus. Nomi reads the printed values and researches nothing.")
     }
 
     CaptureScaffold(
@@ -249,13 +241,13 @@ fun PhotoCaptureScreen(
                 when {
                     !cameraAvailable -> CameraPlaceholder(
                         icon = Icons.Outlined.BrokenImage,
-                        title = nomiString("No camera found", "Keine Kamera gefunden"),
-                        message = nomiString("Choose an existing photo or enter the meal manually.", "Wähle ein vorhandenes Foto aus oder gib die Mahlzeit manuell ein."),
+                        title = nomiString("No camera found"),
+                        message = nomiString("Choose an existing photo or enter the meal manually."),
                     )
                     !cameraPermissionGranted -> CameraPlaceholder(
                         icon = Icons.Outlined.CameraAlt,
-                        title = nomiString("Camera access is off", "Kamerazugriff ist deaktiviert"),
-                        message = nomiString("Allow access only when you're ready to take a photo.", "Erlaube den Zugriff, wenn du ein Foto aufnehmen möchtest."),
+                        title = nomiString("Camera access is off"),
+                        message = nomiString("Allow access only when you're ready to take a photo."),
                         action = {
                             FilledTonalButton(
                                 onClick = {
@@ -263,7 +255,7 @@ fun PhotoCaptureScreen(
                                     cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                                 },
                             ) {
-                                Text(nomiString("Allow camera", "Kamera erlauben"))
+                                Text(nomiString("Allow camera"))
                             }
                         },
                     )
@@ -276,16 +268,16 @@ fun PhotoCaptureScreen(
 
             if (cameraPermissionDenied) {
                 CaptureMessageCard(
-                    title = nomiString("Camera permission not granted", "Kamerazugriff nicht erlaubt"),
-                    message = nomiString("You can try again, choose a photo, or enter the meal manually.", "Du kannst es erneut versuchen, ein Foto auswählen oder die Mahlzeit manuell eingeben."),
+                    title = nomiString("Camera permission not granted"),
+                    message = nomiString("You can try again, choose a photo, or enter the meal manually."),
                     icon = Icons.Outlined.CameraAlt,
                     isError = true,
                 )
             }
             cameraError?.let { message ->
                 CaptureMessageCard(
-                    title = nomiString("Camera unavailable", "Kamera nicht verfügbar"),
-                    message = nomiString("$message You can still choose an existing photo.", "$message Du kannst weiterhin ein vorhandenes Foto auswählen."),
+                    title = nomiString("Camera unavailable"),
+                    message = nomiFormat("{0} You can still choose an existing photo.", message),
                     icon = Icons.Outlined.BrokenImage,
                     isError = true,
                 )
@@ -303,10 +295,10 @@ fun PhotoCaptureScreen(
                 Spacer(Modifier.size(8.dp))
                 Text(
                     when {
-                        !cameraPermissionGranted -> nomiString("Allow camera", "Kamera erlauben")
-                        isCapturing -> nomiString("Saving photo…", "Foto wird gespeichert…")
-                        !cameraReady -> nomiString("Preparing camera…", "Kamera wird vorbereitet…")
-                        else -> nomiString("Take photo", "Foto aufnehmen")
+                        !cameraPermissionGranted -> nomiString("Allow camera")
+                        isCapturing -> nomiString("Saving photo…")
+                        !cameraReady -> nomiString("Preparing camera…")
+                        else -> nomiString("Take photo")
                     },
                 )
             }
@@ -318,7 +310,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(Icons.Outlined.Image, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text(nomiString("Choose a photo", "Foto auswählen"))
+                Text(nomiString("Choose a photo"))
             }
             TextButton(
                 onClick = onManualEntry,
@@ -328,7 +320,7 @@ fun PhotoCaptureScreen(
             ) {
                 Icon(Icons.Outlined.Keyboard, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text(nomiString("Enter manually", "Manuell eingeben"))
+                Text(nomiString("Enter manually"))
             }
         }
     }

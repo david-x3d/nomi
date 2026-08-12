@@ -3,6 +3,8 @@ package com.nomi.app.ui.logging
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.NutritionVerificationStatus
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.NomiTranslations
 import java.util.Locale
 
 /**
@@ -10,7 +12,7 @@ import java.util.Locale
  * Nutrition is summed without another model request; only the visible label and serving wrapper
  * change. A single researched food is already concise and therefore stays untouched.
  */
-internal fun FoodAnalysis.asSingleLoggedMeal(useGerman: Boolean): FoodAnalysis {
+internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalysis {
     if (items.size <= 1) return this
 
     val commonBrand = items.mapNotNull { it.brand?.trim()?.takeIf(String::isNotBlank) }
@@ -21,18 +23,18 @@ internal fun FoodAnalysis.asSingleLoggedMeal(useGerman: Boolean): FoodAnalysis {
         ?.let { normalized -> items.firstNotNullOf { item ->
             item.brand?.trim()?.takeIf { it.lowercase(Locale.ROOT) == normalized }
         } }
-    val firstName = items.first().name.trim().ifBlank { if (useGerman) "Mahlzeit" else "Meal" }
+    // The logged unit and the name suffix are the same word, so "1 Menü" reads as the thing the
+    // row is called. Only its capitalization differs, which each language decides for itself.
+    val unitWord = NomiTranslations.translate("meal", language)
+    val suffix = unitWord.replaceFirstChar { it.uppercase(language.locale) }
+    val firstName = items.first().name.trim()
+        .ifBlank { NomiTranslations.translate("Meal", language) }
     val baseName = commonBrand ?: firstName
-    val suffix = if (useGerman) "Menü" else "Meal"
-    val displayName = if (
-        baseName.endsWith("menu", ignoreCase = true) ||
-        baseName.endsWith("meal", ignoreCase = true) ||
-        baseName.endsWith("menü", ignoreCase = true)
-    ) {
-        baseName
-    } else {
-        "$baseName $suffix"
-    }
+    // "McDonald's Menu" must not become "McDonald's Menu Meal". English and German are checked
+    // alongside the active language because brand names carry those words in every market.
+    val alreadyNamedAsMeal = listOf(suffix, "menu", "meal", "menü")
+        .any { word -> baseName.endsWith(word, ignoreCase = true) }
+    val displayName = if (alreadyNamedAsMeal) baseName else "$baseName $suffix"
 
     val verification = when {
         items.all { it.verificationStatus == NutritionVerificationStatus.VERIFIED } ->
@@ -46,7 +48,7 @@ internal fun FoodAnalysis.asSingleLoggedMeal(useGerman: Boolean): FoodAnalysis {
             AnalyzedFoodItem(
                 name = displayName,
                 quantity = 1.0,
-                unit = if (useGerman) "Menü" else "meal",
+                unit = unitWord,
                 gramsEquivalent = items.map(AnalyzedFoodItem::gramsEquivalent)
                     .takeIf { grams -> grams.all { it != null } }
                     ?.sumOf { requireNotNull(it) },

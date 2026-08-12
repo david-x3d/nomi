@@ -136,7 +136,13 @@ data class PersistedOnboardingDraft(
 data class AppPreferences(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val dynamicColorEnabled: Boolean = false,
-    val germanTranslationEnabled: Boolean = false,
+    /**
+     * BCP-47 tag of the interface language, or blank to follow the device locale.
+     *
+     * A tag rather than an enum because the supported set lives in the UI layer, and an unknown
+     * tag from a newer build must degrade to the device locale instead of failing to decode.
+     */
+    val languageTag: String = "",
     val weightUnit: WeightUnitPreference = WeightUnitPreference.KILOGRAMS,
     val heightUnit: HeightUnitPreference = HeightUnitPreference.CENTIMETERS,
     val foodResearchProvider: ProviderSelection = ProviderSelection(

@@ -36,9 +36,9 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -62,10 +62,11 @@ import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.format.quantityDisplay
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
-import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.today.MealCategory
 import kotlin.math.roundToInt
@@ -94,12 +95,12 @@ fun FoodLoggingScreen(
         modifier = modifier.fillMaxSize().imePadding(),
         topBar = {
             TopAppBar(
-                title = { Text(nomiString("Add food", "Essen hinzufügen")) },
+                title = { Text(nomiString("Add food")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = nomiString("Back", "Zurück"),
+                            contentDescription = nomiString("Back"),
                         )
                     }
                 },
@@ -180,15 +181,12 @@ private fun InputContent(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            nomiString("What did you eat?", "Was hast du gegessen?"),
+            nomiString("What did you eat?"),
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            nomiString(
-                "Try “two slices of toast with butter and a banana” or “250 g Skyr and a banana”.",
-                "Versuche zum Beispiel „zwei Scheiben Toast mit Butter und einer Banane“ oder „250 g Skyr und eine Banane“.",
-            ),
+            nomiString("Try “two slices of toast with butter and a banana” or “250 g Skyr and a banana”."),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         NomiTextField(
@@ -198,10 +196,10 @@ private fun InputContent(
             singleLine = false,
             minLines = 3,
             maxLines = 7,
-            placeholder = nomiString("Tell Nomi what you ate", "Sag Nomi, was du gegessen hast"),
+            placeholder = nomiString("Tell Nomi what you ate"),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { if (state.text.isNotBlank()) onAnalyze() }),
-            supportingText = nomiString("German and English work naturally.", "Deutsch und Englisch funktionieren ganz natürlich."),
+            supportingText = nomiString("Your own language and English both work naturally."),
         )
         MealCategorySelector(state.mealCategory, onMealCategoryChanged)
         Spacer(Modifier.weight(1f))
@@ -212,10 +210,10 @@ private fun InputContent(
         ) {
             Icon(Icons.Default.AutoAwesome, contentDescription = null)
             Spacer(Modifier.padding(4.dp))
-            Text(nomiString("Understand meal", "Mahlzeit verstehen"))
+            Text(nomiString("Understand meal"))
         }
         OutlinedButton(onClick = onManual, modifier = Modifier.fillMaxWidth()) {
-            Text(nomiString("Enter manually", "Manuell eingeben"))
+            Text(nomiString("Enter manually"))
         }
     }
 }
@@ -243,17 +241,14 @@ private fun PhotoReviewContent(
     ) {
         item {
             Text(
-                nomiString("Is this what you ate?", "Ist das, was du gegessen hast?"),
+                nomiString("Is this what you ate?"),
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.semantics { heading() },
             )
         }
         item {
             Text(
-                nomiString(
-                    "Nomi read your photo as the words below. Fix anything it got wrong before it looks up the nutrition.",
-                    "Nomi hat dein Foto als den folgenden Text gelesen. Korrigiere alles Falsche, bevor die Nährwerte recherchiert werden.",
-                ),
+                nomiString("Nomi read your photo as the words below. Fix anything it got wrong before it looks up the nutrition."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -264,26 +259,20 @@ private fun PhotoReviewContent(
                 singleLine = false,
                 minLines = 3,
                 maxLines = 8,
-                label = nomiString("What's in the photo", "Was auf dem Foto ist"),
+                label = nomiString("What's in the photo"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
-                supportingText = nomiString(
-                    "Correct a food, an amount, or an ingredient — it reads like anything you'd type.",
-                    "Korrigiere ein Lebensmittel, eine Menge oder eine Zutat – es liest sich wie alles, was du tippst.",
-                ),
+                supportingText = nomiString("Correct a food, an amount, or an ingredient — it reads like anything you'd type."),
             )
         }
         item {
             NomiTextField(
                 value = state.place,
                 onValueChange = onPlaceChanged,
-                label = nomiString("Restaurant or shop (optional)", "Restaurant oder Laden (optional)"),
-                placeholder = nomiString("e.g. Five Guys", "z. B. Five Guys"),
+                label = nomiString("Restaurant or shop (optional)"),
+                placeholder = nomiString("e.g. Five Guys"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
-                supportingText = nomiString(
-                    "Naming the place sends Nomi to its own published nutrition instead of a generic recipe.",
-                    "Mit dem Namen sucht Nomi in den offiziellen Nährwerten des Anbieters statt in einem allgemeinen Rezept.",
-                ),
+                supportingText = nomiString("Naming the place sends Nomi to its own published nutrition instead of a generic recipe."),
             )
         }
         if (state.notes.isNotEmpty()) {
@@ -308,7 +297,7 @@ private fun PhotoReviewContent(
             ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null)
                 Spacer(Modifier.padding(4.dp))
-                Text(nomiString("Find nutrition", "Nährwerte suchen"))
+                Text(nomiString("Find nutrition"))
             }
         }
     }
@@ -353,15 +342,9 @@ private fun ProcessingContent(
         Spacer(Modifier.height(12.dp))
         Text(
             if (showResearchSources) {
-                nomiString(
-                    "Nomi checks sources against the exact food and amount before showing calories.",
-                    "Nomi prüft Quellen, Lebensmittel und Menge, bevor Kalorien angezeigt werden.",
-                )
+                nomiString("Nomi checks sources against the exact food and amount before showing calories.")
             } else {
-                nomiString(
-                    "Nomi is turning your description into editable foods.",
-                    "Nomi verwandelt deine Beschreibung in bearbeitbare Lebensmittel.",
-                )
+                nomiString("Nomi is turning your description into editable foods.")
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -391,9 +374,9 @@ private fun PreviewContent(
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(nomiString("Detected", "Erkannt"), style = MaterialTheme.typography.headlineMedium)
+                Text(nomiString("Detected"), style = MaterialTheme.typography.headlineMedium)
                 Text(
-                    nomiString("Check the portions before saving.", "Prüfe die Portionen vor dem Speichern."),
+                    nomiString("Check the portions before saving."),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 MealCategorySelector(mealCategory, onMealCategoryChanged)
@@ -427,10 +410,10 @@ private fun PreviewContent(
                             )
                         }
                         if (item.isEstimate) {
-                            Text(nomiString("Estimated", "Geschätzt"), color = MaterialTheme.colorScheme.tertiary)
+                            Text(nomiString("Estimated"), color = MaterialTheme.colorScheme.tertiary)
                         }
                         item.sourceName?.let {
-                            Text(nomiString("Source: $it", "Quelle: $it"))
+                            Text(nomiFormat("Source: {0}", it))
                         }
                     }
                 },
@@ -441,19 +424,19 @@ private fun PreviewContent(
                             IconButton(onClick = { onChangePortion(index) }) {
                                 Icon(
                                     Icons.Default.AutoAwesome,
-                                    contentDescription = nomiString("Change ${item.name} portion with AI", "Portion von ${item.name} mit KI ändern"),
+                                    contentDescription = nomiFormat("Change {0} portion with AI", item.name),
                                 )
                             }
                             IconButton(onClick = { onEditItem(index) }) {
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = nomiString("Edit ${item.name} manually", "${item.name} manuell bearbeiten"),
+                                    contentDescription = nomiFormat("Edit {0} manually", item.name),
                                 )
                             }
                             IconButton(onClick = { onRemoveItem(index) }) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = nomiString("Remove ${item.name} from meal", "${item.name} aus dem Men\u00fc entfernen"),
+                                    contentDescription = nomiFormat("Remove {0} from meal", item.name),
                                 )
                             }
                         }
@@ -468,19 +451,16 @@ private fun PreviewContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(nomiString("Total", "Gesamt"), style = MaterialTheme.typography.titleLarge)
+                    Text(nomiString("Total"), style = MaterialTheme.typography.titleLarge)
                     Text("${total.roundToInt()} kcal", style = MaterialTheme.typography.titleLarge)
                 }
                 Button(onClick = onConfirm, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.padding(4.dp))
-                    Text(nomiString("Add to today", "Zu Heute hinzufügen"))
+                    Text(nomiString("Add to today"))
                 }
                 Text(
-                    nomiString(
-                        "AI and portion values can be estimates. You can edit every item.",
-                        "KI- und Portionswerte können Schätzungen sein. Du kannst jeden Eintrag bearbeiten.",
-                    ),
+                    nomiString("AI and portion values can be estimates. You can edit every item."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -506,10 +486,10 @@ private fun ErrorContent(
         Text(state.message, style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(20.dp))
         if (state.canRetry) {
-            Button(onClick = onRetry) { Text(nomiString("Try again", "Erneut versuchen")) }
+            Button(onClick = onRetry) { Text(nomiString("Try again")) }
         }
         FilledTonalButton(onClick = onManual) {
-            Text(nomiString("Enter manually", "Manuell eingeben"))
+            Text(nomiString("Enter manually"))
         }
     }
 }
@@ -527,33 +507,33 @@ private fun ManualFoodContent(
     ) {
         item {
             Text(
-                nomiString("Enter food manually", "Lebensmittel manuell eingeben"),
+                nomiString("Enter food manually"),
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
-        item { ManualTextField(nomiString("Name", "Name"), draft.name, { onDraftChanged(draft.copy(name = it)) }) }
+        item { ManualTextField(nomiString("Name"), draft.name, { onDraftChanged(draft.copy(name = it)) }) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ManualTextField(
-                    nomiString("Amount", "Menge"),
+                    nomiString("Amount"),
                     draft.amount,
                     { onDraftChanged(draft.copy(amount = it)) },
                     Modifier.weight(1f),
                     numeric = true,
                 )
                 ManualTextField(
-                    nomiString("Unit", "Einheit"),
+                    nomiString("Unit"),
                     draft.unit,
                     { onDraftChanged(draft.copy(unit = it)) },
                     Modifier.weight(1f),
                 )
             }
         }
-        item { ManualTextField(nomiString("Calories", "Kalorien"), draft.calories, { onDraftChanged(draft.copy(calories = it)) }, numeric = true) }
-        item { ManualTextField(nomiString("Protein (g)", "Eiweiß (g)"), draft.protein, { onDraftChanged(draft.copy(protein = it)) }, numeric = true) }
-        item { ManualTextField(nomiString("Carbohydrates (g)", "Kohlenhydrate (g)"), draft.carbohydrates, { onDraftChanged(draft.copy(carbohydrates = it)) }, numeric = true) }
-        item { ManualTextField(nomiString("Fat (g)", "Fett (g)"), draft.fat, { onDraftChanged(draft.copy(fat = it)) }, numeric = true) }
+        item { ManualTextField(nomiString("Calories"), draft.calories, { onDraftChanged(draft.copy(calories = it)) }, numeric = true) }
+        item { ManualTextField(nomiString("Protein (g)"), draft.protein, { onDraftChanged(draft.copy(protein = it)) }, numeric = true) }
+        item { ManualTextField(nomiString("Carbohydrates (g)"), draft.carbohydrates, { onDraftChanged(draft.copy(carbohydrates = it)) }, numeric = true) }
+        item { ManualTextField(nomiString("Fat (g)"), draft.fat, { onDraftChanged(draft.copy(fat = it)) }, numeric = true) }
         item { MealCategorySelector(draft.mealCategory) { onDraftChanged(draft.copy(mealCategory = it)) } }
         item {
             Button(
@@ -561,7 +541,7 @@ private fun ManualFoodContent(
                 enabled = draft.isValid,
                 modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
             ) {
-                Text(nomiString("Add food", "Essen hinzufügen"))
+                Text(nomiString("Add food"))
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
@@ -594,7 +574,7 @@ private fun MealCategorySelector(
     onSelected: (MealCategory) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(nomiString("Meal", "Mahlzeit"), style = MaterialTheme.typography.labelLarge)
+        Text(nomiString("Meal"), style = MaterialTheme.typography.labelLarge)
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             MealCategory.entries.forEachIndexed { index, category ->
                 SegmentedButton(
@@ -612,18 +592,18 @@ private fun MealCategorySelector(
 
 @Composable
 private fun AiProcessingStage.label(): String = when (this) {
-    AiProcessingStage.UNDERSTANDING_MEAL -> nomiString("Understanding your meal", "Deine Mahlzeit wird verstanden")
-    AiProcessingStage.FINDING_NUTRITION -> nomiString("Finding nutrition information", "Nährwertinformationen werden gesucht")
-    AiProcessingStage.CHECKING_PORTIONS -> nomiString("Checking portions", "Portionen werden geprüft")
-    AiProcessingStage.PUTTING_IT_TOGETHER -> nomiString("Putting it together", "Alles wird zusammengestellt")
+    AiProcessingStage.UNDERSTANDING_MEAL -> nomiString("Understanding your meal")
+    AiProcessingStage.FINDING_NUTRITION -> nomiString("Finding nutrition information")
+    AiProcessingStage.CHECKING_PORTIONS -> nomiString("Checking portions")
+    AiProcessingStage.PUTTING_IT_TOGETHER -> nomiString("Putting it together")
 }
 
 @Composable
 private fun MealCategory.localizedDisplayName(): String = when (this) {
-    MealCategory.BREAKFAST -> nomiString("Breakfast", "Frühstück")
-    MealCategory.LUNCH -> nomiString("Lunch", "Mittagessen")
-    MealCategory.DINNER -> nomiString("Dinner", "Abendessen")
-    MealCategory.SNACKS -> nomiString("Snacks", "Snacks")
+    MealCategory.BREAKFAST -> nomiString("Breakfast")
+    MealCategory.LUNCH -> nomiString("Lunch")
+    MealCategory.DINNER -> nomiString("Dinner")
+    MealCategory.SNACKS -> nomiString("Snacks")
 }
 
 @Composable

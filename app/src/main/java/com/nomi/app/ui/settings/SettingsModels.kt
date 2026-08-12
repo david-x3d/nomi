@@ -5,6 +5,7 @@ import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.Micronutrient
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
+import com.nomi.app.ui.localization.NomiLanguage
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class UnitSystem { METRIC, IMPERIAL }
@@ -47,7 +48,7 @@ data class HealthConnectUiState(
 data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,
-    val germanTranslationEnabled: Boolean = false,
+    val language: NomiLanguage = NomiLanguage.Default,
     val unitSystem: UnitSystem = UnitSystem.METRIC,
     val activityTargetAdjustment: Boolean = false,
     val calorieEstimateBias: CalorieEstimateBias = CalorieEstimateBias.NONE,

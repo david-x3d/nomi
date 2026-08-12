@@ -160,7 +160,9 @@ class NomiBackupService(
 
     private suspend fun applyBackupPreferences(value: BackupPreferencesV1) {
         preferencesStore.setAppearance(value.theme, value.dynamicColorEnabled)
-        preferencesStore.setGermanTranslationEnabled(value.germanTranslationEnabled)
+        preferencesStore.setLanguageTag(
+            value.languageTag ?: if (value.germanTranslationEnabled) "de" else "en",
+        )
         preferencesStore.setUnits(value.weightUnit, value.heightUnit)
         preferencesStore.setProvider(
             ProviderPipeline.FOOD_RESEARCH,
@@ -183,7 +185,7 @@ class NomiBackupService(
 
     private suspend fun applyAllPreferences(value: AppPreferences) {
         preferencesStore.setAppearance(value.theme, value.dynamicColorEnabled)
-        preferencesStore.setGermanTranslationEnabled(value.germanTranslationEnabled)
+        preferencesStore.setLanguageTag(value.languageTag)
         preferencesStore.setUnits(value.weightUnit, value.heightUnit)
         preferencesStore.setProvider(ProviderPipeline.FOOD_RESEARCH, value.foodResearchProvider)
         preferencesStore.setProvider(

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Promemoria di Nomi</string>
+    <string name="reminder_channel_description">Pasti, riepilogo giornaliero e controlli del peso</string>
+    <string name="reminder_breakfast_title">Colazione</string>
+    <string name="reminder_breakfast_body">Pronto a registrare la colazione?</string>
+    <string name="reminder_lunch_title">Pranzo</string>
+    <string name="reminder_lunch_body">Registrare il pranzo tiene in carreggiata la giornata.</string>
+    <string name="reminder_dinner_title">Cena</string>
+    <string name="reminder_dinner_body">Registra la cena finché ricordi i dettagli.</string>
+    <string name="reminder_summary_title">Com’è andata oggi?</string>
+    <string name="reminder_summary_body">Rivedi i valori di oggi e completa ciò che manca.</string>
+    <string name="reminder_weight_title">Controllo del peso</string>
+    <string name="reminder_weight_body">Aggiungi un peso quando ti è comodo.</string>
+</resources>

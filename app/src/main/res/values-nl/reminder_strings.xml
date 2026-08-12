@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Nomi-herinneringen</string>
+    <string name="reminder_channel_description">Maaltijden, dagoverzicht en weegmomenten</string>
+    <string name="reminder_breakfast_title">Ontbijt</string>
+    <string name="reminder_breakfast_body">Klaar om je ontbijt vast te leggen?</string>
+    <string name="reminder_lunch_title">Lunch</string>
+    <string name="reminder_lunch_body">Even je lunch vastleggen houdt de dag op koers.</string>
+    <string name="reminder_dinner_title">Avondeten</string>
+    <string name="reminder_dinner_body">Leg je avondeten vast nu je de details nog weet.</string>
+    <string name="reminder_summary_title">Hoe ging je dag?</string>
+    <string name="reminder_summary_body">Bekijk de voeding van vandaag en vul aan wat ontbreekt.</string>
+    <string name="reminder_weight_title">Weegmoment</string>
+    <string name="reminder_weight_body">Voeg een gewicht toe wanneer het jou uitkomt.</string>
+</resources>

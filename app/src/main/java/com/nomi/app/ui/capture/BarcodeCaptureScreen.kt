@@ -108,10 +108,10 @@ fun BarcodeCaptureScreen(
     // has to be felt rather than seen.
     val haptics = rememberNomiHaptics()
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
-    val noUsableCameraError = nomiString("No usable camera was found.", "Keine verwendbare Kamera wurde gefunden.")
-    val barcodeCameraStartError = nomiString("The barcode camera couldn't be started.", "Die Barcode-Kamera konnte nicht gestartet werden.")
-    val cameraPreviewDescription = nomiString("Live barcode camera preview", "Live-Kameravorschau für Barcodes")
-    val scanAreaDescription = nomiString("Barcode scan area", "Barcode-Scanbereich")
+    val noUsableCameraError = nomiString("No usable camera was found.")
+    val barcodeCameraStartError = nomiString("The barcode camera couldn't be started.")
+    val cameraPreviewDescription = nomiString("Live barcode camera preview")
+    val scanAreaDescription = nomiString("Barcode scan area")
     val analysisExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
     val analyzer = remember {
         BarcodeAnalyzer(onBarcodeDetected = { rawValue ->
@@ -187,7 +187,7 @@ fun BarcodeCaptureScreen(
     }
 
     CaptureScaffold(
-        title = nomiString("Scan barcode", "Barcode scannen"),
+        title = nomiString("Scan barcode"),
         onBack = onBack,
         modifier = modifier,
     ) { innerPadding ->
@@ -200,13 +200,13 @@ fun BarcodeCaptureScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = nomiString("Line up the product barcode", "Richte den Produktbarcode aus"),
+                text = nomiString("Line up the product barcode"),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = nomiString("Nomi scans common EAN and UPC barcodes automatically. Nothing is captured until a code is visible.", "Nomi erkennt gängige EAN- und UPC-Barcodes automatisch. Erst wenn ein Code sichtbar ist, wird er erfasst."),
+                text = nomiString("Nomi scans common EAN and UPC barcodes automatically. Nothing is captured until a code is visible."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -246,14 +246,14 @@ fun BarcodeCaptureScreen(
                 when {
                     !cameraAvailable -> ScannerPlaceholder(
                         icon = Icons.Outlined.NoPhotography,
-                        title = nomiString("No camera found", "Keine Kamera gefunden"),
-                        message = nomiString("Enter the barcode or food manually instead.", "Gib stattdessen den Barcode oder das Lebensmittel manuell ein."),
+                        title = nomiString("No camera found"),
+                        message = nomiString("Enter the barcode or food manually instead."),
                     )
                     !cameraPermissionGranted -> ScannerPlaceholder(
                         icon = Icons.Outlined.QrCodeScanner,
-                        title = nomiString("Camera access is off", "Kamerazugriff ist deaktiviert"),
-                        message = nomiString("Nomi asks only when you choose to scan.", "Nomi fragt nur nach Zugriff, wenn du scannen möchtest."),
-                        actionLabel = nomiString("Allow camera", "Kamera erlauben"),
+                        title = nomiString("Camera access is off"),
+                        message = nomiString("Nomi asks only when you choose to scan."),
+                        actionLabel = nomiString("Allow camera"),
                         onAction = {
                             permissionDenied = false
                             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -273,7 +273,7 @@ fun BarcodeCaptureScreen(
                             tint = Color.White,
                         )
                         Text(
-                            nomiString("Scanning…", "Wird gescannt…"),
+                            nomiString("Scanning…"),
                             color = Color.White,
                             style = MaterialTheme.typography.labelLarge,
                         )
@@ -283,15 +283,15 @@ fun BarcodeCaptureScreen(
 
             if (permissionDenied) {
                 CaptureMessageCard(
-                    title = nomiString("Camera permission not granted", "Kamerazugriff nicht erlaubt"),
-                    message = nomiString("Try again when you're ready, or use manual entry.", "Versuch es erneut, wenn du bereit bist, oder nutze die manuelle Eingabe."),
+                    title = nomiString("Camera permission not granted"),
+                    message = nomiString("Try again when you're ready, or use manual entry."),
                     icon = Icons.Outlined.NoPhotography,
                     isError = true,
                 )
             }
             cameraError?.let { message ->
                 CaptureMessageCard(
-                    title = nomiString("Scanner unavailable", "Scanner nicht verfügbar"),
+                    title = nomiString("Scanner unavailable"),
                     message = message,
                     icon = Icons.Outlined.NoPhotography,
                     isError = true,
@@ -300,12 +300,12 @@ fun BarcodeCaptureScreen(
                     onClick = { bindRequest += 1 },
                     modifier = Modifier.fillMaxWidth().testTag("barcode_retry_camera"),
                 ) {
-                    Text(nomiString("Try camera again", "Kamera erneut versuchen"))
+                    Text(nomiString("Try camera again"))
                 }
             }
             deliveredValue?.let { value ->
                 CaptureMessageCard(
-                    title = nomiString("Barcode found", "Barcode erkannt"),
+                    title = nomiString("Barcode found"),
                     message = value,
                     icon = Icons.Outlined.QrCodeScanner,
                 )
@@ -319,7 +319,7 @@ fun BarcodeCaptureScreen(
             ) {
                 Icon(Icons.Outlined.Keyboard, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text(nomiString("Enter manually", "Manuell eingeben"))
+                Text(nomiString("Enter manually"))
             }
         }
     }

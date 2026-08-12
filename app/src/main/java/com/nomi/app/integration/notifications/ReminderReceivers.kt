@@ -20,12 +20,16 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         ReminderReceiverRuntime.scope.launch {
             try {
-                val preferences = DataStoreAppPreferencesStore(context).preferences.first().reminders
-                val setting = type.settingIn(preferences)
+                val stored = DataStoreAppPreferencesStore(context).preferences.first()
+                val setting = type.settingIn(stored.reminders)
                 val scheduler = ReminderScheduler(context)
                 val today = ZonedDateTime.now().dayOfWeek.value
                 if (setting.enabled && today in setting.daysOfWeek) {
-                    ReminderNotifier.show(context.applicationContext, type)
+                    ReminderNotifier.show(
+                        context.applicationContext,
+                        type,
+                        languageTag = stored.languageTag,
+                    )
                 }
                 scheduler.schedule(type, setting)
             } finally {

@@ -19,7 +19,7 @@ import com.nomi.app.data.preferences.ProviderSelection
 internal fun AppPreferences.toBackup(): BackupPreferencesV1 = BackupPreferencesV1(
     theme = theme,
     dynamicColorEnabled = dynamicColorEnabled,
-    germanTranslationEnabled = germanTranslationEnabled,
+    languageTag = languageTag,
     weightUnit = weightUnit,
     heightUnit = heightUnit,
     foodResearchProvider = foodResearchProvider.toBackup(),
@@ -70,6 +70,8 @@ internal fun NutritionSourceSnapshot.toBackup(): BackupNutritionSourceSnapshotV1
         displayName = displayName,
         externalId = externalId,
         url = url,
+        citedUrls = citedUrls,
+        confidence = confidence,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )
@@ -81,6 +83,8 @@ internal fun BackupNutritionSourceSnapshotV1.toEntity(): NutritionSourceSnapshot
         displayName = displayName,
         externalId = externalId,
         url = url,
+        citedUrls = citedUrls,
+        confidence = confidence,
         retrievedAtEpochMillis = retrievedAtEpochMillis,
         verifiedAtEpochMillis = verifiedAtEpochMillis,
     )

@@ -73,12 +73,12 @@ fun LibraryScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text(nomiString("Food library", "Lebensmittelbibliothek")) },
+                title = { Text(nomiString("Food library")) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = nomiString("Back", "Zurück"),
+                            contentDescription = nomiString("Back"),
                         )
                     }
                 },
@@ -138,9 +138,9 @@ fun LibraryScreen(
 
 @Composable
 private fun LibraryItemKind.localizedLabel(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("Recent", "Zuletzt")
-        LibraryItemKind.FAVORITE -> nomiString("Favorites", "Favoriten")
-        LibraryItemKind.SAVED_MEAL -> nomiString("Saved meals", "Gespeicherte Mahlzeiten")
+        LibraryItemKind.RECENT -> nomiString("Recent")
+        LibraryItemKind.FAVORITE -> nomiString("Favorites")
+        LibraryItemKind.SAVED_MEAL -> nomiString("Saved meals")
     }
 
 private val LibraryItemKind.icon: ImageVector
@@ -152,14 +152,14 @@ private val LibraryItemKind.icon: ImageVector
 
 @Composable
 private fun LibraryItemKind.localizedEmptyTitle(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("No recent foods yet", "Noch keine kürzlich verwendeten Lebensmittel")
-        LibraryItemKind.FAVORITE -> nomiString("No favorites yet", "Noch keine Favoriten")
-        LibraryItemKind.SAVED_MEAL -> nomiString("No saved meals yet", "Noch keine gespeicherten Mahlzeiten")
+        LibraryItemKind.RECENT -> nomiString("No recent foods yet")
+        LibraryItemKind.FAVORITE -> nomiString("No favorites yet")
+        LibraryItemKind.SAVED_MEAL -> nomiString("No saved meals yet")
     }
 
 @Composable
 private fun LibraryItemKind.localizedEmptyBody(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("Foods you log will be easy to reuse here.", "Hier kannst du eingetragene Lebensmittel schnell wiederverwenden.")
-        LibraryItemKind.FAVORITE -> nomiString("Mark a food as a favorite from its details.", "Markiere ein Lebensmittel in den Details als Favorit.")
-        LibraryItemKind.SAVED_MEAL -> nomiString("Save a group of logged foods to add it again in one tap.", "Speichere mehrere eingetragene Lebensmittel, um sie mit einem Tippen erneut hinzuzufügen.")
+        LibraryItemKind.RECENT -> nomiString("Foods you log will be easy to reuse here.")
+        LibraryItemKind.FAVORITE -> nomiString("Mark a food as a favorite from its details.")
+        LibraryItemKind.SAVED_MEAL -> nomiString("Save a group of logged foods to add it again in one tap.")
     }

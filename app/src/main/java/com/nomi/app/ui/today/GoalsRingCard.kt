@@ -80,7 +80,7 @@ private fun CalorieRow(state: TodayUiState) {
             verticalAlignment = Alignment.Bottom,
         ) {
             Text(
-                text = nomiString("Calories", "Kalorien"),
+                text = nomiString("Calories"),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -114,7 +114,7 @@ private fun RingGrid(state: TodayUiState) {
     val rings = buildList {
         add(
             RingValue(
-                label = nomiString("Carbs", "Kohlenhydrate"),
+                label = nomiString("Carbs"),
                 consumed = state.carbohydrates.consumedGrams,
                 target = state.carbohydrates.targetGrams,
                 unit = "g",
@@ -124,7 +124,7 @@ private fun RingGrid(state: TodayUiState) {
         )
         add(
             RingValue(
-                label = nomiString("Protein", "Protein"),
+                label = nomiString("Protein"),
                 consumed = state.protein.consumedGrams,
                 target = state.protein.targetGrams,
                 unit = "g",
@@ -134,7 +134,7 @@ private fun RingGrid(state: TodayUiState) {
         )
         add(
             RingValue(
-                label = nomiString("Fat", "Fett"),
+                label = nomiString("Fat"),
                 consumed = state.fat.consumedGrams,
                 target = state.fat.targetGrams,
                 unit = "g",

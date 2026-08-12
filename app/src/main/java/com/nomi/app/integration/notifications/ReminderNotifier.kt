@@ -7,11 +7,26 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import com.nomi.app.R
+import java.util.Locale
 
 internal object ReminderNotifier {
     private const val CHANNEL_ID = "nomi_reminders"
+
+    /**
+     * Resolves reminder copy against the language chosen inside Nomi rather than the system one.
+     *
+     * A reminder is the app talking, so it should speak the language the app is set to. A blank
+     * tag means the user never chose, and the system locale is then the right answer anyway.
+     */
+    private fun Context.localized(languageTag: String): Context {
+        if (languageTag.isBlank()) return this
+        val configuration = Configuration(resources.configuration)
+        configuration.setLocale(Locale.forLanguageTag(languageTag))
+        return createConfigurationContext(configuration)
+    }
 
     fun ensureChannel(context: Context) {
         val manager = requireNotNull(context.getSystemService(NotificationManager::class.java))
@@ -26,7 +41,7 @@ internal object ReminderNotifier {
         )
     }
 
-    fun show(context: Context, type: ReminderType) {
+    fun show(context: Context, type: ReminderType, languageTag: String = "") {
         ensureChannel(context)
         if (Build.VERSION.SDK_INT >= 33 &&
             context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
@@ -35,7 +50,7 @@ internal object ReminderNotifier {
         val manager = requireNotNull(context.getSystemService(NotificationManager::class.java))
         if (!manager.areNotificationsEnabled()) return
 
-        val copy = copyFor(context, type)
+        val copy = copyFor(context.localized(languageTag), type)
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         val contentIntent = launchIntent?.let {
             PendingIntent.getActivity(

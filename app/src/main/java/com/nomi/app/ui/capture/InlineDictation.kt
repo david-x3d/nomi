@@ -64,10 +64,7 @@ fun rememberInlineDictation(
     // after the model has finished loading and the microphone has opened.
     var requested by remember { mutableStateOf(false) }
     var deniedMessage by remember { mutableStateOf<String?>(null) }
-    val permissionDenied = nomiString(
-        "Nomi needs the microphone to hear you.",
-        "Nomi braucht das Mikrofon, um dich zu hören.",
-    )
+    val permissionDenied = nomiString("Nomi needs the microphone to hear you.")
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),

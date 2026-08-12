@@ -1,5 +1,6 @@
 package com.nomi.app.ui.history
 
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -24,11 +25,11 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
@@ -40,9 +41,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.components.NomiDatePickerDialog
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.today.MealCategory
 import java.time.Instant
@@ -50,7 +52,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -76,12 +77,12 @@ fun HistoryScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 scrollBehavior = scrollBehavior,
-                title = { Text(nomiString("History", "Verlauf")) },
+                title = { Text(nomiString("History")) },
                 actions = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(
                             Icons.Default.CalendarMonth,
-                            contentDescription = nomiString("Choose date", "Datum auswählen"),
+                            contentDescription = nomiString("Choose date"),
                         )
                     }
                 },
@@ -97,8 +98,8 @@ fun HistoryScreen(
                 NomiTextField(
                     value = state.query,
                     onValueChange = onQueryChanged,
-                    label = nomiString("Search history", "Verlauf durchsuchen"),
-                    placeholder = nomiString("Toast, McDonald's, Banana…", "Toastbrot, McDonald's, Banane…"),
+                    label = nomiString("Search history"),
+                    placeholder = nomiString("Toast, McDonald's, Banana…"),
                     leadingIcon = Icons.Default.Search,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
@@ -116,17 +117,14 @@ fun HistoryScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            nomiString("Your logged days will appear here.", "Deine protokollierten Tage erscheinen hier."),
+                            nomiString("Your logged days will appear here."),
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
                             if (state.query.isBlank()) {
-                                nomiString("Start by logging a meal on Today.", "Trage zuerst unter Heute eine Mahlzeit ein.")
+                                nomiString("Start by logging a meal on Today.")
                             } else {
-                                nomiString(
-                                    "No foods match “${state.query}”.",
-                                    "Keine Lebensmittel passen zu „${state.query}“.",
-                                )
+                                nomiFormat("No foods match “{0}”.", state.query)
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -145,10 +143,10 @@ fun HistoryScreen(
                     }
                     items(day.entries, key = { "${day.date}-${it.id}" }) { entry ->
                         val categoryLabel = when (entry.mealCategory) {
-                            MealCategory.BREAKFAST -> nomiString("Breakfast", "Frühstück")
-                            MealCategory.LUNCH -> nomiString("Lunch", "Mittagessen")
-                            MealCategory.DINNER -> nomiString("Dinner", "Abendessen")
-                            MealCategory.SNACKS -> nomiString("Snacks", "Snacks")
+                            MealCategory.BREAKFAST -> nomiString("Breakfast")
+                            MealCategory.LUNCH -> nomiString("Lunch")
+                            MealCategory.DINNER -> nomiString("Dinner")
+                            MealCategory.SNACKS -> nomiString("Snacks")
                         }
                         ListItem(
                             headlineContent = {
@@ -185,8 +183,8 @@ fun HistoryScreen(
                 }
                 showDatePicker = false
             },
-            confirmLabel = nomiString("Select", "Auswählen"),
-            dismissLabel = nomiString("Cancel", "Abbrechen"),
+            confirmLabel = nomiString("Select"),
+            dismissLabel = nomiString("Cancel"),
             showModeToggle = false,
         )
     }
@@ -217,11 +215,13 @@ private fun DayHeader(
                     style = MaterialTheme.typography.titleLarge,
                 )
                 Text(
-                    nomiString(
-                        "${day.calories.roundToInt()} / ${day.calorieTarget.roundToInt()} kcal · " +
-                            "P ${day.proteinGrams.roundToInt()} · C ${day.carbohydrateGrams.roundToInt()} · F ${day.fatGrams.roundToInt()}",
-                        "${day.calories.roundToInt()} / ${day.calorieTarget.roundToInt()} kcal · " +
-                            "E ${day.proteinGrams.roundToInt()} · K ${day.carbohydrateGrams.roundToInt()} · F ${day.fatGrams.roundToInt()}",
+                    nomiFormat(
+                        "{0} / {1} kcal · P {2} · C {3} · F {4}",
+                        day.calories.roundToInt(),
+                        day.calorieTarget.roundToInt(),
+                        day.proteinGrams.roundToInt(),
+                        day.carbohydrateGrams.roundToInt(),
+                        day.fatGrams.roundToInt(),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -231,17 +231,17 @@ private fun DayHeader(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip(
                 onClick = onCopyMeal,
-                label = { Text(nomiString("Copy meal", "Mahlzeit kopieren")) },
+                label = { Text(nomiString("Copy meal")) },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
             )
             AssistChip(
                 onClick = onCopyDay,
-                label = { Text(nomiString("Copy day", "Tag kopieren")) },
+                label = { Text(nomiString("Copy day")) },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
             )
             AssistChip(
                 onClick = onSaveMeal,
-                label = { Text(nomiString("Save meal", "Mahlzeit speichern")) },
+                label = { Text(nomiString("Save meal")) },
                 leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
             )
         }

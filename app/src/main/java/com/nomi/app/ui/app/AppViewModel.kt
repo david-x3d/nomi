@@ -1,5 +1,6 @@
 package com.nomi.app.ui.app
 
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nomi.app.BuildConfig
@@ -13,9 +14,10 @@ import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
-import com.nomi.app.ai.parsing.FoodNameCorrection
 import com.nomi.app.ai.model.PortionAdjustment
+import com.nomi.app.ai.parsing.FoodNameCorrection
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
+import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.FoodDisplayName
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
@@ -30,22 +32,23 @@ import com.nomi.app.data.local.entity.NutritionSourceSnapshot
 import com.nomi.app.data.local.entity.NutritionValues
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
+import com.nomi.app.data.local.entity.citedUrlList
+import com.nomi.app.data.local.entity.toCitedUrlColumn
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
 import com.nomi.app.data.local.model.SavedMealWithItems
 import com.nomi.app.data.preferences.AppPreferences
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.HeightUnitPreference
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
-import com.nomi.app.data.preferences.enabledMicronutrients
-import com.nomi.app.data.preferences.resolvedTarget
-import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.data.preferences.WeightUnitPreference
-import com.nomi.app.data.preferences.CalorieEstimateBias
-import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.data.preferences.enabledMicronutrients
+import com.nomi.app.data.preferences.resolvedTarget
+import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.data.preferences.withSupportedModel
-import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
 import com.nomi.app.data.remote.ai.EXA_API_ENDPOINT
 import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
@@ -58,8 +61,8 @@ import com.nomi.app.data.repository.AddSavedMealToLogRequest
 import com.nomi.app.data.repository.HEALTH_CONNECT_WEIGHT_SOURCE
 import com.nomi.app.data.repository.SaveLoggedMealRequest
 import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
-import com.nomi.app.data.repository.mapping.toPersistedDraft
 import com.nomi.app.data.repository.mapping.toEntity
+import com.nomi.app.data.repository.mapping.toPersistedDraft
 import com.nomi.app.data.security.SecretUnavailableException
 import com.nomi.app.di.AppContainer
 import com.nomi.app.domain.Micronutrient
@@ -72,27 +75,29 @@ import com.nomi.app.domain.usecase.PortionEditApplier
 import com.nomi.app.domain.usecase.PortionEditParser
 import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
 import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
-import com.nomi.app.ui.profile.ProfileEdit
+import com.nomi.app.domain.usecase.toPortionContext
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
 import com.nomi.app.integration.health.NomiHealthFeatures
 import com.nomi.app.integration.health.importableHealthWeights
 import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
-import com.nomi.app.ui.history.HistoryDay
-import com.nomi.app.ui.history.HistoryUiState
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
 import com.nomi.app.ui.capture.MenuScanUiState
 import com.nomi.app.ui.capture.menuDishKey
 import com.nomi.app.ui.capture.mergeMenuDishes
+import com.nomi.app.ui.history.HistoryDay
+import com.nomi.app.ui.history.HistoryUiState
 import com.nomi.app.ui.library.LibraryItem
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryUiState
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.NomiTranslations
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.logging.PortionEditUiState
 import com.nomi.app.ui.logging.asSingleLoggedMeal
-import com.nomi.app.domain.usecase.toPortionContext
+import com.nomi.app.ui.profile.ProfileEdit
 import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
 import com.nomi.app.ui.progress.ProgressUiState
@@ -111,8 +116,8 @@ import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.MicronutrientProgress
 import com.nomi.app.ui.today.TodayFoodEntry
-import com.nomi.app.ui.today.reeditableText
 import com.nomi.app.ui.today.TodayUiState
+import com.nomi.app.ui.today.reeditableText
 import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
@@ -120,11 +125,9 @@ import io.ktor.client.plugins.ResponseException
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import java.net.UnknownHostException
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
-
 import java.net.URI
+import java.net.UnknownHostException
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -132,11 +135,11 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
-import java.security.MessageDigest
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -145,15 +148,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlin.math.roundToInt
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.encodeToString
 
 sealed interface AppStartState {
     data object Loading : AppStartState
@@ -529,10 +533,7 @@ class AppViewModel(
                 if (requestId != menuScanRequestId) return@onFailure
                 mutableMenuScanState.value = mutableMenuScanState.value.copy(
                     isProcessing = false,
-                    errorMessage = inUserLanguage(
-                        english = "Nomi couldn't read that menu page. Add a clearer photo.",
-                        german = "Nomi konnte diese Speisekartenseite nicht lesen. F\u00fcge ein deutlicheres Foto hinzu.",
-                    ),
+                    errorMessage = inUserLanguage("Nomi couldn't read that menu page. Add a clearer photo."),
                 )
             }
         }.invokeOnCompletion { bytes.fill(0) }
@@ -740,10 +741,7 @@ class AppViewModel(
                 if (replacement == null) {
                     mutablePortionEditState.value = edit.copy(
                         isProcessing = false,
-                        errorMessage = inUserLanguage(
-                            english = "Nomi couldn't find nutrition for that change. Try again.",
-                            german = "Nomi hat für diese Änderung keine Nährwerte gefunden. Versuch es erneut.",
-                        ),
+                        errorMessage = inUserLanguage("Nomi couldn't find nutrition for that change. Try again."),
                     )
                     return@onSuccess
                 }
@@ -970,7 +968,7 @@ class AppViewModel(
                 runCatching {
                     val grouped = analysis.items.size > 1
                     val visibleAnalysis = analysis.asSingleLoggedMeal(
-                        useGerman = preferences.value.germanTranslationEnabled,
+                        language = currentLanguage(),
                     )
                     val validated = ServingNutritionNormalizer.validateBeforeSave(visibleAnalysis)
                     val logs = validated.items.map { item ->
@@ -1080,10 +1078,7 @@ class AppViewModel(
         val grams = basisQuantity.takeIf { unit.equals("g", ignoreCase = true) }
         return AnalyzedFoodItem(
             name = FoodDisplayName.clean(
-                productName?.takeIf(String::isNotBlank) ?: inUserLanguage(
-                    english = "Photographed label",
-                    german = "Fotografiertes Etikett",
-                ),
+                productName?.takeIf(String::isNotBlank) ?: inUserLanguage("Photographed label"),
             ),
             brand = brand?.takeIf(String::isNotBlank)?.take(200),
             quantity = basisQuantity,
@@ -1097,10 +1092,7 @@ class AppViewModel(
             sugarGrams = sugarGrams,
             saturatedFatGrams = saturatedFatGrams,
             sodiumMilligrams = sodiumMilligrams,
-            sourceName = inUserLanguage(
-                english = "Nutrition label photo",
-                german = "Foto der Nährwerttabelle",
-            ),
+            sourceName = inUserLanguage("Nutrition label photo"),
             sourceProductName = productName?.takeIf(String::isNotBlank),
             sourceServingQuantity = basisQuantity,
             sourceServingUnit = unit,
@@ -1840,9 +1832,9 @@ class AppViewModel(
         }
     }
 
-    fun setGermanTranslationEnabled(enabled: Boolean) {
+    fun setLanguage(language: NomiLanguage) {
         viewModelScope.launch {
-            repository.appPreferencesStore.setGermanTranslationEnabled(enabled)
+            repository.appPreferencesStore.setLanguageTag(language.tag)
         }
     }
 
@@ -2597,7 +2589,7 @@ class AppViewModel(
         return SettingsUiState(
             themeMode = prefs.theme.toThemeMode(),
             dynamicColor = prefs.dynamicColorEnabled,
-            germanTranslationEnabled = prefs.germanTranslationEnabled,
+            language = currentLanguage(),
             unitSystem = if (prefs.weightUnit == WeightUnitPreference.KILOGRAMS) UnitSystem.METRIC else UnitSystem.IMPERIAL,
             activityTargetAdjustment = prefs.adjustTargetFromActivity,
             calorieEstimateBias = prefs.calorieEstimateBias,
@@ -2651,6 +2643,8 @@ class AppViewModel(
         grams = grams,
         sourceName = sourceSnapshot.displayName,
         sourceUrl = sourceSnapshot.url,
+        citedSourceUrls = sourceSnapshot.citedUrlList(),
+        confidence = sourceSnapshot.confidence,
         revealText = revealText,
     )
 
@@ -2682,6 +2676,10 @@ class AppViewModel(
                 providerName = sourceName,
                 displayName = sourceName,
                 url = sourceUrl,
+                // The primary source leads so the detail view can show it first without
+                // re-deriving which of the citations the numbers actually came from.
+                citedUrls = (listOfNotNull(sourceUrl) + supportingSourceUrls).toCitedUrlColumn(),
+                confidence = confidence,
                 retrievedAtEpochMillis = now,
             ),
             isEstimated = isEstimate,
@@ -2880,10 +2878,15 @@ class AppViewModel(
 
     /**
      * The composable [nomiString] needs a composition, but a few strings are written into saved
-     * data from here. They follow the same switch so a German log does not sprout English rows.
+     * data from here. They read the same catalogue so a translated log does not sprout English
+     * rows.
      */
-    private fun inUserLanguage(english: String, german: String): String =
-        if (preferences.value.germanTranslationEnabled) german else english
+    private fun inUserLanguage(english: String): String =
+        NomiTranslations.translate(english, currentLanguage())
+
+    private fun currentLanguage(): NomiLanguage =
+        NomiLanguage.fromTag(preferences.value.languageTag)
+            ?: NomiLanguage.matching(Locale.getDefault())
 
     /** Research validation is actionable to developers, but raw source-ID language is not UI. */
     private fun researchFailureMessage(error: Throwable): String {
@@ -2895,9 +2898,7 @@ class AppViewModel(
         ).any { marker -> error.message?.contains(marker, ignoreCase = true) == true }
         if (!technicalEvidenceFailure) return error.safeAiMessage()
         return inUserLanguage(
-            english = "Nomi couldn't verify nutrition for every product. Try again or edit the entry.",
-            german = "Nomi konnte nicht für alle Produkte passende Nährwerte belegen. " +
-                "Versuche es erneut oder bearbeite die Eingabe.",
+            "Nomi couldn't verify nutrition for every product. Try again or edit the entry.",
         )
     }
 

@@ -136,7 +136,7 @@ fun NomiFox(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
 ) {
-    val description = nomiString("Nomi fox logo", "Nomi-Fuchslogo")
+    val description = nomiString("Nomi fox logo")
     // Resting leans away from the page; curiosity straightens up and lifts a little.
     val lean by animateFloatAsState(
         targetValue = if (mood == NomiFoxMood.RESTING) -3f else 0f,

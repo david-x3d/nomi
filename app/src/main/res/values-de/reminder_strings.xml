@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Nomi-Erinnerungen</string>
+    <string name="reminder_channel_description">Mahlzeiten, Tagesübersicht und Gewichts-Check-ins</string>
+    <string name="reminder_breakfast_title">Frühstücks-Check-in</string>
+    <string name="reminder_breakfast_body">Bereit, das Frühstück einzutragen?</string>
+    <string name="reminder_lunch_title">Mittagessens-Check-in</string>
+    <string name="reminder_lunch_body">Ein kurzer Eintrag hält den Tag auf Kurs.</string>
+    <string name="reminder_dinner_title">Abendessens-Check-in</string>
+    <string name="reminder_dinner_body">Trage das Abendessen ein, solange du es noch genau weißt.</string>
+    <string name="reminder_summary_title">Wie lief dein Tag?</string>
+    <string name="reminder_summary_body">Sieh dir die heutigen Nährwerte an und ergänze, was fehlt.</string>
+    <string name="reminder_weight_title">Gewichts-Check-in</string>
+    <string name="reminder_weight_body">Trage ein Gewicht ein, wann es dir passt.</string>
+</resources>

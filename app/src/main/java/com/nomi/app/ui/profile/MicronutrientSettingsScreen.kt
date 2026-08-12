@@ -25,10 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -51,6 +51,7 @@ import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 
 /**
@@ -83,11 +84,8 @@ fun MicronutrientSettingsScreen(
     }
     var submitted by rememberSaveable { mutableStateOf(false) }
 
-    val missingTarget = nomiString("Enter a daily target.", "Gib ein Tagesziel ein.")
-    val outOfRangeTarget = nomiString(
-        "That target is outside the supported range.",
-        "Dieses Ziel liegt außerhalb des unterstützten Bereichs.",
-    )
+    val missingTarget = nomiString("Enter a daily target.")
+    val outOfRangeTarget = nomiString("That target is outside the supported range.")
     val errors = Micronutrient.entries.associateWith { nutrient ->
         if (enabled[nutrient] != true) return@associateWith null
         val value = targets[nutrient]?.toDoubleOrNull()
@@ -119,7 +117,7 @@ fun MicronutrientSettingsScreen(
     }
 
     SettingsEditorScaffold(
-        title = nomiString("Micronutrients", "Mikronährstoffe"),
+        title = nomiString("Micronutrients"),
         onBack = onBack,
         modifier = modifier,
     ) { innerPadding ->
@@ -134,16 +132,13 @@ fun MicronutrientSettingsScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = nomiString("Track more than macros", "Mehr als nur Makros verfolgen"),
+                        text = nomiString("Track more than macros"),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = nomiString(
-                            "Turn on only what you care about. Each one you enable appears on Today with its own daily goal.",
-                            "Aktiviere nur, was dich interessiert. Jeder aktivierte Nährstoff erscheint mit eigenem Tagesziel auf Heute.",
-                        ),
+                        text = nomiString("Turn on only what you care about. Each one you enable appears on Today with its own daily goal."),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -151,14 +146,8 @@ fun MicronutrientSettingsScreen(
             }
             item {
                 SettingsNoticeCard(
-                    title = nomiString(
-                        "Your existing days count too",
-                        "Deine bisherigen Tage zählen mit",
-                    ),
-                    message = nomiString(
-                        "Nomi has been storing these values alongside every food you logged, so a nutrient you enable today already has history behind it. Foods whose source never published a value are left out of the total rather than counted as zero.",
-                        "Nomi speichert diese Werte bereits zu jedem erfassten Lebensmittel. Ein heute aktivierter Nährstoff hat also schon Verlauf. Lebensmittel, für die keine Quelle einen Wert veröffentlicht hat, fließen nicht als Null in die Summe ein.",
-                    ),
+                    title = nomiString("Your existing days count too"),
+                    message = nomiString("Nomi has been storing these values alongside every food you logged, so a nutrient you enable today already has history behind it. Foods whose source never published a value are left out of the total rather than counted as zero."),
                 )
             }
             for (nutrient in Micronutrient.entries) {
@@ -206,7 +195,7 @@ fun MicronutrientSettingsScreen(
                 ) {
                     Icon(Icons.Outlined.Save, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text(nomiString("Save", "Speichern"))
+                    Text(nomiString("Save"))
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -264,11 +253,8 @@ private fun MicronutrientCard(
                     modifier = Modifier
                         .semantics { errorMessage?.let { error(it) } }
                         .testTag("micronutrient_target_${nutrient.name}"),
-                    label = nomiString("Daily target", "Tagesziel"),
-                    suffix = nomiString(
-                        "${nutrient.storageUnit.suffix}/day",
-                        "${nutrient.storageUnit.suffix}/Tag",
-                    ),
+                    label = nomiString("Daily target"),
+                    suffix = nomiFormat("{0}/day", nutrient.storageUnit.suffix),
                     supportingText = errorMessage,
                     isError = errorMessage != null,
                     keyboardOptions = KeyboardOptions(
@@ -283,10 +269,10 @@ private fun MicronutrientCard(
 
 @Composable
 internal fun Micronutrient.localizedName(): String = when (this) {
-    Micronutrient.FIBER -> nomiString("Fiber", "Ballaststoffe")
-    Micronutrient.SUGAR -> nomiString("Sugar", "Zucker")
-    Micronutrient.SATURATED_FAT -> nomiString("Saturated fat", "Gesättigte Fettsäuren")
-    Micronutrient.SODIUM -> nomiString("Sodium", "Natrium")
+    Micronutrient.FIBER -> nomiString("Fiber")
+    Micronutrient.SUGAR -> nomiString("Sugar")
+    Micronutrient.SATURATED_FAT -> nomiString("Saturated fat")
+    Micronutrient.SODIUM -> nomiString("Sodium")
 }
 
 /**
@@ -298,24 +284,24 @@ internal fun Micronutrient.localizedName(): String = when (this) {
 private fun Micronutrient.localizedGuidance(): String {
     val amount = "${referenceDailyAmount.targetText()} ${storageUnit.suffix}"
     return when (this) {
-        Micronutrient.FIBER -> nomiString(
-            "Aim for at least $amount a day. Most people get well under half of that.",
-            "Ziel: mindestens $amount pro Tag. Die meisten erreichen nicht einmal die Hälfte.",
+        Micronutrient.FIBER -> nomiFormat(
+            "Aim for at least {0} a day. Most people get well under half of that.",
+            amount,
         )
 
-        Micronutrient.SUGAR -> nomiString(
-            "Keep added and free sugars under $amount a day. Drinks are where it adds up fastest.",
-            "Halte zugesetzten und freien Zucker unter $amount pro Tag. Am schnellsten summieren sich Getränke.",
+        Micronutrient.SUGAR -> nomiFormat(
+            "Keep added and free sugars under {0} a day. Drinks are where it adds up fastest.",
+            amount,
         )
 
-        Micronutrient.SATURATED_FAT -> nomiString(
-            "Stay under about $amount a day, roughly a tenth of a 2,000 kcal day.",
-            "Bleib unter etwa $amount pro Tag, ungefähr ein Zehntel eines 2.000-kcal-Tages.",
+        Micronutrient.SATURATED_FAT -> nomiFormat(
+            "Stay under about {0} a day, roughly a tenth of a 2,000 kcal day.",
+            amount,
         )
 
-        Micronutrient.SODIUM -> nomiString(
-            "Stay under $amount a day, which is about 5 g of salt.",
-            "Bleib unter $amount pro Tag, das entspricht etwa 5 g Salz.",
+        Micronutrient.SODIUM -> nomiFormat(
+            "Stay under {0} a day, which is about 5 g of salt.",
+            amount,
         )
     }
 }

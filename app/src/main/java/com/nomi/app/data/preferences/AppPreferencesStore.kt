@@ -20,7 +20,7 @@ interface AppPreferencesStore {
     val preferences: Flow<AppPreferences>
 
     suspend fun setAppearance(theme: ThemePreference, dynamicColorEnabled: Boolean)
-    suspend fun setGermanTranslationEnabled(enabled: Boolean)
+    suspend fun setLanguageTag(languageTag: String)
     suspend fun setUnits(weight: WeightUnitPreference, height: HeightUnitPreference)
     suspend fun setProvider(pipeline: ProviderPipeline, selection: ProviderSelection)
     suspend fun setReminders(reminders: ReminderPreferences)
@@ -60,8 +60,13 @@ class DataStoreAppPreferencesStore(
         }
     }
 
-    override suspend fun setGermanTranslationEnabled(enabled: Boolean) {
-        dataStore.edit { values -> values[Keys.GERMAN_TRANSLATION_ENABLED] = enabled }
+    override suspend fun setLanguageTag(languageTag: String) {
+        dataStore.edit { values ->
+            values[Keys.LANGUAGE_TAG] = languageTag
+            // The legacy flag is dropped once a language is chosen explicitly, so the migration
+            // below cannot later override the newer choice.
+            values.remove(Keys.GERMAN_TRANSLATION_ENABLED)
+        }
     }
 
     override suspend fun setUnits(
@@ -140,8 +145,12 @@ class DataStoreAppPreferencesStore(
                 ?.let { encoded -> enumValues<ThemePreference>().firstOrNull { it.name == encoded } }
                 ?: defaults.theme,
             dynamicColorEnabled = values[Keys.DYNAMIC_COLOR] ?: defaults.dynamicColorEnabled,
-            germanTranslationEnabled = values[Keys.GERMAN_TRANSLATION_ENABLED]
-                ?: defaults.germanTranslationEnabled,
+            // An install that predates the language picker only ever had a German on/off flag.
+            // Honouring it keeps that user on exactly the language they were already reading,
+            // instead of silently switching them to their device locale on upgrade.
+            languageTag = values[Keys.LANGUAGE_TAG]
+                ?: values[Keys.GERMAN_TRANSLATION_ENABLED]?.let { german -> if (german) "de" else "en" }
+                ?: defaults.languageTag,
             weightUnit = values[Keys.WEIGHT_UNIT]
                 ?.let { encoded -> enumValues<WeightUnitPreference>().firstOrNull { it.name == encoded } }
                 ?: defaults.weightUnit,
@@ -197,6 +206,7 @@ class DataStoreAppPreferencesStore(
         val THEME = stringPreferencesKey("appearance.theme")
         val DYNAMIC_COLOR = booleanPreferencesKey("appearance.dynamic_color")
         val GERMAN_TRANSLATION_ENABLED = booleanPreferencesKey("language.german_translation_enabled")
+        val LANGUAGE_TAG = stringPreferencesKey("language.app_language")
         val WEIGHT_UNIT = stringPreferencesKey("units.weight")
         val HEIGHT_UNIT = stringPreferencesKey("units.height")
         val FOOD_RESEARCH_PROVIDER = stringPreferencesKey("providers.food_research")

@@ -264,6 +264,8 @@ private fun Cursor.readSourceSnapshot(prefix: String): BackupNutritionSourceSnap
         displayName = nullableString(prefix + "display_name"),
         externalId = nullableString(prefix + "external_id"),
         url = nullableString(prefix + "url"),
+        citedUrls = nullableString(prefix + "cited_urls"),
+        confidence = nullableDouble(prefix + "confidence"),
         retrievedAtEpochMillis = nullableLong(prefix + "retrieved_at_epoch_millis"),
         verifiedAtEpochMillis = nullableLong(prefix + "verified_at_epoch_millis"),
     )

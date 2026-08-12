@@ -44,7 +44,7 @@ fun PortionEditSheet(
 ) {
     NomiSheet(onDismissRequest = onDismiss) {
         NomiSheetHeader(
-            title = nomiString("Change this food", "Dieses Essen ändern"),
+            title = nomiString("Change this food"),
             subtitle = "${state.current.currentQuantity} ${state.current.currentUnit}",
             icon = Icons.Default.EditNote,
         )
@@ -55,8 +55,8 @@ fun PortionEditSheet(
             NomiTextField(
                 value = state.correction,
                 onValueChange = onCorrectionChanged,
-                label = nomiString("What should I change?", "Was soll ich ändern?"),
-                placeholder = nomiString("Half, or actually it was tuna", "Die Hälfte, oder es war doch Thunfisch"),
+                label = nomiString("What should I change?"),
+                placeholder = nomiString("Half, or actually it was tuna"),
                 singleLine = false,
                 minLines = 2,
             )
@@ -70,9 +70,9 @@ fun PortionEditSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(
                     if (state.isProcessing) {
-                        nomiString("Interpreting…", "Wird interpretiert…")
+                        nomiString("Interpreting…")
                     } else {
-                        nomiString("Preview change", "Änderung prüfen")
+                        nomiString("Preview change")
                     },
                 )
             }
@@ -91,17 +91,11 @@ fun PortionEditSheet(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text(
-                            nomiString(
-                                "That changes the food, not just the amount",
-                                "Das ändert das Essen, nicht nur die Menge",
-                            ),
+                            nomiString("That changes the food, not just the amount"),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            state.researchReason ?: nomiString(
-                                "Nomi needs to look up nutrition for the corrected food.",
-                                "Nomi muss die Nährwerte für das korrigierte Essen neu nachschlagen.",
-                            ),
+                            state.researchReason ?: nomiString("Nomi needs to look up nutrition for the corrected food."),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Button(
@@ -112,9 +106,9 @@ fun PortionEditSheet(
                         ) {
                             Text(
                                 if (state.isProcessing) {
-                                    nomiString("Looking it up…", "Wird nachgeschlagen…")
+                                    nomiString("Looking it up…")
                                 } else {
-                                    nomiString("Look it up again", "Neu nachschlagen")
+                                    nomiString("Look it up again")
                                 },
                             )
                         }
@@ -127,7 +121,7 @@ fun PortionEditSheet(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PortionCard(
-                        title = nomiString("Before", "Vorher"),
+                        title = nomiString("Before"),
                         quantity = "${state.current.currentQuantity} ${state.current.currentUnit}",
                         calories = state.current.calories,
                         modifier = Modifier.weight(1f),
@@ -138,7 +132,7 @@ fun PortionEditSheet(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     PortionCard(
-                        title = nomiString("After", "Nachher"),
+                        title = nomiString("After"),
                         quantity = "${proposed.newQuantity} ${proposed.newUnit}",
                         calories = state.current.calories * proposed.multiplier,
                         highlighted = true,
@@ -155,7 +149,7 @@ fun PortionEditSheet(
                     shape = NomiShapes.Action,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                 ) {
-                    Text(nomiString("Apply", "Übernehmen"))
+                    Text(nomiString("Apply"))
                 }
             }
         }

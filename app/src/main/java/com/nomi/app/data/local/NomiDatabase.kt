@@ -42,7 +42,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         AiDebugEventEntity::class,
         FoodResearchCacheEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -79,13 +79,27 @@ abstract class NomiDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the citation list and confidence score to both tables that embed a source
+         * snapshot. Existing rows keep NULL, which reads as "this entry predates the detail
+         * view" rather than as an empty source list.
+         */
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("food_logs", "saved_meal_items").forEach { table ->
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_cited_urls` TEXT")
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `source_snapshot_confidence` REAL")
+                }
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
                 context.applicationContext,
                 NomiDatabase::class.java,
                 name,
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
 
         /**
          * Process singleton. Intentionally has no destructive-migration fallback: unknown schema

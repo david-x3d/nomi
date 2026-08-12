@@ -8,7 +8,9 @@ import kotlinx.serialization.json.Json
 object AiPrompts {
     fun parseFood(text: String): String = """
         You convert natural-language meal descriptions into strict JSON.
-        The input may be German or English. Preserve the user's language but normalize units.
+        The input may be in any language Nomi supports - English, German, Spanish, French,
+        Italian, Dutch, Portuguese, Albanian, Swedish, or Turkish. Preserve the user's language
+        but normalize units.
         Do not invent nutrition values in this step. Extract every food, quantity, unit, brand,
         preparation, and any assumptions needed. A saved-meal phrase such as "mein übliches
         Frühstück" should be returned in mealReference.
@@ -19,9 +21,11 @@ object AiPrompts {
         with brand "McDonald's", and "Coca-Cola" with brand "Coca-Cola". The brand belongs in
         `brand`, the amount in `quantity`/`unit`, the preparation in `preparation` - none of
         them may be repeated in `name`.
-        Correct spelling and capitalization in the user's own language, and answer in that
-        language: German input gives German names with capitalized nouns ("pommes mit majo"
-        gives "Pommes" and "Mayonnaise"), English input gives English names. Expand a
+        Correct spelling and capitalization in the user's own language, following that
+        language's own rules, and answer in that language: German input gives German names with
+        capitalized nouns ("pommes mit majo" gives "Pommes" and "Mayonnaise"), English input
+        gives English names, French input gives French names ("pates au beurre" gives "Pâtes"
+        and "Beurre"), and so on for every supported language. Expand a
         colloquial short form to the food's common name ("coke" gives "Coca-Cola"). Keep any
         word that changes what the food is or contains, such as "Zero", "Vanille", or "vegan".
         Never invent a variant, brand, or ingredient the user did not write.
@@ -29,9 +33,10 @@ object AiPrompts {
         EXPECT TYPOS. This is typed quickly on a phone, so assume slips rather than new
         products: transposed and dropped letters ("red bull junebrry" is Red Bull Juneberry,
         "haferflcken" is Haferflocken), missing or extra spaces ("redbull", "hafer flocken"),
-        German written without umlauts or with ss for ß ("muesli" is Müsli, "kaese" is Käse,
-        "russisch brot"), and phonetic spellings. Resolve the intended product and return its
-        correct name.
+        accented letters typed without their accents or spelled out ("muesli" is Müsli, "kaese"
+        is Käse, "creme brulee" is crème brûlée, "acucar" is açúcar, "cig kofte" is çiğ köfte),
+        and phonetic spellings. Resolve the intended product and return its correct name with
+        the accents its language requires.
         CORRECTING A SLIP IS NOT THE SAME AS CHANGING THE PRODUCT. A variant is often one short
         word, and swapping it logs a different food behind a confident name. Never turn one
         edition, flavour, or variant into another because the spelling is close: "Juneberry"
@@ -116,8 +121,10 @@ object AiPrompts {
         in `assumptions`, so none of them are repeated in `name`. Keep every word that changes
         what the food is or contains - "Coca-Cola Zero" and "Skyr Vanille" stay whole, because
         dropping the variant would put the wrong food in the log. Spell and capitalize the name
-        in the language of the user's input: German input gives German names with capitalized
-        nouns, English input gives English names. A shortened display name NEVER licenses
+        in the language of the user's input, following that language's own rules: German input
+        gives German names with capitalized nouns, English input gives English names, and the
+        same holds for every other language the user may write in. A shortened display name
+        NEVER licenses
         researching a different, less specific product: identify the exact product first as
         required below, then name it for the log.
         SOURCE AND DATA MUST MATCH: `sourceProductName` MUST be the product title exactly as the

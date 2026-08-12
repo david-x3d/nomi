@@ -66,9 +66,9 @@ fun AiProviderEditorDialog(
     val activity = LocalContext.current.findActivity()
     val busy = state.isTesting || state.isSaving || state.isRemovingKey
     val configurationError = state.configurationError(
-        blankModelMessage = nomiString("Enter a model name.", "Gib einen Modellnamen ein."),
-        missingEndpointMessage = nomiString("Enter an API endpoint.", "Gib einen API-Endpoint ein."),
-        invalidEndpointMessage = nomiString("Enter a valid HTTPS API endpoint.", "Gib einen gültigen HTTPS-API-Endpoint ein."),
+        blankModelMessage = nomiString("Enter a model name."),
+        missingEndpointMessage = nomiString("Enter an API endpoint."),
+        invalidEndpointMessage = nomiString("Enter a valid HTTPS API endpoint."),
     )
     val hasReasoningKey = state.hasStoredApiKey || state.apiKeyInput.isNotBlank()
     val hasSearchKey = state.provider != AiProviderKind.EXA_GEMINI ||
@@ -83,17 +83,17 @@ fun AiProviderEditorDialog(
         title = state.purpose.localizedPurpose(),
         icon = Icons.Outlined.Key,
         confirmLabel = if (state.isSaving) {
-            nomiString("Saving…", "Wird gespeichert…")
+            nomiString("Saving…")
         } else {
-            nomiString("Save", "Speichern")
+            nomiString("Save")
         },
         onConfirm = onSave,
         confirmEnabled = configurationError == null && !busy,
-        dismissLabel = nomiString("Cancel", "Abbrechen"),
+        dismissLabel = nomiString("Cancel"),
         onDismissAction = { if (!busy) onDismiss() },
     ) {
         Text(
-            nomiString("Provider", "Anbieter"),
+            nomiString("Provider"),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -130,14 +130,14 @@ fun AiProviderEditorDialog(
                     ),
                 )
             },
-            label = nomiString("API endpoint", "API-Endpunkt"),
+            label = nomiString("API endpoint"),
             readOnly = state.provider.canonicalEndpoint() != null,
             enabled = !busy,
             isError = configurationError?.contains("endpoint", ignoreCase = true) == true,
             supportingText = if (state.provider.canonicalEndpoint() != null) {
-                nomiString("Built-in provider endpoint managed by Nomi", "Nomi verwaltet den Endpunkt dieses integrierten Anbieters.")
+                nomiString("Built-in provider endpoint managed by Nomi")
             } else {
-                nomiString("OpenAI-compatible base URL (https:// optional)", "OpenAI-kompatible Basis-URL (https:// optional)")
+                nomiString("OpenAI-compatible base URL (https:// optional)")
             },
         )
         NomiTextField(
@@ -147,14 +147,14 @@ fun AiProviderEditorDialog(
                     state.copy(model = it, testResult = null, errorMessage = null),
                 )
             },
-            label = nomiString("Model", "Modell"),
+            label = nomiString("Model"),
             enabled = !busy,
             isError = state.model.isBlank(),
         )
         val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
             "Google Gemini API key"
         } else {
-            nomiString("API key", "API-Schlüssel")
+            nomiString("API key")
         }
         NomiTextField(
             value = state.apiKeyInput,
@@ -165,7 +165,7 @@ fun AiProviderEditorDialog(
             },
             label = if (state.hasStoredApiKey) "$keyName (stored securely)" else keyName,
             placeholder = if (state.hasStoredApiKey) {
-                nomiString("Leave blank to keep existing key", "Leer lassen, um den vorhandenen Schlüssel zu behalten")
+                nomiString("Leave blank to keep existing key")
             } else {
                 null
             },
@@ -197,7 +197,7 @@ fun AiProviderEditorDialog(
                 enabled = !busy,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(if (state.isRemovingKey) nomiString("Removing stored key…", "Gespeicherter Schlüssel wird entfernt…") else nomiString("Remove stored key", "Gespeicherten Schlüssel entfernen"))
+                Text(if (state.isRemovingKey) nomiString("Removing stored key…") else nomiString("Remove stored key"))
             }
         }
         configurationError?.let { NomiInlineError(it) }
@@ -207,7 +207,7 @@ fun AiProviderEditorDialog(
             shape = NomiShapes.Action,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) {
-            Text(if (state.isTesting) nomiString("Testing…", "Wird getestet…") else nomiString("Test connection", "Verbindung testen"))
+            Text(if (state.isTesting) nomiString("Testing…") else nomiString("Test connection"))
         }
         state.testResult?.let {
             Surface(
@@ -291,16 +291,16 @@ private fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.OPEN_AI -> "OpenAI"
     AiProviderKind.CODEX_EASY -> "Codex Easy"
-    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom", "Benutzerdefiniert")
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom")
 }
 
 @Composable
 private fun String.localizedPurpose(): String = when (this) {
-    "Food research" -> nomiString("Food research", "Lebensmittelrecherche")
-    "Food interpretation" -> nomiString("Food interpretation", "Lebensmittelinterpretation")
-    "Portion changes" -> nomiString("Portion changes", "Portionsänderungen")
-    "Photo recognition" -> nomiString("Photo recognition", "Fotoerkennung")
-    "Fallback" -> nomiString("Fallback", "Intelligenter Fallback")
+    "Food research" -> nomiString("Food research")
+    "Food interpretation" -> nomiString("Food interpretation")
+    "Portion changes" -> nomiString("Portion changes")
+    "Photo recognition" -> nomiString("Photo recognition")
+    "Fallback" -> nomiString("Fallback")
     else -> this
 }
 

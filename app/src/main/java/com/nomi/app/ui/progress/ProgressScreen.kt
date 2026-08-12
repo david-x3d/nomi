@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.NomiCard
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import java.util.Locale
@@ -79,7 +80,7 @@ fun ProgressScreen(
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(nomiString("Progress", "Fortschritt")) },
+                title = { Text(nomiString("Progress")) },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -147,12 +148,12 @@ fun ProgressScreen(
 
 @Composable
 private fun ProgressRange.label(): String = when (this) {
-    ProgressRange.SEVEN_DAYS -> nomiString("7 days", "7 Tage")
-    ProgressRange.THIRTY_DAYS -> nomiString("30 days", "30 Tage")
-    ProgressRange.THREE_MONTHS -> nomiString("3 months", "3 Monate")
-    ProgressRange.SIX_MONTHS -> nomiString("6 months", "6 Monate")
-    ProgressRange.ONE_YEAR -> nomiString("1 year", "1 Jahr")
-    ProgressRange.ALL -> nomiString("All", "Alle")
+    ProgressRange.SEVEN_DAYS -> nomiString("7 days")
+    ProgressRange.THIRTY_DAYS -> nomiString("30 days")
+    ProgressRange.THREE_MONTHS -> nomiString("3 months")
+    ProgressRange.SIX_MONTHS -> nomiString("6 months")
+    ProgressRange.ONE_YEAR -> nomiString("1 year")
+    ProgressRange.ALL -> nomiString("All")
 }
 
 @Composable
@@ -174,7 +175,7 @@ private fun WeightSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = nomiString("Weight", "Gewicht"),
+                    text = nomiString("Weight"),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -196,7 +197,7 @@ private fun WeightSection(
             FilledTonalButton(onClick = onAddWeight) {
                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text(
-                    text = nomiString("Add", "Hinzufügen"),
+                    text = nomiString("Add"),
                     modifier = Modifier.padding(start = 6.dp),
                     maxLines = 1,
                 )
@@ -216,14 +217,14 @@ private fun WeightSection(
             ) {
                 state.startingWeightKg?.let {
                     WeightMilestone(
-                        label = nomiString("Starting", "Start"),
+                        label = nomiString("Starting"),
                         value = "${formatWeight(it, locale)} kg",
                         modifier = Modifier.weight(1f),
                     )
                 }
                 state.weights.lastOrNull()?.let {
                     WeightMilestone(
-                        label = nomiString("Current", "Aktuell"),
+                        label = nomiString("Current"),
                         value = "${formatWeight(it.kilograms, locale)} kg",
                         modifier = Modifier.weight(1f),
                         emphasized = true,
@@ -231,7 +232,7 @@ private fun WeightSection(
                 }
                 state.targetWeightKg?.let {
                     WeightMilestone(
-                        label = nomiString("Goal", "Ziel"),
+                        label = nomiString("Goal"),
                         value = "${formatWeight(it, locale)} kg",
                         modifier = Modifier.weight(1f),
                         alignment = TextAlign.End,
@@ -240,10 +241,7 @@ private fun WeightSection(
             }
         } else {
             Text(
-                text = nomiString(
-                    "Log a little more to see your weight trend.",
-                    "Trage noch etwas mehr ein, um deinen Gewichtsverlauf zu sehen.",
-                ),
+                text = nomiString("Log a little more to see your weight trend."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -298,11 +296,11 @@ private fun WeightChart(
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
     val min = (points.minOf { it.kilograms }.let { if (targetKg != null) minOf(it, targetKg) else it } - 1).toFloat()
     val max = (points.maxOf { it.kilograms }.let { if (targetKg != null) maxOf(it, targetKg) else it } + 1).toFloat()
-    val summary = nomiString(
-        "Weight trend from ${formatWeight(points.first().kilograms, locale)} to " +
-            "${formatWeight(points.last().kilograms, locale)} kilograms across ${points.size} measurements",
-        "Gewichtsverlauf von ${formatWeight(points.first().kilograms, locale)} bis " +
-            "${formatWeight(points.last().kilograms, locale)} Kilogramm über ${points.size} Messungen",
+    val summary = nomiFormat(
+        "Weight trend from {0} to {1} kilograms across {2} measurements",
+        formatWeight(points.first().kilograms, locale),
+        formatWeight(points.last().kilograms, locale),
+        points.size,
     )
     Canvas(modifier = modifier.semantics { contentDescription = summary }) {
         drawLine(track, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 2.dp.toPx())
@@ -350,13 +348,14 @@ private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modi
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = nomiString("Consistency", "Regelmäßigkeit"),
+                    text = nomiString("Consistency"),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = nomiString(
-                        "${state.loggingDays} of ${state.totalDays} days logged",
-                        "An ${state.loggingDays} von ${state.totalDays} Tagen eingetragen",
+                    text = nomiFormat(
+                        "{0} of {1} days logged",
+                        state.loggingDays,
+                        state.totalDays,
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -387,24 +386,24 @@ private fun NutritionAverages(state: ProgressUiState, modifier: Modifier = Modif
         spacing = 12.dp,
     ) {
         Text(
-            text = nomiString("Daily averages", "Tagesdurchschnitt"),
+            text = nomiString("Daily averages"),
             style = MaterialTheme.typography.titleMedium,
         )
         AverageRow(
-            label = nomiString("Calories", "Kalorien"),
+            label = nomiString("Calories"),
             value = "${state.nutrition.sumOf { it.calories }.div(days).roundToInt()} kcal",
             emphasized = true,
         )
         AverageRow(
-            label = nomiString("Protein", "Eiweiß"),
+            label = nomiString("Protein"),
             value = "${state.nutrition.sumOf { it.protein }.div(days).roundToInt()} g",
         )
         AverageRow(
-            label = nomiString("Carbs", "Kohlenhydrate"),
+            label = nomiString("Carbs"),
             value = "${state.nutrition.sumOf { it.carbohydrates }.div(days).roundToInt()} g",
         )
         AverageRow(
-            label = nomiString("Fat", "Fett"),
+            label = nomiString("Fat"),
             value = "${state.nutrition.sumOf { it.fat }.div(days).roundToInt()} g",
         )
     }

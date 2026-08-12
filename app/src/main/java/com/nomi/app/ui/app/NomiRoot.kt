@@ -49,9 +49,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,23 +70,24 @@ import com.nomi.app.di.AppContainer
 import com.nomi.app.integration.camera.MealImagePreprocessor
 import com.nomi.app.integration.camera.deleteOwnedCameraCapture
 import com.nomi.app.integration.health.HealthFeatures
-import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.BarcodeAmountSheet
+import com.nomi.app.ui.capture.BarcodeCaptureScreen
+import com.nomi.app.ui.capture.MenuScanScreen
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
-import com.nomi.app.ui.capture.MenuScanScreen
+import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingScreen
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.PortionEditSheet
-import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.onboarding.OnboardingRoute
 import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.progress.ProgressScreen
-import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.settings.AiProviderEditorDialog
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.SettingsScreen
@@ -277,7 +278,7 @@ private fun NomiMain(
                     onAddWeight = { showWeightDialog = true },
                     onTheme = viewModel::setTheme,
                     onDynamicColor = viewModel::setDynamicColor,
-                    onGermanTranslation = viewModel::setGermanTranslationEnabled,
+                    onLanguage = viewModel::setLanguage,
                     onUnits = viewModel::setUnits,
                     onActivityAdjustment = viewModel::setActivityAdjustment,
                     onCalorieEstimateBias = viewModel::setCalorieEstimateBias,
@@ -740,7 +741,7 @@ private fun MainNavigationSuite(
     onAddWeight: () -> Unit,
     onTheme: (com.nomi.app.ui.settings.ThemeMode) -> Unit,
     onDynamicColor: (Boolean) -> Unit,
-    onGermanTranslation: (Boolean) -> Unit,
+    onLanguage: (NomiLanguage) -> Unit,
     onUnits: (com.nomi.app.ui.settings.UnitSystem) -> Unit,
     onActivityAdjustment: (Boolean) -> Unit,
     onCalorieEstimateBias: (CalorieEstimateBias) -> Unit,
@@ -866,7 +867,7 @@ private fun MainNavigationSuite(
                     state = settingsState,
                     onThemeModeChanged = onTheme,
                     onDynamicColorChanged = onDynamicColor,
-                    onGermanTranslationChanged = onGermanTranslation,
+                    onLanguageChanged = onLanguage,
                     onUnitSystemChanged = onUnits,
                     onActivityTargetAdjustmentChanged = onActivityAdjustment,
                     onProfile = onProfile,
@@ -905,9 +906,9 @@ private enum class MainDestination(
 
 @Composable
 private fun MainDestination.localizedLabel(): String = when (this) {
-    MainDestination.TODAY -> nomiString("Today", "Heute")
-    MainDestination.PROGRESS -> nomiString("Progress", "Fortschritt")
-    MainDestination.SETTINGS -> nomiString("Settings", "Einstellungen")
+    MainDestination.TODAY -> nomiString("Today")
+    MainDestination.PROGRESS -> nomiString("Progress")
+    MainDestination.SETTINGS -> nomiString("Settings")
 }
 
 private object Routes {

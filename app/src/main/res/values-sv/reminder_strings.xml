@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Nomi-påminnelser</string>
+    <string name="reminder_channel_description">Måltider, dagssammanfattning och viktavstämningar</string>
+    <string name="reminder_breakfast_title">Frukost</string>
+    <string name="reminder_breakfast_body">Redo att logga frukosten?</string>
+    <string name="reminder_lunch_title">Lunch</string>
+    <string name="reminder_lunch_body">En snabb lunchloggning håller dagen på rätt spår.</string>
+    <string name="reminder_dinner_title">Middag</string>
+    <string name="reminder_dinner_body">Logga middagen medan detaljerna är färska.</string>
+    <string name="reminder_summary_title">Hur gick dagen?</string>
+    <string name="reminder_summary_body">Gå igenom dagens näring och fyll i det som saknas.</string>
+    <string name="reminder_weight_title">Viktavstämning</string>
+    <string name="reminder_weight_body">Lägg till en vikt när det passar dig.</string>
+</resources>

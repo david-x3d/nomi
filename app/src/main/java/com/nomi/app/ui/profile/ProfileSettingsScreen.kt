@@ -57,13 +57,14 @@ import com.nomi.app.domain.ActivityLevel
 import com.nomi.app.domain.EnergySex
 import com.nomi.app.domain.GoalType
 import com.nomi.app.domain.ProgressRate
-import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.components.NomiDatePickerDialog
 import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import java.time.Instant
 import java.time.LocalDate
@@ -129,7 +130,7 @@ fun ProfileSettingsScreen(
     val progressionRateError = localizeProfileError(validation.progressionRateError)
 
     SettingsEditorScaffold(
-        title = nomiString("Profile & goals", "Profil & Ziele"),
+        title = nomiString("Profile & goals"),
         onBack = onBack,
         modifier = modifier,
     ) { innerPadding ->
@@ -148,15 +149,15 @@ fun ProfileSettingsScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = nomiString("Your calculation inputs", "Deine Berechnungsdaten"),
+                        text = nomiString("Your calculation inputs"),
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = nomiString(
-                            "Current weight stays at ${profile.startingWeightKg.displayNumber(locale)} kg. Record a new weight from Progress instead.",
-                            "Das aktuelle Gewicht bleibt bei ${profile.startingWeightKg.displayNumber(locale)} kg. Trage ein neues Gewicht stattdessen unter Fortschritt ein.",
+                        text = nomiFormat(
+                            "Current weight stays at {0} kg. Record a new weight from Progress instead.",
+                            profile.startingWeightKg.displayNumber(locale),
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -165,11 +166,8 @@ fun ProfileSettingsScreen(
             }
             item {
                 SettingsNoticeCard(
-                    title = nomiString("Saving creates a new plan", "Beim Speichern wird ein neuer Plan erstellt"),
-                    message = nomiString(
-                        "Nomi recalculates from the updated profile and starts a new plan version. Previous days keep the targets they originally used.",
-                        "Nomi berechnet anhand des aktualisierten Profils neu und startet eine neue Planversion. Frühere Tage behalten ihre ursprünglichen Ziele.",
-                    ),
+                    title = nomiString("Saving creates a new plan"),
+                    message = nomiString("Nomi recalculates from the updated profile and starts a new plan version. Previous days keep the targets they originally used."),
                 )
             }
             item {
@@ -181,18 +179,15 @@ fun ProfileSettingsScreen(
                             if (submitted) dateOfBirthError?.let { error(it) }
                         }
                         .testTag("profile_date_of_birth"),
-                    label = nomiString("Date of birth", "Geburtsdatum"),
-                    placeholder = nomiString("YYYY-MM-DD", "JJJJ-MM-TT"),
-                    supportingText = dateOfBirthError.takeIf { submitted } ?: nomiString(
-                        "Stored as a date so your age updates automatically.",
-                        "Als Datum gespeichert, damit dein Alter automatisch aktualisiert wird.",
-                    ),
+                    label = nomiString("Date of birth"),
+                    placeholder = nomiString("YYYY-MM-DD"),
+                    supportingText = dateOfBirthError.takeIf { submitted } ?: nomiString("Stored as a date so your age updates automatically."),
                     isError = submitted && dateOfBirthError != null,
                     trailingIcon = {
                         IconButton(onClick = { showDatePicker = true }) {
                             Icon(
                                 Icons.Outlined.CalendarMonth,
-                                contentDescription = nomiString("Choose date", "Datum auswählen"),
+                                contentDescription = nomiString("Choose date"),
                             )
                         }
                     },
@@ -207,12 +202,12 @@ fun ProfileSettingsScreen(
             }
             item {
                 StringSelector(
-                    label = nomiString("Energy calculation", "Energieberechnung"),
+                    label = nomiString("Energy calculation"),
                     selectedValue = energySex,
                     options = listOf(
-                        EnergySex.FEMALE.name to nomiString("Female equation", "Formel für Frauen"),
-                        EnergySex.MALE.name to nomiString("Male equation", "Formel für Männer"),
-                        EnergySex.MANUAL.name to nomiString("Manual energy target", "Manuelles Energieziel"),
+                        EnergySex.FEMALE.name to nomiString("Female equation"),
+                        EnergySex.MALE.name to nomiString("Male equation"),
+                        EnergySex.MANUAL.name to nomiString("Manual energy target"),
                     ),
                     onSelected = { energySex = it },
                     errorMessage = energySexError.takeIf { submitted },
@@ -229,7 +224,7 @@ fun ProfileSettingsScreen(
                             if (submitted) heightError?.let { error(it) }
                         }
                         .testTag("profile_height_cm"),
-                    label = nomiString("Height", "Körpergröße"),
+                    label = nomiString("Height"),
                     suffix = "cm",
                     supportingText = heightError.takeIf { submitted },
                     isError = submitted && heightError != null,
@@ -242,7 +237,7 @@ fun ProfileSettingsScreen(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(nomiString("Goal", "Ziel"), style = MaterialTheme.typography.labelLarge)
+                    Text(nomiString("Goal"), style = MaterialTheme.typography.labelLarge)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         val goals = listOf(GoalType.LOSE, GoalType.MAINTAIN, GoalType.GAIN)
                         goals.forEachIndexed { index, option ->
@@ -276,7 +271,7 @@ fun ProfileSettingsScreen(
                                 if (submitted) targetWeightError?.let { error(it) }
                             }
                             .testTag("profile_target_weight_kg"),
-                        label = nomiString("Target weight", "Zielgewicht"),
+                        label = nomiString("Target weight"),
                         suffix = "kg",
                         supportingText = targetWeightError.takeIf { submitted },
                         isError = submitted && targetWeightError != null,
@@ -290,13 +285,13 @@ fun ProfileSettingsScreen(
             }
             item {
                 StringSelector(
-                    label = nomiString("Activity level", "Aktivitätsniveau"),
+                    label = nomiString("Activity level"),
                     selectedValue = activityLevel,
                     options = listOf(
-                        ActivityLevel.SEDENTARY.name to nomiString("Mostly seated", "Überwiegend sitzend"),
-                        ActivityLevel.LIGHTLY_ACTIVE.name to nomiString("Lightly active", "Leicht aktiv"),
-                        ActivityLevel.ACTIVE.name to nomiString("Active", "Aktiv"),
-                        ActivityLevel.VERY_ACTIVE.name to nomiString("Very active", "Sehr aktiv"),
+                        ActivityLevel.SEDENTARY.name to nomiString("Mostly seated"),
+                        ActivityLevel.LIGHTLY_ACTIVE.name to nomiString("Lightly active"),
+                        ActivityLevel.ACTIVE.name to nomiString("Active"),
+                        ActivityLevel.VERY_ACTIVE.name to nomiString("Very active"),
                     ),
                     onSelected = { activityLevel = it },
                     errorMessage = activityError.takeIf { submitted },
@@ -307,18 +302,18 @@ fun ProfileSettingsScreen(
                 item {
                     val rateOptions = if (goal == GoalType.GAIN) {
                         listOf(
-                            ProgressRate.GENTLE.name to nomiString("Gentle gain", "Langsame Zunahme"),
-                            ProgressRate.MODERATE.name to nomiString("Moderate gain", "Moderate Zunahme"),
+                            ProgressRate.GENTLE.name to nomiString("Gentle gain"),
+                            ProgressRate.MODERATE.name to nomiString("Moderate gain"),
                         )
                     } else {
                         listOf(
-                            ProgressRate.GENTLE.name to nomiString("Gentle", "Langsam"),
-                            ProgressRate.MODERATE.name to nomiString("Moderate", "Moderat"),
-                            ProgressRate.FASTER.name to nomiString("Faster", "Schneller"),
+                            ProgressRate.GENTLE.name to nomiString("Gentle"),
+                            ProgressRate.MODERATE.name to nomiString("Moderate"),
+                            ProgressRate.FASTER.name to nomiString("Faster"),
                         )
                     }
                     StringSelector(
-                        label = nomiString("Progression rate", "Tempo"),
+                        label = nomiString("Progression rate"),
                         selectedValue = progressionRate,
                         options = rateOptions,
                         onSelected = { progressionRate = it },
@@ -351,14 +346,11 @@ fun ProfileSettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                nomiString("Keep custom targets, if set", "Benutzerdefinierte Ziele beibehalten"),
+                                nomiString("Keep custom targets, if set"),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
-                                nomiString(
-                                    "Carry your custom calorie and macro targets into the new plan instead of replacing them with calculated targets.",
-                                    "Übernimm deine benutzerdefinierten Kalorien- und Makroziele in den neuen Plan, statt sie durch berechnete Ziele zu ersetzen.",
-                                ),
+                                nomiString("Carry your custom calorie and macro targets into the new plan instead of replacing them with calculated targets."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -384,7 +376,7 @@ fun ProfileSettingsScreen(
                     ) {
                         Text(
                             text = localizeProfileError(validation.firstError)
-                                ?: nomiString("Check the highlighted fields.", "Prüfe die markierten Felder."),
+                                ?: nomiString("Check the highlighted fields."),
                             modifier = Modifier.padding(16.dp),
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -405,7 +397,7 @@ fun ProfileSettingsScreen(
                 ) {
                     Icon(Icons.Outlined.Refresh, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text(nomiString("Save and create new plan", "Speichern und neuen Plan erstellen"))
+                    Text(nomiString("Save and create new plan"))
                 }
             }
             item { Spacer(Modifier.height(16.dp)) }
@@ -430,9 +422,9 @@ fun ProfileSettingsScreen(
                 }
                 showDatePicker = false
             },
-            confirmLabel = nomiString("Save", "Speichern"),
-            dismissLabel = nomiString("Cancel", "Abbrechen"),
-            title = nomiString("Date of birth", "Geburtsdatum"),
+            confirmLabel = nomiString("Save"),
+            dismissLabel = nomiString("Cancel"),
+            title = nomiString("Date of birth"),
         )
     }
 }
@@ -450,9 +442,9 @@ private inline fun <reified T : Enum<T>> enumValueOrNull(value: String): T? =
 
 @Composable
 private fun GoalType.toGoalLabel(): String = when (this) {
-    GoalType.LOSE -> nomiString("Lose", "Abnehmen")
-    GoalType.MAINTAIN -> nomiString("Maintain", "Halten")
-    GoalType.GAIN -> nomiString("Gain", "Zunehmen")
+    GoalType.LOSE -> nomiString("Lose")
+    GoalType.MAINTAIN -> nomiString("Maintain")
+    GoalType.GAIN -> nomiString("Gain")
 }
 
 private fun String.decimalInput(maxIntegerDigits: Int): String {
@@ -475,59 +467,13 @@ private fun String.toDecimalOrNull(): Double? = replace(',', '.').toDoubleOrNull
 private fun Double.displayNumber(locale: Locale): String =
     String.format(locale, "%.1f", this).removeSuffix(".0").removeSuffix(",0")
 
+/**
+ * The view model reports validation failures as English sentences, which are exactly the
+ * catalogue keys, so every message translates through one lookup. An unrecognized message falls
+ * back to itself rather than disappearing.
+ */
 @Composable
-private fun localizeProfileError(message: String?): String? = when (message) {
-    null -> null
-    "Use a valid date in YYYY-MM-DD format." -> nomiString(
-        message,
-        "Gib ein gültiges Datum im Format JJJJ-MM-TT ein.",
-    )
-    "Date of birth can't be in the future." -> nomiString(
-        message,
-        "Das Geburtsdatum darf nicht in der Zukunft liegen.",
-    )
-    "Nomi supports ages 13 to 120." -> nomiString(
-        message,
-        "Nomi unterstützt ein Alter von 13 bis 120 Jahren.",
-    )
-    "Choose an energy calculation option." -> nomiString(
-        message,
-        "Wähle eine Option für die Energieberechnung.",
-    )
-    "Keep custom targets or choose an equation so Nomi can calculate the new plan." -> nomiString(
-        message,
-        "Behalte benutzerdefinierte Ziele bei oder wähle eine Formel, damit Nomi den neuen Plan berechnen kann.",
-    )
-    "Enter your height." -> nomiString(message, "Gib deine Körpergröße ein.")
-    "Height must be between 100 and 250 cm." -> nomiString(
-        message,
-        "Die Körpergröße muss zwischen 100 und 250 cm liegen.",
-    )
-    "Enter a target weight." -> nomiString(message, "Gib ein Zielgewicht ein.")
-    "Target weight must be between 30 and 400 kg." -> nomiString(
-        message,
-        "Das Zielgewicht muss zwischen 30 und 400 kg liegen.",
-    )
-    "For weight loss, the target must be below your current weight." -> nomiString(
-        message,
-        "Beim Abnehmen muss das Ziel unter deinem aktuellen Gewicht liegen.",
-    )
-    "For weight gain, the target must be above your current weight." -> nomiString(
-        message,
-        "Beim Zunehmen muss das Ziel über deinem aktuellen Gewicht liegen.",
-    )
-    "Choose a progression rate." -> nomiString(message, "Wähle ein Tempo.")
-    "Choose a preset rate when recalculating from profile settings." -> nomiString(
-        message,
-        "Wähle bei der Neuberechnung in den Profileinstellungen ein vorgegebenes Tempo.",
-    )
-    "Faster is available for loss plans only." -> nomiString(
-        message,
-        "„Schneller“ ist nur für Abnehmpläne verfügbar.",
-    )
-    "Choose a goal." -> nomiString(message, "Wähle ein Ziel.")
-    "Choose an activity level." -> nomiString(message, "Wähle ein Aktivitätsniveau.")
-    else -> message
-}
+private fun localizeProfileError(message: String?): String? =
+    message?.let { nomiString(it) }
 
 private fun LocalDate.toUtcMilliseconds(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()

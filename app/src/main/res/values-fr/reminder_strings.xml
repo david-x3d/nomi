@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Rappels Nomi</string>
+    <string name="reminder_channel_description">Repas, résumé quotidien et suivi du poids</string>
+    <string name="reminder_breakfast_title">Petit-déjeuner</string>
+    <string name="reminder_breakfast_body">Prêt à enregistrer ton petit-déjeuner ?</string>
+    <string name="reminder_lunch_title">Déjeuner</string>
+    <string name="reminder_lunch_body">Un déjeuner noté rapidement garde la journée sur les rails.</string>
+    <string name="reminder_dinner_title">Dîner</string>
+    <string name="reminder_dinner_body">Enregistre ton dîner tant que les détails sont frais.</string>
+    <string name="reminder_summary_title">Comment s’est passée ta journée ?</string>
+    <string name="reminder_summary_body">Revois la nutrition du jour et complète ce qui manque.</string>
+    <string name="reminder_weight_title">Suivi du poids</string>
+    <string name="reminder_weight_body">Ajoute une pesée quand cela t’arrange.</string>
+</resources>

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.QrCodeScanner
@@ -30,8 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.NomiFieldShape
 import com.nomi.app.ui.components.NomiInlineError
@@ -39,6 +39,7 @@ import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -56,7 +57,7 @@ fun BarcodeAmountSheet(
         modifier = modifier.testTag("barcode_amount_sheet"),
     ) {
         NomiSheetHeader(
-            title = nomiString("How much did you eat?", "Wie viel hast du gegessen?"),
+            title = nomiString("How much did you eat?"),
             subtitle = listOfNotNull(state.sourceItem.brand, state.sourceItem.name)
                 .joinToString(" · "),
             icon = Icons.Outlined.QrCodeScanner,
@@ -73,7 +74,7 @@ fun BarcodeAmountSheet(
                 value = state.amount,
                 onValueChange = onAmountChanged,
                 modifier = Modifier.testTag("barcode_amount_input"),
-                label = nomiString("Amount eaten", "Gegessene Menge"),
+                label = nomiString("Amount eaten"),
                 isError = state.amount.isNotBlank() && state.parsedAmount == null,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Decimal,
@@ -86,7 +87,7 @@ fun BarcodeAmountSheet(
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = nomiString("Unit", "Einheit"),
+                    text = nomiString("Unit"),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -116,9 +117,9 @@ fun BarcodeAmountSheet(
                     label = "barcode amount summary",
                 ) { amountLabel ->
                     Text(
-                        text = nomiString(
-                            "Nomi will normalize the source to per 100 first, then calculate $amountLabel.",
-                            "Nomi rechnet die Quelle zuerst auf 100 um und berechnet dann $amountLabel.",
+                        text = nomiFormat(
+                            "Nomi will normalize the source to per 100 first, then calculate {0}.",
+                            amountLabel,
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -129,7 +130,7 @@ fun BarcodeAmountSheet(
 
             state.servingLabel?.takeIf(String::isNotBlank)?.let { serving ->
                 Text(
-                    text = nomiString("Package serving: $serving", "Packungsportion: $serving"),
+                    text = nomiFormat("Package serving: {0}", serving),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -148,7 +149,7 @@ fun BarcodeAmountSheet(
                     shape = NomiShapes.Action,
                     modifier = Modifier.weight(1f).heightIn(min = 56.dp),
                 ) {
-                    Text(nomiString("Cancel", "Abbrechen"), maxLines = 1)
+                    Text(nomiString("Cancel"), maxLines = 1)
                 }
                 Button(
                     onClick = onCalculate,
@@ -159,7 +160,7 @@ fun BarcodeAmountSheet(
                         .heightIn(min = 56.dp)
                         .testTag("barcode_calculate"),
                 ) {
-                    Text(nomiString("Calculate nutrition", "Nährwerte berechnen"), maxLines = 1)
+                    Text(nomiString("Calculate nutrition"), maxLines = 1)
                 }
             }
         }

@@ -16,14 +16,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -59,14 +63,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.zIndex
 import com.nomi.app.domain.Micronutrient
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
@@ -77,6 +90,7 @@ import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.format.quantityDisplay
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
@@ -108,7 +122,7 @@ fun NomiFoodDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = nomiString("Nutrition details", "Ernährungsdetails"),
+                        text = nomiString("Nutrition details"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -117,7 +131,7 @@ fun NomiFoodDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = nomiString("Close nutrition details", "Ernährungsdetails schließen"),
+                            contentDescription = nomiString("Close nutrition details"),
                         )
                     }
                 },
@@ -128,10 +142,7 @@ fun NomiFoodDetailScreen(
                     ) {
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = nomiString(
-                                "Correct the eaten amount",
-                                "Gegessene Menge korrigieren",
-                            ),
+                            contentDescription = nomiString("Correct the eaten amount"),
                         )
                     }
                     // The overflow raises a sheet, not a menu: the actions need a line of
@@ -142,7 +153,7 @@ fun NomiFoodDetailScreen(
                     ) {
                         Icon(
                             Icons.Default.MoreVert,
-                            contentDescription = nomiString("Food entry actions", "Aktionen für den Lebensmitteleintrag"),
+                            contentDescription = nomiString("Food entry actions"),
                         )
                     }
                 },
@@ -202,7 +213,7 @@ private fun FoodEntryActionsSheet(
 ) {
     NomiSheet(onDismissRequest = onDismiss) {
         NomiSheetHeader(
-            title = nomiString("Entry actions", "Aktionen"),
+            title = nomiString("Entry actions"),
             subtitle = entry.name,
             icon = Icons.Default.Restaurant,
         )
@@ -214,37 +225,25 @@ private fun FoodEntryActionsSheet(
         ) {
             FoodEntryActionRow(
                 icon = Icons.Default.Edit,
-                title = nomiString("Change amount", "Menge ändern"),
-                description = nomiString(
-                    "Recalculate this entry if you ate more or less",
-                    "Neu berechnen, wenn du mehr oder weniger gegessen hast",
-                ),
+                title = nomiString("Change amount"),
+                description = nomiString("Recalculate this entry if you ate more or less"),
                 onClick = onEditAmount,
             )
             FoodEntryActionRow(
                 icon = Icons.Default.Favorite,
-                title = nomiString("Add to favorites", "Zu Favoriten hinzufügen"),
+                title = nomiString("Add to favorites"),
                 description = if (entry.foodId != null) {
-                    nomiString(
-                        "Keep this food ready for faster logging",
-                        "Dieses Lebensmittel schneller wieder eintragen",
-                    )
+                    nomiString("Keep this food ready for faster logging")
                 } else {
-                    nomiString(
-                        "Available after this food is saved to your library",
-                        "Verfügbar, sobald das Lebensmittel gespeichert ist",
-                    )
+                    nomiString("Available after this food is saved to your library")
                 },
                 enabled = entry.foodId != null,
                 onClick = onFavorite,
             )
             FoodEntryActionRow(
                 icon = Icons.Default.ContentCopy,
-                title = nomiString("Duplicate entry", "Eintrag duplizieren"),
-                description = nomiString(
-                    "Add another copy to this day",
-                    "Eine weitere Portion für diesen Tag eintragen",
-                ),
+                title = nomiString("Duplicate entry"),
+                description = nomiString("Add another copy to this day"),
                 onClick = onDuplicate,
             )
             HorizontalDivider(
@@ -253,11 +252,8 @@ private fun FoodEntryActionsSheet(
             )
             FoodEntryActionRow(
                 icon = Icons.Default.Delete,
-                title = nomiString("Delete entry", "Eintrag löschen"),
-                description = nomiString(
-                    "Remove it from this day",
-                    "Aus diesem Tag entfernen",
-                ),
+                title = nomiString("Delete entry"),
+                description = nomiString("Remove it from this day"),
                 destructive = true,
                 onClick = onDelete,
             )
@@ -364,7 +360,7 @@ private fun LoadingNutrition(modifier: Modifier = Modifier) {
         ) {
             CircularProgressIndicator()
             Text(
-                text = nomiString("Loading nutrition…", "Nährwerte werden geladen…"),
+                text = nomiString("Loading nutrition…"),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -406,16 +402,19 @@ private fun NutritionContent(
         item(key = "explanation") {
             EstimateExplanationCard(entry = entry)
         }
+        item(key = "references") {
+            ReferencesCard(entry = entry)
+        }
     }
 }
 
 @Composable
 private fun EntryHeading(entry: TodayFoodEntry) {
     val categoryLabel = when (entry.mealCategory) {
-        MealCategory.BREAKFAST -> nomiString("Breakfast", "Frühstück")
-        MealCategory.LUNCH -> nomiString("Lunch", "Mittagessen")
-        MealCategory.DINNER -> nomiString("Dinner", "Abendessen")
-        MealCategory.SNACKS -> nomiString("Snacks", "Snacks")
+        MealCategory.BREAKFAST -> nomiString("Breakfast")
+        MealCategory.LUNCH -> nomiString("Lunch")
+        MealCategory.DINNER -> nomiString("Dinner")
+        MealCategory.SNACKS -> nomiString("Snacks")
     }
     val locale = nomiLocale()
     val quantityText = entry.quantityDisplay(locale).withContext
@@ -427,7 +426,7 @@ private fun EntryHeading(entry: TodayFoodEntry) {
             LabelPill(categoryLabel)
             if (entry.isEstimated) {
                 LabelPill(
-                    text = nomiString("Estimated", "Geschätzt"),
+                    text = nomiString("Estimated"),
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
@@ -461,7 +460,7 @@ private fun NutritionSummaryCard(
     val metrics = buildList {
         add(
             NutritionMetric(
-                nomiString("Protein", "Eiweiß"),
+                nomiString("Protein"),
                 entry.proteinGrams,
                 "g",
                 MaterialTheme.colorScheme.primary,
@@ -469,7 +468,7 @@ private fun NutritionSummaryCard(
         )
         add(
             NutritionMetric(
-                nomiString("Carbs", "Kohlenhydrate"),
+                nomiString("Carbs"),
                 entry.carbohydrateGrams,
                 "g",
                 MaterialTheme.colorScheme.secondary,
@@ -477,7 +476,7 @@ private fun NutritionSummaryCard(
         )
         add(
             NutritionMetric(
-                nomiString("Fat", "Fett"),
+                nomiString("Fat"),
                 entry.fatGrams,
                 "g",
                 MaterialTheme.colorScheme.tertiary,
@@ -633,9 +632,9 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
     }
     val sourceLabel = entry.sourceName?.takeIf { it.isNotBlank() }
         ?: if (entry.isEstimated) {
-            nomiString("Nomi estimate", "Nomi-Schätzung")
+            nomiString("Nomi estimate")
         } else {
-            nomiString("Manually logged", "Manuell eingetragen")
+            nomiString("Manually logged")
         }
 
     Card(
@@ -659,12 +658,12 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = nomiString("Items & source", "Eintrag & Quelle"),
+                        text = nomiString("Items & source"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        text = nomiString("1 item • $sourceLabel", "1 Eintrag • $sourceLabel"),
+                        text = nomiFormat("1 item • {0}", sourceLabel),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -672,9 +671,9 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = if (expanded) {
-                        nomiString("Collapse item details", "Eintragsdetails einklappen")
+                        nomiString("Collapse item details")
                     } else {
-                        nomiString("Expand item details", "Eintragsdetails ausklappen")
+                        nomiString("Expand item details")
                     },
                 )
             }
@@ -726,7 +725,7 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(
-                                text = nomiString("Nutrition source", "Nährwertquelle"),
+                                text = nomiString("Nutrition source"),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -772,19 +771,23 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
     val amountDetail = entry.quantityDisplay(locale).withContext
     val sourceDetail = entry.sourceName?.takeIf { it.isNotBlank() }
         ?: if (entry.isEstimated) {
-            nomiString("the food description you entered", "deiner eingegebenen Lebensmittelbeschreibung")
+            nomiString("the food description you entered")
         } else {
-            nomiString("the saved nutrition values", "den gespeicherten Nährwerten")
+            nomiString("the saved nutrition values")
         }
     val explanation = if (entry.isEstimated) {
-        nomiString(
-            "Nomi estimated this entry for $amountDetail using $sourceDetail. The serving size and matching food source have the biggest effect on the result, so the actual nutrition may vary.",
-            "Nomi hat diesen Eintrag für $amountDetail anhand von $sourceDetail geschätzt. Portionsgröße und passende Lebensmittelquelle beeinflussen das Ergebnis am stärksten, daher können die tatsächlichen Nährwerte abweichen.",
+        nomiFormat(
+            "Nomi estimated this entry for {0} using {1}. The serving size and matching food " +
+                "source have the biggest effect on the result, so the actual nutrition may vary.",
+            amountDetail,
+            sourceDetail,
         )
     } else {
-        nomiString(
-            "These totals use $sourceDetail and the logged amount of $amountDetail. Change the serving amount if this does not match what you ate.",
-            "Diese Gesamtwerte basieren auf $sourceDetail und der eingetragenen Menge von $amountDetail. Ändere die Portionsmenge, wenn sie nicht dem entspricht, was du gegessen hast.",
+        nomiFormat(
+            "These totals use {0} and the logged amount of {1}. Change the serving amount if " +
+                "this does not match what you ate.",
+            sourceDetail,
+            amountDetail,
         )
     }
 
@@ -799,52 +802,279 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry) {
     ) {
         Column(
             modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.tertiary,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiary,
-                        modifier = Modifier.padding(8.dp).size(20.dp),
-                    )
-                }
-                Column {
-                    Text(
-                        text = nomiString("Nomi’s thought process", "Nomis Gedankengang"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = if (entry.isEstimated) {
-                            nomiString("Estimate summary", "Zusammenfassung der Schätzung")
-                        } else {
-                            nomiString("Nutrition summary", "Nährwertübersicht")
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
+            // The confidence ring replaces the old icon-and-subtitle header: how sure Nomi is
+            // says more about whether to trust the number than a restatement of the section name.
+            ConfidenceHeader(confidence = entry.confidence, isEstimated = entry.isEstimated)
             Text(
                 text = explanation,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+        }
+    }
+}
+
+/** Confidence bands. 80 and above reads as trustworthy, below 50 as a rough guess. */
+private enum class ConfidenceBand { HIGH, MEDIUM, LOW }
+
+private fun confidenceBandFor(percent: Int): ConfidenceBand = when {
+    percent >= 80 -> ConfidenceBand.HIGH
+    percent >= 50 -> ConfidenceBand.MEDIUM
+    else -> ConfidenceBand.LOW
+}
+
+/**
+ * Green, amber and red are stated outright rather than mapped onto theme roles: this is a
+ * traffic light, and a dynamic-color palette would happily make "low confidence" look inviting.
+ * The dark variants are lightened so they stay legible on a dark card.
+ */
+@Composable
+private fun ConfidenceBand.color(): Color {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    return when (this) {
+        ConfidenceBand.HIGH -> if (dark) Color(0xFF7BD08A) else Color(0xFF2E7D32)
+        ConfidenceBand.MEDIUM -> if (dark) Color(0xFFE8B45C) else Color(0xFFA96A00)
+        ConfidenceBand.LOW -> if (dark) Color(0xFFF08C86) else Color(0xFFC0392B)
+    }
+}
+
+@Composable
+private fun ConfidenceHeader(confidence: Double?, isEstimated: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // A confidence is only meaningful when something claimed one. Older entries and manual
+        // ones fall back to the section icon rather than inventing a score.
+        val percent = confidence
+            ?.takeIf { it.isFinite() }
+            ?.let { (it * 100).roundToInt().coerceIn(0, 100) }
+        if (percent == null) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiary) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiary,
+                    modifier = Modifier.padding(10.dp).size(22.dp),
+                )
+            }
+        } else {
+            ConfidenceRing(percent = percent, color = confidenceBandFor(percent).color())
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             Text(
-                text = nomiString(
-                    "This is a concise explanation of the amount and source used—not a step-by-step AI transcript.",
-                    "Dies ist eine kurze Erklärung der verwendeten Menge und Quelle – kein schrittweises KI-Protokoll.",
-                ),
-                style = MaterialTheme.typography.bodySmall,
+                text = if (percent == null) {
+                    nomiString("Nomi’s thought process")
+                } else {
+                    nomiString("Confidence level")
+                },
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = when {
+                    percent != null -> when (confidenceBandFor(percent)) {
+                        ConfidenceBand.HIGH -> nomiString("Very high")
+                        ConfidenceBand.MEDIUM -> nomiString("Moderate")
+                        ConfidenceBand.LOW -> nomiString("Low")
+                    }
+                    isEstimated -> nomiString("Estimate summary")
+                    else -> nomiString("Nutrition summary")
+                },
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = percent?.let { confidenceBandFor(it).color() }
+                    ?: MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfidenceRing(percent: Int, color: Color) {
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val description = nomiFormat("Confidence {0} out of 100", percent)
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+            val inset = stroke.width / 2
+            val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
+            drawArc(
+                color = track,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = stroke,
+            )
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f * (percent / 100f),
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = stroke,
+            )
+        }
+        Text(
+            text = percent.toString(),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+        )
+    }
+}
+
+/**
+ * Every page the research cited, collapsed to a stack of site icons until it is opened.
+ *
+ * Only hostnames that survive [WebsiteFaviconUrl] validation are shown, so a malformed or
+ * private URL from a provider cannot end up as a row the user is invited to trust.
+ */
+@Composable
+private fun ReferencesCard(entry: TodayFoodEntry) {
+    val references = remember(entry.citedSourceUrls) {
+        entry.citedSourceUrls
+            .mapNotNull { url ->
+                WebsiteFaviconUrl.normalizePublicHttpsHostname(url)?.let { host -> url to host }
+            }
+            .distinctBy { (_, host) -> host }
+    }
+    if (references.isEmpty()) return
+
+    var expanded by rememberSaveable(entry.id) { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = nomiString("References"),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = nomiCardShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
+            elevation = nomiCardElevation(),
+            border = nomiCardBorder(),
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = !expanded }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    FaviconRow(hostUrls = references.map { (url, _) -> url })
+                    Spacer(Modifier.width(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = if (references.size == 1) {
+                                nomiFormat("{0} source", references.size)
+                            } else {
+                                nomiFormat("{0} sources", references.size)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Icon(
+                            imageVector = if (expanded) {
+                                Icons.Default.ExpandLess
+                            } else {
+                                Icons.Default.ExpandMore
+                            },
+                            contentDescription = if (expanded) {
+                                nomiString("Hide sources")
+                            } else {
+                                nomiString("Show sources")
+                            },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                AnimatedVisibility(visible = expanded) {
+                    Column(
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        references.forEach { (url, host) ->
+                            ReferenceRow(
+                                host = host,
+                                url = url,
+                                onOpen = { runCatching { uriHandler.openUri(url) } },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The collapsed summary: site icons overlapping left to right, newest research first. */
+@Composable
+private fun FaviconRow(hostUrls: List<String>, maxIcons: Int = 5) {
+    val shown = hostUrls.take(maxIcons)
+    val overlap = 18.dp
+    Box(
+        modifier = Modifier
+            .width(30.dp + overlap * (shown.size - 1).coerceAtLeast(0))
+            .height(30.dp),
+    ) {
+        shown.forEachIndexed { index, url ->
+            WebsiteFavicon(
+                sourceUrl = url,
+                size = 30.dp,
+                modifier = Modifier
+                    .offset(x = overlap * index)
+                    .zIndex(index.toFloat()),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReferenceRow(host: String, url: String, onOpen: () -> Unit) {
+    Surface(
+        onClick = onOpen,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            WebsiteFavicon(sourceUrl = url, size = 26.dp)
+            Text(
+                text = host,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                contentDescription = nomiFormat("Open {0}", host),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
             )
         }
     }

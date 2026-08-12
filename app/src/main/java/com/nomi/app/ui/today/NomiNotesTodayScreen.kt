@@ -54,7 +54,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
@@ -63,6 +62,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -84,8 +84,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -110,9 +108,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
@@ -138,10 +136,13 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.ui.capture.InlineDictationState
 import com.nomi.app.ui.capture.rememberInlineDictation
 import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.DictationWaveform
+import com.nomi.app.ui.components.NomiFox
+import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
@@ -150,26 +151,24 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
-import com.nomi.app.ui.profile.localizedName
-import com.nomi.app.ui.components.NomiFox
-import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.format.quantityDisplay
-import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
+import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * A notes-first Today experience. The adaptive navigation suite remains owned by the caller;
@@ -471,7 +470,7 @@ private fun NotesHeader(
     onToday: () -> Unit,
 ) {
     val locale = nomiLocale()
-    val datePattern = nomiString("EEEE, MMMM d", "EEEE, d. MMMM")
+    val datePattern = nomiString("EEEE, MMMM d")
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     Surface(
@@ -535,9 +534,9 @@ private fun NotesHeader(
                             ) { isToday ->
                                 Text(
                                     text = if (isToday) {
-                                        nomiString("Today", "Heute")
+                                        nomiString("Today")
                                     } else {
-                                        nomiString("Go to today", "Zum heutigen Tag")
+                                        nomiString("Go to today")
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     textAlign = TextAlign.Center,
@@ -558,7 +557,7 @@ private fun NotesHeader(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = nomiString("Previous day", "Vorheriger Tag"),
+                            contentDescription = nomiString("Previous day"),
                         )
                     }
                     AnimatedContent(
@@ -591,7 +590,7 @@ private fun NotesHeader(
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = nomiString("Next day", "Nächster Tag"),
+                            contentDescription = nomiString("Next day"),
                         )
                     }
                 }
@@ -609,10 +608,7 @@ private fun NotesEmptyState() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = nomiString(
-                "Tap below to log your first meal",
-                "Tippe unten, um deine erste Mahlzeit einzutragen",
-            ),
+            text = nomiString("Tap below to log your first meal"),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
@@ -645,9 +641,9 @@ private fun SwipeToDeleteFoodRow(
     onEditText: (Int) -> Unit,
     onDelete: () -> Unit,
 ) {
-    val deleteLabel = nomiString("Delete ${entry.name}", "${entry.name} löschen")
-    val editLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
-    val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
+    val deleteLabel = nomiFormat("Delete {0}", entry.name)
+    val editLabel = nomiFormat("Rewrite {0}", entry.name)
+    val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
     val haptics = rememberNomiHaptics()
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
@@ -697,7 +693,7 @@ private fun SwipeToDeleteFoodRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = nomiString("Delete", "Löschen"),
+                        text = nomiString("Delete"),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -775,7 +771,7 @@ private fun InlineDeletedFoodRow(
             )
             TextButton(onClick = onUndo) {
                 Text(
-                    text = nomiString("Undo", "Rückgängig"),
+                    text = nomiString("Undo"),
                     maxLines = 1,
                     softWrap = false,
                     fontWeight = FontWeight.Bold,
@@ -805,7 +801,7 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
         ) {
             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             Text(
-                text = nomiString("Restoring ${entry.name}", "${entry.name} wird wiederhergestellt"),
+                text = nomiFormat("Restoring {0}", entry.name),
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 2,
             )
@@ -867,8 +863,8 @@ private fun NotesFoodRow(
     val description = if (showOriginal) originalDescription.orEmpty() else finalDescription
     val locale = nomiLocale()
     val amountDisplay = entry.quantityDisplay(locale).withContext
-    val detailsLabel = nomiString("Nutrition for ${entry.name}", "Nährwerte von ${entry.name}")
-    val writeLabel = nomiString("Rewrite ${entry.name}", "${entry.name} umschreiben")
+    val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
+    val writeLabel = nomiFormat("Rewrite {0}", entry.name)
     val summaryProgress = summarySweep.value
     val summaryActive = originalDescription != null && !showOriginal && summaryProgress < 1.34f
     val calorieProgress = calorieSweep.value
@@ -1144,10 +1140,7 @@ private fun InlineComposerCanvas(
             decorationBox = { innerTextField ->
                 if (text.isEmpty()) {
                     Text(
-                        text = nomiString(
-                            "Tell Nomi what you ate",
-                            "Sag Nomi, was du gegessen hast",
-                        ),
+                        text = nomiString("Tell Nomi what you ate"),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
@@ -1163,7 +1156,7 @@ private fun InlineComposerCanvas(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = nomiString("Analyze meal", "Mahlzeit analysieren"),
+                    contentDescription = nomiString("Analyze meal"),
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -1200,7 +1193,7 @@ private fun ProcessingNote(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = description.ifBlank {
-                            nomiString("Understanding your meal", "Deine Mahlzeit wird ausgewertet")
+                            nomiString("Understanding your meal")
                         },
                         style = MaterialTheme.typography.bodyLarge,
                     )
@@ -1210,15 +1203,9 @@ private fun ProcessingNote(
                     ) { ready ->
                         Text(
                             text = if (ready) {
-                                nomiString(
-                                    "Checking sources and portions",
-                                    "Quellen und Portionen werden abgeglichen",
-                                )
+                                nomiString("Checking sources and portions")
                             } else {
-                                nomiString(
-                                    "Preparing a careful lookup",
-                                    "Sorgfältige Recherche wird vorbereitet",
-                                )
+                                nomiString("Preparing a careful lookup")
                             },
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
@@ -1235,8 +1222,8 @@ private fun ProcessingNote(
                 modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                TextButton(onClick = onEditText) { Text(nomiString("Edit text", "Text bearbeiten")) }
-                TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
+                TextButton(onClick = onEditText) { Text(nomiString("Edit text")) }
+                TextButton(onClick = onCancel) { Text(nomiString("Cancel")) }
             }
         }
     }
@@ -1256,7 +1243,7 @@ private fun PreviewNote(
     val totalCarbohydrates = analysis.items.sumOf(AnalyzedFoodItem::carbohydrateGrams)
     val totalFat = analysis.items.sumOf(AnalyzedFoodItem::fatGrams)
     val locale = nomiLocale()
-    val estimatedSuffix = nomiString(" · estimated", " · geschätzt")
+    val estimatedSuffix = nomiString(" · estimated")
 
     Surface(
         modifier = Modifier
@@ -1293,7 +1280,7 @@ private fun PreviewNote(
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(Modifier.size(6.dp))
-                        Text(nomiString("Change wording", "Formulierung ändern"))
+                        Text(nomiString("Change wording"))
                     }
                 }
                 Text(
@@ -1343,9 +1330,11 @@ private fun PreviewNote(
                 shape = RoundedCornerShape(18.dp),
             ) {
                 Text(
-                    text = nomiString(
-                        "C ${totalCarbohydrates.roundToInt()} g  ·  P ${totalProtein.roundToInt()} g  ·  F ${totalFat.roundToInt()} g",
-                        "K ${totalCarbohydrates.roundToInt()} g  ·  E ${totalProtein.roundToInt()} g  ·  F ${totalFat.roundToInt()} g",
+                    text = nomiFormat(
+                        "C {0} g  ·  P {1} g  ·  F {2} g",
+                        totalCarbohydrates.roundToInt(),
+                        totalProtein.roundToInt(),
+                        totalFat.roundToInt(),
                     ),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1362,17 +1351,17 @@ private fun PreviewNote(
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
+                    TextButton(onClick = onCancel) { Text(nomiString("Cancel")) }
                     FilledTonalButton(onClick = onEditPreview) {
                         Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
-                        Text(nomiString("Edit", "Bearbeiten"), maxLines = 1)
+                        Text(nomiString("Edit"), maxLines = 1)
                     }
                 }
                 Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
-                    Text(nomiString("Add", "Hinzufügen"), maxLines = 1)
+                    Text(nomiString("Add"), maxLines = 1)
                 }
             }
         }
@@ -1407,7 +1396,7 @@ private fun PhotoReviewNote(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = nomiString("From your photo", "Aus deinem Foto"),
+                text = nomiString("From your photo"),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1418,20 +1407,17 @@ private fun PhotoReviewNote(
                 minLines = 2,
                 maxLines = 6,
                 textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = nomiString("Describe what you ate", "Beschreibe, was du gegessen hast"),
+                placeholder = nomiString("Describe what you ate"),
             )
             NomiTextField(
                 value = state.place,
                 onValueChange = onPlaceChanged,
-                label = nomiString("Restaurant (optional)", "Restaurant (optional)"),
+                label = nomiString("Restaurant (optional)"),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
             )
             Text(
-                text = nomiString(
-                    "Fix anything Nomi misread, then look up the nutrition.",
-                    "Korrigiere, was Nomi falsch gelesen hat, und suche dann die Nährwerte.",
-                ),
+                text = nomiString("Fix anything Nomi misread, then look up the nutrition."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1442,10 +1428,10 @@ private fun PhotoReviewNote(
                     .fillMaxWidth()
                     .heightIn(min = 48.dp),
             ) {
-                Text(nomiString("Find nutrition", "Nährwerte suchen"))
+                Text(nomiString("Find nutrition"))
             }
             TextButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
-                Text(nomiString("Discard", "Verwerfen"))
+                Text(nomiString("Discard"))
             }
         }
     }
@@ -1480,7 +1466,7 @@ private fun ErrorNote(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = description.ifBlank {
-                            nomiString("Couldn’t understand this meal", "Diese Mahlzeit wurde nicht erkannt")
+                            nomiString("Couldn’t understand this meal")
                         },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
@@ -1506,7 +1492,7 @@ private fun ErrorNote(
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text(
-                            text = nomiString("Retry", "Erneut versuchen"),
+                            text = nomiString("Retry"),
                             maxLines = 1,
                             softWrap = false,
                         )
@@ -1521,7 +1507,7 @@ private fun ErrorNote(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(
-                            text = nomiString("Cancel", "Abbrechen"),
+                            text = nomiString("Cancel"),
                             maxLines = 1,
                             softWrap = false,
                         )
@@ -1533,7 +1519,7 @@ private fun ErrorNote(
                         Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text(
-                            text = nomiString("Edit", "Bearbeiten"),
+                            text = nomiString("Edit"),
                             maxLines = 1,
                             softWrap = false,
                         )
@@ -1565,7 +1551,7 @@ private fun ManualDraftNote(
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = draft.name.ifBlank { nomiString("Manual food", "Manueller Eintrag") },
+                    text = draft.name.ifBlank { nomiString("Manual food") },
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
                 )
@@ -1582,10 +1568,10 @@ private fun ManualDraftNote(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
-                TextButton(onClick = onCancel) { Text(nomiString("Cancel", "Abbrechen")) }
-                FilledTonalButton(onClick = onEdit) { Text(nomiString("Edit", "Bearbeiten")) }
+                TextButton(onClick = onCancel) { Text(nomiString("Cancel")) }
+                FilledTonalButton(onClick = onEdit) { Text(nomiString("Edit")) }
                 Button(onClick = onAdd, enabled = draft.isValid) {
-                    Text(nomiString("Add", "Hinzufügen"))
+                    Text(nomiString("Add"))
                 }
             }
         }
@@ -1623,9 +1609,9 @@ private fun NotesFloatingActionRow(
     )
     val difference = animatedDifference.roundToInt()
     val calorieText = if (difference >= 0) {
-        nomiString("${difference.formatted(locale)} left", "${difference.formatted(locale)} übrig")
+        nomiFormat("{0} left", difference.formatted(locale))
     } else {
-        nomiString("${abs(difference).formatted(locale)} over", "${abs(difference).formatted(locale)} darüber")
+        nomiFormat("{0} over", abs(difference).formatted(locale))
     }
     AnimatedContent(
         targetState = dictation.isActive,
@@ -1654,13 +1640,13 @@ private fun NotesFloatingActionRow(
                 }
                 NotesCircleAction(
                     icon = Icons.Default.Check,
-                    description = nomiString("Done speaking", "Fertig gesprochen"),
+                    description = nomiString("Done speaking"),
                     onClick = onDictationDone,
                     emphasized = true,
                 )
                 NotesCircleAction(
                     icon = Icons.Default.Close,
-                    description = nomiString("Discard dictation", "Diktat verwerfen"),
+                    description = nomiString("Discard dictation"),
                     onClick = dictation.cancel,
                 )
             } else {
@@ -1686,12 +1672,12 @@ private fun NotesFloatingActionRow(
                 }
                 NotesCircleAction(
                     icon = Icons.Default.Mic,
-                    description = nomiString("Describe food by voice", "Essen per Sprache beschreiben"),
+                    description = nomiString("Describe food by voice"),
                     onClick = onVoice,
                 )
                 NotesCircleAction(
                     icon = Icons.Default.Add,
-                    description = nomiString("More ways to add food", "Weitere Möglichkeiten zum Hinzufügen"),
+                    description = nomiString("More ways to add food"),
                     onClick = onMore,
                 )
                 // Once there is something written, the same slot becomes the way to send it, and
@@ -1711,17 +1697,14 @@ private fun NotesFloatingActionRow(
                     if (sendable) {
                         NotesCircleAction(
                             icon = Icons.AutoMirrored.Filled.Send,
-                            description = nomiString("Analyze meal", "Mahlzeit analysieren"),
+                            description = nomiString("Analyze meal"),
                             onClick = onSend,
                             emphasized = true,
                         )
                     } else {
                         NotesCircleAction(
                             icon = Icons.Default.Keyboard,
-                            description = nomiString(
-                                "Write what you ate",
-                                "Schreiben, was du gegessen hast",
-                            ),
+                            description = nomiString("Write what you ate"),
                             onClick = onWrite,
                         )
                     }
@@ -1784,10 +1767,7 @@ private fun DictationPillContent(dictation: InlineDictationState) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = nomiString(
-                    "Preparing speech, once only…",
-                    "Spracherkennung wird einmalig vorbereitet …",
-                ),
+                text = nomiString("Preparing speech, once only…"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -1808,7 +1788,7 @@ private fun DictationPillContent(dictation: InlineDictationState) {
                 strokeWidth = 2.dp,
             )
             Text(
-                text = nomiString("Writing it down…", "Wird aufgeschrieben …"),
+                text = nomiString("Writing it down…"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -1856,56 +1836,58 @@ private fun NotesCircleAction(
 private fun QuickAddSheet(onDismiss: () -> Unit, onSelect: (AddFoodMethod) -> Unit) {
     NomiSheet(onDismissRequest = onDismiss) {
         NomiSheetHeader(
-            title = nomiString("Add food another way", "Essen anders hinzufügen"),
+            title = nomiString("Add food another way"),
             icon = Icons.Default.Add,
         )
-        Column(modifier = Modifier.fillMaxWidth()) {
+        // Seven rows is more than a phone shows at once, so the list scrolls; the gutter and gap
+        // match the entry-actions sheet, which is the same stack of tappable cards.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             QuickAddRow(
                 icon = Icons.Default.CameraAlt,
-                title = nomiString("Photo", "Foto"),
-                description = nomiString("Recognize a meal from a photo", "Mahlzeit auf einem Foto erkennen"),
+                title = nomiString("Photo"),
+                description = nomiString("Recognize a meal from a photo"),
                 onClick = { onSelect(AddFoodMethod.PHOTO) },
             )
             QuickAddRow(
                 icon = Icons.Default.RestaurantMenu,
-                title = nomiString("Scan menu", "Speisekarte scannen"),
-                description = nomiString(
-                    "Photograph pages, search every dish, then log one",
-                    "Seiten fotografieren, alle Gerichte durchsuchen und eines eintragen",
-                ),
+                title = nomiString("Scan menu"),
+                description = nomiString("Photograph pages, search every dish, then log one"),
                 onClick = { onSelect(AddFoodMethod.MENU) },
             )
             QuickAddRow(
                 icon = Icons.Default.QrCodeScanner,
-                title = nomiString("Barcode", "Barcode"),
-                description = nomiString("Scan a packaged food", "Verpacktes Lebensmittel scannen"),
+                title = nomiString("Barcode"),
+                description = nomiString("Scan a packaged food"),
                 onClick = { onSelect(AddFoodMethod.BARCODE) },
             )
             QuickAddRow(
                 icon = Icons.Default.Article,
-                title = nomiString("Nutrition label", "Nährwerttabelle"),
-                description = nomiString(
-                    "Read the printed values, no research",
-                    "Gedruckte Werte ablesen, ohne Recherche",
-                ),
+                title = nomiString("Nutrition label"),
+                description = nomiString("Read the printed values, no research"),
                 onClick = { onSelect(AddFoodMethod.LABEL) },
             )
             QuickAddRow(
                 icon = Icons.Default.History,
-                title = nomiString("Recent", "Zuletzt verwendet"),
-                description = nomiString("Log something again", "Etwas erneut eintragen"),
+                title = nomiString("Recent"),
+                description = nomiString("Log something again"),
                 onClick = { onSelect(AddFoodMethod.RECENT) },
             )
             QuickAddRow(
                 icon = Icons.Default.FavoriteBorder,
-                title = nomiString("Favorites", "Favoriten"),
-                description = nomiString("Choose one of your starred foods", "Ein favorisiertes Lebensmittel auswählen"),
+                title = nomiString("Favorites"),
+                description = nomiString("Choose one of your starred foods"),
                 onClick = { onSelect(AddFoodMethod.FAVORITES) },
             )
             QuickAddRow(
                 icon = Icons.Default.RestaurantMenu,
-                title = nomiString("Saved meals", "Gespeicherte Mahlzeiten"),
-                description = nomiString("Reuse a complete meal", "Eine vollständige Mahlzeit erneut verwenden"),
+                title = nomiString("Saved meals"),
+                description = nomiString("Reuse a complete meal"),
                 onClick = { onSelect(AddFoodMethod.SAVED_MEALS) },
             )
         }
@@ -1927,31 +1909,47 @@ private fun QuickAddRow(
         elevation = nomiCardElevation(),
         border = nomiCardBorder(),
     ) {
-        ListItem(
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            leadingContent = {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                    Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
+        // Laid out by hand rather than with ListItem so the row keeps the same height, gutter and
+        // icon size as the entry-actions sheet instead of ListItem's tighter defaults.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 76.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
                 }
-            },
-            headlineContent = {
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
-                    title,
+                    text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                 )
-            },
-            supportingContent = { Text(description) },
-            trailingContent = {
-                Icon(Icons.Default.ChevronRight, contentDescription = null)
-            },
-        )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -2023,13 +2021,13 @@ private fun GoalsSheetHeader() {
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = nomiString("Goals", "Ziele"),
+                text = nomiString("Goals"),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = nomiString("Your day at a glance", "Dein Tag im Überblick"),
+                text = nomiString("Your day at a glance"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2067,9 +2065,9 @@ private fun CalorieGoalCard(state: TodayUiState) {
                     // Over the target is stated, never coloured as a warning. Nomi keeps the
                     // log and has no opinion about the number in it.
                     text = if (difference >= 0) {
-                        nomiString("kcal left today", "kcal heute übrig")
+                        nomiString("kcal left today")
                     } else {
-                        nomiString("kcal over today", "kcal heute darüber")
+                        nomiString("kcal over today")
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2104,17 +2102,17 @@ private fun MacroGoalCard(state: TodayUiState) {
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             MacroGoalRow(
-                label = nomiString("Carbs", "Kohlenhydrate"),
+                label = nomiString("Carbs"),
                 progress = state.carbohydrates,
                 color = MaterialTheme.colorScheme.error,
             )
             MacroGoalRow(
-                label = nomiString("Protein", "Eiweiß"),
+                label = nomiString("Protein"),
                 progress = state.protein,
                 color = MaterialTheme.colorScheme.tertiary,
             )
             MacroGoalRow(
-                label = nomiString("Fat", "Fett"),
+                label = nomiString("Fat"),
                 progress = state.fat,
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -2181,10 +2179,7 @@ private fun MicronutrientGoalRow(progress: MicronutrientProgress) {
         GoalWave(fraction = progress.fraction, color = color)
         if (progress.isPartial) {
             Text(
-                text = nomiString(
-                    "Some of today's foods didn't publish this value, so the real total is higher.",
-                    "Für einige Lebensmittel von heute wurde kein Wert veröffentlicht, die tatsächliche Summe liegt also höher.",
-                ),
+                text = nomiString("Some of today's foods didn't publish this value, so the real total is higher."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

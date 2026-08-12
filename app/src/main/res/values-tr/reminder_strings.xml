@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="reminder_channel_name">Nomi hatırlatıcıları</string>
+    <string name="reminder_channel_description">Öğün, günlük özet ve kilo kayıtları</string>
+    <string name="reminder_breakfast_title">Kahvaltı</string>
+    <string name="reminder_breakfast_body">Kahvaltını kaydetmeye hazır mısın?</string>
+    <string name="reminder_lunch_title">Öğle yemeği</string>
+    <string name="reminder_lunch_body">Kısa bir öğle kaydı günü yolunda tutar.</string>
+    <string name="reminder_dinner_title">Akşam yemeği</string>
+    <string name="reminder_dinner_body">Ayrıntılar tazeyken akşam yemeğini kaydet.</string>
+    <string name="reminder_summary_title">Günün nasıl geçti?</string>
+    <string name="reminder_summary_body">Bugünkü beslenmeni gözden geçir ve eksikleri tamamla.</string>
+    <string name="reminder_weight_title">Kilo kaydı</string>
+    <string name="reminder_weight_body">Sana uyan bir zamanda kilonu ekle.</string>
+</resources>
