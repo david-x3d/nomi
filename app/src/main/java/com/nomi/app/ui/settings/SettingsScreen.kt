@@ -649,7 +649,8 @@ private fun CalorieBiasSetting(
 ) {
     val entries = CalorieEstimateBias.entries
     var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
-    val selected = entries[position.roundToInt().coerceIn(0, entries.lastIndex)]
+    fun entryAt(value: Float) = entries[value.roundToInt().coerceIn(0, entries.lastIndex)]
+    val selected = entryAt(position)
     val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
@@ -691,7 +692,11 @@ private fun CalorieBiasSetting(
             Slider(
                 value = position,
                 onValueChange = { position = it },
-                onValueChangeFinished = { onBiasChanged(selected) },
+                // Read the stop at release rather than the one this composition captured. A tap on
+                // the track reports its value and finishes inside the same frame, before any
+                // recomposition, so the captured stop is still the previous one and would be
+                // written back as if the tap had never happened.
+                onValueChangeFinished = { onBiasChanged(entryAt(position)) },
                 valueRange = 0f..entries.lastIndex.toFloat(),
                 steps = entries.size - 2,
                 modifier = Modifier.fillMaxWidth(),

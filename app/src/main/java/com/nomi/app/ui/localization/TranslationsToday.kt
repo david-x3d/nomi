@@ -288,6 +288,23 @@ internal val todayTranslations: Map<String, NomiTranslation> = mapOf(
         it = "kcal in più oggi", nl = "kcal te veel vandaag", pt = "kcal a mais hoje",
         sq = "kcal mbi objektiv sot", sv = "kcal över idag", tr = "bugün aşılan kcal",
     ),
+    "Burned" to NomiTranslation(
+        de = "Verbrannt", es = "Quemadas", fr = "Brûlées",
+        it = "Bruciate", nl = "Verbrand", pt = "Queimadas",
+        sq = "Djegur", sv = "Förbränt", tr = "Yakılan",
+    ),
+    "Burned through activity" to NomiTranslation(
+        de = "Durch Bewegung verbrannt", es = "Quemadas con actividad",
+        fr = "Brûlées par l’activité", it = "Bruciate con l’attività",
+        nl = "Verbrand door beweging", pt = "Queimadas com atividade",
+        sq = "Djegur nga aktiviteti", sv = "Förbränt genom aktivitet",
+        tr = "Hareketle yakılan",
+    ),
+    "{0} steps" to NomiTranslation(
+        de = "{0} Schritte", es = "{0} pasos", fr = "{0} pas",
+        it = "{0} passi", nl = "{0} stappen", pt = "{0} passos",
+        sq = "{0} hapa", sv = "{0} steg", tr = "{0} adım",
+    ),
     "Some of today's foods didn't publish this value, so the real total is higher." to
         NomiTranslation(
             de = "Für einige Lebensmittel von heute wurde kein Wert veröffentlicht, die " +

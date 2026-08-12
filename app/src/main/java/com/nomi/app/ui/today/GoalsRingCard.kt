@@ -33,6 +33,8 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.components.nomiCardTonalElevation
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
 import kotlin.math.roundToInt
@@ -73,32 +75,95 @@ fun GoalsRingCard(
 
 @Composable
 private fun CalorieRow(state: TodayUiState) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(
+                    text = nomiString("Calories"),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = state.caloriesConsumed.roundToInt().toString(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = " / ${state.calorieTarget.roundToInt()} kcal",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            LinearProgressIndicator(
+                progress = { state.calorieFraction },
+                strokeCap = StrokeCap.Round,
+                modifier = Modifier.fillMaxWidth().size(width = 0.dp, height = 10.dp),
+            )
+        }
+        state.activeCaloriesKcal?.let { burned ->
+            BurnedRow(burnedKcal = burned, steps = state.steps, fraction = state.burnedFraction)
+        }
+    }
+}
+
+/**
+ * Movement on the same scale as the plate.
+ *
+ * The second bar shares the calorie target with the one above it, so equal lengths mean equal
+ * calories and the two can be read against each other. Nothing is subtracted from the day: Nomi
+ * states what was burned and leaves the arithmetic to the reader, the same way it states what
+ * was eaten.
+ *
+ * The whole row is absent when Health Connect reported nothing, because a missing figure is not
+ * a day without movement.
+ */
+@Composable
+private fun BurnedRow(burnedKcal: Double, steps: Long?, fraction: Float) {
+    val locale = nomiLocale()
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            Text(
-                text = nomiString("Calories"),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = nomiString("Burned"),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                steps?.let {
+                    Text(
+                        text = nomiFormat("{0} steps", it.formatted(locale)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
-                    text = state.caloriesConsumed.roundToInt().toString(),
+                    text = burnedKcal.roundToInt().formatted(locale),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
                 Text(
-                    text = " / ${state.calorieTarget.roundToInt()} kcal",
+                    text = " kcal",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
         LinearProgressIndicator(
-            progress = { state.calorieFraction },
+            progress = { fraction },
+            color = MaterialTheme.colorScheme.tertiary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             strokeCap = StrokeCap.Round,
             modifier = Modifier.fillMaxWidth().size(width = 0.dp, height = 10.dp),
         )

@@ -452,7 +452,7 @@ private fun BarcodePreviewContent(
             verticalArrangement = Arrangement.Bottom,
         ) {
             Icon(Icons.Outlined.CenterFocusStrong, contentDescription = null, tint = Color.White)
-            Text(nomiString("Scanningâ€¦"), color = Color.White)
+            Text(nomiString("Scanning…"), color = Color.White)
         }
     }
 }

@@ -1,5 +1,26 @@
 # Changelog
 
+## Nomi v1.6 — 2026-08-12
+
+### Calories burned
+
+- The Today action bar now shows the calories movement burned today beside the calories eaten.
+- The Goals sheet gained a second bar for burned calories, in both the ring and the bar layout.
+- The burned bar shares the calorie target as its scale, so equal lengths mean equal calories.
+- Steps are shown underneath the burned figure.
+- Nothing is subtracted from the day's intake; the eaten figure stays the eaten figure.
+- Burned calories and steps appear only on today, and only once Health Connect has reported them.
+
+### Drawn icons
+
+- Added Nomi's own flame and running-figure icons, replacing the stock ones.
+- Both are single-colour shapes that take their colour from the active scheme, including dynamic colour.
+
+### Fixes
+
+- The barcode scanner's "Scanning…" label no longer renders as mojibake and is translated again.
+- The calorie estimate bias slider now saves the stop it was released on instead of the previous one.
+
 ## Nomi v1.5.3 — 2026-08-12
 
 - Shortened the swipe-to-delete Undo window from three seconds to two seconds.

@@ -225,10 +225,33 @@ data class TodayUiState(
     val entries: List<TodayFoodEntry> = emptyList(),
     val isLoading: Boolean = false,
     val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
+    /**
+     * Active calories Health Connect reported for today, and the steps behind them.
+     *
+     * Null means Nomi has no figure, which is not the same as zero: Health Connect may be absent,
+     * unpermitted, or simply not synced yet. Nothing about burned calories is shown in that case
+     * rather than claiming the user did not move. Only today can carry them, because Health
+     * Connect is read for the current day and a past date has no matching figure.
+     */
+    val activeCaloriesKcal: Double? = null,
+    val steps: Long? = null,
 ) {
     val caloriesDifference: Double get() = calorieTarget - caloriesConsumed
     val calorieFraction: Float
         get() = if (calorieTarget <= 0) 0f else (caloriesConsumed / calorieTarget).toFloat().coerceIn(0f, 1f)
+
+    /**
+     * Burned calories measured against the same target as intake.
+     *
+     * Movement has no goal of its own here, so the second bar borrows the calorie target as its
+     * scale. That is the only choice that lets the two bars be read against each other: an equal
+     * length means an equal number of calories.
+     */
+    val burnedFraction: Float
+        get() {
+            val burned = activeCaloriesKcal ?: return 0f
+            return if (calorieTarget <= 0) 0f else (burned / calorieTarget).toFloat().coerceIn(0f, 1f)
+        }
 
     fun entriesFor(category: MealCategory): List<TodayFoodEntry> =
         entries.filter { it.mealCategory == category }.sortedBy { it.time }

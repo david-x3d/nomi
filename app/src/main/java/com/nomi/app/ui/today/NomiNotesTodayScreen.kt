@@ -69,7 +69,6 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -159,6 +158,7 @@ import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.DictationWaveform
 import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
+import com.nomi.app.ui.components.NomiIcons
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
@@ -1851,7 +1851,7 @@ private fun NotesFloatingActionRow(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
+                            imageVector = NomiIcons.Flame,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                             tint = MaterialTheme.colorScheme.primary,
@@ -1863,6 +1863,24 @@ private fun NotesFloatingActionRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
+                        // What movement burned today, kept beside the plate rather than folded
+                        // into it. The eaten figure has to stay the eaten figure.
+                        state.activeCaloriesKcal?.let { burned ->
+                            Icon(
+                                imageVector = NomiIcons.Runner,
+                                contentDescription = nomiString("Burned through activity"),
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.tertiary,
+                            )
+                            Text(
+                                text = "${burned.roundToInt().formatted(locale)} kcal",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 NotesCircleAction(
@@ -2255,6 +2273,23 @@ private fun CalorieGoalCard(state: TodayUiState) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // Movement drawn against the same target as the plate above it, so the two waves can
+            // be compared. Absent entirely when Health Connect had nothing to report.
+            state.activeCaloriesKcal?.let { burned ->
+                GoalWave(
+                    fraction = state.burnedFraction,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+                Text(
+                    text = listOfNotNull(
+                        "${nomiString("Burned")} · " +
+                            "${burned.roundToInt().formatted(locale)} kcal",
+                        state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -2398,7 +2433,9 @@ private fun GoalWave(fraction: Float, color: Color) {
 private fun cleanAmount(value: Double, locale: Locale): String =
     if (value % 1.0 == 0.0) value.roundToInt().toString() else String.format(locale, "%.1f", value)
 
-private fun Int.formatted(locale: Locale): String = String.format(locale, "%,d", this)
+internal fun Int.formatted(locale: Locale): String = String.format(locale, "%,d", this)
+
+internal fun Long.formatted(locale: Locale): String = String.format(locale, "%,d", this)
 
 private fun sampleTodayState() = TodayUiState(
     date = LocalDate.now(),

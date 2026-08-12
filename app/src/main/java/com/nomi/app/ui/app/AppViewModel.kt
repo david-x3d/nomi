@@ -221,7 +221,11 @@ class AppViewModel(
     /** Original wording kept briefly so a freshly saved row can visibly resolve into its label. */
     private val recentlySavedInputs = MutableStateFlow<Map<String, String>>(emptyMap())
 
-    val todayState: StateFlow<TodayUiState> = combine(
+    // Declared before the flows that read it: a property initialiser running earlier would see
+    // null and take the whole view model down at construction.
+    private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
+
+    private val loggedTodayState: Flow<TodayUiState> = combine(
         selectedDate.flatMapLatest { repository.dayLogs(it.toString()) }
             .onEach { dayLogSnapshot = it },
         repository.currentPlan,
@@ -230,6 +234,27 @@ class AppViewModel(
         recentlySavedInputs,
     ) { logs, plan, date, prefs, freshInputs ->
         mapToday(date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle, freshInputs)
+    }
+
+    /**
+     * The logged day joined with what Health Connect reported for today.
+     *
+     * The activity figures only belong to the current date. Health Connect is read for today
+     * alone, so attaching them to a day the user paged back to would label yesterday's plate with
+     * this morning's steps.
+     */
+    val todayState: StateFlow<TodayUiState> = combine(
+        loggedTodayState,
+        healthConnectUiState,
+    ) { state, health ->
+        if (state.date != today) {
+            state
+        } else {
+            state.copy(
+                activeCaloriesKcal = health.todayActiveCaloriesKcal,
+                steps = health.todaySteps,
+            )
+        }
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(isLoading = true))
     val aiDebugEvents: StateFlow<List<AiDebugEventEntity>> = repository.aiDebugEvents().stateIn(
@@ -289,7 +314,6 @@ class AppViewModel(
     }
 
     private val keyPresence = MutableStateFlow<Map<ProviderPipeline, ProviderKeyPresence>>(emptyMap())
-    private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
     private val healthSyncMutex = Mutex()
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
