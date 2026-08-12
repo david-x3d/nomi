@@ -646,6 +646,16 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
     val sourceHostname = remember(entry.sourceUrl) {
         WebsiteFaviconUrl.normalizePublicHttpsHostname(entry.sourceUrl)
     }
+    // With no cited page the block used to sit behind a placeholder globe, even when the
+    // research had leant on one site throughout. That site is shown instead - as the page Nomi
+    // spent its time on, never as the source of the numbers.
+    val leadingSiteUrl = remember(entry.sourceUrl, entry.citedSourceUrls) {
+        entry.sourceUrl?.takeIf { WebsiteFaviconUrl.normalizePublicHttpsHostname(it) != null }
+            ?: entry.mostConsultedUrl()
+    }
+    val leadingSiteHost = remember(leadingSiteUrl) {
+        WebsiteFaviconUrl.normalizePublicHttpsHostname(leadingSiteUrl)
+    }
     val sourceLabel = entry.sourceName?.takeIf { it.isNotBlank() }
         ?: if (entry.isEstimated) {
             nomiString("Nomi estimate")
@@ -750,7 +760,7 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 WebsiteFavicon(
-                                    sourceUrl = entry.sourceUrl,
+                                    sourceUrl = leadingSiteUrl,
                                     size = 34.dp,
                                 )
                                 Column(
@@ -772,6 +782,14 @@ private fun ItemAndSourceCard(entry: TodayFoodEntry) {
                                         )
                                     }
                                 }
+                            }
+                            // Named rather than shown as a bare hostname, because these values
+                            // did not come off that page: the research read it, then estimated.
+                            if (sourceHostname == null) {
+                                SourceFactLine(
+                                    label = nomiString("Mainly checked"),
+                                    value = leadingSiteHost,
+                                )
                             }
                             // What the page itself said, which is the part that makes the number
                             // checkable: the product it names, and the amount its values describe.
@@ -894,6 +912,26 @@ private fun CorrectionPrompt(onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.primary,
         )
     }
+}
+
+/**
+ * The site the research leant on most, or null when it cited nothing usable.
+ *
+ * "Most" is how many of the consulted pages share a host: a search that opened three pages on
+ * one site and one elsewhere was working from the first. Ties go to whichever appeared first,
+ * because the provider reports its strongest evidence ahead of the rest.
+ */
+internal fun TodayFoodEntry.mostConsultedUrl(): String? {
+    val byHost = citedSourceUrls
+        .mapNotNull { url ->
+            WebsiteFaviconUrl.normalizePublicHttpsHostname(url)?.let { host -> host to url }
+        }
+        .groupBy({ (host, _) -> host }, { (_, url) -> url })
+    if (byHost.isEmpty()) return null
+    return byHost.entries
+        .maxByOrNull { (_, urls) -> urls.size }
+        ?.value
+        ?.firstOrNull()
 }
 
 /**

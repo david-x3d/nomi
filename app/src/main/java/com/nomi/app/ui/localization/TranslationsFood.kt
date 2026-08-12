@@ -252,6 +252,13 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
     ),
 
     // What the cited page itself said
+    "Mainly checked" to NomiTranslation(
+        de = "Hauptsächlich geprüft", es = "Consultado sobre todo",
+        fr = "Surtout consulté", it = "Consultato soprattutto",
+        nl = "Vooral bekeken", pt = "Consultado sobretudo",
+        sq = "Kryesisht i kontrolluar", sv = "Främst kontrollerad",
+        tr = "Ağırlıklı olarak incelenen",
+    ),
     "Product on the page" to NomiTranslation(
         de = "Produkt auf der Seite", es = "Producto en la página",
         fr = "Produit sur la page", it = "Prodotto sulla pagina",
