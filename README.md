@@ -2,7 +2,7 @@
 
 <img src="app/src/main/res/drawable-nodpi/nomi_logo.png" alt="Nomi — fox logo" width="220" />
 
-### A fast, local-first nutrition journal for Android
+### A fast Nutrition journal for Android
 
 [![Release v1.2.1](https://img.shields.io/badge/release-v1.2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.2.1)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
@@ -59,7 +59,7 @@ Nomi is a native Jetpack Compose app built with Material 3 Expressive. It suppor
 
 ## 🛡️ Privacy
 
-- Nutrition history, saved meals, favorites, goals, and weight records are local-first.
+- Nutrition history, saved meals, favorites, goals, and weight records are locally saved
 - API credentials use Android Keystore-backed encryption and are excluded from exports and backups.
 - Meal text or a selected image is sent only when an AI-powered action needs it.
 - The configured provider's own privacy policy and pricing apply to those requests.
