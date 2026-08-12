@@ -85,6 +85,7 @@ fun PhotoCaptureScreen(
     inline: Boolean = false,
     controllerFactory: (Context) -> CameraCaptureController = ::CameraCaptureController,
 ) {
+    ViewfinderKeyboardDismissal()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val appContext = context.applicationContext

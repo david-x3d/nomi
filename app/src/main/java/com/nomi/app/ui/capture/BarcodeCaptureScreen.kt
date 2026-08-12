@@ -82,6 +82,7 @@ fun BarcodeCaptureScreen(
     modifier: Modifier = Modifier,
     inline: Boolean = false,
 ) {
+    ViewfinderKeyboardDismissal()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember(context) {

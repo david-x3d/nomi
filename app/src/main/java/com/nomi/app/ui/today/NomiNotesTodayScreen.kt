@@ -321,6 +321,11 @@ fun NomiNotesTodayScreen(
 
     LaunchedEffect(inlineCaptureSubject, showInlineBarcode) {
         if (inlineCaptureSubject != null || showInlineBarcode) {
+            // Reaching for the camera ends writing: the caret is dropped and the page is not
+            // put back where composing found it, because the viewfinder is what should be
+            // looked at now. Whatever was typed is kept and waits below the camera.
+            composerOpen = false
+            positionBeforeComposing = null
             listState.animateScrollToItem(1)
         }
     }

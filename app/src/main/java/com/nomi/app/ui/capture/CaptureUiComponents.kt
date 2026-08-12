@@ -22,9 +22,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -34,6 +37,22 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
+
+/**
+ * Puts the keyboard away for as long as a viewfinder is on screen. A camera opened while a
+ * line was being written - or while the menu search still had the caret - would otherwise
+ * come up behind the keyboard, which covers exactly the half of the frame being aimed. The
+ * text stays where it was; only the keyboard goes, because looking is not writing.
+ */
+@Composable
+internal fun ViewfinderKeyboardDismissal() {
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(Unit) {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

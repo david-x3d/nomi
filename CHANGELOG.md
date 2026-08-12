@@ -1,5 +1,14 @@
 # Changelog
 
+## Nomi v1.6.1 — 2026-08-12
+
+### The keyboard steps aside for the camera
+
+- Opening the camera now puts the keyboard away instead of leaving it in front of the viewfinder.
+- This covers every way in: the Today action bar, the barcode scanner, the nutrition-label shot, and "Add another page" while searching a scanned menu.
+- Typed text is kept — only the caret and the keyboard go, and the entry waits below the camera.
+- After the camera closes, the page stays with the shot instead of jumping back to where writing left off.
+
 ## Nomi v1.6 — 2026-08-12
 
 ### Calories burned
