@@ -5,11 +5,13 @@
 ### A fast Nutrition journal for Android
 
 [![Release v1.3.5](https://img.shields.io/badge/release-v1.3.5-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.3.5)
+[![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
 [![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
 [![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#design)
-[![License](https://img.shields.io/badge/license-proprietary-263238?style=for-the-badge)](LICENSE)
+[![License PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-FF6F00?style=for-the-badge)](LICENSE)
+[![Noncommercial](https://img.shields.io/badge/use-noncommercial%20only-C62828?style=for-the-badge)](LICENSE)
 
 [Download the latest APK](https://github.com/david-x3d/nomi/releases/latest) · [Report a bug](https://github.com/david-x3d/nomi/issues)
 
@@ -150,4 +152,15 @@ Published historical tags are immutable so existing APK links and update paths r
 
 ## 📄 License
 
-Copyright © 2026 Nomi. All rights reserved. This is source-available proprietary software; no permission to copy, modify, redistribute, sublicense, or sell the software is granted. See [LICENSE](LICENSE) for the full notice.
+Nomi is released under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+**You may** use the app, read the source, run it, study it, fork it, modify it, and share your changes — for any noncommercial purpose. Personal use, hobby projects, study and research all count, as does use by schools, charities, and public institutions.
+
+**You may not** sell Nomi or anything built from it, or use it commercially. That includes selling copies, charging for access, and running it as a paid service.
+
+**No trademark rights are granted.** "Nomi", the name, the fox logo, and the app icon stay with the copyright holder, so a fork needs its own name and icon. This is stated as a `Required Notice:` in the licence, which means it has to travel with every copy you pass on.
+
+Copyright © 2026 Nomi. The software is provided "as is", without warranty of any kind. Third-party dependencies keep their own licences, and the brand names visible in the screenshots belong to their respective owners.
+
+> [!NOTE]
+> This is a source-available licence, not an OSI-approved open-source one — the noncommercial restriction is what puts it outside that definition.
