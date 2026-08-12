@@ -553,7 +553,7 @@ private fun nutritionMetrics(
             MaterialTheme.colorScheme.tertiary,
         ),
     )
-    (Micronutrient.entries + enabledMicronutrients).distinct().forEach { nutrient ->
+    detailMicronutrients(enabledMicronutrients).forEach { nutrient ->
         add(
             NutritionMetric(
                 label = nutrient.localizedName(),
@@ -564,6 +564,11 @@ private fun nutritionMetrics(
         )
     }
 }
+
+/** Only nutrients enabled in Settings belong in the meal and item detail grids. */
+internal fun detailMicronutrients(
+    enabledMicronutrients: List<Micronutrient>,
+): List<Micronutrient> = enabledMicronutrients.distinct()
 
 private data class NutritionMetric(
     val label: String,

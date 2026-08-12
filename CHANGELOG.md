@@ -1,5 +1,11 @@
 # Changelog
 
+## Nomi 1.4.2 — 2026-08-12
+
+- Meal and item detail cards now respect the micronutrient tracking preferences.
+- Disabled micronutrients, such as sodium, are no longer shown in nutrition grids.
+- Macronutrients remain visible regardless of micronutrient tracking choices.
+
 ## Nomi 1.4.1 — 2026-08-12
 
 - Grouped meal items now expand directly inside the meal details page.
