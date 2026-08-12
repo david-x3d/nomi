@@ -57,7 +57,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
@@ -366,8 +365,6 @@ fun NomiNotesTodayScreen(
                 ) {
                     NotesFloatingActionRow(
                         state = state,
-                        canSend = (loggingState as? FoodLoggingUiState.Input)
-                            ?.text?.isNotBlank() == true,
                         dictation = dictation,
                         onGoals = { haptics.selected(); showGoals = true },
                         onVoice = { haptics.selected(); dictation.start() },
@@ -394,7 +391,6 @@ fun NomiNotesTodayScreen(
                             haptics.selected()
                             onQuickMethod(method)
                         },
-                        onSend = { haptics.sent(); closeComposer(); onAnalyze() },
                     )
                 }
             }
@@ -1282,8 +1278,8 @@ private fun InlineLoggingState(
  * a logged row, so what you type reads as part of the page and stays in place when it turns
  * into real entries. As the page composer it claims the rest of the sheet and takes as many
  * lines as you want - Return breaks a line instead of submitting, so several foods can be
- * written out before anything is sent. Rewriting one existing row keeps the compact form with
- * its own send action, because there it sits between other entries.
+ * written out before research starts automatically. Rewriting one existing row keeps the same
+ * compact shape because there it sits between other entries.
  *
  * [initialCaret] is where the words were touched. It only seeds the caret; from then on the
  * caret belongs to the field, so typing in the middle of a sentence stays where it is.
@@ -1348,10 +1344,6 @@ private fun InlineComposerCanvas(
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions = KeyboardOptions(
                 capitalization = KeyboardCapitalization.Sentences,
-                imeAction = if (fillsPage) ImeAction.Default else ImeAction.Send,
-            ),
-            keyboardActions = KeyboardActions(
-                onSend = { if (text.isNotBlank()) onAnalyze() },
             ),
             decorationBox = { innerTextField ->
                 if (text.isEmpty()) {
@@ -1364,18 +1356,10 @@ private fun InlineComposerCanvas(
                 innerTextField()
             },
         )
-        // The page composer sends from the floating row, so nothing hovers over the sheet.
-        AnimatedVisibility(visible = !fillsPage && text.isNotBlank()) {
-            IconButton(
-                onClick = onAnalyze,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = nomiString("Analyze meal"),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-            }
+        // This is the same right-hand position where the finished row will show its calories.
+        // The dots leave with the composer when the quiet-period search starts.
+        AnimatedVisibility(visible = userHasTyped && text.isNotBlank()) {
+            TypingDots()
         }
     }
 }
@@ -1805,7 +1789,6 @@ private fun ManualDraftNote(
 @Composable
 private fun NotesFloatingActionRow(
     state: TodayUiState,
-    canSend: Boolean,
     dictation: InlineDictationState,
     onGoals: () -> Unit,
     onVoice: () -> Unit,
@@ -1813,7 +1796,6 @@ private fun NotesFloatingActionRow(
     onCameraMethod: (AddFoodMethod) -> Unit,
     onChoosePhoto: () -> Unit,
     onLibraryMethod: (AddFoodMethod) -> Unit,
-    onSend: () -> Unit,
 ) {
     val locale = nomiLocale()
     var showCameraMenu by rememberSaveable { mutableStateOf(false) }
@@ -1865,36 +1847,23 @@ private fun NotesFloatingActionRow(
                 )
             } else {
                 NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
-                    AnimatedContent(
-                        targetState = canSend,
-                        transitionSpec = {
-                            fadeIn(animationSpec = effectsSpec)
-                                .togetherWith(fadeOut(animationSpec = effectsSpec))
-                        },
-                        label = "typing calories",
-                    ) { typing ->
-                        if (typing) {
-                            TypingDots()
-                        } else {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalFireDepartment,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(
-                                    text = calorieText,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = calorieText,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
                 NotesCircleAction(
@@ -1952,70 +1921,46 @@ private fun NotesFloatingActionRow(
                         )
                     }
                 }
-                // Once there is something written, the plus becomes the way to send it, and it
-                // trades places instead of adding a fifth action to the compact row.
-                AnimatedContent(
-                    targetState = canSend,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = effectsSpec) +
-                            scaleIn(animationSpec = effectsSpec, initialScale = 0.72f))
-                            .togetherWith(
-                                fadeOut(animationSpec = effectsSpec) +
-                                    scaleOut(animationSpec = effectsSpec, targetScale = 0.72f),
-                            )
-                    },
-                    label = "composer action",
-                ) { sendable ->
-                    if (sendable) {
-                        NotesCircleAction(
-                            icon = Icons.AutoMirrored.Filled.Send,
-                            description = nomiString("Analyze meal"),
-                            onClick = onSend,
-                            emphasized = true,
+                Box {
+                    NotesCircleAction(
+                        icon = Icons.Default.Add,
+                        description = nomiString("More ways to add food"),
+                        onClick = {
+                            showCameraMenu = false
+                            showLibraryMenu = true
+                        },
+                    )
+                    DropdownMenu(
+                        expanded = showLibraryMenu,
+                        onDismissRequest = { showLibraryMenu = false },
+                        offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        CompactActionMenuItem(
+                            icon = Icons.Default.History,
+                            label = nomiString("Recent"),
+                            onClick = {
+                                showLibraryMenu = false
+                                onLibraryMethod(AddFoodMethod.RECENT)
+                            },
                         )
-                    } else {
-                        Box {
-                            NotesCircleAction(
-                                icon = Icons.Default.Add,
-                                description = nomiString("More ways to add food"),
-                                onClick = {
-                                    showCameraMenu = false
-                                    showLibraryMenu = true
-                                },
-                            )
-                            DropdownMenu(
-                                expanded = showLibraryMenu,
-                                onDismissRequest = { showLibraryMenu = false },
-                                offset = DpOffset(x = (-8).dp, y = (-8).dp),
-                                shape = RoundedCornerShape(24.dp),
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            ) {
-                                CompactActionMenuItem(
-                                    icon = Icons.Default.History,
-                                    label = nomiString("Recent"),
-                                    onClick = {
-                                        showLibraryMenu = false
-                                        onLibraryMethod(AddFoodMethod.RECENT)
-                                    },
-                                )
-                                CompactActionMenuItem(
-                                    icon = Icons.Default.FavoriteBorder,
-                                    label = nomiString("Favorites"),
-                                    onClick = {
-                                        showLibraryMenu = false
-                                        onLibraryMethod(AddFoodMethod.FAVORITES)
-                                    },
-                                )
-                                CompactActionMenuItem(
-                                    icon = Icons.Default.RestaurantMenu,
-                                    label = nomiString("Saved meals"),
-                                    onClick = {
-                                        showLibraryMenu = false
-                                        onLibraryMethod(AddFoodMethod.SAVED_MEALS)
-                                    },
-                                )
-                            }
-                        }
+                        CompactActionMenuItem(
+                            icon = Icons.Default.FavoriteBorder,
+                            label = nomiString("Favorites"),
+                            onClick = {
+                                showLibraryMenu = false
+                                onLibraryMethod(AddFoodMethod.FAVORITES)
+                            },
+                        )
+                        CompactActionMenuItem(
+                            icon = Icons.Default.RestaurantMenu,
+                            label = nomiString("Saved meals"),
+                            onClick = {
+                                showLibraryMenu = false
+                                onLibraryMethod(AddFoodMethod.SAVED_MEALS)
+                            },
+                        )
                     }
                 }
             }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Nomi v1.5.2 — 2026-08-12
+
+- Removed the send button from typed food logging and its keyboard action.
+- Moved the animated typing dots into the food line, where the finished entry shows its calories.
+- Kept the calorie summary and add-method action bar stable while typing.
+- Food research still starts automatically after 1.5 seconds without further input.
+
 ## Nomi v1.5.1 — 2026-08-12
 
 - Food descriptions now start researching automatically after 1.5 seconds without further typing.
