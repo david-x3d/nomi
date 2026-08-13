@@ -4,12 +4,14 @@ import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import androidx.health.connect.client.units.Energy
 import androidx.health.connect.client.units.Mass
 import java.time.Instant
 import java.time.ZoneId
@@ -26,6 +28,7 @@ data class HealthFeatures(
     val writeWeight: Boolean = false,
     val readSteps: Boolean = false,
     val readActiveCalories: Boolean = false,
+    val writeNutrition: Boolean = false,
 )
 
 data class HealthWeight(
@@ -55,7 +58,11 @@ val NomiHealthFeatures = HealthFeatures(
     writeWeight = true,
     readSteps = true,
     readActiveCalories = true,
+    writeNutrition = true,
 )
+
+/** Health Connect takes a bounded batch per call, and a busy month easily exceeds one. */
+private const val NUTRITION_BATCH_SIZE = 100
 
 internal fun resolveHealthConnectPermissionStatus(
     availability: HealthConnectAvailability,
@@ -106,6 +113,9 @@ class HealthConnectManager(private val context: Context) {
         if (features.readActiveCalories) {
             add(HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class))
         }
+        if (features.writeNutrition) {
+            add(HealthPermission.getWritePermission(NutritionRecord::class))
+        }
     }
 
     suspend fun grantedPermissions(): Set<String> = if (availability == HealthConnectAvailability.AVAILABLE) {
@@ -154,6 +164,40 @@ class HealthConnectManager(private val context: Context) {
         return client.insertRecords(listOf(record)).recordIdsList.single()
     }
 
+    /**
+     * Mirrors logged portions into Health Connect, one record per food entry.
+     *
+     * Each record carries the log row's own client record id, so writing an entry Health Connect
+     * already holds replaces it rather than duplicating the meal. Batches are kept small because
+     * a single insert call has a record limit that a month of logging would pass.
+     */
+    suspend fun writeNutrition(entries: List<HealthNutritionEntry>) {
+        if (entries.isEmpty()) return
+        entries.chunked(NUTRITION_BATCH_SIZE).forEach { batch ->
+            client.insertRecords(batch.map(HealthNutritionEntry::toRecord))
+        }
+    }
+
+    /**
+     * Removes nutrition records for food the user deleted in Nomi.
+     *
+     * Deletes are best effort by design: the user can also clear Nomi's data from inside Health
+     * Connect, and a delete for a record that is already gone must not be able to wedge every
+     * later sync behind it.
+     */
+    suspend fun deleteNutrition(clientRecordIds: List<String>) {
+        if (clientRecordIds.isEmpty()) return
+        clientRecordIds.chunked(NUTRITION_BATCH_SIZE).forEach { batch ->
+            runCatching {
+                client.deleteRecords(
+                    recordType = NutritionRecord::class,
+                    recordIdsList = emptyList(),
+                    clientRecordIdsList = batch,
+                )
+            }
+        }
+    }
+
     suspend fun readActivity(start: Instant, end: Instant): HealthActivitySummary {
         val aggregation = client.aggregate(
             AggregateRequest(
@@ -171,3 +215,25 @@ class HealthConnectManager(private val context: Context) {
         )
     }
 }
+
+/** Optional nutrients stay absent rather than becoming a claimed zero. */
+private fun HealthNutritionEntry.toRecord(): NutritionRecord = NutritionRecord(
+    startTime = startTime,
+    startZoneOffset = zoneOffset,
+    endTime = endTime,
+    endZoneOffset = zoneOffset,
+    energy = Energy.kilocalories(caloriesKcal),
+    protein = Mass.grams(proteinGrams),
+    totalCarbohydrate = Mass.grams(carbohydrateGrams),
+    totalFat = Mass.grams(fatGrams),
+    dietaryFiber = fiberGrams?.let(Mass::grams),
+    sugar = sugarGrams?.let(Mass::grams),
+    saturatedFat = saturatedFatGrams?.let(Mass::grams),
+    sodium = sodiumGrams()?.let(Mass::grams),
+    name = name,
+    mealType = mealType,
+    metadata = Metadata.manualEntry(
+        clientRecordId = clientRecordId,
+        clientRecordVersion = version,
+    ),
+)

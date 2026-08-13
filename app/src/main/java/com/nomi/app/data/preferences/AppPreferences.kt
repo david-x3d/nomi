@@ -114,6 +114,21 @@ data class MicronutrientPreferences(
 }
 
 /**
+ * What the food log last handed to Health Connect, as day -> (food log id -> written version).
+ *
+ * The version is the log row's update timestamp, so an unchanged entry is never rewritten and a
+ * corrected one always is. Deleted entries leave no row to compare against, which is exactly why
+ * the ids are remembered here: without them their Health Connect records could never be found
+ * again and would outlive the food they describe.
+ */
+@Serializable
+data class HealthNutritionSyncState(
+    val syncedVersions: Map<String, Map<String, Long>> = emptyMap(),
+) {
+    val entryCount: Int get() = syncedVersions.values.sumOf(Map<String, Long>::size)
+}
+
+/**
  * Small resumable draft only; calculated plans and completed profiles are persisted in Room.
  * Strings intentionally mirror stable domain codes rather than UI display labels.
  */
@@ -175,6 +190,7 @@ data class AppPreferences(
     val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
     /** When on, AI requests wait for the provider instead of failing at the built-in limit. */
     val aiRequestTimeoutDisabled: Boolean = false,
+    val healthNutritionSync: HealthNutritionSyncState = HealthNutritionSyncState(),
 )
 
 /**

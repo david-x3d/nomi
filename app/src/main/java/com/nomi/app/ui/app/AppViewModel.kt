@@ -39,6 +39,7 @@ import com.nomi.app.data.local.model.SavedMealWithItems
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.data.preferences.HealthNutritionSyncState
 import com.nomi.app.data.preferences.HeightUnitPreference
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
@@ -80,7 +81,9 @@ import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
 import com.nomi.app.integration.health.NomiHealthFeatures
 import com.nomi.app.integration.health.importableHealthWeights
+import com.nomi.app.integration.health.planNutritionSync
 import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
+import com.nomi.app.integration.health.toHealthNutritionEntry
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
 import com.nomi.app.ui.capture.MenuScanUiState
@@ -137,6 +140,7 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -147,6 +151,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -397,6 +403,7 @@ class AppViewModel(
 
     init {
         refreshProviderAndHealthStatus()
+        observeFoodLogForHealthConnect()
         viewModelScope.launch {
             runCatching { container.reminderScheduler.reconcileFrom(repository.appPreferencesStore) }
         }
@@ -2211,6 +2218,8 @@ class AppViewModel(
             var importedWeightCount = 0
             var weightsSynced = false
             var activitySynced = false
+            var nutritionSynced = false
+            var sharedNutritionEntryCount: Int? = null
             var todaySteps: Long? = null
             var todayActiveCaloriesKcal: Double? = null
 
@@ -2260,12 +2269,26 @@ class AppViewModel(
                 failures += "activity"
             }
 
+            runCatching { pushNutritionToHealthConnect() }
+                .onSuccess { sharedCount ->
+                    nutritionSynced = true
+                    sharedNutritionEntryCount = sharedCount
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    failures += "nutrition"
+                }
+
             healthConnectUiState.value = HealthConnectUiState(
                 status = HealthConnectPermissionStatus.CONNECTED,
                 isSyncing = false,
                 todaySteps = if (activitySynced) todaySteps else null,
                 todayActiveCaloriesKcal = if (activitySynced) todayActiveCaloriesKcal else null,
-                lastSyncEpochMillis = if (weightsSynced && activitySynced) {
+                sharedNutritionEntryCount = if (nutritionSynced) {
+                    sharedNutritionEntryCount
+                } else {
+                    previous.sharedNutritionEntryCount
+                },
+                lastSyncEpochMillis = if (weightsSynced && activitySynced && nutritionSynced) {
                     syncEpochMillis
                 } else {
                     previous.lastSyncEpochMillis
@@ -2287,6 +2310,80 @@ class AppViewModel(
             )
         } finally {
             healthSyncMutex.unlock()
+        }
+    }
+
+    /**
+     * Mirrors the recent food log into Health Connect and reports how many entries it now holds.
+     *
+     * Only what actually changed is written: the diff runs against the versions the last sync
+     * recorded, so an ordinary resume with nothing new logged makes no Health Connect calls at
+     * all. The new bookkeeping is stored only once both the deletes and the writes went through,
+     * which leaves a failed sync to be repeated in full rather than half-remembered.
+     */
+    private suspend fun pushNutritionToHealthConnect(): Int {
+        val endDate = today
+        val startDate = endDate.minusDays(NUTRITION_SYNC_WINDOW_DAYS - 1L)
+        val windowDates = generateSequence(startDate) { it.plusDays(1) }
+            .takeWhile { !it.isAfter(endDate) }
+            .map(LocalDate::toString)
+            .toSet()
+
+        val entries = repository.logsInRange(startDate.toString(), endDate.toString())
+            .map { log -> log.toHealthNutritionEntry(zoneId) }
+        val stored = loadedPreferences().healthNutritionSync
+        val plan = planNutritionSync(
+            entries = entries,
+            windowDates = windowDates,
+            synced = stored.syncedVersions,
+        )
+        if (plan.isEmpty && plan.syncedVersions == stored.syncedVersions) {
+            return stored.entryCount
+        }
+
+        val healthConnect = container.healthConnect
+        healthConnect.deleteNutrition(plan.deleteClientRecordIds)
+        healthConnect.writeNutrition(plan.write)
+        val synced = HealthNutritionSyncState(plan.syncedVersions)
+        repository.appPreferencesStore.setHealthNutritionSync(synced)
+        return synced.entryCount
+    }
+
+    /**
+     * Keeps Health Connect in step with edits made after a sync.
+     *
+     * Every logging path ends in a food_logs write, so watching the day totals of the sync window
+     * catches new entries, corrections, deletions, restored undos and copied days alike without
+     * each of them having to remember to push. The debounce lets a multi-item meal land as one
+     * batch instead of one write per item.
+     */
+    @OptIn(FlowPreview::class)
+    private fun observeFoodLogForHealthConnect() {
+        viewModelScope.launch {
+            val endDate = today
+            val startDate = endDate.minusDays(NUTRITION_SYNC_WINDOW_DAYS - 1L)
+            repository.nutritionHistory(startDate.toString(), endDate.toString())
+                .drop(1)
+                .debounce(NUTRITION_SYNC_DEBOUNCE_MILLIS)
+                .collect {
+                    val canWrite = runCatching {
+                        container.healthConnect.hasPermissions(HealthFeatures(writeNutrition = true))
+                    }.getOrDefault(false)
+                    if (!canWrite) return@collect
+                    if (!healthSyncMutex.tryLock()) return@collect
+                    try {
+                        val shared = runCatching { pushNutritionToHealthConnect() }
+                            .getOrElse { error ->
+                                if (error is CancellationException) throw error
+                                return@collect
+                            }
+                        healthConnectUiState.update { state ->
+                            state.copy(sharedNutritionEntryCount = shared)
+                        }
+                    } finally {
+                        healthSyncMutex.unlock()
+                    }
+                }
         }
     }
 
@@ -3062,6 +3159,12 @@ class AppViewModel(
 private const val MAX_PHOTO_DESCRIPTION_CHARS = 1_000
 private const val MAX_PHOTO_PLACE_CHARS = 120
 private const val MAX_MENU_LOGGING_TEXT_CHARS = 1_500
+
+/** Matches the weight import window, so both directions of the health sync cover the same month. */
+private const val NUTRITION_SYNC_WINDOW_DAYS = 30
+
+/** Long enough for a whole multi-item meal to be inserted before anything is pushed. */
+private const val NUTRITION_SYNC_DEBOUNCE_MILLIS = 1_500L
 
 private operator fun NutritionValues.plus(other: NutritionValues) = NutritionValues(
     caloriesKcal = caloriesKcal + other.caloriesKcal,

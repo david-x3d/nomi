@@ -143,27 +143,35 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         tr = "İsteğe bağlı sağlık eşitlemesi",
     ),
     "Nomi reads weight from the last 30 days, reads today's steps and active calories, and " +
-        "writes only weights you enter in Nomi. Your nutrition log stays local." to NomiTranslation(
+        "writes back the weights you enter plus the calories, protein, carbs and fat of " +
+        "everything you log." to NomiTranslation(
         de = "Nomi liest Gewichte der letzten 30 Tage, heutige Schritte und aktive Kalorien und " +
-            "schreibt nur Gewichte, die du in Nomi einträgst. Dein Ernährungstagebuch bleibt lokal.",
+            "schreibt die Gewichte, die du einträgst, sowie Kalorien, Eiweiß, Kohlenhydrate und " +
+            "Fett von allem, was du erfasst.",
         es = "Nomi lee los pesos de los últimos 30 días, los pasos y las calorías activas de hoy, " +
-            "y solo escribe los pesos que introduces en Nomi. Tu registro de comidas se queda en " +
-            "el dispositivo.",
+            "y escribe los pesos que introduces más las calorías, proteínas, carbohidratos y " +
+            "grasas de todo lo que registras.",
         fr = "Nomi lit les poids des 30 derniers jours, les pas et les calories actives du jour, " +
-            "et n’écrit que les poids que tu saisis dans Nomi. Ton journal alimentaire reste local.",
+            "et écrit les poids que tu saisis ainsi que les calories, protéines, glucides et " +
+            "lipides de tout ce que tu enregistres.",
         it = "Nomi legge i pesi degli ultimi 30 giorni, i passi e le calorie attive di oggi e " +
-            "scrive solo i pesi che inserisci in Nomi. Il tuo diario alimentare resta sul dispositivo.",
+            "scrive i pesi che inserisci più calorie, proteine, carboidrati e grassi di tutto " +
+            "quello che registri.",
         nl = "Nomi leest gewichten van de laatste 30 dagen, de stappen en actieve calorieën van " +
-            "vandaag, en schrijft alleen gewichten die je in Nomi invoert. Je voedingsdagboek " +
-            "blijft lokaal.",
+            "vandaag, en schrijft de gewichten die je invoert plus de calorieën, eiwitten, " +
+            "koolhydraten en vetten van alles wat je logt.",
         pt = "A Nomi lê os pesos dos últimos 30 dias, os passos e as calorias ativas de hoje, e " +
-            "só escreve os pesos que introduzes na Nomi. O teu diário alimentar fica no dispositivo.",
+            "escreve os pesos que introduzes mais as calorias, proteínas, hidratos de carbono e " +
+            "gorduras de tudo o que registas.",
         sq = "Nomi lexon peshat e 30 ditëve të fundit, hapat dhe kaloritë aktive të sotme, dhe " +
-            "shkruan vetëm peshat që fut ti në Nomi. Ditari yt ushqimor mbetet në pajisje.",
+            "shkruan peshat që fut ti si edhe kaloritë, proteinat, karbohidratet dhe yndyrat e " +
+            "gjithçkaje që regjistron.",
         sv = "Nomi läser vikter från de senaste 30 dagarna, dagens steg och aktiva kalorier, och " +
-            "skriver bara vikter som du anger i Nomi. Din matdagbok stannar lokalt.",
+            "skriver tillbaka vikterna du anger plus kalorier, protein, kolhydrater och fett för " +
+            "allt du loggar.",
         tr = "Nomi son 30 günün kilo kayıtlarını, bugünkü adımları ve aktif kalorileri okur; " +
-            "yalnızca Nomi’ye girdiğin kiloları yazar. Beslenme günlüğün cihazda kalır.",
+            "girdiğin kilolarla birlikte kaydettiğin her şeyin kalori, protein, karbonhidrat ve " +
+            "yağ değerlerini yazar.",
     ),
     "Health Connect isn't available on this device. Nomi works fully without it." to NomiTranslation(
         de = "Health Connect ist auf diesem Gerät nicht verfügbar. Nomi funktioniert auch ohne " +
@@ -204,22 +212,24 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Ingenting delas förrän du godkänner alla begärda kategorier.",
         tr = "İstenen tüm kategorileri onaylamadan hiçbir şey paylaşılmaz.",
     ),
-    "Some permissions are missing. Approve all four categories to finish connecting." to
+    "Some permissions are missing. Approve every requested category to finish connecting." to
         NomiTranslation(
-            de = "Einige Berechtigungen fehlen. Gib alle vier Kategorien frei, um die Verbindung " +
-                "abzuschließen.",
-            es = "Faltan permisos. Aprueba las cuatro categorías para terminar de conectar.",
-            fr = "Des autorisations manquent. Approuve les quatre catégories pour finaliser la " +
-                "connexion.",
-            it = "Mancano alcune autorizzazioni. Approva tutte e quattro le categorie per " +
+            de = "Einige Berechtigungen fehlen. Gib alle angeforderten Kategorien frei, um die " +
+                "Verbindung abzuschließen.",
+            es = "Faltan permisos. Aprueba todas las categorías solicitadas para terminar de " +
+                "conectar.",
+            fr = "Des autorisations manquent. Approuve toutes les catégories demandées pour " +
+                "finaliser la connexion.",
+            it = "Mancano alcune autorizzazioni. Approva tutte le categorie richieste per " +
                 "completare il collegamento.",
-            nl = "Er ontbreken machtigingen. Keur alle vier de categorieën goed om de verbinding " +
-                "af te ronden.",
-            pt = "Faltam permissões. Aprova as quatro categorias para concluir a ligação.",
-            sq = "Disa leje mungojnë. Mirato të katër kategoritë për ta përfunduar lidhjen.",
-            sv = "Vissa behörigheter saknas. Godkänn alla fyra kategorier för att slutföra " +
+            nl = "Er ontbreken machtigingen. Keur alle gevraagde categorieën goed om de " +
+                "verbinding af te ronden.",
+            pt = "Faltam permissões. Aprova todas as categorias pedidas para concluir a ligação.",
+            sq = "Disa leje mungojnë. Mirato të gjitha kategoritë e kërkuara për ta përfunduar " +
+                "lidhjen.",
+            sv = "Vissa behörigheter saknas. Godkänn alla begärda kategorier för att slutföra " +
                 "anslutningen.",
-            tr = "Bazı izinler eksik. Bağlantıyı tamamlamak için dört kategoriyi de onayla.",
+            tr = "Bazı izinler eksik. Bağlantıyı tamamlamak için istenen tüm kategorileri onayla.",
         ),
     "Connected. You can change access at any time in Health Connect." to NomiTranslation(
         de = "Verbunden. Du kannst den Zugriff jederzeit in Health Connect ändern.",
@@ -262,6 +272,13 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Aktive Kalorien", es = "Calorías activas", fr = "Calories actives",
         it = "Calorie attive", nl = "Actieve calorieën", pt = "Calorias ativas",
         sq = "Kalori aktive", sv = "Aktiva kalorier", tr = "Aktif kalori",
+    ),
+    "Food entries shared" to NomiTranslation(
+        de = "Geteilte Ernährungseinträge", es = "Registros de comida compartidos",
+        fr = "Entrées alimentaires partagées", it = "Voci alimentari condivise",
+        nl = "Gedeelde voedingsitems", pt = "Registos de comida partilhados",
+        sq = "Regjistrime ushqimore të ndara", sv = "Delade matposter",
+        tr = "Paylaşılan besin kaydı",
     ),
     "Sync now" to NomiTranslation(
         de = "Jetzt synchronisieren", es = "Sincronizar ahora", fr = "Synchroniser maintenant",

@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v1.7 — 2026-08-13
+
+### Your food reaches Health Connect
+
+- Nomi now writes what you eat to Health Connect: the calories, protein, carbohydrates and fat of every logged portion.
+- Fibre, sugar, saturated fat and sodium travel with the entry whenever the food reports them.
+- Each entry keeps its name, its brand and its meal, so breakfast arrives as breakfast.
+- Correcting a portion updates the matching Health Connect entry, and deleting food removes it.
+- The last 30 days are covered, which is the same window Nomi already reads weights from.
+- Only what changed is sent, so opening Nomi with nothing new logged asks Health Connect for nothing.
+- Entries keep the time zone they were logged in, so a travel day reads the same in both apps.
+- The Health Connect page counts the food entries Nomi is currently sharing.
+
+### Note
+
+- Health Connect asks for one new permission, "write nutrition". Until you approve it, Nomi reports the connection as incomplete and shares nothing new.
+
 ## Nomi v1.6.1 — 2026-08-12
 
 ### The keyboard steps aside for the camera

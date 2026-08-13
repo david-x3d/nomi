@@ -32,6 +32,7 @@ interface AppPreferencesStore {
     suspend fun setCalorieEstimateBias(bias: CalorieEstimateBias)
     suspend fun setGoalsCardStyle(style: GoalsCardStyle)
     suspend fun setAiRequestTimeoutDisabled(disabled: Boolean)
+    suspend fun setHealthNutritionSync(state: HealthNutritionSyncState)
 }
 
 class DataStoreAppPreferencesStore(
@@ -138,6 +139,16 @@ class DataStoreAppPreferencesStore(
         dataStore.edit { values -> values[Keys.AI_REQUEST_TIMEOUT_DISABLED] = disabled }
     }
 
+    override suspend fun setHealthNutritionSync(state: HealthNutritionSyncState) {
+        dataStore.edit { values ->
+            if (state.syncedVersions.isEmpty()) {
+                values.remove(Keys.HEALTH_NUTRITION_SYNC)
+            } else {
+                values[Keys.HEALTH_NUTRITION_SYNC] = json.encodeToString(state)
+            }
+        }
+    }
+
     private fun decodePreferences(values: Preferences): AppPreferences {
         val defaults = AppPreferences()
         return AppPreferences(
@@ -193,6 +204,10 @@ class DataStoreAppPreferencesStore(
                 ?: defaults.goalsCardStyle,
             aiRequestTimeoutDisabled = values[Keys.AI_REQUEST_TIMEOUT_DISABLED]
                 ?: defaults.aiRequestTimeoutDisabled,
+            healthNutritionSync = decode(
+                values[Keys.HEALTH_NUTRITION_SYNC],
+                defaults.healthNutritionSync,
+            ),
         )
     }
 
@@ -223,6 +238,7 @@ class DataStoreAppPreferencesStore(
         val CALORIE_ESTIMATE_BIAS = stringPreferencesKey("nutrition.calorie_estimate_bias")
         val GOALS_CARD_STYLE = stringPreferencesKey("appearance.goals_card_style")
         val AI_REQUEST_TIMEOUT_DISABLED = booleanPreferencesKey("ai.request_timeout_disabled")
+        val HEALTH_NUTRITION_SYNC = stringPreferencesKey("health.nutrition_sync")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {
             ProviderPipeline.FOOD_RESEARCH -> FOOD_RESEARCH_PROVIDER

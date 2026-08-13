@@ -126,6 +126,14 @@ class NomiRepository(
         return logDao.observeHistoryRange(startLocalDate, endLocalDate)
     }
 
+    suspend fun logsInRange(
+        startLocalDate: String,
+        endLocalDate: String,
+    ): List<FoodLogEntity> {
+        validateDateRange(startLocalDate, endLocalDate)
+        return logDao.logsInRange(startLocalDate, endLocalDate)
+    }
+
     fun nutritionHistory(
         startLocalDate: String,
         endLocalDate: String,

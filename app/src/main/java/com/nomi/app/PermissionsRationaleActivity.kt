@@ -65,14 +65,20 @@ private fun HealthConnectRationale(onClose: () -> Unit) {
             )
             Text(
                 text(
-                    "Nomi writes only weight measurements that you manually save in Nomi. A failed Health Connect write never removes the weight from Nomi.",
-                    "Nomi schreibt nur Gewichtsmessungen, die du manuell in Nomi speicherst. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
+                    "Nomi writes the weight measurements that you manually save in Nomi. A failed Health Connect write never removes the weight from Nomi.",
+                    "Nomi schreibt die Gewichtsmessungen, die du manuell in Nomi speicherst. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
                 ),
             )
             Text(
                 text(
-                    "Your Health Connect data is stored in Nomi's local database. Nomi does not sell or upload this health data. Your nutrition log is not shared with Health Connect.",
-                    "Deine Health-Connect-Daten werden in der lokalen Nomi-Datenbank gespeichert. Nomi verkauft oder überträgt diese Gesundheitsdaten nicht. Dein Ernährungstagebuch wird nicht mit Health Connect geteilt.",
+                    "Nomi also writes your food log of the last 30 days as nutrition entries: the calories, protein, carbohydrates and fat of each logged portion, with its name and meal. Editing or deleting food in Nomi updates or removes the matching Health Connect entry.",
+                    "Nomi schreibt außerdem dein Ernährungstagebuch der letzten 30 Tage als Ernährungseinträge: Kalorien, Eiweiß, Kohlenhydrate und Fett jeder erfassten Portion samt Name und Mahlzeit. Wenn du ein Lebensmittel in Nomi änderst oder löschst, wird der zugehörige Health-Connect-Eintrag aktualisiert oder entfernt.",
+                ),
+            )
+            Text(
+                text(
+                    "Your Health Connect data is stored in Nomi's local database. Nomi does not sell or upload this health data.",
+                    "Deine Health-Connect-Daten werden in der lokalen Nomi-Datenbank gespeichert. Nomi verkauft oder überträgt diese Gesundheitsdaten nicht.",
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -243,7 +243,7 @@ fun HealthConnectScreen(
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                nomiString("Nomi reads weight from the last 30 days, reads today's steps and active calories, and writes only weights you enter in Nomi. Your nutrition log stays local."),
+                nomiString("Nomi reads weight from the last 30 days, reads today's steps and active calories, and writes back the weights you enter plus the calories, protein, carbs and fat of everything you log."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
@@ -251,7 +251,7 @@ fun HealthConnectScreen(
                     HealthConnectPermissionStatus.UNAVAILABLE -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.")
                     HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString("Health Connect must be installed or updated before Nomi can connect.")
                     HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve all requested categories.")
-                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Some permissions are missing. Approve all four categories to finish connecting.")
+                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Some permissions are missing. Approve every requested category to finish connecting.")
                     HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected. You can change access at any time in Health Connect.")
                 },
             )
@@ -285,6 +285,11 @@ fun HealthConnectScreen(
                         NutritionLine(
                             nomiString("Active calories"),
                             health.todayActiveCaloriesKcal?.let { "${it.roundToInt()} kcal" }
+                                ?: nomiString("Not synced yet"),
+                        )
+                        NutritionLine(
+                            nomiString("Food entries shared"),
+                            health.sharedNutritionEntryCount?.toString()
                                 ?: nomiString("Not synced yet"),
                         )
                     }

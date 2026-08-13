@@ -40,6 +40,8 @@ data class HealthConnectUiState(
     val isSyncing: Boolean = false,
     val todaySteps: Long? = null,
     val todayActiveCaloriesKcal: Double? = null,
+    /** Food entries Health Connect currently holds from Nomi, or null before the first sync. */
+    val sharedNutritionEntryCount: Int? = null,
     val lastSyncEpochMillis: Long? = null,
     val importedWeightCount: Int = 0,
     val message: String? = null,
