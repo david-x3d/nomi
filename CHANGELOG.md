@@ -1,5 +1,12 @@
 # Changelog
 
+## Nomi v1.7.1 — 2026-08-13
+
+### "Complete permissions" works again
+
+- The button asked Health Connect only for the four categories Nomi wanted before v1.7, all of which were already granted — so Health Connect returned at once and nothing appeared to happen, while the missing nutrition permission kept the connection incomplete.
+- The request now always asks for exactly the categories the connection status is judged against, so the two cannot drift apart again.
+
 ## Nomi v1.7 — 2026-08-13
 
 ### Your food reaches Health Connect

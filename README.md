@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v1.7](https://img.shields.io/badge/release-v1.7-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.7)
+[![Release v1.7.1](https://img.shields.io/badge/release-v1.7.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v1.7.1)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)

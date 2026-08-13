@@ -56,6 +56,25 @@ class HealthConnectManagerTest {
         )
     }
 
+    /**
+     * The connection is only reported as complete once every feature listed here is granted, so a
+     * feature dropped from this set would leave the permission request asking for less than the
+     * status demands - which is a connection the user can never finish.
+     */
+    @Test
+    fun nomiFeatures_coverEveryCategoryTheSyncNeeds() {
+        assertEquals(
+            HealthFeatures(
+                readWeight = true,
+                writeWeight = true,
+                readSteps = true,
+                readActiveCalories = true,
+                writeNutrition = true,
+            ),
+            NomiHealthFeatures,
+        )
+    }
+
     @Test
     fun importableWeights_excludesNomiRecordsAndDuplicateExternalIds() {
         val firstExternal = weight(id = "external-1", origin = "com.scale.app")

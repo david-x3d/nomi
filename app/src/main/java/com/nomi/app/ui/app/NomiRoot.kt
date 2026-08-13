@@ -69,7 +69,7 @@ import com.nomi.app.data.preferences.enabledMicronutrients
 import com.nomi.app.di.AppContainer
 import com.nomi.app.integration.camera.MealImagePreprocessor
 import com.nomi.app.integration.camera.deleteOwnedCameraCapture
-import com.nomi.app.integration.health.HealthFeatures
+import com.nomi.app.integration.health.NomiHealthFeatures
 import com.nomi.app.ui.capture.BarcodeAmountSheet
 import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.MenuScanScreen
@@ -193,10 +193,12 @@ private fun NomiMain(
         pendingReminderIndex = null
     }
 
+    // Asks for exactly the set the connection status is judged against. Spelling the features out
+    // here once let the request fall behind what Nomi had started requiring, and a request for
+    // permissions that are all granted already returns instantly: the button appeared dead while
+    // the missing category kept the connection incomplete.
     val healthPermissions = remember {
-        container.healthConnect.permissionsFor(
-            HealthFeatures(readWeight = true, writeWeight = true, readSteps = true, readActiveCalories = true),
-        )
+        container.healthConnect.permissionsFor(NomiHealthFeatures)
     }
     val healthPermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
