@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Close
@@ -45,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,6 +74,8 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Scans the first supported retail barcode and returns its normalized raw value. */
 @OptIn(ExperimentalGetImage::class)
@@ -112,6 +117,16 @@ fun BarcodeCaptureScreen(
     // The code is read while the phone is still pointed at the package, so the confirmation
     // has to be felt rather than seen.
     val haptics = rememberNomiHaptics()
+    val scope = rememberCoroutineScope()
+    val scanFrameColor by animateColorAsState(
+        targetValue = if (deliveredValue == null) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            Color(0xFF45C46A)
+        },
+        animationSpec = tween(durationMillis = 140),
+        label = "Barcode found frame",
+    )
     val mainExecutor = remember(context) { ContextCompat.getMainExecutor(context) }
     val noUsableCameraError = nomiString("No usable camera was found.")
     val barcodeCameraStartError = nomiString("The barcode camera couldn't be started.")
@@ -125,7 +140,12 @@ fun BarcodeCaptureScreen(
                 if (value.isNotBlank() && deliveredValue == null) {
                     deliveredValue = value
                     haptics.confirmed()
-                    currentOnBarcodeDetected.value(value)
+                    // Keep the green confirmation frame on screen long enough to be seen before
+                    // the caller closes the camera and opens the amount sheet.
+                    scope.launch {
+                        delay(240)
+                        currentOnBarcodeDetected.value(value)
+                    }
                 }
             }
         })
@@ -219,6 +239,7 @@ fun BarcodeCaptureScreen(
                     deliveredValue = deliveredValue,
                     previewDescription = cameraPreviewDescription,
                     scanAreaDescription = scanAreaDescription,
+                    scanFrameColor = scanFrameColor,
                     onRequestPermission = {
                         permissionDenied = false
                         permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -305,13 +326,13 @@ fun BarcodeCaptureScreen(
                     )
                 }
 
-                if (cameraReady && deliveredValue == null) {
+                if (cameraReady) {
                     Box(
                         modifier = Modifier
                             .size(width = 280.dp, height = 170.dp)
                             .border(
                                 width = 3.dp,
-                                color = MaterialTheme.colorScheme.primaryContainer,
+                                color = scanFrameColor,
                                 shape = RoundedCornerShape(22.dp),
                             )
                             .semantics { contentDescription = scanAreaDescription }
@@ -411,6 +432,7 @@ private fun BarcodePreviewContent(
     deliveredValue: String?,
     previewDescription: String,
     scanAreaDescription: String,
+    scanFrameColor: Color,
     onRequestPermission: () -> Unit,
 ) {
     if (cameraPermissionGranted && cameraAvailable) {
@@ -421,13 +443,13 @@ private fun BarcodePreviewContent(
                 .semantics { contentDescription = previewDescription },
         )
     }
-    if (cameraReady && deliveredValue == null) {
+    if (cameraReady) {
         Box(
             modifier = Modifier
                 .size(width = 280.dp, height = 170.dp)
                 .border(
                     width = 3.dp,
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    color = scanFrameColor,
                     shape = RoundedCornerShape(22.dp),
                 )
                 .semantics { contentDescription = scanAreaDescription },

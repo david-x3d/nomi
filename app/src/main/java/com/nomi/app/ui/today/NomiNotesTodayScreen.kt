@@ -25,6 +25,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -91,6 +92,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -99,6 +101,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -147,6 +153,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
+import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.ui.capture.InlineDictationState
@@ -168,6 +175,8 @@ import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.feedback.rememberNomiHaptics
+import com.nomi.app.ui.feedback.nomiPress
+import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
@@ -207,6 +216,9 @@ fun NomiNotesTodayScreen(
     onDeleteFoodImmediately: (Long) -> Unit = {},
     onUndoDeleteFood: (Long) -> Unit = {},
     onDiscardDeletedFood: (Long) -> Unit = {},
+    onDuplicateFood: (Long) -> Unit = {},
+    onFavoriteFood: (Long) -> Unit = {},
+    onEditFoodAmount: (TodayFoodEntry) -> Unit = {},
     editedEntryId: Long? = null,
     onEditEntryText: (TodayFoodEntry) -> Unit = {},
     onTextChanged: (String) -> Unit,
@@ -346,9 +358,9 @@ fun NomiNotesTodayScreen(
             NotesHeader(
                 date = state.date,
                 foxMood = foxMood,
-                onPreviousDay = onPreviousDay,
-                onNextDay = onNextDay,
-                onToday = onToday,
+                onPreviousDay = { haptics.selected(); onPreviousDay() },
+                onNextDay = { haptics.selected(); onNextDay() },
+                onToday = { haptics.selected(); onToday() },
             )
         },
         bottomBar = {
@@ -586,6 +598,9 @@ fun NomiNotesTodayScreen(
                                     pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
                                     onDeleteFood(entry.id)
                                 },
+                                onDuplicate = { onDuplicateFood(entry.id) },
+                                onFavorite = { onFavoriteFood(entry.id) },
+                                onEditAmount = { onEditFoodAmount(entry) },
                             )
                             pending.undoRequested -> RestoringFoodRow(entry)
                             else -> InlineDeletedFoodRow(
@@ -786,17 +801,24 @@ private fun NotesHeader(
 
 @Composable
 private fun NotesEmptyState() {
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 28.dp),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = nomiString("Tap below to log your first meal"),
+            text = nomiString("Tell Nomi what you ate"),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = nomiString("For example: 2 rolls with cheese"),
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
             textAlign = TextAlign.Center,
         )
     }
@@ -824,6 +846,9 @@ private fun SwipeToDeleteFoodRow(
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
     onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onFavorite: () -> Unit,
+    onEditAmount: () -> Unit,
 ) {
     val deleteLabel = nomiFormat("Delete {0}", entry.name)
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
@@ -913,7 +938,15 @@ private fun SwipeToDeleteFoodRow(
         },
     ) {
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
-            NotesFoodRow(entry = entry, onOpenDetails = onOpenDetails, onEditText = onEditText)
+            NotesFoodRow(
+                entry = entry,
+                onOpenDetails = onOpenDetails,
+                onEditText = onEditText,
+                onDuplicate = onDuplicate,
+                onFavorite = onFavorite,
+                onEditAmount = onEditAmount,
+                onDelete = onDelete,
+            )
         }
     }
 }
@@ -1008,7 +1041,13 @@ private fun NotesFoodRow(
     entry: TodayFoodEntry,
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
+    onDuplicate: () -> Unit,
+    onFavorite: () -> Unit,
+    onEditAmount: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    val haptics = rememberNomiHaptics()
+    var showQuickActions by remember(entry.id) { mutableStateOf(false) }
     val finalDescription = entry.rowDescription()
     val originalDescription = entry.revealText?.trim()
         ?.takeIf { it.isNotBlank() && it != finalDescription }
@@ -1057,110 +1096,165 @@ private fun NotesFoodRow(
     val summaryActive = originalDescription != null && !showOriginal && summaryProgress < 1.34f
     val calorieProgress = calorieSweep.value
     val calorieActive = originalDescription != null && calorieProgress < 1.34f
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // Past the end of the words the line still opens for writing, with the caret at
-            // the end, the way tapping the empty part of a note's line behaves.
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClickLabel = primaryClickLabel,
-                onClick = {
-                    if (isGrouped) onOpenDetails()
-                    else onEditText(entry.reeditableText().length)
-                },
-            )
-            .heightIn(min = 64.dp)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            var descriptionLayout by remember(entry.id) {
-                mutableStateOf<TextLayoutResult?>(null)
-            }
-            Text(
-                text = description,
-                modifier = Modifier
-                    .oneShotTextGradient(
-                        active = summaryActive,
-                        progress = summaryProgress,
-                        colors = listOf(
-                            Color(0xFFFF9A45),
-                            Color(0xFFB65CFF),
-                        ),
-                    )
-                    .pointerInput(entry.id, description) {
-                        detectTapGestures(
-                            onLongPress = { onOpenDetails() },
-                            onTap = { position ->
-                                if (isGrouped) {
-                                    onOpenDetails()
-                                } else {
-                                    val tapped = descriptionLayout?.getOffsetForPosition(position)
-                                        ?: description.length
-                                    onEditText(entry.reeditableCaretForDescription(tapped))
-                                }
-                            },
-                        )
-                    },
-                onTextLayout = { descriptionLayout = it },
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (entry.amountText.isNotBlank() || entry.amount > 0.0) {
-                var amountLayout by remember(entry.id) { mutableStateOf<TextLayoutResult?>(null) }
-                Text(
-                    text = amountDisplay,
-                    modifier = Modifier.pointerInput(entry.id, amountDisplay) {
-                        detectTapGestures(
-                            onLongPress = { onOpenDetails() },
-                            onTap = { position ->
-                                if (isGrouped) {
-                                    onOpenDetails()
-                                } else {
-                                    val tapped = amountLayout?.getOffsetForPosition(position) ?: 0
-                                    onEditText(entry.reeditableCaretForAmount(tapped))
-                                }
-                            },
-                        )
-                    },
-                    onTextLayout = { amountLayout = it },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Text(
-            text = "${entry.calories.roundToInt()} kcal",
-            // The calories are the way into the entry's details now that the words belong to
-            // the keyboard, so the figure carries a touch target rather than only its glyphs.
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .oneShotTextGradient(
-                    active = calorieActive,
-                    progress = calorieProgress,
-                    colors = listOf(
-                        Color(0xFFA7E8FF),
-                        Color(0xFF55AEFF),
-                    ),
-                )
-                .clickable(
+                .fillMaxWidth()
+                // Past the end of the words the line still opens for writing, with the caret at
+                // the end, the way tapping the empty part of a note's line behaves.
+                .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClickLabel = detailsLabel,
-                    onClick = onOpenDetails,
+                    onClickLabel = primaryClickLabel,
+                    onLongClickLabel = nomiString("Quick actions"),
+                    onLongClick = {
+                        haptics.held()
+                        showQuickActions = true
+                    },
+                    onClick = {
+                        if (isGrouped) onOpenDetails()
+                        else onEditText(entry.reeditableText().length)
+                    },
                 )
-                .heightIn(min = 44.dp)
-                .wrapContentHeight(Alignment.Top),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.End,
-        )
+                .heightIn(min = 64.dp)
+                .padding(horizontal = 24.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                var descriptionLayout by remember(entry.id) {
+                    mutableStateOf<TextLayoutResult?>(null)
+                }
+                Text(
+                    text = description,
+                    modifier = Modifier
+                        .oneShotTextGradient(
+                            active = summaryActive,
+                            progress = summaryProgress,
+                            colors = listOf(
+                                Color(0xFFFF9A45),
+                                Color(0xFFB65CFF),
+                            ),
+                        )
+                        .pointerInput(entry.id, description) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    haptics.held()
+                                    showQuickActions = true
+                                },
+                                onTap = { position ->
+                                    if (isGrouped) {
+                                        onOpenDetails()
+                                    } else {
+                                        val tapped = descriptionLayout
+                                            ?.getOffsetForPosition(position) ?: description.length
+                                        onEditText(entry.reeditableCaretForDescription(tapped))
+                                    }
+                                },
+                            )
+                        },
+                    onTextLayout = { descriptionLayout = it },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (entry.amountText.isNotBlank() || entry.amount > 0.0) {
+                    var amountLayout by remember(entry.id) {
+                        mutableStateOf<TextLayoutResult?>(null)
+                    }
+                    Text(
+                        text = amountDisplay,
+                        modifier = Modifier.pointerInput(entry.id, amountDisplay) {
+                            detectTapGestures(
+                                onLongPress = {
+                                    haptics.held()
+                                    showQuickActions = true
+                                },
+                                onTap = { position ->
+                                    if (isGrouped) {
+                                        onOpenDetails()
+                                    } else {
+                                        val tapped = amountLayout
+                                            ?.getOffsetForPosition(position) ?: 0
+                                        onEditText(entry.reeditableCaretForAmount(tapped))
+                                    }
+                                },
+                            )
+                        },
+                        onTextLayout = { amountLayout = it },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Text(
+                text = "${entry.calories.roundToInt()} kcal",
+                // The calories are the way into details now that the words belong to the keyboard.
+                modifier = Modifier
+                    .oneShotTextGradient(
+                        active = calorieActive,
+                        progress = calorieProgress,
+                        colors = listOf(
+                            Color(0xFFA7E8FF),
+                            Color(0xFF55AEFF),
+                        ),
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClickLabel = detailsLabel,
+                        onClick = onOpenDetails,
+                    )
+                    .heightIn(min = 44.dp)
+                    .wrapContentHeight(Alignment.Top),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.End,
+            )
+        }
+        DropdownMenu(
+            expanded = showQuickActions,
+            onDismissRequest = { showQuickActions = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(nomiString("Duplicate")) },
+                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                onClick = {
+                    showQuickActions = false
+                    haptics.confirmed()
+                    onDuplicate()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(nomiString("Change amount")) },
+                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                onClick = {
+                    showQuickActions = false
+                    haptics.selected()
+                    onEditAmount()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(nomiString("Favorite")) },
+                leadingIcon = { Icon(Icons.Default.FavoriteBorder, contentDescription = null) },
+                onClick = {
+                    showQuickActions = false
+                    haptics.confirmed()
+                    onFavorite()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(nomiString("Delete")) },
+                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                onClick = {
+                    showQuickActions = false
+                    onDelete()
+                },
+            )
+        }
     }
 }
 
@@ -1234,6 +1328,7 @@ private fun InlineLoggingState(
             }
             is FoodLoggingUiState.Processing -> ProcessingNote(
                 description = rememberedDescription,
+                stage = state.stage,
                 sourceUrls = state.sourceUrls,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
@@ -1371,11 +1466,12 @@ private fun InlineComposerCanvas(
 @Composable
 private fun ProcessingNote(
     description: String,
+    stage: AiProcessingStage,
     sourceUrls: List<String>,
     onEditText: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    val sourcesReady = sourceUrls.isNotEmpty()
+    val stageIndex = AiProcessingStage.entries.indexOf(stage)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -1402,20 +1498,20 @@ private fun ProcessingNote(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     AnimatedContent(
-                        targetState = sourcesReady,
+                        targetState = stage,
                         label = "research source status",
-                    ) { ready ->
+                    ) { currentStage ->
                         Text(
-                            text = if (ready) {
-                                nomiString("Checking sources and portions")
-                            } else {
-                                nomiString("Preparing a careful lookup")
-                            },
+                            text = currentStage.inlineLabel(),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 6.dp),
                         )
                     }
+                    LinearWavyProgressIndicator(
+                        progress = { (stageIndex + 1f) / AiProcessingStage.entries.size },
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
                 }
                 AnimatedWebsiteIconStack(
                     sourceUrls = sourceUrls,
@@ -1434,6 +1530,14 @@ private fun ProcessingNote(
 }
 
 @Composable
+private fun AiProcessingStage.inlineLabel(): String = when (this) {
+    AiProcessingStage.UNDERSTANDING_MEAL -> nomiString("Understanding your meal")
+    AiProcessingStage.FINDING_NUTRITION -> nomiString("Finding nutrition information")
+    AiProcessingStage.CHECKING_PORTIONS -> nomiString("Checking portions")
+    AiProcessingStage.PUTTING_IT_TOGETHER -> nomiString("Putting it together")
+}
+
+@Composable
 private fun PreviewNote(
     analysis: FoodAnalysis,
     description: String,
@@ -1442,6 +1546,7 @@ private fun PreviewNote(
     onEditPreview: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val addPress = rememberNomiPressFeedback()
     val totalCalories = analysis.items.sumOf(AnalyzedFoodItem::calories)
     val totalProtein = analysis.items.sumOf(AnalyzedFoodItem::proteinGrams)
     val totalCarbohydrates = analysis.items.sumOf(AnalyzedFoodItem::carbohydrateGrams)
@@ -1562,7 +1667,11 @@ private fun PreviewNote(
                         Text(nomiString("Edit"), maxLines = 1)
                     }
                 }
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = onAdd,
+                    interactionSource = addPress.interactionSource,
+                    modifier = Modifier.fillMaxWidth().nomiPress(addPress),
+                ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.size(6.dp))
                     Text(nomiString("Add"), maxLines = 1)
@@ -2127,6 +2236,7 @@ private fun DictationPillContent(dictation: InlineDictationState) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NotesCircleAction(
     icon: ImageVector,
@@ -2134,23 +2244,34 @@ private fun NotesCircleAction(
     onClick: () -> Unit,
     emphasized: Boolean = false,
 ) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = if (emphasized) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        },
-        contentColor = if (emphasized) {
-            MaterialTheme.colorScheme.onPrimary
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        },
-        border = if (emphasized) null else hairlineOnPitchBlack(),
+    val press = rememberNomiPressFeedback()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+            TooltipAnchorPosition.Above,
+        ),
+        tooltip = { PlainTooltip { Text(description) } },
+        state = rememberTooltipState(),
     ) {
-        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            Icon(imageVector = icon, contentDescription = description)
+        Surface(
+            onClick = onClick,
+            interactionSource = press.interactionSource,
+            shape = CircleShape,
+            color = if (emphasized) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+            contentColor = if (emphasized) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            border = if (emphasized) null else hairlineOnPitchBlack(),
+            modifier = Modifier.nomiPress(press),
+        ) {
+            Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                Icon(imageVector = icon, contentDescription = description)
+            }
         }
     }
 }

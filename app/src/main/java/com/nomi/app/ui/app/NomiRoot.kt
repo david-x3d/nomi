@@ -14,6 +14,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -49,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -76,6 +80,7 @@ import com.nomi.app.ui.capture.MenuScanScreen
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.localization.NomiLanguage
@@ -133,6 +138,7 @@ private fun NomiMain(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
+    val haptics = rememberNomiHaptics()
     val resolver = context.contentResolver
     val scope = rememberCoroutineScope()
     val navController = rememberNavController()
@@ -207,7 +213,10 @@ private fun NomiMain(
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->
             when (event) {
-                AppEvent.FoodSaved -> navController.popBackStack(Routes.HOME, inclusive = false)
+                AppEvent.FoodSaved -> {
+                    haptics.confirmed()
+                    navController.popBackStack(Routes.HOME, inclusive = false)
+                }
                 AppEvent.OnboardingSaved -> Unit
                 is AppEvent.Message -> snackbarHostState.showSnackbar(event.text)
             }
@@ -244,6 +253,9 @@ private fun NomiMain(
                     onDeleteFoodImmediately = viewModel::deleteFoodLog,
                     onUndoDeleteFood = viewModel::undoDeletedFoodLog,
                     onDiscardDeletedFood = viewModel::discardDeletedFoodLog,
+                    onDuplicateFood = viewModel::duplicateFoodLog,
+                    onFavoriteFood = viewModel::favoriteFoodLog,
+                    onEditFoodAmount = viewModel::startLoggedAmountEdit,
                     onVoiceTranscription = { text ->
                         viewModel.beginLogging(AddFoodMethod.VOICE, text)
                         viewModel.analyzeText()
@@ -783,6 +795,9 @@ private fun MainNavigationSuite(
     onDeleteFoodImmediately: (Long) -> Unit,
     onUndoDeleteFood: (Long) -> Unit,
     onDiscardDeletedFood: (Long) -> Unit,
+    onDuplicateFood: (Long) -> Unit,
+    onFavoriteFood: (Long) -> Unit,
+    onEditFoodAmount: (com.nomi.app.ui.today.TodayFoodEntry) -> Unit,
     onAddFood: (AddFoodMethod) -> Unit,
     onVoiceTranscription: (String) -> Unit,
     onInlinePhotoSelected: (android.net.Uri, String, PhotoCaptureSubject) -> Unit,
@@ -816,6 +831,7 @@ private fun MainNavigationSuite(
     onDeveloper: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableStateOf(MainDestination.TODAY) }
+    val haptics = rememberNomiHaptics()
     val destinationStateHolder = rememberSaveableStateHolder()
     val destinationSpatialSpec = nomiPageMotionSpec<IntOffset>()
     val destinationEffectsSpec = nomiFadeMotionSpec<Float>()
@@ -847,11 +863,26 @@ private fun MainNavigationSuite(
             MainDestination.entries.forEach { destination ->
                 item(
                     selected = selected == destination,
-                    onClick = { selected = destination },
+                    onClick = {
+                        if (selected != destination) haptics.selected() else haptics.tapped()
+                        selected = destination
+                    },
                     icon = {
+                        val iconScale by animateFloatAsState(
+                            targetValue = if (selected == destination) 1.12f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium,
+                            ),
+                            label = "Selected destination",
+                        )
                         androidx.compose.material3.Icon(
                             destination.icon,
                             contentDescription = destination.localizedLabel(),
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            },
                         )
                     },
                     label = { Text(destination.localizedLabel()) },
@@ -902,6 +933,9 @@ private fun MainNavigationSuite(
                     onDeleteFoodImmediately = onDeleteFoodImmediately,
                     onUndoDeleteFood = onUndoDeleteFood,
                     onDiscardDeletedFood = onDiscardDeletedFood,
+                    onDuplicateFood = onDuplicateFood,
+                    onFavoriteFood = onFavoriteFood,
+                    onEditFoodAmount = onEditFoodAmount,
                     editedEntryId = editedEntryId,
                     onEditEntryText = viewModel::editEntryTextInline,
                     onTextChanged = onLoggingTextChanged,
@@ -924,32 +958,34 @@ private fun MainNavigationSuite(
                 val progressState by viewModel.progressState.collectAsStateWithLifecycle()
                 ProgressScreen(
                     state = progressState,
-                    onRangeChanged = onProgressRange,
-                    onAddWeight = onAddWeight,
+                    onRangeChanged = { haptics.toggled(); onProgressRange(it) },
+                    onAddWeight = { haptics.selected(); onAddWeight() },
                 )
             }
                     MainDestination.SETTINGS -> {
                 val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
                 SettingsScreen(
                     state = settingsState,
-                    onThemeModeChanged = onTheme,
-                    onDynamicColorChanged = onDynamicColor,
-                    onLanguageChanged = onLanguage,
-                    onUnitSystemChanged = onUnits,
-                    onActivityTargetAdjustmentChanged = onActivityAdjustment,
-                    onProfile = onProfile,
-                    onNutrition = onNutrition,
-                    onMicronutrients = onMicronutrients,
-                    onAiProvider = onAiProvider,
-                    onAiRequestTimeoutDisabledChanged = onAiRequestTimeoutDisabled,
-                    onHealthConnect = onHealth,
-                    onReminderChanged = onReminder,
-                    onCalorieEstimateBiasChanged = onCalorieEstimateBias,
-                    onGoalsCardStyleChanged = onGoalsCardStyle,
-                    onReminderTimeChanged = onReminderTime,
-                    onExport = onExport,
-                    onImport = onImport,
-                    onDeveloper = onDeveloper,
+                    onThemeModeChanged = { haptics.toggled(); onTheme(it) },
+                    onDynamicColorChanged = { haptics.toggled(); onDynamicColor(it) },
+                    onLanguageChanged = { haptics.toggled(); onLanguage(it) },
+                    onUnitSystemChanged = { haptics.toggled(); onUnits(it) },
+                    onActivityTargetAdjustmentChanged = { haptics.toggled(); onActivityAdjustment(it) },
+                    onProfile = { haptics.selected(); onProfile() },
+                    onNutrition = { haptics.selected(); onNutrition() },
+                    onMicronutrients = { haptics.selected(); onMicronutrients() },
+                    onAiProvider = { haptics.selected(); onAiProvider(it) },
+                    onAiRequestTimeoutDisabledChanged = { haptics.toggled(); onAiRequestTimeoutDisabled(it) },
+                    onHealthConnect = { haptics.selected(); onHealth() },
+                    onReminderChanged = { index, enabled -> haptics.toggled(); onReminder(index, enabled) },
+                    onCalorieEstimateBiasChanged = { haptics.toggled(); onCalorieEstimateBias(it) },
+                    onGoalsCardStyleChanged = { haptics.toggled(); onGoalsCardStyle(it) },
+                    onReminderTimeChanged = { index, hour, minute ->
+                        haptics.confirmed(); onReminderTime(index, hour, minute)
+                    },
+                    onExport = { haptics.selected(); onExport() },
+                    onImport = { haptics.selected(); onImport() },
+                    onDeveloper = { haptics.selected(); onDeveloper() },
                 )
                     }
                 }

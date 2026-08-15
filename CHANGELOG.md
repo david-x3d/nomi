@@ -1,5 +1,23 @@
 # Changelog
 
+## Nomi v1.8 — 2026-08-15
+
+### Nomi feels more responsive
+
+- Added meaningful haptic feedback across navigation, date changes, settings, capture actions, submitting, saving, errors, swipe-to-delete, Undo and quick actions.
+- Frequently used circular actions now press inward and spring back, while the selected destination icon responds with a small expressive lift.
+- Barcode recognition now confirms itself with haptic feedback and a green scan frame that remains visible briefly before the amount sheet opens.
+- Holding a food on Today opens quick actions to duplicate it, change its amount, save it as a favorite or delete it.
+- Food analysis now shows the current step — understanding the meal, finding nutrition, checking portions or putting the result together — with live progress and source icons.
+- Compact Today actions now explain themselves with tooltips.
+- Empty days now offer a friendly, concrete logging example in every supported language.
+
+### Verification
+
+- 393 unit tests passed with no failures, errors or skipped tests.
+- Android lint and the signed release build passed.
+- APK SHA-256: `D619B6A40750C3FD7606433DBB5808E27A3CE5B66C324EA9940A83F8CAE9A179`
+
 ## Nomi v1.7.1 — 2026-08-13
 
 ### "Complete permissions" works again

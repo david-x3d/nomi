@@ -34,6 +34,17 @@ internal val todayTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Tryck nedan för att logga din första måltid",
         tr = "İlk öğününü kaydetmek için aşağıya dokun",
     ),
+    "For example: 2 rolls with cheese" to NomiTranslation(
+        de = "Zum Beispiel: 2 Brötchen mit Käse",
+        es = "Por ejemplo: 2 panecillos con queso",
+        fr = "Par exemple : 2 petits pains au fromage",
+        it = "Per esempio: 2 panini con formaggio",
+        nl = "Bijvoorbeeld: 2 broodjes met kaas",
+        pt = "Por exemplo: 2 pães com queijo",
+        sq = "Për shembull: 2 simite me djathë",
+        sv = "Till exempel: 2 frallor med ost",
+        tr = "Örneğin: peynirli 2 küçük ekmek",
+    ),
     "Undo" to NomiTranslation(
         de = "Rückgängig", es = "Deshacer", fr = "Annuler", it = "Annulla", nl = "Ongedaan maken",
         pt = "Anular", sq = "Zhbëj", sv = "Ångra", tr = "Geri al",

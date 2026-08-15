@@ -41,6 +41,11 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Favorit", es = "Favorito", fr = "Favori", it = "Preferito", nl = "Favoriet",
         pt = "Favorito", sq = "I preferuar", sv = "Favorit", tr = "Favori",
     ),
+    "Quick actions" to NomiTranslation(
+        de = "Schnellaktionen", es = "Acciones rápidas", fr = "Actions rapides",
+        it = "Azioni rapide", nl = "Snelle acties", pt = "Ações rápidas",
+        sq = "Veprime të shpejta", sv = "Snabbåtgärder", tr = "Hızlı işlemler",
+    ),
     "Back" to NomiTranslation(
         de = "Zurück", es = "Atrás", fr = "Retour", it = "Indietro", nl = "Terug",
         pt = "Voltar", sq = "Prapa", sv = "Tillbaka", tr = "Geri",

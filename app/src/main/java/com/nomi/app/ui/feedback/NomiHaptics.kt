@@ -18,8 +18,17 @@ import androidx.compose.ui.platform.LocalHapticFeedback
  */
 @Immutable
 class NomiHaptics(private val feedback: HapticFeedback) {
+    /** A normal button, row or navigation destination was pressed. */
+    fun tapped() = feedback.performHapticFeedback(HapticFeedbackType.VirtualKey)
+
     /** A writing surface or compact action was deliberately opened. */
     fun selected() = feedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+
+    /** A switch, chip or discrete slider stop changed value. */
+    fun toggled() = feedback.performHapticFeedback(HapticFeedbackType.ToggleOn)
+
+    /** Holding a food row opened its quick actions. */
+    fun held() = feedback.performHapticFeedback(HapticFeedbackType.LongPress)
 
     /** A meal was handed over to be researched. */
     fun sent() = feedback.performHapticFeedback(HapticFeedbackType.SegmentTick)
