@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -673,11 +674,30 @@ private fun NotesHeader(
     val datePattern = nomiString("EEEE, MMMM d")
     val spatialSpec = nomiPageMotionSpec<IntOffset>()
     val effectsSpec = nomiFadeMotionSpec<Float>()
+    val foxHalo by animateColorAsState(
+        targetValue = when (foxMood) {
+            NomiFoxMood.RESTING -> MaterialTheme.colorScheme.secondaryContainer
+            NomiFoxMood.CURIOUS -> MaterialTheme.colorScheme.tertiaryContainer
+            NomiFoxMood.SETTLED -> MaterialTheme.colorScheme.primaryContainer
+            NomiFoxMood.CONCERNED -> MaterialTheme.colorScheme.errorContainer
+        },
+        animationSpec = tween(durationMillis = 420),
+        label = "Nomi mood halo",
+    )
+    val headerBrush = Brush.verticalGradient(
+        colors = listOf(
+            foxHalo.copy(alpha = 0.24f),
+            MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+    )
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         tonalElevation = 0.dp,
     ) {
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Box(
+            modifier = Modifier.fillMaxWidth().background(headerBrush),
+            contentAlignment = Alignment.TopCenter,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -695,20 +715,31 @@ private fun NotesHeader(
                     Row(
                         modifier = Modifier.align(Alignment.CenterStart),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        NomiFox(mood = foxMood)
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(foxHalo.copy(alpha = 0.58f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            NomiFox(mood = foxMood, size = 42.dp)
+                        }
                         Text(
                             text = "Nomi",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
 
                     Surface(
                         onClick = onToday,
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 1.dp,
+                        border = hairlineOnPitchBlack(),
                         modifier = Modifier
                             .sizeIn(minWidth = 72.dp, minHeight = 48.dp)
                             .animateContentSize(),
@@ -1218,6 +1249,15 @@ private fun NotesFoodRow(
         DropdownMenu(
             expanded = showQuickActions,
             onDismissRequest = { showQuickActions = false },
+            // A context menu belongs to the touched row, not to the page's left edge. Anchoring
+            // its popup at the row's trailing centre lets it float beside the content while the
+            // position provider still keeps it safely inside narrow screens.
+            modifier = Modifier.align(Alignment.CenterEnd),
+            offset = DpOffset(x = (-12).dp, y = 0.dp),
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            shadowElevation = 14.dp,
         ) {
             DropdownMenuItem(
                 text = { Text(nomiString("Duplicate")) },
@@ -1938,160 +1978,173 @@ private fun NotesFloatingActionRow(
         },
         label = "dictation row",
     ) { listening ->
-        Row(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            shape = RoundedCornerShape(32.dp),
+            color = lerp(
+                MaterialTheme.colorScheme.surfaceContainerLow,
+                MaterialTheme.colorScheme.primaryContainer,
+                0.08f,
+            ),
+            border = hairlineOnPitchBlack(),
+            tonalElevation = 2.dp,
+            shadowElevation = 8.dp,
         ) {
-            if (listening) {
-                NotesPill(modifier = Modifier.weight(1f)) {
-                    DictationPillContent(dictation)
-                }
-                NotesCircleAction(
-                    icon = Icons.Default.Check,
-                    description = nomiString("Done speaking"),
-                    onClick = onDictationDone,
-                    emphasized = true,
-                )
-                NotesCircleAction(
-                    icon = Icons.Default.Close,
-                    description = nomiString("Discard dictation"),
-                    onClick = dictation.cancel,
-                )
-            } else {
-                NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = NomiIcons.Flame,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = calorieText,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        // What movement burned today, kept beside the plate rather than folded
-                        // into it. The eaten figure has to stay the eaten figure.
-                        state.activeCaloriesKcal?.let { burned ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (listening) {
+                    NotesPill(modifier = Modifier.weight(1f)) {
+                        DictationPillContent(dictation)
+                    }
+                    NotesCircleAction(
+                        icon = Icons.Default.Check,
+                        description = nomiString("Done speaking"),
+                        onClick = onDictationDone,
+                        emphasized = true,
+                    )
+                    NotesCircleAction(
+                        icon = Icons.Default.Close,
+                        description = nomiString("Discard dictation"),
+                        onClick = dictation.cancel,
+                    )
+                } else {
+                    NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Icon(
-                                imageVector = NomiIcons.Runner,
-                                contentDescription = nomiString("Burned through activity"),
+                                imageVector = NomiIcons.Flame,
+                                contentDescription = null,
                                 modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.tertiary,
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                             Text(
-                                text = "${burned.roundToInt().formatted(locale)} kcal",
+                                text = calorieText,
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            // What movement burned today, kept beside the plate rather than folded
+                            // into it. The eaten figure has to stay the eaten figure.
+                            state.activeCaloriesKcal?.let { burned ->
+                                Icon(
+                                    imageVector = NomiIcons.Runner,
+                                    contentDescription = nomiString("Burned through activity"),
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.tertiary,
+                                )
+                                Text(
+                                    text = "${burned.roundToInt().formatted(locale)} kcal",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
-                }
-                NotesCircleAction(
-                    icon = Icons.Default.Mic,
-                    description = nomiString("Describe food by voice"),
-                    onClick = onVoice,
-                )
-                Box {
                     NotesCircleAction(
-                        icon = Icons.Default.CameraAlt,
-                        description = nomiString("Photo"),
-                        onClick = {
-                            showLibraryMenu = false
-                            showCameraMenu = true
-                        },
+                        icon = Icons.Default.Mic,
+                        description = nomiString("Describe food by voice"),
+                        onClick = onVoice,
                     )
-                    DropdownMenu(
-                        expanded = showCameraMenu,
-                        onDismissRequest = { showCameraMenu = false },
-                        offset = DpOffset(x = (-8).dp, y = (-8).dp),
-                        shape = RoundedCornerShape(24.dp),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) {
-                        CompactActionMenuItem(
+                    Box {
+                        NotesCircleAction(
                             icon = Icons.Default.CameraAlt,
-                            label = nomiString("Photo"),
+                            description = nomiString("Photo"),
                             onClick = {
-                                showCameraMenu = false
-                                onCameraMethod(AddFoodMethod.PHOTO)
+                                showLibraryMenu = false
+                                showCameraMenu = true
                             },
                         )
-                        CompactActionMenuItem(
-                            icon = Icons.Default.QrCodeScanner,
-                            label = nomiString("Barcode"),
-                            onClick = {
-                                showCameraMenu = false
-                                onCameraMethod(AddFoodMethod.BARCODE)
-                            },
-                        )
-                        CompactActionMenuItem(
-                            icon = Icons.Default.RestaurantMenu,
-                            label = nomiString("Scan menu"),
-                            onClick = {
-                                showCameraMenu = false
-                                onCameraMethod(AddFoodMethod.MENU)
-                            },
-                        )
-                        CompactActionMenuItem(
-                            icon = Icons.Default.PhotoLibrary,
-                            label = nomiString("Choose a photo"),
-                            onClick = {
-                                showCameraMenu = false
-                                onChoosePhoto()
-                            },
-                        )
+                        DropdownMenu(
+                            expanded = showCameraMenu,
+                            onDismissRequest = { showCameraMenu = false },
+                            offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            CompactActionMenuItem(
+                                icon = Icons.Default.CameraAlt,
+                                label = nomiString("Photo"),
+                                onClick = {
+                                    showCameraMenu = false
+                                    onCameraMethod(AddFoodMethod.PHOTO)
+                                },
+                            )
+                            CompactActionMenuItem(
+                                icon = Icons.Default.QrCodeScanner,
+                                label = nomiString("Barcode"),
+                                onClick = {
+                                    showCameraMenu = false
+                                    onCameraMethod(AddFoodMethod.BARCODE)
+                                },
+                            )
+                            CompactActionMenuItem(
+                                icon = Icons.Default.RestaurantMenu,
+                                label = nomiString("Scan menu"),
+                                onClick = {
+                                    showCameraMenu = false
+                                    onCameraMethod(AddFoodMethod.MENU)
+                                },
+                            )
+                            CompactActionMenuItem(
+                                icon = Icons.Default.PhotoLibrary,
+                                label = nomiString("Choose a photo"),
+                                onClick = {
+                                    showCameraMenu = false
+                                    onChoosePhoto()
+                                },
+                            )
+                        }
                     }
-                }
-                Box {
-                    NotesCircleAction(
-                        icon = Icons.Default.Add,
-                        description = nomiString("More ways to add food"),
-                        onClick = {
-                            showCameraMenu = false
-                            showLibraryMenu = true
-                        },
-                    )
-                    DropdownMenu(
-                        expanded = showLibraryMenu,
-                        onDismissRequest = { showLibraryMenu = false },
-                        offset = DpOffset(x = (-8).dp, y = (-8).dp),
-                        shape = RoundedCornerShape(24.dp),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ) {
-                        CompactActionMenuItem(
-                            icon = Icons.Default.History,
-                            label = nomiString("Recent"),
+                    Box {
+                        NotesCircleAction(
+                            icon = Icons.Default.Add,
+                            description = nomiString("More ways to add food"),
                             onClick = {
-                                showLibraryMenu = false
-                                onLibraryMethod(AddFoodMethod.RECENT)
+                                showCameraMenu = false
+                                showLibraryMenu = true
                             },
                         )
-                        CompactActionMenuItem(
-                            icon = Icons.Default.FavoriteBorder,
-                            label = nomiString("Favorites"),
-                            onClick = {
-                                showLibraryMenu = false
-                                onLibraryMethod(AddFoodMethod.FAVORITES)
-                            },
-                        )
-                        CompactActionMenuItem(
-                            icon = Icons.Default.RestaurantMenu,
-                            label = nomiString("Saved meals"),
-                            onClick = {
-                                showLibraryMenu = false
-                                onLibraryMethod(AddFoodMethod.SAVED_MEALS)
-                            },
-                        )
+                        DropdownMenu(
+                            expanded = showLibraryMenu,
+                            onDismissRequest = { showLibraryMenu = false },
+                            offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            CompactActionMenuItem(
+                                icon = Icons.Default.History,
+                                label = nomiString("Recent"),
+                                onClick = {
+                                    showLibraryMenu = false
+                                    onLibraryMethod(AddFoodMethod.RECENT)
+                                },
+                            )
+                            CompactActionMenuItem(
+                                icon = Icons.Default.FavoriteBorder,
+                                label = nomiString("Favorites"),
+                                onClick = {
+                                    showLibraryMenu = false
+                                    onLibraryMethod(AddFoodMethod.FAVORITES)
+                                },
+                            )
+                            CompactActionMenuItem(
+                                icon = Icons.Default.RestaurantMenu,
+                                label = nomiString("Saved meals"),
+                                onClick = {
+                                    showLibraryMenu = false
+                                    onLibraryMethod(AddFoodMethod.SAVED_MEALS)
+                                },
+                            )
+                        }
                     }
                 }
             }

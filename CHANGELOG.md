@@ -1,5 +1,24 @@
 # Changelog
 
+## Nomi v1.9 Beta 1 — 2026-08-15
+
+### A calmer, more distinct Today page
+
+- Refreshed the Today header with a soft dynamic-colour wash that follows Nomi's current state without judging the day.
+- Gave the Nomi fox a subtle matching halo and strengthened the wordmark while keeping the header compact.
+- Turned the bottom actions into one elevated floating dock, preserving the familiar calorie, voice, camera and library controls.
+- Moved food quick actions away from the screen's left edge: the rounded menu now floats beside the entry that was held.
+- Kept the existing notes-first layout, gestures, source states, dynamic colour, dark theme and pitch-black adaptation intact.
+
+### Beta note
+
+- This prerelease is intentionally a visual and interaction preview. It does not change saved nutrition data or provider behaviour.
+
+### Verification
+
+- 393 unit tests, Android lint and the signed prerelease build passed.
+- APK SHA-256: `CDA2E2E5B1C0B10A52B86782A3F43DEDA246B88871DD930DDA63C506862430F7`
+
 ## Nomi v1.8 — 2026-08-15
 
 ### Nomi feels more responsive
