@@ -200,6 +200,7 @@ internal fun BackupFoodLogV1.toEntity(): FoodLogEntity = FoodLogEntity(
     foodServingId = foodServingId,
     nutritionSourceId = nutritionSourceId,
     entryGroupId = entryGroupId,
+    originalInput = originalInput,
     mealCategory = mealCategory,
     displayNameSnapshot = displayNameSnapshot,
     brandSnapshot = brandSnapshot,

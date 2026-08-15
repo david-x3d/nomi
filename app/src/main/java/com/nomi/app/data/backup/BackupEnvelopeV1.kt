@@ -214,6 +214,7 @@ data class BackupFoodLogV1(
     val foodServingId: Long? = null,
     val nutritionSourceId: Long? = null,
     val entryGroupId: String? = null,
+    val originalInput: String? = null,
     val mealCategory: String,
     val displayNameSnapshot: String,
     val brandSnapshot: String? = null,

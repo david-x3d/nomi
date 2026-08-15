@@ -187,6 +187,7 @@ private fun Cursor.readFoodLog(): BackupFoodLogV1 = BackupFoodLogV1(
     foodServingId = nullableLong("food_serving_id"),
     nutritionSourceId = nullableLong("nutrition_source_id"),
     entryGroupId = nullableString("entry_group_id"),
+    originalInput = nullableString("original_input"),
     mealCategory = string("meal_category"),
     displayNameSnapshot = string("display_name_snapshot"),
     brandSnapshot = nullableString("brand_snapshot"),

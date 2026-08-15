@@ -153,6 +153,8 @@ data class TodayFoodEntry(
     val calorieExplanation: String? = null,
     /** Individual logs that make up a combined meal shown as one row on the Today page. */
     val groupItems: List<TodayFoodEntry> = emptyList(),
+    /** Exact sentence used to create the entry, persisted so it can be rewritten later. */
+    val originalInput: String? = null,
     /** Briefly present after auto-save so the written sentence can resolve into its short label. */
     val revealText: String? = null,
 )
@@ -162,11 +164,17 @@ data class TodayFoodEntry(
  * was written rather than from a stripped-down display name. Amount and brand are included
  * because the re-run research needs them to identify the same food again.
  */
-fun TodayFoodEntry.reeditableText(): String = listOfNotNull(
-    editableAmount(),
-    editableName(),
-    editableBrand(),
-).joinToString(" ")
+fun TodayFoodEntry.reeditableText(): String {
+    originalInput?.trim()?.takeIf(String::isNotBlank)?.let { return it }
+    if (groupItems.size > 1) {
+        return groupItems.joinToString(", ") { item -> item.reeditableText() }
+    }
+    return listOfNotNull(
+        editableAmount(),
+        editableName(),
+        editableBrand(),
+    ).joinToString(" ")
+}
 
 /** Separator between a food and its brand on the row, as one string so taps can skip it. */
 const val BRAND_SEPARATOR = " · "

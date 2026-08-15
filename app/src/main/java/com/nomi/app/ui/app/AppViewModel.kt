@@ -503,7 +503,7 @@ class AppViewModel(
         val text = entry.reeditableText()
         lastLoggingText = text
         mutableEditedEntryId.value = entry.id
-        mutableLoggingState.value = FoodLoggingUiState.Input(text, defaultMealCategory())
+        mutableLoggingState.value = FoodLoggingUiState.Input(text, entry.mealCategory)
     }
 
     fun updateLoggingMealCategory(category: MealCategory) {
@@ -1023,7 +1023,7 @@ class AppViewModel(
                     val validated = ServingNutritionNormalizer.validateBeforeSave(analysis)
                     val logs = validated.items.map { item ->
                         val foodId = if (grouped) null else cacheAnalyzedFood(item)
-                        item.toLog(category, "ai", consultedUrls).copy(
+                        item.toLog(category, "ai", consultedUrls, originalText).copy(
                             foodId = foodId,
                             entryGroupId = revealGroupId,
                         )
@@ -1033,7 +1033,7 @@ class AppViewModel(
                     // The rewritten entry exists now, so the one it replaces can go.
                     mutableEditedEntryId.value?.let { replaced ->
                         mutableEditedEntryId.value = null
-                        runCatching { repository.deleteLog(replaced) }
+                        runCatching { repository.deleteLogsForUndo(replaced) }
                     }
                     lastLoggingText = ""
                     dismissPortionEdit()
@@ -1456,7 +1456,7 @@ class AppViewModel(
                     // The rewritten entry exists now, so the one it replaces can go.
                     mutableEditedEntryId.value?.let { replaced ->
                         mutableEditedEntryId.value = null
-                        runCatching { repository.deleteLog(replaced) }
+                        runCatching { repository.deleteLogsForUndo(replaced) }
                     }
                     lastLoggingText = ""
                     dismissPortionEdit()
@@ -2768,6 +2768,7 @@ class AppViewModel(
                 citedSourceUrls = items.flatMap(TodayFoodEntry::citedSourceUrls).distinct(),
                 confidence = items.mapNotNull(TodayFoodEntry::confidence).minOrNull(),
                 groupItems = items,
+                originalInput = first.originalInput,
                 revealText = first.revealText,
             )
         }
@@ -2856,6 +2857,7 @@ class AppViewModel(
         sourceServingQuantity = sourceSnapshot.servingQuantity,
         sourceServingUnit = sourceSnapshot.servingUnit,
         calorieExplanation = sourceSnapshot.calorieExplanation,
+        originalInput = originalInput,
         revealText = revealText,
     )
 
@@ -2863,6 +2865,7 @@ class AppViewModel(
         category: MealCategory,
         inputMethod: String,
         consultedUrls: List<String> = emptyList(),
+        originalInput: String? = null,
     ): FoodLogEntity {
         val now = System.currentTimeMillis()
         val enteredServingUnit = quantityResolution?.enteredUnit
@@ -2907,6 +2910,7 @@ class AppViewModel(
             ),
             isEstimated = isEstimate,
             inputMethod = inputMethod,
+            originalInput = originalInput?.trim()?.takeIf(String::isNotBlank),
             localDate = selectedDate.value.toString(),
             loggedAtEpochMillis = now,
             zoneId = zoneId.id,

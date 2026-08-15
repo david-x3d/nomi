@@ -67,6 +67,38 @@ class ReeditableCaretTest {
         assertEquals(6, entry.reeditableCaretForDescription(-5))
     }
 
+    @Test
+    fun `grouped meal reopens the exact sentence that created it`() {
+        val original = "Protein Wrap, Thunfisch, Mozzarella und Tomate, Frito"
+        val grouped = entry(name = "Protein Wrap mit Thunfisch", brand = null, amountText = "")
+            .copy(
+                originalInput = original,
+                groupItems = listOf(
+                    entry(name = "Protein Wrap", brand = null, amountText = "1 Stück"),
+                    entry(name = "Thunfisch", brand = null, amountText = "120 g"),
+                ),
+            )
+
+        assertEquals(original, grouped.reeditableText())
+    }
+
+    @Test
+    fun `older grouped meal rebuilds editable text from every item`() {
+        val grouped = entry(name = "Protein Wrap mit Thunfisch", brand = null, amountText = "")
+            .copy(
+                groupItems = listOf(
+                    entry(name = "Protein Wrap", brand = null, amountText = "1 Stück"),
+                    entry(name = "Thunfisch", brand = null, amountText = "120 g"),
+                    entry(name = "Mozzarella", brand = null, amountText = "80 g"),
+                ),
+            )
+
+        assertEquals(
+            "1 Stück Protein Wrap, 120 g Thunfisch, 80 g Mozzarella",
+            grouped.reeditableText(),
+        )
+    }
+
     private fun entry(name: String, brand: String?, amountText: String) = TodayFoodEntry(
         id = 1L,
         name = name,

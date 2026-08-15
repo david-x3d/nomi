@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v2.0.1 — 2026-08-15
+
+### Rewrite complete grouped meals
+
+- Tapping the name of a grouped meal now opens it for inline editing, just like a single food; calories still open nutrition details.
+- Nomi stores the exact typed or dictated sentence behind new entries, so a meal such as `Protein Wrap, Thunfisch, Mozzarella und Tomate, Frito` reopens with those words intact.
+- Older grouped meals remain editable by rebuilding a sentence from every stored item and amount.
+- Saving a rewritten group replaces all of its previous items, preventing stale ingredients from remaining in the day.
+- The original meal category is preserved while rewriting.
+- Backups now carry the original input, and database migration 5→6 preserves all existing history.
+
+### Verification
+
+- 397 unit tests passed with no failures, errors or skipped tests.
+- Android lint and the signed stable build passed.
+- APK SHA-256: `895E7E6A7E5B4A4B20DF88D7211BE0B38174801263F7EE0854D3D44FA31E9588`
+
 ## Nomi v2.0 — 2026-08-15
 
 ### A more responsive, polished Nomi

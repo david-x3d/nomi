@@ -46,6 +46,8 @@ data class FoodLogEntity(
     @ColumnInfo(name = "food_serving_id") val foodServingId: Long? = null,
     @ColumnInfo(name = "nutrition_source_id") val nutritionSourceId: Long? = null,
     @ColumnInfo(name = "entry_group_id") val entryGroupId: String? = null,
+    /** Exact typed or dictated sentence that produced this log, shared by grouped items. */
+    @ColumnInfo(name = "original_input") val originalInput: String? = null,
     @ColumnInfo(name = "meal_category") val mealCategory: String,
     @ColumnInfo(name = "display_name_snapshot") val displayNameSnapshot: String,
     @ColumnInfo(name = "brand_snapshot") val brandSnapshot: String? = null,

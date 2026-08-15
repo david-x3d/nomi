@@ -883,8 +883,7 @@ private fun SwipeToDeleteFoodRow(
 ) {
     val deleteLabel = nomiFormat("Delete {0}", entry.name)
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
-    val isGrouped = entry.groupItems.size > 1
-    val editLabel = if (isGrouped) detailsLabel else nomiFormat("Rewrite {0}", entry.name)
+    val editLabel = nomiFormat("Rewrite {0}", entry.name)
     val haptics = rememberNomiHaptics()
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
@@ -950,8 +949,7 @@ private fun SwipeToDeleteFoodRow(
         modifier = Modifier.semantics {
             customActions = listOf(
                 CustomAccessibilityAction(label = editLabel) {
-                    if (isGrouped) onOpenDetails()
-                    else onEditText(entry.reeditableText().length)
+                    onEditText(entry.reeditableText().length)
                     true
                 },
                 CustomAccessibilityAction(label = detailsLabel) {
@@ -1122,7 +1120,7 @@ private fun NotesFoodRow(
     val amountDisplay = entry.quantityDisplay(locale).withContext
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
     val writeLabel = nomiFormat("Rewrite {0}", entry.name)
-    val primaryClickLabel = if (isGrouped) detailsLabel else writeLabel
+    val primaryClickLabel = writeLabel
     val summaryProgress = summarySweep.value
     val summaryActive = originalDescription != null && !showOriginal && summaryProgress < 1.34f
     val calorieProgress = calorieSweep.value
@@ -1143,8 +1141,7 @@ private fun NotesFoodRow(
                         showQuickActions = true
                     },
                     onClick = {
-                        if (isGrouped) onOpenDetails()
-                        else onEditText(entry.reeditableText().length)
+                        onEditText(entry.reeditableText().length)
                     },
                 )
                 .heightIn(min = 64.dp)
@@ -1178,7 +1175,7 @@ private fun NotesFoodRow(
                                 },
                                 onTap = { position ->
                                     if (isGrouped) {
-                                        onOpenDetails()
+                                        onEditText(entry.reeditableText().length)
                                     } else {
                                         val tapped = descriptionLayout
                                             ?.getOffsetForPosition(position) ?: description.length

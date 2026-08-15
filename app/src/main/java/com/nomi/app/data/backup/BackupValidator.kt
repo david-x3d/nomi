@@ -235,6 +235,7 @@ object BackupValidator {
                 if (it !in sourceIds) issue("$path.nutritionSourceId", "unknown nutrition source")
             }
             validateText(row.entryGroupId, "$path.entryGroupId", issues, max = 200)
+            validateText(row.originalInput, "$path.originalInput", issues, max = 4_000)
             validateText(row.mealCategory, "$path.mealCategory", issues, max = 100)
             validateText(row.displayNameSnapshot, "$path.displayNameSnapshot", issues)
             validateText(row.brandSnapshot, "$path.brandSnapshot", issues)
