@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v2.0 — 2026-08-15
+
+### A more responsive, polished Nomi
+
+- Promoted the complete Nomi 1.9 beta experience to the stable 2.0 release.
+- Refreshed Today with a soft dynamic-colour header, a subtle fox halo and an elevated floating action dock.
+- Food quick actions now float beside the entry that was held instead of against the screen edge.
+- Added meaningful haptic feedback and press animations across the app's most important interactions.
+- Multi-item inputs name the actual researched foods: `250g tenderloin 120g pommes und ein red bull` appears as `Tenderloin mit Pommes und Red Bull`.
+- Corrected item names, localized conjunctions and punctuation make grouped meals easier to read while preserving individual amounts and nutrition details.
+
+### Verification
+
+- 395 unit tests passed with no failures, errors or skipped tests.
+- Android lint and the signed stable build passed.
+- APK SHA-256: `D5FBC66B31B8D22FFB093104105FEB60D8AE5A1BBA40B7951410E3D9EBD5E9AE`
+
 ## Nomi v1.9 Beta 2 — 2026-08-15
 
 ### Meal titles say what you logged
