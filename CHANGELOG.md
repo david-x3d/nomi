@@ -1,5 +1,21 @@
 # Changelog
 
+## Nomi v1.9 Beta 2 — 2026-08-15
+
+### Meal titles say what you logged
+
+- Multi-item inputs now keep the actual researched foods in the Today title instead of collapsing them into a generic menu name.
+- For example, `250g tenderloin 120g pommes und ein red bull` appears as `Tenderloin mit Pommes und Red Bull`.
+- Item names use the provider's corrected spelling and are joined with localized words and punctuation.
+- Amounts, nutrition and sources remain attached to each individual item in the meal details.
+- The visual and interaction refinements from Beta 1 remain included.
+
+### Verification
+
+- 395 unit tests passed with no failures, errors or skipped tests.
+- Android lint and the signed prerelease build passed.
+- APK SHA-256: `69641F93F12B33DC25902A792B8F0567E51469DFA95A96D618A5332BCA480DD4`
+
 ## Nomi v1.9 Beta 1 — 2026-08-15
 
 ### A calmer, more distinct Today page

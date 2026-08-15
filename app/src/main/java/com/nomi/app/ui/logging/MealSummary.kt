@@ -5,7 +5,6 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.NutritionVerificationStatus
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.NomiTranslations
-import java.util.Locale
 
 /**
  * Turns a researched multi-part order into the one line the person originally intended to log.
@@ -15,26 +14,8 @@ import java.util.Locale
 internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalysis {
     if (items.size <= 1) return this
 
-    val commonBrand = items.mapNotNull { it.brand?.trim()?.takeIf(String::isNotBlank) }
-        .groupingBy { it.lowercase(Locale.ROOT) }
-        .eachCount()
-        .maxByOrNull(Map.Entry<String, Int>::value)
-        ?.key
-        ?.let { normalized -> items.firstNotNullOf { item ->
-            item.brand?.trim()?.takeIf { it.lowercase(Locale.ROOT) == normalized }
-        } }
-    // The logged unit and the name suffix are the same word, so "1 Menü" reads as the thing the
-    // row is called. Only its capitalization differs, which each language decides for itself.
     val unitWord = NomiTranslations.translate("meal", language)
-    val suffix = unitWord.replaceFirstChar { it.uppercase(language.locale) }
-    val firstName = items.first().name.trim()
-        .ifBlank { NomiTranslations.translate("Meal", language) }
-    val baseName = commonBrand ?: firstName
-    // "McDonald's Menu" must not become "McDonald's Menu Meal". English and German are checked
-    // alongside the active language because brand names carry those words in every market.
-    val alreadyNamedAsMeal = listOf(suffix, "menu", "meal", "menü")
-        .any { word -> baseName.endsWith(word, ignoreCase = true) }
-    val displayName = if (alreadyNamedAsMeal) baseName else "$baseName $suffix"
+    val displayName = groupedMealTitle(items.map(AnalyzedFoodItem::name), language)
 
     val verification = when {
         items.all { it.verificationStatus == NutritionVerificationStatus.VERIFIED } ->
@@ -85,6 +66,43 @@ internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalys
         ),
         overallConfidence = overallConfidence,
     )
+}
+
+/**
+ * Names every researched part instead of inventing a generic menu label.
+ *
+ * The provider already returns corrected product names. This function only tidies whitespace,
+ * gives the sentence its initial capital and joins the names naturally in the selected language.
+ * Quantities remain on the individual stored items and are still visible in meal details.
+ */
+internal fun groupedMealTitle(names: List<String>, language: NomiLanguage): String {
+    val cleaned = names.mapNotNull { raw ->
+        raw.trim()
+            .replace(Regex("\\s+"), " ")
+            .takeIf(String::isNotBlank)
+    }
+    if (cleaned.isEmpty()) return NomiTranslations.translate("Meal", language)
+    val sentenceStart = cleaned.first().replaceFirstChar { initial ->
+        if (initial.isLowerCase()) initial.titlecase(language.locale) else initial.toString()
+    }
+    if (cleaned.size == 1) return sentenceStart
+
+    val (withWord, andWord) = when (language) {
+        NomiLanguage.ENGLISH -> "with" to "and"
+        NomiLanguage.GERMAN -> "mit" to "und"
+        NomiLanguage.SPANISH -> "con" to "y"
+        NomiLanguage.FRENCH -> "avec" to "et"
+        NomiLanguage.ITALIAN -> "con" to "e"
+        NomiLanguage.DUTCH -> "met" to "en"
+        NomiLanguage.PORTUGUESE -> "com" to "e"
+        NomiLanguage.ALBANIAN -> "me" to "dhe"
+        NomiLanguage.SWEDISH -> "med" to "och"
+        NomiLanguage.TURKISH -> "ile" to "ve"
+    }
+    if (cleaned.size == 2) return "$sentenceStart $withWord ${cleaned[1]}"
+
+    val middle = cleaned.subList(1, cleaned.lastIndex).joinToString(", ")
+    return "$sentenceStart $withWord $middle $andWord ${cleaned.last()}"
 }
 
 private fun List<AnalyzedFoodItem>.sumOptional(

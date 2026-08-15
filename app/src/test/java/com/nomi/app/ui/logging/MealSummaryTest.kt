@@ -10,7 +10,7 @@ import org.junit.Test
 
 class MealSummaryTest {
     @Test
-    fun `multi-part branded order becomes one menu without losing totals`() {
+    fun `multi-part order names every item without losing totals`() {
         val analysis = FoodAnalysis(
             items = listOf(
                 item("Cheeseburger", "McDonald's", calories = 300.0, protein = 15.0, fiber = 2.0),
@@ -23,13 +23,35 @@ class MealSummaryTest {
 
         assertEquals(1, summarized.items.size)
         with(summarized.items.single()) {
-            assertEquals("McDonald's Menü", name)
+            assertEquals("Cheeseburger mit Pommes und Cola", name)
             assertEquals(780.0, calories, 0.0)
             assertEquals(19.0, proteinGrams, 0.0)
             assertEquals(6.0, fiberGrams ?: 0.0, 0.0)
             assertEquals("Menü", unit)
             assertNull(gramsEquivalent)
         }
+    }
+
+    @Test
+    fun `grouped title corrects spacing capitalization and German punctuation`() {
+        assertEquals(
+            "Tenderloin mit Pommes und Red Bull",
+            groupedMealTitle(
+                names = listOf("  tenderloin ", "Pommes", "Red Bull"),
+                language = NomiLanguage.GERMAN,
+            ),
+        )
+    }
+
+    @Test
+    fun `grouped title uses comma separated middle items`() {
+        assertEquals(
+            "Tenderloin with fries, ketchup and Red Bull",
+            groupedMealTitle(
+                names = listOf("Tenderloin", "fries", "ketchup", "Red Bull"),
+                language = NomiLanguage.ENGLISH,
+            ),
+        )
     }
 
     @Test

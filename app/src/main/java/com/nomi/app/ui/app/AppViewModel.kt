@@ -97,6 +97,7 @@ import com.nomi.app.ui.library.LibraryUiState
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.NomiTranslations
 import com.nomi.app.ui.logging.FoodLoggingUiState
+import com.nomi.app.ui.logging.groupedMealTitle
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.logging.PortionEditUiState
 import com.nomi.app.ui.profile.ProfileEdit
@@ -2744,21 +2745,7 @@ class AppViewModel(
             if (items.size == 1) return@map items.single()
 
             val first = items.first()
-            val mealWord = NomiTranslations.translate("meal", currentLanguage())
-            val commonBrand = items.mapNotNull { it.brand?.trim()?.takeIf(String::isNotBlank) }
-                .groupingBy { it.lowercase(Locale.ROOT) }
-                .eachCount()
-                .maxByOrNull(Map.Entry<String, Int>::value)
-                ?.key
-                ?.let { normalized ->
-                    items.firstNotNullOfOrNull {
-                        it.brand?.takeIf { brand -> brand.lowercase(Locale.ROOT) == normalized }
-                    }
-                }
-            val baseName = commonBrand ?: first.name
-            val alreadyNamedAsMeal = listOf(mealWord, "menu", "meal", "menü")
-                .any { word -> baseName.endsWith(word, ignoreCase = true) }
-            val title = if (alreadyNamedAsMeal) baseName else "$baseName $mealWord"
+            val title = groupedMealTitle(items.map(TodayFoodEntry::name), currentLanguage())
             TodayFoodEntry(
                 id = first.id,
                 name = title,
