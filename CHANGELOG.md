@@ -1,5 +1,17 @@
 # Changelog
 
+## Nomi v2.0.3 — 2026-08-16
+
+### The burned calories are no longer cut off
+
+- Writes "kcal" once for the pair in the Today action bar instead of after each number, so the burned figure fits beside the eaten one on a normal phone screen.
+- Drops the approximation sign from the walking estimate in the bar and sets both numbers in the same type and colour, so eaten and burned read as one pair.
+- Lets the pair wrap onto a second line on narrow screens or at large font sizes, so the burned calories move instead of being clipped to an ellipsis.
+- Keeps "kcal" on the eaten number when there is no activity figure beside it.
+- Gives both icons the same size and one shared centre line.
+- Leaves the goals sheet and the Health Connect screen unchanged, where the estimate keeps its "≈" and its "from steps" wording.
+- Names the eaten figure for screen readers in all ten supported interface languages.
+
 ## Nomi v2.0.2 — 2026-08-16
 
 ### Polished Material UI and personal step calories

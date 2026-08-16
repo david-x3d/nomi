@@ -35,6 +35,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -154,6 +156,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
@@ -1975,6 +1978,7 @@ private fun ManualDraftNote(
  * and the two actions become "done" and "forget it". Nothing opens on top of the day, because
  * the day is what the sentence is about.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NotesFloatingActionRow(
     state: TodayUiState,
@@ -1997,7 +2001,7 @@ private fun NotesFloatingActionRow(
         animationSpec = nomiProgressMotionSpec(),
         label = "calories consumed",
     )
-    val calorieText = "${animatedCalories.roundToInt().formatted(locale)} kcal"
+    val calorieValue = animatedCalories.roundToInt().formatted(locale)
     AnimatedContent(
         targetState = dictation.isActive,
         modifier = Modifier
@@ -2047,56 +2051,62 @@ private fun NotesFloatingActionRow(
                         onClick = dictation.cancel,
                     )
                 } else {
+                    val burnedCalories = state.effectiveBurnedCaloriesKcal
                     NotesPill(
                         modifier = Modifier
                             .weight(1f)
                             .semantics(mergeDescendants = true) {},
                         onClick = onGoals,
+                        // The pair needs every millimetre it can get beside the three round
+                        // actions, so the pill keeps a little less air around it than it does
+                        // when it holds a single figure or the waveform.
+                        contentPadding = if (burnedCalories == null) 18.dp else 14.dp,
                     ) {
-                        Row(
+                        // Eaten and burned are the same unit, so "kcal" is written once, after
+                        // the pair. Spelled out twice it did not fit, and the burned figure was
+                        // always the one clipped off the end. FlowRow keeps that promise when
+                        // the text is scaled up: the burned figure drops onto its own line
+                        // instead of being cut in half.
+                        FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            // Centred against each other rather than hung from the top of the
+                            // line, so the two icons sit on one axis whatever the numbers do.
+                            verticalArrangement = Arrangement.spacedBy(
+                                space = 2.dp,
+                                alignment = Alignment.CenterVertically,
+                            ),
                         ) {
-                            Icon(
-                                imageVector = NomiIcons.Flame,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                            CalorieFigure(
+                                modifier = Modifier.align(Alignment.CenterVertically),
+                                icon = NomiIcons.Flame,
+                                description = nomiString("Eaten"),
                                 tint = MaterialTheme.colorScheme.primary,
-                            )
-                            Text(
-                                text = calorieText,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                text = if (burnedCalories == null) {
+                                    "$calorieValue kcal"
+                                } else {
+                                    calorieValue
+                                },
                             )
                             // Health Connect activity wins when present; otherwise the same slot
                             // carries Nomi's visibly approximate step estimate. Neither changes
                             // the eaten figure beside it.
-                            state.effectiveBurnedCaloriesKcal?.let { burned ->
-                                Icon(
-                                    imageVector = NomiIcons.Runner,
-                                    contentDescription = nomiString(
+                            burnedCalories?.let { burned ->
+                                CalorieFigure(
+                                    modifier = Modifier.align(Alignment.CenterVertically),
+                                    icon = NomiIcons.Runner,
+                                    description = nomiString(
                                         if (state.burnedCaloriesAreEstimated) {
                                             "Estimated from steps"
                                         } else {
                                             "Burned through activity"
                                         },
                                     ),
-                                    modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.tertiary,
-                                )
-                                Text(
                                     text = if (state.burnedCaloriesAreEstimated) {
-                                        estimatedStepCaloriesText(burned, locale)
+                                        "${estimatedStepCaloriesValue(burned, locale)} kcal"
                                     } else {
                                         "${burned.roundToInt().formatted(locale)} kcal"
                                     },
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }
@@ -2253,11 +2263,50 @@ private fun CompactActionMenuItem(
     )
 }
 
+/**
+ * One figure in the calorie pill: an icon, its number, and nothing else.
+ *
+ * Eaten and burned are set in the same type and the same colour and read as two figures of
+ * equal standing. Only the icon beside each number says which is which.
+ */
+@Composable
+private fun CalorieFigure(
+    icon: ImageVector,
+    description: String,
+    tint: Color,
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            // Both icons keep the same size and sit on the same line: the quieter figure is
+            // told apart by its type and colour, not by a smaller symbol.
+            modifier = Modifier.size(18.dp),
+            tint = tint,
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
 /** The rounded slot on the left of the floating row, whatever happens to be inside it. */
 @Composable
 private fun NotesPill(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    contentPadding: Dp = 18.dp,
     content: @Composable () -> Unit,
 ) {
     val shape = CircleShape
@@ -2267,7 +2316,7 @@ private fun NotesPill(
         Box(
             modifier = Modifier
                 .heightIn(min = 48.dp)
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .padding(horizontal = contentPadding, vertical = 12.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             content()

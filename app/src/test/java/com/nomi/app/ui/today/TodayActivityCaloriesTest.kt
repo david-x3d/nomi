@@ -51,4 +51,12 @@ class TodayActivityCaloriesTest {
         assertEquals("< 5 kcal", estimatedStepCaloriesText(3.2, Locale.US))
         assertEquals("0 kcal", estimatedStepCaloriesText(0.0, Locale.US))
     }
+
+    @Test
+    fun `the pill spells the estimate as a plain rounded number`() {
+        assertEquals("250", estimatedStepCaloriesValue(248.1, Locale.US))
+        assertEquals("1,250", estimatedStepCaloriesValue(1_248.1, Locale.US))
+        assertEquals("< 5", estimatedStepCaloriesValue(3.2, Locale.US))
+        assertEquals("0", estimatedStepCaloriesValue(0.0, Locale.US))
+    }
 }
