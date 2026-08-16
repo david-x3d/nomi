@@ -184,6 +184,7 @@ fun NomiPickerField(
         } else {
             MaterialTheme.colorScheme.onSurface
         },
+        border = hairlineOnPitchBlack(),
     ) {
         Row(
             modifier = Modifier
@@ -195,8 +196,16 @@ fun NomiPickerField(
             leadingIcon?.let {
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = if (isError) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    contentColor = if (isError) {
+                        MaterialTheme.colorScheme.onError
+                    } else {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    },
                 ) {
                     Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
                         Icon(it, contentDescription = null, modifier = Modifier.size(22.dp))
@@ -207,22 +216,30 @@ fun NomiPickerField(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isError) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
                 Text(
                     text = value ?: placeholder,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (value == null) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                    color = when {
+                        isError -> MaterialTheme.colorScheme.onErrorContainer
+                        value == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                        else -> MaterialTheme.colorScheme.onSurface
                     },
                 )
             }
             Icon(
                 imageVector = trailingIcon,
                 contentDescription = trailingIconDescription,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isError) {
+                    MaterialTheme.colorScheme.onErrorContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
         }
     }

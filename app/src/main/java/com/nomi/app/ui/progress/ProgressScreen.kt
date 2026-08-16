@@ -12,7 +12,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,11 +43,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -60,6 +66,7 @@ import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
 import com.nomi.app.ui.theme.nomiLayoutMotionSpec
+import com.nomi.app.ui.theme.nomiPageContainerColor
 import com.nomi.app.ui.theme.nomiPageMotionSpec
 import com.nomi.app.ui.theme.nomiProgressMotionSpec
 import java.util.Locale
@@ -76,6 +83,10 @@ fun ProgressScreen(
     // The title collapses into the bar as you read down, which is what gives a Material screen
     // its sense of depth without adding a single element to it.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val pageContainerColor = nomiPageContainerColor(
+        accent = MaterialTheme.colorScheme.secondaryContainer,
+        strength = 0.09f,
+    )
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -84,11 +95,16 @@ fun ProgressScreen(
             LargeFlexibleTopAppBar(
                 title = { Text(nomiString("Progress")) },
                 scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = pageContainerColor,
+                    scrolledContainerColor = pageContainerColor,
+                ),
             )
         },
+        containerColor = pageContainerColor,
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().background(pageContainerColor),
             contentPadding = innerPadding,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -300,6 +316,11 @@ private fun WeightChart(
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val chartReveal = remember { Animatable(0f) }
+    LaunchedEffect(points, targetKg) {
+        chartReveal.snapTo(0f)
+        chartReveal.animateTo(1f, animationSpec = nomiProgressMotionSpec())
+    }
     val min = (points.minOf { it.kilograms }.let { if (targetKg != null) minOf(it, targetKg) else it } - 1).toFloat()
     val max = (points.maxOf { it.kilograms }.let { if (targetKg != null) maxOf(it, targetKg) else it } + 1).toFloat()
     val summary = nomiFormat(
@@ -309,21 +330,57 @@ private fun WeightChart(
         points.size,
     )
     Canvas(modifier = modifier.semantics { contentDescription = summary }) {
-        drawLine(track, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 2.dp.toPx())
+        drawLine(
+            track,
+            Offset(0f, size.height),
+            Offset(size.width, size.height),
+            strokeWidth = 2.dp.toPx(),
+        )
+        val path = Path()
+        val fillPath = Path()
+        var lastX = 0f
+        points.forEachIndexed { index, point ->
+            val x = if (points.lastIndex == 0) 0f else index.toFloat() / points.lastIndex * size.width
+            val settledY = size.height - ((point.kilograms.toFloat() - min) / (max - min)) * size.height
+            val y = size.height + (settledY - size.height) * chartReveal.value
+            if (index == 0) {
+                path.moveTo(x, y)
+                fillPath.moveTo(x, size.height)
+                fillPath.lineTo(x, y)
+            } else {
+                path.lineTo(x, y)
+                fillPath.lineTo(x, y)
+            }
+            lastX = x
+        }
+        fillPath.lineTo(lastX, size.height)
+        fillPath.close()
+        drawPath(
+            path = fillPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(primary.copy(alpha = 0.24f), primary.copy(alpha = 0.02f)),
+                startY = 0f,
+                endY = size.height,
+            ),
+        )
+        drawPath(path, primary, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round))
+        // The marker is drawn after the translucent area so its dashes keep their own colour.
         targetKg?.let {
             val y = size.height - ((it.toFloat() - min) / (max - min)) * size.height
-            drawLine(tertiary, Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
+            drawLine(
+                tertiary.copy(alpha = 0.72f),
+                Offset(0f, y),
+                Offset(size.width, y),
+                strokeWidth = 2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(
+                    intervals = floatArrayOf(8.dp.toPx(), 6.dp.toPx()),
+                ),
+            )
         }
-        val path = Path()
         points.forEachIndexed { index, point ->
             val x = if (points.lastIndex == 0) 0f else index.toFloat() / points.lastIndex * size.width
-            val y = size.height - ((point.kilograms.toFloat() - min) / (max - min)) * size.height
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, primary, style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round))
-        points.forEachIndexed { index, point ->
-            val x = if (points.lastIndex == 0) 0f else index.toFloat() / points.lastIndex * size.width
-            val y = size.height - ((point.kilograms.toFloat() - min) / (max - min)) * size.height
+            val settledY = size.height - ((point.kilograms.toFloat() - min) / (max - min)) * size.height
+            val y = size.height + (settledY - size.height) * chartReveal.value
             drawCircle(primary, radius = 4.dp.toPx(), center = Offset(x, y))
         }
     }

@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -67,6 +69,7 @@ fun NomiSelectionRow(
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         },
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "selection_container",
     )
     val checkScale by animateFloatAsState(
@@ -85,7 +88,11 @@ fun NomiSelectionRow(
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .semantics { this.selected = selected },
+            .graphicsLayer { alpha = if (enabled) 1f else 0.48f }
+            .semantics {
+                this.selected = selected
+                role = Role.RadioButton
+            },
         shape = RoundedCornerShape(corner),
         color = container,
         contentColor = content,

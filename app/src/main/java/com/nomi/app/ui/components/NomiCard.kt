@@ -67,25 +67,25 @@ fun nomiCardElevation(): CardElevation = CardDefaults.cardElevation(
     disabledElevation = 0.dp,
 )
 
+/**
+ * An opaque tone stays crisp over tinted destination canvases. The old translucent dark surface
+ * mixed with every page behind it and made otherwise identical cards look different.
+ */
 @Composable
-fun nomiCardContainerColor(): Color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-    MaterialTheme.colorScheme.surfaceContainerHigh
-} else {
-    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
-}
+fun nomiCardContainerColor(): Color = MaterialTheme.colorScheme.surfaceContainerHigh
 
 @Composable
-fun nomiCardTonalElevation(): Dp = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) {
-    0.dp
-} else {
-    2.dp
-}
+fun nomiCardTonalElevation(): Dp = 0.dp
 
 @Composable
 fun nomiCardBorder(): BorderStroke = BorderStroke(
     1.dp,
     MaterialTheme.colorScheme.outlineVariant.copy(
-        alpha = if (LocalPitchBlackSurfaces.current) 0.72f else 0.42f,
+        alpha = when {
+            LocalPitchBlackSurfaces.current -> 0.72f
+            MaterialTheme.colorScheme.surface.luminance() > 0.5f -> 0.20f
+            else -> 0.28f
+        },
     ),
 )
 
@@ -96,6 +96,9 @@ fun nomiCardBorder(): BorderStroke = BorderStroke(
 @Composable
 fun hairlineOnPitchBlack(): BorderStroke? = when {
     LocalPitchBlackSurfaces.current ->
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+        )
     else -> null
 }

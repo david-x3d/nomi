@@ -1,6 +1,7 @@
 package com.nomi.app.ui.library
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,8 +19,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RestaurantMenu
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,15 +29,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.theme.nomiPageContainerColor
 import kotlin.math.roundToInt
 
 enum class LibraryItemKind { RECENT, FAVORITE, SAVED_MEAL }
@@ -63,14 +67,19 @@ fun LibraryScreen(
     onAdd: (LibraryItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var selected by remember(initialKind) { mutableStateOf(initialKind) }
+    var selected by rememberSaveable(initialKind) { mutableStateOf(initialKind) }
     val items = when (selected) {
         LibraryItemKind.RECENT -> state.recent
         LibraryItemKind.FAVORITE -> state.favorites
         LibraryItemKind.SAVED_MEAL -> state.savedMeals
     }
+    val pageContainerColor = nomiPageContainerColor(
+        accent = MaterialTheme.colorScheme.secondaryContainer,
+        strength = 0.07f,
+    )
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = pageContainerColor,
         topBar = {
             TopAppBar(
                 title = { Text(nomiString("Food library")) },
@@ -82,21 +91,30 @@ fun LibraryScreen(
                         )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = pageContainerColor,
+                    scrolledContainerColor = pageContainerColor,
+                ),
             )
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().background(pageContainerColor),
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 8.dp,
+                    ),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    LibraryItemKind.entries.forEach { kind ->
-                        AssistChip(
+                    items(LibraryItemKind.entries) { kind ->
+                        FilterChip(
+                            selected = kind == selected,
                             onClick = { selected = kind },
                             label = { Text(kind.localizedLabel()) },
                             leadingIcon = { Icon(kind.icon, contentDescription = null) },
@@ -107,7 +125,7 @@ fun LibraryScreen(
             if (items.isEmpty()) {
                 item {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(32.dp).animateItem(),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(selected.localizedEmptyTitle(), style = MaterialTheme.typography.titleLarge)
@@ -126,7 +144,7 @@ fun LibraryScreen(
                                 Icon(Icons.Default.Add, contentDescription = null)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().clickable { onAdd(item) },
+                        modifier = Modifier.fillMaxWidth().clickable { onAdd(item) }.animateItem(),
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 }

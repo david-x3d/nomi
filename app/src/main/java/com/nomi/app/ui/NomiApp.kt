@@ -1,11 +1,17 @@
 package com.nomi.app.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.di.AppContainer
@@ -32,6 +38,15 @@ fun NomiApp(
         ThemePreference.LIGHT -> false
         ThemePreference.DARK -> true
     }
+    val view = LocalView.current
+    SideEffect {
+        view.context.findActivity()?.window?.let { window ->
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
     NomiTheme(
         darkTheme = dark,
         dynamicColor = preferences.dynamicColorEnabled,
@@ -46,4 +61,10 @@ fun NomiApp(
             NomiRoot(container = container, viewModel = viewModel)
         }
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

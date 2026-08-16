@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -20,7 +21,9 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -674,6 +677,9 @@ private fun NotesHeader(
     val datePattern = nomiString("EEEE, MMMM d")
     val spatialSpec = nomiPageMotionSpec<IntOffset>()
     val effectsSpec = nomiFadeMotionSpec<Float>()
+    val todayPress = rememberNomiPressFeedback(pressedScale = 0.97f)
+    val previousPress = rememberNomiPressFeedback(pressedScale = 0.90f)
+    val nextPress = rememberNomiPressFeedback(pressedScale = 0.90f)
     val foxHalo by animateColorAsState(
         targetValue = when (foxMood) {
             NomiFoxMood.RESTING -> MaterialTheme.colorScheme.secondaryContainer
@@ -736,13 +742,15 @@ private fun NotesHeader(
 
                     Surface(
                         onClick = onToday,
+                        interactionSource = todayPress.interactionSource,
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
                         tonalElevation = 1.dp,
                         border = hairlineOnPitchBlack(),
                         modifier = Modifier
                             .sizeIn(minWidth = 72.dp, minHeight = 48.dp)
-                            .animateContentSize(),
+                            .animateContentSize()
+                            .nomiPress(todayPress),
                     ) {
                         Box(
                             modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
@@ -784,7 +792,10 @@ private fun NotesHeader(
                 ) {
                     IconButton(
                         onClick = onPreviousDay,
-                        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                        interactionSource = previousPress.interactionSource,
+                        modifier = Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .nomiPress(previousPress),
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -797,9 +808,14 @@ private fun NotesHeader(
                             .weight(1f)
                             .padding(horizontal = 8.dp),
                         transitionSpec = {
-                            (slideInHorizontally(animationSpec = spatialSpec) { width -> width / 10 } +
+                            val direction = if (targetState.isAfter(initialState)) 1 else -1
+                            (slideInHorizontally(animationSpec = spatialSpec) { width ->
+                                direction * (width / 10)
+                            } +
                                 fadeIn(animationSpec = effectsSpec)).togetherWith(
-                                slideOutHorizontally(animationSpec = spatialSpec) { width -> -width / 12 } +
+                                slideOutHorizontally(animationSpec = spatialSpec) { width ->
+                                    -direction * (width / 12)
+                                } +
                                     fadeOut(animationSpec = effectsSpec),
                             )
                         },
@@ -817,7 +833,10 @@ private fun NotesHeader(
                     }
                     IconButton(
                         onClick = onNextDay,
-                        modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                        interactionSource = nextPress.interactionSource,
+                        modifier = Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .nomiPress(nextPress),
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
@@ -1163,8 +1182,8 @@ private fun NotesFoodRow(
                             active = summaryActive,
                             progress = summaryProgress,
                             colors = listOf(
-                                Color(0xFFFF9A45),
-                                Color(0xFFB65CFF),
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.tertiary,
                             ),
                         )
                         .pointerInput(entry.id, description) {
@@ -1225,8 +1244,8 @@ private fun NotesFoodRow(
                         active = calorieActive,
                         progress = calorieProgress,
                         colors = listOf(
-                            Color(0xFFA7E8FF),
-                            Color(0xFF55AEFF),
+                            MaterialTheme.colorScheme.secondary,
+                            MaterialTheme.colorScheme.primary,
                         ),
                     )
                     .clickable(
@@ -1352,11 +1371,31 @@ private fun InlineLoggingState(
     onPhotoPlaceChanged: (String) -> Unit,
     onConfirmPhotoDescription: () -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-        when (state) {
+    AnimatedContent(
+        targetState = state,
+        modifier = Modifier.fillMaxWidth(),
+        contentKey = { it::class },
+        transitionSpec = {
+            (
+                fadeIn(animationSpec = nomiFadeMotionSpec()) +
+                    slideInVertically(animationSpec = nomiPageMotionSpec()) { height -> height / 24 }
+                ).togetherWith(
+                fadeOut(animationSpec = nomiFadeMotionSpec()) +
+                    slideOutVertically(animationSpec = nomiPageMotionSpec()) { height -> -height / 30 },
+            ).using(
+                SizeTransform(
+                    clip = false,
+                    sizeAnimationSpec = { _, _ -> nomiLayoutMotionSpec() },
+                ),
+            )
+        },
+        contentAlignment = Alignment.TopCenter,
+        label = "Food logging state",
+    ) { animatedState ->
+        when (animatedState) {
             is FoodLoggingUiState.Input -> if (!suppressComposer) {
                 InlineComposerCanvas(
-                    text = state.text,
+                    text = animatedState.text,
                     autoFocus = composerFocused,
                     fillsPage = true,
                     onTextChanged = onTextChanged,
@@ -1365,14 +1404,14 @@ private fun InlineLoggingState(
             }
             is FoodLoggingUiState.Processing -> ProcessingNote(
                 description = rememberedDescription,
-                stage = state.stage,
-                sourceUrls = state.sourceUrls,
+                stage = animatedState.stage,
+                sourceUrls = animatedState.sourceUrls,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
             )
 
             is FoodLoggingUiState.PhotoReview -> PhotoReviewNote(
-                state = state,
+                state = animatedState,
                 onDescriptionChanged = onPhotoDescriptionChanged,
                 onPlaceChanged = onPhotoPlaceChanged,
                 onConfirm = onConfirmPhotoDescription,
@@ -1380,7 +1419,7 @@ private fun InlineLoggingState(
             )
 
             is FoodLoggingUiState.Preview -> PreviewNote(
-                analysis = state.analysis,
+                analysis = animatedState.analysis,
                 description = rememberedDescription,
                 onAdd = onConfirm,
                 onEditText = onEditText,
@@ -1390,15 +1429,15 @@ private fun InlineLoggingState(
 
             is FoodLoggingUiState.Error -> ErrorNote(
                 description = rememberedDescription,
-                message = state.message,
-                canRetry = state.canRetry,
+                message = animatedState.message,
+                canRetry = animatedState.canRetry,
                 onRetry = onRetry,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
             )
 
             is FoodLoggingUiState.Manual -> ManualDraftNote(
-                state = state,
+                state = animatedState,
                 onAdd = onConfirm,
                 onEdit = onEditPreview,
                 onCancel = onDismissDraft,

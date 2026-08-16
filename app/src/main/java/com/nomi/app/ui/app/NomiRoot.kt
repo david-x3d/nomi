@@ -14,9 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -31,6 +29,9 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -153,7 +154,7 @@ private fun NomiMain(
     val backupRestoredMessage = nomiString("Backup restored")
     val backupRestoreFailedMessage = nomiString("Nomi couldn't restore that backup")
 
-    var libraryKind by remember { mutableStateOf(LibraryItemKind.RECENT) }
+    var libraryKind by rememberSaveable { mutableStateOf(LibraryItemKind.RECENT) }
     var selectedProviderIndex by remember { mutableIntStateOf(-1) }
     var providerEditor by remember { mutableStateOf<AiProviderEditorState?>(null) }
     var editedItemIndex by remember { mutableStateOf<Int?>(null) }
@@ -869,16 +870,18 @@ private fun MainNavigationSuite(
                     },
                     icon = {
                         val iconScale by animateFloatAsState(
-                            targetValue = if (selected == destination) 1.12f else 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium,
-                            ),
+                            targetValue = if (selected == destination) 1.08f else 1f,
+                            animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
                             label = "Selected destination",
                         )
                         androidx.compose.material3.Icon(
-                            destination.icon,
-                            contentDescription = destination.localizedLabel(),
+                            imageVector = if (selected == destination) {
+                                destination.selectedIcon
+                            } else {
+                                destination.unselectedIcon
+                            },
+                            // The adjacent NavigationSuite label already names this destination.
+                            contentDescription = null,
                             modifier = Modifier.graphicsLayer {
                                 scaleX = iconScale
                                 scaleY = iconScale
@@ -907,7 +910,8 @@ private fun MainNavigationSuite(
                         },
                 ).using(
                     SizeTransform(
-                        clip = false,
+                        // Keep a sliding destination inside the content slot on rail layouts.
+                        clip = true,
                         sizeAnimationSpec = { _, _ -> snap() },
                     ),
                 )
@@ -1001,11 +1005,12 @@ private fun LoadingPage() = Box(Modifier.fillMaxSize(), contentAlignment = Align
 }
 
 private enum class MainDestination(
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
 ) {
-    TODAY(Icons.Default.Today),
-    PROGRESS(Icons.Default.Insights),
-    SETTINGS(Icons.Default.Settings),
+    TODAY(Icons.Default.Today, Icons.Outlined.Today),
+    PROGRESS(Icons.Default.Insights, Icons.Outlined.Insights),
+    SETTINGS(Icons.Default.Settings, Icons.Outlined.Settings),
 }
 
 @Composable

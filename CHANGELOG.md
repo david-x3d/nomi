@@ -1,5 +1,30 @@
 # Changelog
 
+## Nomi v2.0.2 Beta 1 — 2026-08-16
+
+### A calmer, more cohesive Material finish
+
+- Refined Nomi's fallback palette around warm fox orange, soft sage and muted gold while preserving Android dynamic color.
+- Strengthened the Material type hierarchy without replacing Android's system font or changing screen layouts.
+- Made cards crisp and opaque across light, dark and pitch-black themes, with quieter outlines and one shared surface treatment.
+- Added subtle destination tones to Progress, Settings and the food library while keeping every control in its familiar place.
+- Replaced bouncy press and navigation springs with the active standard Material motion scheme and added directional date movement.
+- Smoothed the complete input → research → preview flow on Today and tied its completion shimmer to the active Material palette.
+- Polished the weight chart with a restrained animated area fill and a clearer dashed goal line.
+- Made food-library categories visibly selectable and horizontally scrollable for long translations.
+- Kept status- and navigation-bar icon contrast in sync with Nomi's own Light, Dark and System setting.
+- Corrected picker error colors and preserved crisp field boundaries on true-black OLED themes.
+
+### Beta note
+
+- This prerelease is a visual and interaction preview. It does not migrate or change saved nutrition data, AI providers or research behaviour.
+
+### Verification
+
+- 397 unit tests passed with no failures, errors or skipped tests.
+- Android lint and the signed prerelease build passed.
+- APK SHA-256: `4EE7E47FD1E6219217318E36F2F7AE0E30E51E162FE527EE968FF922F9F8C153`
+
 ## Nomi v2.0.1 — 2026-08-15
 
 ### Rewrite complete grouped meals

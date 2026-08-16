@@ -1,7 +1,7 @@
 package com.nomi.app.ui.settings
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,9 +55,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
@@ -67,10 +67,17 @@ import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiSelectionRow
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.components.NomiCardShadowElevation
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardContainerColor
+import com.nomi.app.ui.components.nomiCardTonalElevation
+import com.nomi.app.ui.feedback.nomiPress
+import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
+import com.nomi.app.ui.theme.nomiPageContainerColor
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -102,10 +109,9 @@ fun SettingsScreen(
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and History, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val pageContainerColor = lerp(
-        MaterialTheme.colorScheme.surfaceContainerLow,
-        MaterialTheme.colorScheme.primaryContainer,
-        0.12f,
+    val pageContainerColor = nomiPageContainerColor(
+        accent = MaterialTheme.colorScheme.tertiaryContainer,
+        strength = 0.09f,
     )
     Scaffold(
         modifier = modifier
@@ -413,7 +419,9 @@ private fun SectionTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 6.dp),
+        modifier = Modifier
+            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 6.dp)
+            .semantics { heading() },
     )
 }
 
@@ -431,7 +439,7 @@ private fun SettingsLink(
     } else {
         iconColor
     }
-    GlassSettingSurface(
+    SettingSurface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         onClick = onClick,
         enabled = enabled,
@@ -467,7 +475,7 @@ private fun ToggleSetting(
     } else {
         iconColor
     }
-    GlassSettingSurface(
+    SettingSurface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         onClick = { onClick?.invoke() ?: onCheckedChange(!checked) },
     ) {
@@ -490,15 +498,13 @@ private fun SettingsInfo(
     supporting: String,
     iconColor: Color,
 ) {
-    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(22.dp),
-        color = if (lightMode) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
-        },
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
+        shadowElevation = NomiCardShadowElevation,
+        border = nomiCardBorder(),
     ) {
         ListItem(
             headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
@@ -510,23 +516,23 @@ private fun SettingsInfo(
 }
 
 @Composable
-private fun GlassSettingSurface(
+private fun SettingSurface(
     modifier: Modifier,
     onClick: () -> Unit,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
+    val press = rememberNomiPressFeedback(pressedScale = 0.985f)
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
+        interactionSource = press.interactionSource,
+        modifier = modifier.nomiPress(press),
         shape = RoundedCornerShape(22.dp),
-        color = if (lightMode) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
-        },
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
+        shadowElevation = NomiCardShadowElevation,
+        border = nomiCardBorder(),
         content = content,
     )
 }
@@ -600,7 +606,9 @@ private fun ChoiceSheet(
     NomiSheet(onDismissRequest = onDismiss) {
         NomiSheetHeader(title = title)
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp),
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .selectableGroup(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             choices.forEachIndexed { index, choice ->
@@ -651,20 +659,13 @@ private fun CalorieBiasSetting(
     var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
     fun entryAt(value: Float) = entries[value.roundToInt().coerceIn(0, entries.lastIndex)]
     val selected = entryAt(position)
-    val lightMode = MaterialTheme.colorScheme.surface.luminance() > 0.5f
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(22.dp),
-        color = if (lightMode) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.86f)
-        },
-        tonalElevation = if (lightMode) 0.dp else 2.dp,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-        ),
+        color = nomiCardContainerColor(),
+        tonalElevation = nomiCardTonalElevation(),
+        shadowElevation = NomiCardShadowElevation,
+        border = nomiCardBorder(),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
