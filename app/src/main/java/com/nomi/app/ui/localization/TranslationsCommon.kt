@@ -206,35 +206,33 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Health Connect måste installeras eller uppdateras innan Nomi kan ansluta.",
         tr = "Nomi bağlanabilmesi için Health Connect kurulmalı veya güncellenmeli.",
     ),
-    "Nothing is shared until you approve all requested categories." to NomiTranslation(
-        de = "Es werden keine Daten geteilt, bevor du alle angeforderten Kategorien freigibst.",
-        es = "No se comparte nada hasta que apruebes todas las categorías solicitadas.",
-        fr = "Rien n’est partagé tant que tu n’as pas approuvé toutes les catégories demandées.",
-        it = "Non viene condiviso nulla finché non approvi tutte le categorie richieste.",
-        nl = "Er wordt niets gedeeld totdat je alle gevraagde categorieën goedkeurt.",
-        pt = "Nada é partilhado até aprovares todas as categorias pedidas.",
-        sq = "Asgjë nuk ndahet derisa të miratosh të gjitha kategoritë e kërkuara.",
-        sv = "Ingenting delas förrän du godkänner alla begärda kategorier.",
-        tr = "İstenen tüm kategorileri onaylamadan hiçbir şey paylaşılmaz.",
+    "Nothing is shared until you approve the required categories." to NomiTranslation(
+        de = "Es werden keine Daten geteilt, bevor du die erforderlichen Kategorien freigibst.",
+        es = "No se comparte nada hasta que apruebes las categorías necesarias.",
+        fr = "Rien n’est partagé tant que tu n’as pas approuvé les catégories requises.",
+        it = "Non viene condiviso nulla finché non approvi le categorie necessarie.",
+        nl = "Er wordt niets gedeeld totdat je de vereiste categorieën goedkeurt.",
+        pt = "Nada é partilhado até aprovares as categorias necessárias.",
+        sq = "Asgjë nuk ndahet derisa të miratosh kategoritë e nevojshme.",
+        sv = "Ingenting delas förrän du godkänner de nödvändiga kategorierna.",
+        tr = "Gerekli kategorileri onaylamadan hiçbir şey paylaşılmaz.",
     ),
-    "Some permissions are missing. Approve every requested category to finish connecting." to
+    "Some required permissions are missing. Approve them to finish connecting." to
         NomiTranslation(
-            de = "Einige Berechtigungen fehlen. Gib alle angeforderten Kategorien frei, um die " +
-                "Verbindung abzuschließen.",
-            es = "Faltan permisos. Aprueba todas las categorías solicitadas para terminar de " +
-                "conectar.",
-            fr = "Des autorisations manquent. Approuve toutes les catégories demandées pour " +
-                "finaliser la connexion.",
-            it = "Mancano alcune autorizzazioni. Approva tutte le categorie richieste per " +
-                "completare il collegamento.",
-            nl = "Er ontbreken machtigingen. Keur alle gevraagde categorieën goed om de " +
-                "verbinding af te ronden.",
-            pt = "Faltam permissões. Aprova todas as categorias pedidas para concluir a ligação.",
-            sq = "Disa leje mungojnë. Mirato të gjitha kategoritë e kërkuara për ta përfunduar " +
-                "lidhjen.",
-            sv = "Vissa behörigheter saknas. Godkänn alla begärda kategorier för att slutföra " +
+            de = "Einige erforderliche Berechtigungen fehlen. Gib sie frei, um die Verbindung " +
+                "abzuschließen.",
+            es = "Faltan algunos permisos necesarios. Apruébalos para terminar de conectar.",
+            fr = "Certaines autorisations requises manquent. Approuve-les pour finaliser la " +
+                "connexion.",
+            it = "Mancano alcune autorizzazioni necessarie. Concedile per completare il " +
+                "collegamento.",
+            nl = "Er ontbreken enkele vereiste machtigingen. Keur ze goed om de verbinding af " +
+                "te ronden.",
+            pt = "Faltam algumas permissões necessárias. Aprova-as para concluir a ligação.",
+            sq = "Mungojnë disa leje të nevojshme. Miratoji për ta përfunduar lidhjen.",
+            sv = "Vissa nödvändiga behörigheter saknas. Godkänn dem för att slutföra " +
                 "anslutningen.",
-            tr = "Bazı izinler eksik. Bağlantıyı tamamlamak için istenen tüm kategorileri onayla.",
+            tr = "Bazı gerekli izinler eksik. Bağlantıyı tamamlamak için bunları onayla.",
         ),
     "Connected. You can change access at any time in Health Connect." to NomiTranslation(
         de = "Verbunden. Du kannst den Zugriff jederzeit in Health Connect ändern.",
@@ -277,6 +275,43 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Aktive Kalorien", es = "Calorías activas", fr = "Calories actives",
         it = "Calorie attive", nl = "Actieve calorieën", pt = "Calorias ativas",
         sq = "Kalori aktive", sv = "Aktiva kalorier", tr = "Aktif kalori",
+    ),
+    "Estimated from steps" to NomiTranslation(
+        de = "Aus Schritten geschätzt", es = "Estimadas a partir de pasos",
+        fr = "Estimées à partir des pas", it = "Stimate dai passi",
+        nl = "Geschat uit stappen", pt = "Estimadas a partir dos passos",
+        sq = "Vlerësuar nga hapat", sv = "Uppskattat från steg", tr = "Adımlardan tahmin",
+    ),
+    "from steps" to NomiTranslation(
+        de = "aus Schritten", es = "a partir de pasos", fr = "à partir des pas",
+        it = "dai passi", nl = "uit stappen", pt = "a partir dos passos",
+        sq = "nga hapat", sv = "från steg", tr = "adımlardan",
+    ),
+    "Step calories are estimated locally from your current weight and height when available. " +
+        "They are not added to Health Connect active calories." to NomiTranslation(
+        de = "Schrittkalorien werden lokal aus deinem aktuellen Gewicht und, falls vorhanden, " +
+            "deiner Größe geschätzt. Sie werden nicht zu den aktiven Kalorien aus Health " +
+            "Connect addiert.",
+        es = "Las calorías de los pasos se estiman localmente con tu peso actual y, cuando está " +
+            "disponible, tu altura. No se suman a las calorías activas de Health Connect.",
+        fr = "Les calories liées aux pas sont estimées localement à partir de ton poids actuel " +
+            "et, si disponible, de ta taille. Elles ne sont pas ajoutées aux calories actives " +
+            "de Health Connect.",
+        it = "Le calorie dei passi vengono stimate localmente dal peso attuale e, se " +
+            "disponibile, dall'altezza. Non vengono sommate alle calorie attive di Health " +
+            "Connect.",
+        nl = "Calorieën uit stappen worden lokaal geschat op basis van je huidige gewicht en, " +
+            "indien beschikbaar, je lengte. Ze worden niet opgeteld bij actieve calorieën uit " +
+            "Health Connect.",
+        pt = "As calorias dos passos são estimadas localmente a partir do teu peso atual e, " +
+            "quando disponível, da tua altura. Não são somadas às calorias ativas do Health " +
+            "Connect.",
+        sq = "Kaloritë nga hapat vlerësohen lokalisht nga pesha jote aktuale dhe, kur ka, nga " +
+            "gjatësia. Ato nuk u shtohen kalorive aktive nga Health Connect.",
+        sv = "Stegkalorier uppskattas lokalt utifrån din aktuella vikt och, när den finns, din " +
+            "längd. De läggs inte till de aktiva kalorierna från Health Connect.",
+        tr = "Adım kalorileri mevcut kilon ve varsa boyun kullanılarak yerel olarak tahmin " +
+            "edilir. Health Connect'teki aktif kalorilere eklenmez.",
     ),
     "Food entries shared" to NomiTranslation(
         de = "Geteilte Ernährungseinträge", es = "Registros de comida compartidos",

@@ -16,6 +16,7 @@ import androidx.health.connect.client.units.Mass
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlinx.coroutines.CancellationException
 
 enum class HealthConnectAvailability {
     AVAILABLE,
@@ -41,8 +42,8 @@ data class HealthWeight(
 )
 
 data class HealthActivitySummary(
-    val steps: Long,
-    val activeCaloriesKcal: Double,
+    val steps: Long?,
+    val activeCaloriesKcal: Double?,
 )
 
 enum class HealthConnectPermissionStatus {
@@ -60,6 +61,9 @@ val NomiHealthFeatures = HealthFeatures(
     readActiveCalories = true,
     writeNutrition = true,
 )
+
+/** Active calories improve the display but are not needed for Nomi's step-based estimate. */
+val NomiRequiredHealthFeatures = NomiHealthFeatures.copy(readActiveCalories = false)
 
 /** Health Connect takes a bounded batch per call, and a busy month easily exceeds one. */
 private const val NUTRITION_BATCH_SIZE = 100
@@ -198,20 +202,46 @@ class HealthConnectManager(private val context: Context) {
         }
     }
 
-    suspend fun readActivity(start: Instant, end: Instant): HealthActivitySummary {
-        val aggregation = client.aggregate(
-            AggregateRequest(
-                metrics = setOf(
-                    StepsRecord.COUNT_TOTAL,
-                    ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL,
+    suspend fun readActivity(
+        start: Instant,
+        end: Instant,
+        features: HealthFeatures = NomiHealthFeatures,
+    ): HealthActivitySummary {
+        require(features.readSteps || features.readActiveCalories) {
+            "At least one activity category is required."
+        }
+        val timeRange = TimeRangeFilter.between(start, end)
+        val steps = if (features.readSteps) {
+            client.aggregate(
+                AggregateRequest(
+                    metrics = setOf(StepsRecord.COUNT_TOTAL),
+                    timeRangeFilter = timeRange,
                 ),
-                timeRangeFilter = TimeRangeFilter.between(start, end),
-            ),
-        )
+            )[StepsRecord.COUNT_TOTAL]
+        } else {
+            null
+        }
+        val activeCaloriesKcal = if (features.readActiveCalories) {
+            try {
+                client.aggregate(
+                    AggregateRequest(
+                        metrics = setOf(ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL),
+                        timeRangeFilter = timeRange,
+                    ),
+                )[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]?.inKilocalories
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Total activity is optional. A provider failure must not discard valid steps or
+                // prevent Nomi's local step estimate from being shown.
+                null
+            }
+        } else {
+            null
+        }
         return HealthActivitySummary(
-            steps = aggregation[StepsRecord.COUNT_TOTAL] ?: 0L,
-            activeCaloriesKcal = aggregation[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
-                ?.inKilocalories ?: 0.0,
+            steps = steps,
+            activeCaloriesKcal = activeCaloriesKcal,
         )
     }
 }

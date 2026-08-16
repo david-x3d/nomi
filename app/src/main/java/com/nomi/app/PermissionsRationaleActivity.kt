@@ -65,6 +65,12 @@ private fun HealthConnectRationale(onClose: () -> Unit) {
             )
             Text(
                 text(
+                    "Nomi estimates calories from steps locally using your latest weight and, when available, your height. This estimate is kept separate from Health Connect active calories.",
+                    "Nomi schätzt Schrittkalorien lokal anhand deines aktuellen Gewichts und, falls vorhanden, deiner Größe. Diese Schätzung bleibt von den aktiven Kalorien aus Health Connect getrennt.",
+                ),
+            )
+            Text(
+                text(
                     "Nomi writes the weight measurements that you manually save in Nomi. A failed Health Connect write never removes the weight from Nomi.",
                     "Nomi schreibt die Gewichtsmessungen, die du manuell in Nomi speicherst. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
                 ),

@@ -40,6 +40,9 @@ data class HealthConnectUiState(
     val isSyncing: Boolean = false,
     val todaySteps: Long? = null,
     val todayActiveCaloriesKcal: Double? = null,
+    /** Nomi's net walking-energy estimate, calculated locally from steps and profile data. */
+    val estimatedStepCaloriesKcal: Double? = null,
+    val stepEstimateUsesProfileHeight: Boolean = false,
     /** Food entries Health Connect currently holds from Nomi, or null before the first sync. */
     val sharedNutritionEntryCount: Int? = null,
     val lastSyncEpochMillis: Long? = null,

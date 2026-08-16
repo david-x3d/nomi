@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -106,8 +107,8 @@ private fun CalorieRow(state: TodayUiState) {
                 modifier = Modifier.fillMaxWidth().size(width = 0.dp, height = 10.dp),
             )
         }
-        state.activeCaloriesKcal?.let { burned ->
-            BurnedRow(burnedKcal = burned, steps = state.steps, fraction = state.burnedFraction)
+        state.effectiveBurnedCaloriesKcal?.let {
+            BurnedRow(state = state)
         }
     }
 }
@@ -120,13 +121,25 @@ private fun CalorieRow(state: TodayUiState) {
  * states what was burned and leaves the arithmetic to the reader, the same way it states what
  * was eaten.
  *
- * The whole row is absent when Health Connect reported nothing, because a missing figure is not
- * a day without movement.
+ * Health Connect's complete activity remains the primary figure when available. Nomi's walking
+ * estimate is shown alongside the steps and becomes the fallback only when Health Connect has no
+ * active-calorie record; the two are never added together.
  */
 @Composable
-private fun BurnedRow(burnedKcal: Double, steps: Long?, fraction: Float) {
+private fun BurnedRow(state: TodayUiState) {
     val locale = nomiLocale()
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val burnedKcal = requireNotNull(state.effectiveBurnedCaloriesKcal)
+    val stepEstimate = state.estimatedStepCaloriesKcal
+    val supporting = listOfNotNull(
+        state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
+        stepEstimate?.takeIf { !state.burnedCaloriesAreEstimated }?.let {
+            "${estimatedStepCaloriesText(it, locale)} ${nomiString("from steps")}"
+        },
+    ).joinToString(" · ")
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -134,34 +147,45 @@ private fun BurnedRow(burnedKcal: Double, steps: Long?, fraction: Float) {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = nomiString("Burned"),
+                    text = nomiString(
+                        if (state.burnedCaloriesAreEstimated) "Estimated from steps" else "Burned",
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                steps?.let {
+                supporting.takeIf(String::isNotBlank)?.let {
                     Text(
-                        text = nomiFormat("{0} steps", it.formatted(locale)),
+                        text = it,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            Row(verticalAlignment = Alignment.Bottom) {
+            if (state.burnedCaloriesAreEstimated) {
                 Text(
-                    text = burnedKcal.roundToInt().formatted(locale),
+                    text = estimatedStepCaloriesText(burnedKcal, locale),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
-                Text(
-                    text = " kcal",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = burnedKcal.roundToInt().formatted(locale),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                    Text(
+                        text = " kcal",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         LinearProgressIndicator(
-            progress = { fraction },
+            progress = { state.burnedFraction },
             color = MaterialTheme.colorScheme.tertiary,
             trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             strokeCap = StrokeCap.Round,

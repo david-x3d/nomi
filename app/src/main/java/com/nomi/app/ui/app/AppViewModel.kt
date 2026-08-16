@@ -67,6 +67,8 @@ import com.nomi.app.data.repository.mapping.toPersistedDraft
 import com.nomi.app.data.security.SecretUnavailableException
 import com.nomi.app.di.AppContainer
 import com.nomi.app.domain.Micronutrient
+import com.nomi.app.domain.StepCalorieEstimate
+import com.nomi.app.domain.StepCalorieEstimator
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
@@ -80,6 +82,7 @@ import com.nomi.app.domain.usecase.toPortionContext
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
 import com.nomi.app.integration.health.NomiHealthFeatures
+import com.nomi.app.integration.health.NomiRequiredHealthFeatures
 import com.nomi.app.integration.health.importableHealthWeights
 import com.nomi.app.integration.health.planNutritionSync
 import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
@@ -232,6 +235,26 @@ class AppViewModel(
     // null and take the whole view model down at construction.
     private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
 
+    /** Recalculates immediately when steps, the profile, or the latest logged weight changes. */
+    private val stepCalorieEstimate: Flow<StepCalorieEstimate?> = combine(
+        healthConnectUiState,
+        repository.profile,
+        repository.latestWeight,
+    ) { health, profile, latestWeight ->
+        if (profile == null) {
+            null
+        } else {
+            runCatching {
+                StepCalorieEstimator.estimateFromAvailableData(
+                    steps = health.todaySteps,
+                    latestWeightKg = latestWeight?.weightKg,
+                    startingWeightKg = profile.startingWeightKg,
+                    heightCm = profile.heightCm,
+                )
+            }.getOrNull()
+        }
+    }
+
     private val loggedTodayState: Flow<TodayUiState> = combine(
         selectedDate.flatMapLatest { repository.dayLogs(it.toString()) }
             .onEach { dayLogSnapshot = it },
@@ -253,12 +276,15 @@ class AppViewModel(
     val todayState: StateFlow<TodayUiState> = combine(
         loggedTodayState,
         healthConnectUiState,
-    ) { state, health ->
+        stepCalorieEstimate,
+    ) { state, health, stepEstimate ->
         if (state.date != today) {
             state
         } else {
             state.copy(
                 activeCaloriesKcal = health.todayActiveCaloriesKcal,
+                estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
+                stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
                 steps = health.todaySteps,
             )
         }
@@ -327,7 +353,10 @@ class AppViewModel(
         repository.currentPlan,
         keyPresence,
         healthConnectUiState,
-    ) { prefs, plan, keys, health -> mapSettings(prefs, plan, keys, health) }
+        stepCalorieEstimate,
+    ) { prefs, plan, keys, health, stepEstimate ->
+        mapSettings(prefs, plan, keys, health, stepEstimate)
+    }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     private var recentFoodsSnapshot: List<FoodEntity> = emptyList()
@@ -2181,7 +2210,7 @@ class AppViewModel(
         try {
             val healthConnect = container.healthConnect
             val availability = healthConnect.availability
-            val requiredPermissions = healthConnect.permissionsFor(NomiHealthFeatures)
+            val requiredPermissions = healthConnect.permissionsFor(NomiRequiredHealthFeatures)
             val grantedPermissions = runCatching { healthConnect.grantedPermissions() }
                 .getOrElse { error ->
                     if (error is CancellationException) throw error
@@ -2199,7 +2228,7 @@ class AppViewModel(
                         HealthConnectPermissionStatus.UPDATE_REQUIRED ->
                             "Update Health Connect to enable syncing."
                         HealthConnectPermissionStatus.PARTIAL ->
-                            "Grant all requested categories to finish connecting."
+                            "Grant the required Health Connect categories to finish connecting."
                         else -> null
                     },
                 )
@@ -2223,6 +2252,13 @@ class AppViewModel(
             var sharedNutritionEntryCount: Int? = null
             var todaySteps: Long? = null
             var todayActiveCaloriesKcal: Double? = null
+            val activeCaloriesPermission = healthConnect.permissionsFor(
+                HealthFeatures(readActiveCalories = true),
+            ).single()
+            val activityFeatures = HealthFeatures(
+                readSteps = true,
+                readActiveCalories = activeCaloriesPermission in grantedPermissions,
+            )
 
             runCatching {
                 val weights = healthConnect.readWeights(
@@ -2260,6 +2296,7 @@ class AppViewModel(
                 healthConnect.readActivity(
                     start = today.atStartOfDay(zoneId).toInstant(),
                     end = now,
+                    features = activityFeatures,
                 )
             }.onSuccess { activity ->
                 activitySynced = true
@@ -2778,6 +2815,7 @@ class AppViewModel(
         plan: NutritionPlanEntity?,
         keys: Map<ProviderPipeline, ProviderKeyPresence>,
         health: HealthConnectUiState,
+        stepEstimate: StepCalorieEstimate?,
     ): SettingsUiState {
         val providers = ProviderPipeline.entries.map { pipeline ->
             val selected = prefs.selectionFor(pipeline)
@@ -2804,7 +2842,10 @@ class AppViewModel(
             goalsCardStyle = prefs.goalsCardStyle,
             healthConnectAvailable = health.status != HealthConnectPermissionStatus.UNAVAILABLE,
             healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED,
-            healthConnect = health,
+            healthConnect = health.copy(
+                estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
+                stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
+            ),
             nutritionTargets = NutritionTargetSetting(
                 calories = plan?.calorieTargetKcal?.roundToInt() ?: 2_000,
                 proteinGrams = plan?.proteinTargetGrams?.roundToInt() ?: 130,

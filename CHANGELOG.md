@@ -1,5 +1,26 @@
 # Changelog
 
+## Nomi v2.0.2 — 2026-08-16
+
+### Polished Material UI and personal step calories
+
+- Includes the complete Beta 1 UI refresh: the warmer Material palette, clearer typography, crisper cards, quieter outlines and smoother motion remain intact.
+- Estimates active walking calories from today's steps, the latest logged weight and the saved height when available.
+- Uses the newest weight entry first and falls back to the onboarding weight, so the estimate follows the user's current profile without changing stored goals.
+- Shows the estimate as an approximate value in the existing Today calorie pill, both goal-card styles and the Health Connect detail screen.
+- Keeps Health Connect total active calories separate and never adds the two figures together or changes calories left for the day.
+- Preserves a missing Health Connect calorie record as missing instead of silently treating it as a real zero.
+- Keeps the calculation local and labels the estimate across all ten supported interface languages.
+
+### Accuracy note
+
+- This release combines the visual refresh with the new step-calorie estimate. Walking pace, incline, running, terrain and step-count accuracy can make actual energy use differ.
+
+### Verification
+
+- The signed stable APK assembled successfully and its APK v2 signature was verified.
+- APK SHA-256: `8D9A9AC053FDF2002FB04ACA7F9C409FDADEE97C6AFECF6E1F90F674A3C4784B`
+
 ## Nomi v2.0.2 Beta 1 — 2026-08-16
 
 ### A calmer, more cohesive Material finish

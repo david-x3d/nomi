@@ -234,14 +234,16 @@ data class TodayUiState(
     val isLoading: Boolean = false,
     val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
     /**
-     * Active calories Health Connect reported for today, and the steps behind them.
+     * Total active calories Health Connect reported for today, kept separate from steps.
      *
-     * Null means Nomi has no figure, which is not the same as zero: Health Connect may be absent,
-     * unpermitted, or simply not synced yet. Nothing about burned calories is shown in that case
-     * rather than claiming the user did not move. Only today can carry them, because Health
-     * Connect is read for the current day and a past date has no matching figure.
+     * Null means no total-activity record exists; it never silently becomes zero. Only today can
+     * carry activity because Health Connect is read for the current day and a past date has no
+     * matching figure. [estimatedStepCaloriesKcal] may still provide a labeled walking fallback.
      */
     val activeCaloriesKcal: Double? = null,
+    /** Net walking energy Nomi estimates locally; never added to Health Connect activity. */
+    val estimatedStepCaloriesKcal: Double? = null,
+    val stepEstimateUsesProfileHeight: Boolean = false,
     val steps: Long? = null,
 ) {
     val caloriesDifference: Double get() = calorieTarget - caloriesConsumed
@@ -249,15 +251,21 @@ data class TodayUiState(
         get() = if (calorieTarget <= 0) 0f else (caloriesConsumed / calorieTarget).toFloat().coerceIn(0f, 1f)
 
     /**
-     * Burned calories measured against the same target as intake.
+     * Burned calories measured against the same target as intake, without changing that target.
      *
      * Movement has no goal of its own here, so the second bar borrows the calorie target as its
-     * scale. That is the only choice that lets the two bars be read against each other: an equal
-     * length means an equal number of calories.
+     * scale. Health Connect total activity wins; the step estimate is only a fallback and is
+     * never added to it.
      */
+    val effectiveBurnedCaloriesKcal: Double?
+        get() = activeCaloriesKcal ?: estimatedStepCaloriesKcal
+
+    val burnedCaloriesAreEstimated: Boolean
+        get() = activeCaloriesKcal == null && estimatedStepCaloriesKcal != null
+
     val burnedFraction: Float
         get() {
-            val burned = activeCaloriesKcal ?: return 0f
+            val burned = effectiveBurnedCaloriesKcal ?: return 0f
             return if (calorieTarget <= 0) 0f else (burned / calorieTarget).toFloat().coerceIn(0f, 1f)
         }
 

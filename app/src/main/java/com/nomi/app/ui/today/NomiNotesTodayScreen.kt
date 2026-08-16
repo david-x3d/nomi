@@ -2047,7 +2047,12 @@ private fun NotesFloatingActionRow(
                         onClick = dictation.cancel,
                     )
                 } else {
-                    NotesPill(modifier = Modifier.weight(1f), onClick = onGoals) {
+                    NotesPill(
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics(mergeDescendants = true) {},
+                        onClick = onGoals,
+                    ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -2065,17 +2070,28 @@ private fun NotesFloatingActionRow(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            // What movement burned today, kept beside the plate rather than folded
-                            // into it. The eaten figure has to stay the eaten figure.
-                            state.activeCaloriesKcal?.let { burned ->
+                            // Health Connect activity wins when present; otherwise the same slot
+                            // carries Nomi's visibly approximate step estimate. Neither changes
+                            // the eaten figure beside it.
+                            state.effectiveBurnedCaloriesKcal?.let { burned ->
                                 Icon(
                                     imageVector = NomiIcons.Runner,
-                                    contentDescription = nomiString("Burned through activity"),
+                                    contentDescription = nomiString(
+                                        if (state.burnedCaloriesAreEstimated) {
+                                            "Estimated from steps"
+                                        } else {
+                                            "Burned through activity"
+                                        },
+                                    ),
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.tertiary,
                                 )
                                 Text(
-                                    text = "${burned.roundToInt().formatted(locale)} kcal",
+                                    text = if (state.burnedCaloriesAreEstimated) {
+                                        estimatedStepCaloriesText(burned, locale)
+                                    } else {
+                                        "${burned.roundToInt().formatted(locale)} kcal"
+                                    },
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -2489,21 +2505,42 @@ private fun CalorieGoalCard(state: TodayUiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // Movement drawn against the same target as the plate above it, so the two waves can
-            // be compared. Absent entirely when Health Connect had nothing to report.
-            state.activeCaloriesKcal?.let { burned ->
+            // be compared. A step estimate fills the existing slot only when Health Connect has
+            // no total activity value; the two values are never added.
+            state.effectiveBurnedCaloriesKcal?.let { burned ->
                 GoalWave(
                     fraction = state.burnedFraction,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
                 Text(
-                    text = listOfNotNull(
+                    text = if (state.burnedCaloriesAreEstimated) {
+                        listOfNotNull(
+                            nomiString("Estimated from steps"),
+                            estimatedStepCaloriesText(burned, locale),
+                            state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
+                        ).joinToString(" · ")
+                    } else {
                         "${nomiString("Burned")} · " +
-                            "${burned.roundToInt().formatted(locale)} kcal",
-                        state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
-                    ).joinToString(" · "),
+                            "${burned.roundToInt().formatted(locale)} kcal"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (!state.burnedCaloriesAreEstimated) {
+                    state.estimatedStepCaloriesKcal?.let { estimate ->
+                        Text(
+                            text = listOfNotNull(
+                                "${estimatedStepCaloriesText(estimate, locale)} " +
+                                    nomiString("from steps"),
+                                state.steps?.let {
+                                    nomiFormat("{0} steps", it.formatted(locale))
+                                },
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

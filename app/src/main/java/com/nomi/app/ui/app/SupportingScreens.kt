@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
@@ -49,7 +51,10 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.settings.HealthConnectUiState
+import com.nomi.app.ui.today.estimatedStepCaloriesText
+import com.nomi.app.ui.today.formatted
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import kotlin.math.roundToInt
@@ -188,8 +193,16 @@ fun FoodEntryDetailScreen(
 
 @Composable
 private fun NutritionLine(label: String, value: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(value, style = MaterialTheme.typography.titleMedium)
     }
 }
@@ -219,6 +232,7 @@ fun HealthConnectScreen(
     onSyncNow: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val locale = nomiLocale()
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -233,7 +247,10 @@ fun HealthConnectScreen(
         },
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).padding(24.dp),
+            modifier = Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.Start,
         ) {
@@ -250,8 +267,8 @@ fun HealthConnectScreen(
                 when (health.status) {
                     HealthConnectPermissionStatus.UNAVAILABLE -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.")
                     HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString("Health Connect must be installed or updated before Nomi can connect.")
-                    HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve all requested categories.")
-                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Some permissions are missing. Approve every requested category to finish connecting.")
+                    HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve the required categories.")
+                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Some required permissions are missing. Approve them to finish connecting.")
                     HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected. You can change access at any time in Health Connect.")
                 },
             )
@@ -280,13 +297,20 @@ fun HealthConnectScreen(
                         Text(nomiString("Today's activity"), style = MaterialTheme.typography.titleLarge)
                         NutritionLine(
                             nomiString("Steps"),
-                            health.todaySteps?.toString() ?: nomiString("Not synced yet"),
+                            health.todaySteps?.formatted(locale) ?: nomiString("Not synced yet"),
                         )
                         NutritionLine(
-                            nomiString("Active calories"),
-                            health.todayActiveCaloriesKcal?.let { "${it.roundToInt()} kcal" }
-                                ?: nomiString("Not synced yet"),
+                            nomiString("Estimated from steps"),
+                            health.estimatedStepCaloriesKcal?.let {
+                                estimatedStepCaloriesText(it, locale)
+                            } ?: nomiString("Not synced yet"),
                         )
+                        health.todayActiveCaloriesKcal?.let {
+                            NutritionLine(
+                                nomiString("Active calories"),
+                                "${it.roundToInt().formatted(locale)} kcal"
+                            )
+                        }
                         NutritionLine(
                             nomiString("Food entries shared"),
                             health.sharedNutritionEntryCount?.toString()
@@ -294,6 +318,14 @@ fun HealthConnectScreen(
                         )
                     }
                 }
+                Text(
+                    nomiString(
+                        "Step calories are estimated locally from your current weight and height " +
+                            "when available. They are not added to Health Connect active calories.",
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Button(onClick = onSyncNow, enabled = !health.isSyncing) {
                     Text(nomiString("Sync now"))
                 }

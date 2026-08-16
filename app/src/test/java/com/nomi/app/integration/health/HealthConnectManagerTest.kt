@@ -6,10 +6,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class HealthConnectManagerTest {
-    private val required = setOf("readWeight", "writeWeight", "readSteps", "readCalories")
+    private val required = setOf("readWeight", "writeWeight", "readSteps", "writeNutrition")
 
     @Test
-    fun permissionStatus_requiresEveryRequestedCategoryForConnection() {
+    fun permissionStatus_requiresEveryRequiredCategoryForConnection() {
         assertEquals(
             HealthConnectPermissionStatus.CONNECTED,
             resolveHealthConnectPermissionStatus(
@@ -57,9 +57,8 @@ class HealthConnectManagerTest {
     }
 
     /**
-     * The connection is only reported as complete once every feature listed here is granted, so a
-     * feature dropped from this set would leave the permission request asking for less than the
-     * status demands - which is a connection the user can never finish.
+     * Nomi asks for the complete useful set, while the required subset deliberately leaves total
+     * active calories optional so denying them cannot block the local step estimate.
      */
     @Test
     fun nomiFeatures_coverEveryCategoryTheSyncNeeds() {
@@ -72,6 +71,31 @@ class HealthConnectManagerTest {
                 writeNutrition = true,
             ),
             NomiHealthFeatures,
+        )
+        assertEquals(
+            HealthFeatures(
+                readWeight = true,
+                writeWeight = true,
+                readSteps = true,
+                readActiveCalories = false,
+                writeNutrition = true,
+            ),
+            NomiRequiredHealthFeatures,
+        )
+    }
+
+    @Test
+    fun permissionStatus_doesNotBlockStepEstimateWhenOptionalCaloriesAreMissing() {
+        val requested = required + "readCalories"
+        assertEquals(false, "readCalories" in required)
+        assertEquals(true, "readCalories" in requested)
+        assertEquals(
+            HealthConnectPermissionStatus.CONNECTED,
+            resolveHealthConnectPermissionStatus(
+                HealthConnectAvailability.AVAILABLE,
+                required,
+                required,
+            ),
         )
     }
 
