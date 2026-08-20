@@ -81,12 +81,15 @@ import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.domain.usecase.toPortionContext
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
+import com.nomi.app.integration.health.HealthNutritionDeleteRange
 import com.nomi.app.integration.health.NomiHealthFeatures
-import com.nomi.app.integration.health.NomiRequiredHealthFeatures
 import com.nomi.app.integration.health.importableHealthWeights
+import com.nomi.app.integration.health.nutritionSyncDatesForFullHistory
+import com.nomi.app.integration.health.nutritionSyncStartTimes
 import com.nomi.app.integration.health.planNutritionSync
 import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
 import com.nomi.app.integration.health.toHealthNutritionEntry
+import com.nomi.app.integration.health.weightClientRecordId
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
 import com.nomi.app.ui.capture.MenuScanUiState
@@ -138,7 +141,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -165,6 +167,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.yield
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 
@@ -241,7 +245,7 @@ class AppViewModel(
         repository.profile,
         repository.latestWeight,
     ) { health, profile, latestWeight ->
-        if (profile == null) {
+        if (profile == null || health.activityLocalDate != today.toString()) {
             null
         } else {
             runCatching {
@@ -281,11 +285,13 @@ class AppViewModel(
         if (state.date != today) {
             state
         } else {
+            val activityBelongsToSelectedDay = health.activityLocalDate == state.date.toString()
             state.copy(
-                activeCaloriesKcal = health.todayActiveCaloriesKcal,
+                activeCaloriesKcal = health.todayActiveCaloriesKcal
+                    .takeIf { activityBelongsToSelectedDay },
                 estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
                 stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
-                steps = health.todaySteps,
+                steps = health.todaySteps.takeIf { activityBelongsToSelectedDay },
             )
         }
     }
@@ -346,8 +352,17 @@ class AppViewModel(
         val complete: Boolean get() = primary && search
     }
 
+    private data class WeightExportSummary(
+        val sentCount: Int,
+        val failedCount: Int,
+    )
+
     private val keyPresence = MutableStateFlow<Map<ProviderPipeline, ProviderKeyPresence>>(emptyMap())
     private val healthSyncMutex = Mutex()
+    private var healthSyncJob: Job? = null
+    private var pendingFullHealthSync = false
+    private var pendingNutritionHealthSync = false
+    private var pendingUserInitiatedHealthSync = false
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
         repository.currentPlan,
@@ -432,7 +447,9 @@ class AppViewModel(
 
 
     init {
-        refreshProviderAndHealthStatus()
+        // Provider keys are local and safe to inspect immediately. Health Connect reads, on the
+        // other hand, must wait for MainActivity.onStart so they run while Nomi is foregrounded.
+        refreshProviderStatus()
         observeFoodLogForHealthConnect()
         viewModelScope.launch {
             runCatching { container.reminderScheduler.reconcileFrom(repository.appPreferencesStore) }
@@ -1780,29 +1797,32 @@ class AppViewModel(
             }.getOrDefault(false)
             if (!canWriteWeight) return@launch
 
-            runCatching {
-                container.healthConnect.writeWeight(
-                    kilograms = kilograms,
-                    time = Instant.ofEpochMilli(now),
-                    clientRecordId = "nomi-weight-${UUID.randomUUID()}",
-                    zoneId = zoneId,
-                )
-            }.onSuccess { healthConnectId ->
+            healthSyncMutex.withLock {
                 runCatching {
-                    repository.markWeightHealthConnectSynced(
-                        id = localId,
-                        externalId = healthConnectId,
-                        updatedAtEpochMillis = System.currentTimeMillis(),
+                    container.healthConnect.writeWeight(
+                        kilograms = kilograms,
+                        time = Instant.ofEpochMilli(now),
+                        clientRecordId = weightClientRecordId(localId, now),
+                        clientRecordVersion = now,
+                        zoneId = zoneId,
                     )
+                }.onSuccess { healthConnectId ->
+                    runCatching {
+                        repository.markWeightHealthConnectSynced(
+                            id = localId,
+                            externalId = healthConnectId,
+                            updatedAtEpochMillis = System.currentTimeMillis(),
+                        )
+                    }.onFailure {
+                        mutableEvents.emit(
+                            AppEvent.Message("Weight was saved in Nomi and Health Connect, but sync status couldn't be updated."),
+                        )
+                    }
                 }.onFailure {
                     mutableEvents.emit(
-                        AppEvent.Message("Weight was saved in Nomi and Health Connect, but sync status couldn't be updated."),
+                        AppEvent.Message("Weight was saved in Nomi, but Health Connect sync failed."),
                     )
                 }
-            }.onFailure {
-                mutableEvents.emit(
-                    AppEvent.Message("Weight was saved in Nomi, but Health Connect sync failed."),
-                )
             }
         }
     }
@@ -2185,6 +2205,11 @@ class AppViewModel(
     }
 
     fun refreshProviderAndHealthStatus() {
+        refreshProviderStatus()
+        requestHealthConnectSync()
+    }
+
+    private fun refreshProviderStatus() {
         viewModelScope.launch {
             val prefs = loadedPreferences()
             keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
@@ -2198,135 +2223,230 @@ class AppViewModel(
                 ProviderKeyPresence(primary = primary, search = search)
             }
         }
-        viewModelScope.launch { refreshHealthConnectAndSync() }
     }
 
     fun syncHealthConnect() {
-        viewModelScope.launch { refreshHealthConnectAndSync(userInitiated = true) }
+        requestHealthConnectSync(userInitiated = true)
     }
 
-    private suspend fun refreshHealthConnectAndSync(userInitiated: Boolean = false) {
-        if (!healthSyncMutex.tryLock()) return
+    fun healthConnectPermissionsChanged() {
+        requestHealthConnectSync()
+    }
+
+    /**
+     * Coalesces onStart, permission callbacks, food changes and repeated button taps.
+     *
+     * A request made while a sync is running becomes one follow-up pass rather than being dropped
+     * or queued repeatedly. Yielding once also folds the usual onStart + permission-result pair
+     * into the same pass before any Health Connect I/O starts.
+     */
+    private fun requestHealthConnectSync(
+        userInitiated: Boolean = false,
+        nutritionOnly: Boolean = false,
+    ) {
+        if (nutritionOnly) {
+            pendingNutritionHealthSync = true
+        } else {
+            pendingFullHealthSync = true
+            pendingUserInitiatedHealthSync = pendingUserInitiatedHealthSync || userInitiated
+        }
+        if (healthSyncJob?.isActive == true) return
+
+        healthSyncJob = viewModelScope.launch {
+            yield()
+            try {
+                while (pendingFullHealthSync || pendingNutritionHealthSync) {
+                    val runFullSync = pendingFullHealthSync
+                    val runUserInitiated = pendingUserInitiatedHealthSync
+                    pendingFullHealthSync = false
+                    pendingUserInitiatedHealthSync = false
+                    if (runFullSync) pendingNutritionHealthSync = false
+
+                    healthSyncMutex.withLock {
+                        if (runFullSync) {
+                            refreshHealthConnectAndSyncLocked(runUserInitiated)
+                        } else {
+                            pendingNutritionHealthSync = false
+                            syncNutritionLogToHealthConnect()
+                        }
+                    }
+                }
+            } finally {
+                healthSyncJob = null
+            }
+        }
+    }
+
+    private suspend fun refreshHealthConnectAndSyncLocked(userInitiated: Boolean) {
         try {
             val healthConnect = container.healthConnect
             val availability = healthConnect.availability
-            val requiredPermissions = healthConnect.permissionsFor(NomiRequiredHealthFeatures)
+            val requestedPermissions = healthConnect.permissionsFor(NomiHealthFeatures)
             val grantedPermissions = runCatching { healthConnect.grantedPermissions() }
                 .getOrElse { error ->
                     if (error is CancellationException) throw error
-                    emptySet()
+                    healthConnectUiState.value = healthConnectUiState.value.copy(
+                        isSyncing = false,
+                        message = "Health Connect permissions couldn't be checked. Try again.",
+                    )
+                    return
                 }
             val status = resolveHealthConnectPermissionStatus(
                 availability = availability,
-                requiredPermissions = requiredPermissions,
+                requiredPermissions = requestedPermissions,
                 grantedPermissions = grantedPermissions,
             )
-            if (status != HealthConnectPermissionStatus.CONNECTED) {
+            if (
+                status == HealthConnectPermissionStatus.UNAVAILABLE ||
+                status == HealthConnectPermissionStatus.UPDATE_REQUIRED
+            ) {
                 healthConnectUiState.value = HealthConnectUiState(
                     status = status,
                     message = when (status) {
                         HealthConnectPermissionStatus.UPDATE_REQUIRED ->
                             "Update Health Connect to enable syncing."
-                        HealthConnectPermissionStatus.PARTIAL ->
-                            "Grant the required Health Connect categories to finish connecting."
                         else -> null
                     },
                 )
                 return
             }
 
+            val grantedFeatures = healthConnect.featuresForGrantedPermissions(grantedPermissions)
+            val hasUsablePermission = grantedFeatures.readWeight || grantedFeatures.writeWeight ||
+                grantedFeatures.readSteps || grantedFeatures.readActiveCalories ||
+                grantedFeatures.writeNutrition
+            if (!hasUsablePermission) {
+                healthConnectUiState.value = HealthConnectUiState(status = status)
+                return
+            }
+
             val previous = healthConnectUiState.value
             healthConnectUiState.value = previous.copy(
-                status = HealthConnectPermissionStatus.CONNECTED,
+                status = status,
                 isSyncing = true,
                 message = if (userInitiated) "Syncing Health Connect..." else previous.message,
             )
 
             val now = Instant.now()
+            val activityDate = now.atZone(zoneId).toLocalDate()
+            val activityDateText = activityDate.toString()
             val syncEpochMillis = now.toEpochMilli()
             val failures = mutableListOf<String>()
+            var attemptedOperationCount = 0
             var importedWeightCount = 0
-            var weightsSynced = false
-            var activitySynced = false
-            var nutritionSynced = false
-            var sharedNutritionEntryCount: Int? = null
-            var todaySteps: Long? = null
-            var todayActiveCaloriesKcal: Double? = null
-            val activeCaloriesPermission = healthConnect.permissionsFor(
-                HealthFeatures(readActiveCalories = true),
-            ).single()
-            val activityFeatures = HealthFeatures(
-                readSteps = true,
-                readActiveCalories = activeCaloriesPermission in grantedPermissions,
-            )
+            var sentWeightCount = 0
+            var sharedNutritionEntryCount = previous.sharedNutritionEntryCount
+            val canRetainPreviousActivity = previous.activityLocalDate == activityDateText
+            var todaySteps = if (grantedFeatures.readSteps && canRetainPreviousActivity) {
+                previous.todaySteps
+            } else {
+                null
+            }
+            var todayActiveCaloriesKcal = if (
+                grantedFeatures.readActiveCalories && canRetainPreviousActivity
+            ) {
+                previous.todayActiveCaloriesKcal
+            } else {
+                null
+            }
+            var syncedActivityLocalDate = activityDateText.takeIf {
+                canRetainPreviousActivity &&
+                    (grantedFeatures.readSteps || grantedFeatures.readActiveCalories)
+            }
 
-            runCatching {
-                val weights = healthConnect.readWeights(
-                    start = now.minus(30, ChronoUnit.DAYS),
-                    end = now,
-                )
-                val entries = importableHealthWeights(
-                    weights = weights,
-                    ownPackageName = healthConnect.applicationPackageName,
-                ).map { weight ->
-                    val measuredDate = weight.zoneOffset
-                        ?.let { offset -> weight.time.atOffset(offset).toLocalDate() }
-                        ?: weight.time.atZone(zoneId).toLocalDate()
-                    WeightEntryEntity(
-                        weightKg = weight.kilograms,
-                        localDate = measuredDate.toString(),
-                        measuredAtEpochMillis = weight.time.toEpochMilli(),
-                        zoneId = weight.zoneOffset?.id ?: zoneId.id,
-                        source = HEALTH_CONNECT_WEIGHT_SOURCE,
-                        externalId = weight.id,
-                        createdAtEpochMillis = syncEpochMillis,
-                        updatedAtEpochMillis = syncEpochMillis,
+            if (grantedFeatures.readWeight) {
+                attemptedOperationCount += 1
+                runCatching {
+                    val weights = healthConnect.readWeights(
+                        // Without extended-history access Health Connect safely filters this to
+                        // the caller's grant-era boundary; with it, the complete history returns.
+                        start = Instant.EPOCH,
+                        end = now,
                     )
-                }
-                repository.importHealthConnectWeights(entries)
-            }.onSuccess { imported ->
-                weightsSynced = true
-                importedWeightCount = imported
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                failures += "weight"
-            }
-
-            runCatching {
-                healthConnect.readActivity(
-                    start = today.atStartOfDay(zoneId).toInstant(),
-                    end = now,
-                    features = activityFeatures,
-                )
-            }.onSuccess { activity ->
-                activitySynced = true
-                todaySteps = activity.steps
-                todayActiveCaloriesKcal = activity.activeCaloriesKcal
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                failures += "activity"
-            }
-
-            runCatching { pushNutritionToHealthConnect() }
-                .onSuccess { sharedCount ->
-                    nutritionSynced = true
-                    sharedNutritionEntryCount = sharedCount
+                    val entries = importableHealthWeights(
+                        weights = weights,
+                        ownPackageName = healthConnect.applicationPackageName,
+                    ).map { weight ->
+                        val measuredDate = weight.zoneOffset
+                            ?.let { offset -> weight.time.atOffset(offset).toLocalDate() }
+                            ?: weight.time.atZone(zoneId).toLocalDate()
+                        WeightEntryEntity(
+                            weightKg = weight.kilograms,
+                            localDate = measuredDate.toString(),
+                            measuredAtEpochMillis = weight.time.toEpochMilli(),
+                            zoneId = weight.zoneOffset?.id ?: zoneId.id,
+                            source = HEALTH_CONNECT_WEIGHT_SOURCE,
+                            externalId = weight.id,
+                            createdAtEpochMillis = syncEpochMillis,
+                            updatedAtEpochMillis = syncEpochMillis,
+                        )
+                    }
+                    repository.importHealthConnectWeights(entries)
+                }.onSuccess { imported ->
+                    importedWeightCount = imported
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
-                    failures += "nutrition"
+                    failures += "weight import"
                 }
+            }
+
+            if (grantedFeatures.writeWeight) {
+                attemptedOperationCount += 1
+                runCatching { pushPendingWeightsToHealthConnect() }
+                    .onSuccess { result ->
+                        sentWeightCount = result.sentCount
+                        if (result.failedCount > 0) failures += "weight export"
+                    }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        failures += "weight export"
+                    }
+            }
+
+            if (grantedFeatures.readSteps || grantedFeatures.readActiveCalories) {
+                attemptedOperationCount += 1
+                runCatching {
+                    healthConnect.readActivity(
+                        start = activityDate.atStartOfDay(zoneId).toInstant(),
+                        end = now,
+                        features = HealthFeatures(
+                            readSteps = grantedFeatures.readSteps,
+                            readActiveCalories = grantedFeatures.readActiveCalories,
+                        ),
+                    )
+                }.onSuccess { activity ->
+                    if (grantedFeatures.readSteps) todaySteps = activity.steps
+                    if (
+                        grantedFeatures.readActiveCalories &&
+                        activity.activeCaloriesReadSucceeded
+                    ) {
+                        todayActiveCaloriesKcal = activity.activeCaloriesKcal
+                    }
+                    syncedActivityLocalDate = activityDateText
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    failures += "activity"
+                }
+            }
+
+            if (grantedFeatures.writeNutrition) {
+                attemptedOperationCount += 1
+                runCatching { pushNutritionToHealthConnect(forceRewrite = userInitiated) }
+                    .onSuccess { sharedNutritionEntryCount = it }
+                    .onFailure { error ->
+                        if (error is CancellationException) throw error
+                        failures += "nutrition"
+                    }
+            }
 
             healthConnectUiState.value = HealthConnectUiState(
-                status = HealthConnectPermissionStatus.CONNECTED,
+                status = status,
                 isSyncing = false,
-                todaySteps = if (activitySynced) todaySteps else null,
-                todayActiveCaloriesKcal = if (activitySynced) todayActiveCaloriesKcal else null,
-                sharedNutritionEntryCount = if (nutritionSynced) {
-                    sharedNutritionEntryCount
-                } else {
-                    previous.sharedNutritionEntryCount
-                },
-                lastSyncEpochMillis = if (weightsSynced && activitySynced && nutritionSynced) {
+                todaySteps = todaySteps,
+                todayActiveCaloriesKcal = todayActiveCaloriesKcal,
+                activityLocalDate = syncedActivityLocalDate,
+                sharedNutritionEntryCount = sharedNutritionEntryCount,
+                lastSyncEpochMillis = if (attemptedOperationCount > 0 && failures.isEmpty()) {
                     syncEpochMillis
                 } else {
                     previous.lastSyncEpochMillis
@@ -2336,6 +2456,10 @@ class AppViewModel(
                     failures.isNotEmpty() -> "Some Health Connect data couldn't be synced. Try again."
                     importedWeightCount == 1 -> "Health Connect synced. Imported 1 new weight."
                     importedWeightCount > 1 -> "Health Connect synced. Imported $importedWeightCount new weights."
+                    sentWeightCount == 1 -> "Health Connect synced. Sent 1 pending weight."
+                    sentWeightCount > 1 -> "Health Connect synced. Sent $sentWeightCount pending weights."
+                    status == HealthConnectPermissionStatus.PARTIAL ->
+                        "Allowed Health Connect categories are up to date. Grant missing permissions for full sync."
                     else -> "Health Connect is up to date."
                 },
             )
@@ -2346,43 +2470,103 @@ class AppViewModel(
                 isSyncing = false,
                 message = "Health Connect couldn't be synced. Try again.",
             )
-        } finally {
-            healthSyncMutex.unlock()
         }
     }
 
-    /**
-     * Mirrors the recent food log into Health Connect and reports how many entries it now holds.
-     *
-     * Only what actually changed is written: the diff runs against the versions the last sync
-     * recorded, so an ordinary resume with nothing new logged makes no Health Connect calls at
-     * all. The new bookkeeping is stored only once both the deletes and the writes went through,
-     * which leaves a failed sync to be repeated in full rather than half-remembered.
-     */
-    private suspend fun pushNutritionToHealthConnect(): Int {
-        val endDate = today
-        val startDate = endDate.minusDays(NUTRITION_SYNC_WINDOW_DAYS - 1L)
-        val windowDates = generateSequence(startDate) { it.plusDays(1) }
-            .takeWhile { !it.isAfter(endDate) }
-            .map(LocalDate::toString)
-            .toSet()
+    /** Retries every local/onboarding weight that has never reached Health Connect. */
+    private suspend fun pushPendingWeightsToHealthConnect(): WeightExportSummary {
+        val healthConnect = container.healthConnect
+        var sent = 0
+        var failed = 0
+        repository.pendingHealthConnectWeightSync().forEach { weight ->
+            try {
+                val externalId = healthConnect.writeWeight(
+                    kilograms = weight.weightKg,
+                    time = Instant.ofEpochMilli(weight.measuredAtEpochMillis),
+                    clientRecordId = weightClientRecordId(weight.id, weight.createdAtEpochMillis),
+                    clientRecordVersion = weight.updatedAtEpochMillis.coerceAtLeast(0L),
+                    zoneId = runCatching { ZoneId.of(weight.zoneId) }.getOrDefault(zoneId),
+                )
+                check(
+                    repository.markWeightHealthConnectSynced(
+                        id = weight.id,
+                        externalId = externalId,
+                        updatedAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                ) { "A synced weight could not be marked locally" }
+                sent += 1
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Keep this row pending but do not let one bad legacy measurement block the rest.
+                failed += 1
+            }
+        }
+        return WeightExportSummary(sentCount = sent, failedCount = failed)
+    }
 
-        val entries = repository.logsInRange(startDate.toString(), endDate.toString())
+    /**
+     * Mirrors the complete food history into Health Connect and reports how many entries it holds.
+     *
+     * Ordinary automatic syncs still write only changes. Local deletes use owned-data time ranges
+     * that are safe to retry even when a record was already removed in Health Connect. Legacy
+     * ledger rows without a stored timestamp fall back to a checkpointed one-time rebuild.
+     */
+    private suspend fun pushNutritionToHealthConnect(forceRewrite: Boolean = false): Int {
+        val endDate = today
+        val entries = repository.logsInRange(HEALTH_CONNECT_HISTORY_START_LOCAL_DATE, endDate.toString())
             .map { log -> log.toHealthNutritionEntry(zoneId) }
         val stored = loadedPreferences().healthNutritionSync
         val plan = planNutritionSync(
             entries = entries,
-            windowDates = windowDates,
+            windowDates = nutritionSyncDatesForFullHistory(entries, stored.syncedVersions),
             synced = stored.syncedVersions,
+            forceRewrite = forceRewrite,
         )
-        if (plan.isEmpty && plan.syncedVersions == stored.syncedVersions) {
+        val syncedStartTimes = nutritionSyncStartTimes(entries)
+        val storedStartsByLogId = stored.syncedStartEpochMillis.values
+            .asSequence()
+            .flatMap { day -> day.asSequence() }
+            .associate { (logId, start) -> logId to start }
+        val deletedStarts = plan.deleteClientRecordIds.mapNotNull { clientRecordId ->
+            val logId = clientRecordId.substringAfterLast('-').takeIf(String::isNotBlank)
+            logId?.let(storedStartsByLogId::get)
+        }
+        val requiresFullRewrite = stored.needsFullRewrite ||
+            deletedStarts.size != plan.deleteClientRecordIds.size
+        val synced = HealthNutritionSyncState(
+            syncedVersions = plan.syncedVersions,
+            syncedStartEpochMillis = syncedStartTimes,
+        )
+        if (
+            plan.isEmpty &&
+            synced == stored &&
+            !requiresFullRewrite
+        ) {
             return stored.entryCount
         }
 
         val healthConnect = container.healthConnect
-        healthConnect.deleteNutrition(plan.deleteClientRecordIds)
-        healthConnect.writeNutrition(plan.write)
-        val synced = HealthNutritionSyncState(plan.syncedVersions)
+        if (requiresFullRewrite) {
+            repository.appPreferencesStore.setHealthNutritionSync(
+                stored.copy(needsFullRewrite = true),
+            )
+            healthConnect.replaceNutrition(entries)
+        } else {
+            val deleteRanges = deletedStarts.distinct().map { startEpochMillis ->
+                val start = Instant.ofEpochMilli(startEpochMillis)
+                HealthNutritionDeleteRange(start = start, end = start.plusSeconds(1))
+            }
+            healthConnect.deleteNutrition(deleteRanges)
+            val overlapRewrites = entries.filter { entry ->
+                deleteRanges.any { range ->
+                    entry.startTime < range.end && entry.endTime > range.start
+                }
+            }
+            healthConnect.writeNutrition(
+                (plan.write + overlapRewrites).distinctBy { entry -> entry.logId },
+            )
+        }
         repository.appPreferencesStore.setHealthNutritionSync(synced)
         return synced.entryCount
     }
@@ -2390,7 +2574,7 @@ class AppViewModel(
     /**
      * Keeps Health Connect in step with edits made after a sync.
      *
-     * Every logging path ends in a food_logs write, so watching the day totals of the sync window
+     * Every logging path ends in a food_logs write, so watching the complete history totals
      * catches new entries, corrections, deletions, restored undos and copied days alike without
      * each of them having to remember to push. The debounce lets a multi-item meal land as one
      * batch instead of one write per item.
@@ -2398,30 +2582,32 @@ class AppViewModel(
     @OptIn(FlowPreview::class)
     private fun observeFoodLogForHealthConnect() {
         viewModelScope.launch {
-            val endDate = today
-            val startDate = endDate.minusDays(NUTRITION_SYNC_WINDOW_DAYS - 1L)
-            repository.nutritionHistory(startDate.toString(), endDate.toString())
+            repository.nutritionHistory(
+                HEALTH_CONNECT_HISTORY_START_LOCAL_DATE,
+                HEALTH_CONNECT_HISTORY_END_LOCAL_DATE,
+            )
                 .drop(1)
                 .debounce(NUTRITION_SYNC_DEBOUNCE_MILLIS)
                 .collect {
-                    val canWrite = runCatching {
-                        container.healthConnect.hasPermissions(HealthFeatures(writeNutrition = true))
-                    }.getOrDefault(false)
-                    if (!canWrite) return@collect
-                    if (!healthSyncMutex.tryLock()) return@collect
-                    try {
-                        val shared = runCatching { pushNutritionToHealthConnect() }
-                            .getOrElse { error ->
-                                if (error is CancellationException) throw error
-                                return@collect
-                            }
-                        healthConnectUiState.update { state ->
-                            state.copy(sharedNutritionEntryCount = shared)
-                        }
-                    } finally {
-                        healthSyncMutex.unlock()
-                    }
+                    requestHealthConnectSync(nutritionOnly = true)
                 }
+        }
+    }
+
+    private suspend fun syncNutritionLogToHealthConnect() {
+        val canWrite = runCatching {
+            container.healthConnect.hasPermissions(HealthFeatures(writeNutrition = true))
+        }.getOrDefault(false)
+        if (!canWrite) return
+        val shared = try {
+            pushNutritionToHealthConnect()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            return
+        }
+        healthConnectUiState.update { state ->
+            state.copy(sharedNutritionEntryCount = shared)
         }
     }
 
@@ -2841,7 +3027,8 @@ class AppViewModel(
             calorieEstimateBias = prefs.calorieEstimateBias,
             goalsCardStyle = prefs.goalsCardStyle,
             healthConnectAvailable = health.status != HealthConnectPermissionStatus.UNAVAILABLE,
-            healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED,
+            healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED ||
+                health.status == HealthConnectPermissionStatus.PARTIAL,
             healthConnect = health.copy(
                 estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
                 stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
@@ -3192,8 +3379,9 @@ private const val MAX_PHOTO_DESCRIPTION_CHARS = 1_000
 private const val MAX_PHOTO_PLACE_CHARS = 120
 private const val MAX_MENU_LOGGING_TEXT_CHARS = 1_500
 
-/** Matches the weight import window, so both directions of the health sync cover the same month. */
-private const val NUTRITION_SYNC_WINDOW_DAYS = 30
+/** Nomi cannot contain a legitimate journal entry before Unix time; this covers all app history. */
+private const val HEALTH_CONNECT_HISTORY_START_LOCAL_DATE = "1970-01-01"
+private const val HEALTH_CONNECT_HISTORY_END_LOCAL_DATE = "9999-12-31"
 
 /** Long enough for a whole multi-item meal to be inserted before anything is pushed. */
 private const val NUTRITION_SYNC_DEBOUNCE_MILLIS = 1_500L

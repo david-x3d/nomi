@@ -68,15 +68,54 @@ data class SaveLoggedMealRequest(
 )
 
 const val HEALTH_CONNECT_WEIGHT_SOURCE = "health_connect"
+private const val HEALTH_CONNECT_WEIGHT_LOOKUP_BATCH_SIZE = 500
 
-internal fun newExternalWeightEntries(
+internal data class ExternalWeightChanges(
+    val additions: List<WeightEntryEntity>,
+    val updates: List<WeightEntryEntity>,
+)
+
+internal fun externalWeightChanges(
     entries: List<WeightEntryEntity>,
-    existingExternalIds: Set<String>,
-): List<WeightEntryEntity> = entries.asSequence()
-    .filter { !it.externalId.isNullOrBlank() }
-    .distinctBy { it.externalId }
-    .filterNot { it.externalId in existingExternalIds }
-    .toList()
+    existingEntries: List<WeightEntryEntity>,
+): ExternalWeightChanges {
+    val existingByExternalId = existingEntries
+        .filter { !it.externalId.isNullOrBlank() }
+        .associateBy { it.externalId }
+    val additions = mutableListOf<WeightEntryEntity>()
+    val updates = mutableListOf<WeightEntryEntity>()
+
+    entries.asSequence()
+        .filter { !it.externalId.isNullOrBlank() }
+        .distinctBy { it.externalId }
+        .forEach { incoming ->
+            val existing = existingByExternalId[incoming.externalId]
+            if (existing == null) {
+                additions += incoming.copy(id = 0)
+                return@forEach
+            }
+
+            // Health Connect has no note field. Keep a local note and the original creation time,
+            // while refreshing the measurements that the external record actually owns.
+            val changed = existing.weightKg != incoming.weightKg ||
+                existing.localDate != incoming.localDate ||
+                existing.measuredAtEpochMillis != incoming.measuredAtEpochMillis ||
+                existing.zoneId != incoming.zoneId ||
+                existing.source != incoming.source
+            if (changed) {
+                updates += existing.copy(
+                    weightKg = incoming.weightKg,
+                    localDate = incoming.localDate,
+                    measuredAtEpochMillis = incoming.measuredAtEpochMillis,
+                    zoneId = incoming.zoneId,
+                    source = incoming.source,
+                    updatedAtEpochMillis = incoming.updatedAtEpochMillis,
+                )
+            }
+        }
+
+    return ExternalWeightChanges(additions = additions, updates = updates)
+}
 
 /**
  * Cohesive local-first boundary. It deliberately returns persistence models; domain adapters can
@@ -565,6 +604,10 @@ class NomiRepository(
         return weightDao.insert(entry.copy(id = 0))
     }
 
+    /** Returns every locally-authored weight that has not yet been acknowledged by Health Connect. */
+    suspend fun pendingHealthConnectWeightSync(): List<WeightEntryEntity> =
+        weightDao.pendingHealthConnectSync(source = HEALTH_CONNECT_WEIGHT_SOURCE)
+
     suspend fun importHealthConnectWeights(entries: List<WeightEntryEntity>): Int {
         if (entries.isEmpty()) return 0
         entries.forEach { entry ->
@@ -579,15 +622,24 @@ class NomiRepository(
         return database.withTransaction {
             val unique = entries.distinctBy { it.externalId }
             val externalIds = unique.mapNotNull(WeightEntryEntity::externalId)
-            val existing = weightDao.existingExternalIds(
-                source = HEALTH_CONNECT_WEIGHT_SOURCE,
-                externalIds = externalIds,
-            ).toSet()
-            val additions = newExternalWeightEntries(unique, existing)
-            if (additions.isNotEmpty()) {
-                weightDao.insertAll(additions.map { it.copy(id = 0) })
+            val existing = externalIds.chunked(HEALTH_CONNECT_WEIGHT_LOOKUP_BATCH_SIZE)
+                .flatMap { batch ->
+                    weightDao.entriesByExternalIds(
+                        source = HEALTH_CONNECT_WEIGHT_SOURCE,
+                        externalIds = batch,
+                    )
+                }
+            val changes = externalWeightChanges(unique, existing)
+            if (changes.additions.isNotEmpty()) {
+                weightDao.insertAll(changes.additions)
             }
-            additions.size
+            changes.updates.forEach { entry ->
+                check(weightDao.update(entry) == 1) {
+                    "Imported Health Connect weight ${entry.externalId} disappeared during sync"
+                }
+            }
+            // The UI reports newly imported measurements; silent corrections are not new rows.
+            changes.additions.size
         }
     }
 

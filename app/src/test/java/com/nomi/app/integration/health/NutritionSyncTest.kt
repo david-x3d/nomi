@@ -1,6 +1,7 @@
 package com.nomi.app.integration.health
 
 import androidx.health.connect.client.records.MealType
+import com.nomi.app.data.preferences.HealthNutritionSyncState
 import com.nomi.app.data.local.entity.FoodLogEntity
 import com.nomi.app.data.local.entity.NutritionSourceSnapshot
 import com.nomi.app.data.local.entity.NutritionValues
@@ -8,6 +9,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,6 +45,24 @@ class NutritionSyncTest {
     }
 
     @Test
+    fun plan_forceRewriteRepairsUnchangedEntriesWithoutChangingTheirIdsOrLedger() {
+        val unchanged = entry(logId = 7, localDate = "2026-08-13", version = 10)
+        val synced = mapOf("2026-08-13" to mapOf("7" to 10L))
+
+        val plan = planNutritionSync(
+            entries = listOf(unchanged),
+            windowDates = window,
+            synced = synced,
+            forceRewrite = true,
+        )
+
+        assertEquals(listOf(unchanged), plan.write)
+        assertEquals(listOf("nomi-food-7"), plan.write.map { it.clientRecordId })
+        assertEquals(emptyList<String>(), plan.deleteClientRecordIds)
+        assertEquals(synced, plan.syncedVersions)
+    }
+
+    @Test
     fun plan_deletesRecordsForFoodThatIsNoLongerLogged() {
         val remaining = entry(logId = 1, localDate = "2026-08-13", version = 10)
         val synced = mapOf("2026-08-13" to mapOf("1" to 10L, "2" to 20L, "3" to 30L))
@@ -65,8 +85,7 @@ class NutritionSyncTest {
     }
 
     /**
-     * A day that slides out of the window keeps its Health Connect records - they still describe
-     * food the user ate - but is forgotten locally so the bookkeeping cannot grow without bound.
+     * A rolling sync still ignores old days when its caller deliberately selects only the window.
      */
     @Test
     fun plan_forgetsDaysOutsideTheWindowWithoutDeletingThem() {
@@ -90,6 +109,64 @@ class NutritionSyncTest {
 
         assertTrue(plan.isEmpty)
         assertEquals(emptyMap<String, Map<String, Long>>(), plan.syncedVersions)
+    }
+
+    @Test
+    fun fullHistoryDates_includeOldEntriesAndLedgerOnlyDays() {
+        val latest = entry(logId = 3, localDate = "2026-08-13", version = 30)
+        val old = entry(logId = 2, localDate = "2026-05-01", version = 20)
+        val synced = linkedMapOf(
+            "2026-07-10" to mapOf("1" to 10L),
+            "2026-05-01" to mapOf("2" to 20L),
+        )
+
+        val dates = nutritionSyncDatesForFullHistory(listOf(latest, old), synced)
+
+        assertEquals(listOf("2026-05-01", "2026-07-10", "2026-08-13"), dates.toList())
+    }
+
+    @Test
+    fun plan_fullHistoryBackfillsOldFoodAndDeletesRemovedLedgerRowsDeterministically() {
+        val latest = entry(logId = 3, localDate = "2026-08-13", version = 30)
+        val old = entry(logId = 2, localDate = "2026-05-01", version = 20)
+        val entries = listOf(latest, old)
+        val synced = linkedMapOf(
+            "2026-07-10" to linkedMapOf("9" to 90L, "1" to 10L),
+        )
+        val fullHistoryDates = nutritionSyncDatesForFullHistory(entries, synced)
+
+        val plan = planNutritionSync(entries, fullHistoryDates, synced)
+
+        assertEquals(listOf(old, latest), plan.write)
+        assertEquals(listOf("nomi-food-1", "nomi-food-9"), plan.deleteClientRecordIds)
+        assertEquals(listOf("2026-05-01", "2026-08-13"), plan.syncedVersions.keys.toList())
+        assertEquals(mapOf("2" to 20L), plan.syncedVersions["2026-05-01"])
+        assertEquals(mapOf("3" to 30L), plan.syncedVersions["2026-08-13"])
+    }
+
+    @Test
+    fun startTimes_areDeterministicAndKeepTheRecordStartForLaterDeletes() {
+        val latest = entry(logId = 3, localDate = "2026-08-13", version = 30)
+        val old = entry(logId = 2, localDate = "2026-05-01", version = 20)
+
+        assertEquals(
+            linkedMapOf(
+                "2026-05-01" to mapOf("2" to old.startTime.toEpochMilli()),
+                "2026-08-13" to mapOf("3" to latest.startTime.toEpochMilli()),
+            ),
+            nutritionSyncStartTimes(listOf(latest, old)),
+        )
+    }
+
+    @Test
+    fun persistedRewriteCheckpointIsNotTreatedAsEmpty() {
+        assertTrue(HealthNutritionSyncState().isEmpty)
+        assertFalse(HealthNutritionSyncState(needsFullRewrite = true).isEmpty)
+        assertFalse(
+            HealthNutritionSyncState(
+                syncedStartEpochMillis = mapOf("2026-08-13" to mapOf("7" to 1L)),
+            ).isEmpty,
+        )
     }
 
     @Test

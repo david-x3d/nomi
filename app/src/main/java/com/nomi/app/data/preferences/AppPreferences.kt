@@ -124,8 +124,15 @@ data class MicronutrientPreferences(
 @Serializable
 data class HealthNutritionSyncState(
     val syncedVersions: Map<String, Map<String, Long>> = emptyMap(),
+    /** Start timestamps let a later local delete use an idempotent owned-data time range. */
+    val syncedStartEpochMillis: Map<String, Map<String, Long>> = emptyMap(),
+    /** Set before an owned-record rebuild and cleared only after every record was written. */
+    val needsFullRewrite: Boolean = false,
 ) {
     val entryCount: Int get() = syncedVersions.values.sumOf(Map<String, Long>::size)
+    val isEmpty: Boolean get() = syncedVersions.isEmpty() &&
+        syncedStartEpochMillis.isEmpty() &&
+        !needsFullRewrite
 }
 
 /**

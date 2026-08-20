@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v2.0.4 — 2026-08-20
+
+### Health Connect sync restored and backfilled
+
+- Syncs every granted Health Connect category independently, so a missing nutrition or weight permission no longer blocks steps and weight reads.
+- Starts Health Connect reads only while Nomi is in the foreground and coalesces overlapping refresh requests instead of dropping them.
+- Imports all accessible weight history with paginated reads and requests extended-history access on supported providers.
+- Retries older local and onboarding weights with stable record IDs, and imports corrections to existing Health Connect weights idempotently.
+- Backfills the complete food journal, safely repairs missing remote nutrition records, and retries interrupted rewrites without losing deletion state.
+- Preserves valid same-day activity after a transient provider error without showing yesterday's values after midnight.
+- Keeps Sync now available with partial access and lets users request missing optional permissions later.
+
+### Verification
+
+- Unit tests, Android lint, the release build, APK version, and APK v2 signature verification passed.
+- APK SHA-256: `6DB7941C405944177BE24E42E0572BAC10C7255C17723BB0CB608EE6C00B859B`
+
 ## Nomi v2.0.3 — 2026-08-16
 
 ### The burned calories are no longer cut off

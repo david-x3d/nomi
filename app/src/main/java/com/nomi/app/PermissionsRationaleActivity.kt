@@ -59,8 +59,8 @@ private fun HealthConnectRationale(onClose: () -> Unit) {
             )
             Text(
                 text(
-                    "Nomi reads weight measurements from the last 30 days and today's step count and active calories. This lets Nomi show your recent health information and weight trend.",
-                    "Nomi liest Gewichtsmessungen der letzten 30 Tage sowie die heutige Schrittzahl und aktive Kalorien. So kann Nomi deine aktuellen Gesundheitsdaten und deinen Gewichtsverlauf anzeigen.",
+                    "Nomi reads today's step count and active calories. With past-data access, it also imports your complete available weight history; otherwise Health Connect limits the import to its standard recent window.",
+                    "Nomi liest die heutige Schrittzahl und aktive Kalorien. Mit Zugriff auf vergangene Daten importiert Nomi außerdem deinen vollständig verfügbaren Gewichtsverlauf; andernfalls gilt das übliche aktuelle Zeitfenster von Health Connect.",
                 ),
             )
             Text(
@@ -71,14 +71,14 @@ private fun HealthConnectRationale(onClose: () -> Unit) {
             )
             Text(
                 text(
-                    "Nomi writes the weight measurements that you manually save in Nomi. A failed Health Connect write never removes the weight from Nomi.",
-                    "Nomi schreibt die Gewichtsmessungen, die du manuell in Nomi speicherst. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
+                    "Nomi writes the weight measurements that you manually save in Nomi and retries pending measurements later. A failed Health Connect write never removes the weight from Nomi.",
+                    "Nomi schreibt die Gewichtsmessungen, die du manuell in Nomi speicherst, und versucht ausstehende Messungen später erneut. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
                 ),
             )
             Text(
                 text(
-                    "Nomi also writes your food log of the last 30 days as nutrition entries: the calories, protein, carbohydrates and fat of each logged portion, with its name and meal. Editing or deleting food in Nomi updates or removes the matching Health Connect entry.",
-                    "Nomi schreibt außerdem dein Ernährungstagebuch der letzten 30 Tage als Ernährungseinträge: Kalorien, Eiweiß, Kohlenhydrate und Fett jeder erfassten Portion samt Name und Mahlzeit. Wenn du ein Lebensmittel in Nomi änderst oder löschst, wird der zugehörige Health-Connect-Eintrag aktualisiert oder entfernt.",
+                    "Nomi also writes your complete food log as nutrition entries: the calories, protein, carbohydrates and fat of each logged portion, with its name and meal. Editing or deleting food in Nomi updates or removes the matching Health Connect entry.",
+                    "Nomi schreibt außerdem dein vollständiges Ernährungstagebuch als Ernährungseinträge: Kalorien, Eiweiß, Kohlenhydrate und Fett jeder erfassten Portion samt Name und Mahlzeit. Wenn du ein Lebensmittel in Nomi änderst oder löschst, wird der zugehörige Health-Connect-Eintrag aktualisiert oder entfernt.",
                 ),
             )
             Text(

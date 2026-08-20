@@ -40,6 +40,8 @@ data class HealthConnectUiState(
     val isSyncing: Boolean = false,
     val todaySteps: Long? = null,
     val todayActiveCaloriesKcal: Double? = null,
+    /** Local date the activity values belong to; prevents yesterday being shown after midnight. */
+    val activityLocalDate: String? = null,
     /** Nomi's net walking-energy estimate, calculated locally from steps and profile data. */
     val estimatedStepCaloriesKcal: Double? = null,
     val stepEstimateUsesProfileHeight: Boolean = false,

@@ -147,36 +147,29 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Valfri hälsosynkronisering",
         tr = "İsteğe bağlı sağlık eşitlemesi",
     ),
-    "Nomi reads weight from the last 30 days, reads today's steps and active calories, and " +
-        "writes back the weights you enter plus the calories, protein, carbs and fat of " +
-        "everything you log." to NomiTranslation(
-        de = "Nomi liest Gewichte der letzten 30 Tage, heutige Schritte und aktive Kalorien und " +
-            "schreibt die Gewichte, die du einträgst, sowie Kalorien, Eiweiß, Kohlenhydrate und " +
-            "Fett von allem, was du erfasst.",
-        es = "Nomi lee los pesos de los últimos 30 días, los pasos y las calorías activas de hoy, " +
-            "y escribe los pesos que introduces más las calorías, proteínas, carbohidratos y " +
-            "grasas de todo lo que registras.",
-        fr = "Nomi lit les poids des 30 derniers jours, les pas et les calories actives du jour, " +
-            "et écrit les poids que tu saisis ainsi que les calories, protéines, glucides et " +
-            "lipides de tout ce que tu enregistres.",
-        it = "Nomi legge i pesi degli ultimi 30 giorni, i passi e le calorie attive di oggi e " +
-            "scrive i pesi che inserisci più calorie, proteine, carboidrati e grassi di tutto " +
-            "quello che registri.",
-        nl = "Nomi leest gewichten van de laatste 30 dagen, de stappen en actieve calorieën van " +
-            "vandaag, en schrijft de gewichten die je invoert plus de calorieën, eiwitten, " +
-            "koolhydraten en vetten van alles wat je logt.",
-        pt = "A Nomi lê os pesos dos últimos 30 dias, os passos e as calorias ativas de hoje, e " +
-            "escreve os pesos que introduzes mais as calorias, proteínas, hidratos de carbono e " +
-            "gorduras de tudo o que registas.",
-        sq = "Nomi lexon peshat e 30 ditëve të fundit, hapat dhe kaloritë aktive të sotme, dhe " +
-            "shkruan peshat që fut ti si edhe kaloritë, proteinat, karbohidratet dhe yndyrat e " +
-            "gjithçkaje që regjistron.",
-        sv = "Nomi läser vikter från de senaste 30 dagarna, dagens steg och aktiva kalorier, och " +
-            "skriver tillbaka vikterna du anger plus kalorier, protein, kolhydrater och fett för " +
-            "allt du loggar.",
-        tr = "Nomi son 30 günün kilo kayıtlarını, bugünkü adımları ve aktif kalorileri okur; " +
-            "girdiğin kilolarla birlikte kaydettiğin her şeyin kalori, protein, karbonhidrat ve " +
-            "yağ değerlerini yazar.",
+    "Nomi reads today's steps and active calories, imports your accessible weight history, and " +
+        "sends pending weights plus your complete food log to Health Connect." to NomiTranslation(
+        de = "Nomi liest heutige Schritte und aktive Kalorien, importiert deinen zugänglichen " +
+            "Gewichtsverlauf und sendet ausstehende Gewichte sowie dein vollständiges " +
+            "Ernährungstagebuch an Health Connect.",
+        es = "Nomi lee los pasos y las calorías activas de hoy, importa tu historial de peso " +
+            "accesible y envía los pesos pendientes y todo tu registro de comidas a Health Connect.",
+        fr = "Nomi lit les pas et les calories actives du jour, importe ton historique de poids " +
+            "accessible et envoie les poids en attente ainsi que tout ton journal alimentaire " +
+            "à Health Connect.",
+        it = "Nomi legge i passi e le calorie attive di oggi, importa la cronologia del peso " +
+            "accessibile e invia i pesi in sospeso e l'intero diario alimentare a Health Connect.",
+        nl = "Nomi leest de stappen en actieve calorieën van vandaag, importeert je toegankelijke " +
+            "gewichtsgeschiedenis en stuurt openstaande gewichten en je volledige voedingsdagboek " +
+            "naar Health Connect.",
+        pt = "A Nomi lê os passos e as calorias ativas de hoje, importa o teu histórico de peso " +
+            "acessível e envia pesos pendentes e todo o teu diário alimentar para o Health Connect.",
+        sq = "Nomi lexon hapat dhe kaloritë aktive të sotme, importon historikun e arritshëm të " +
+            "peshës dhe dërgon peshat në pritje dhe të gjithë ditarin ushqimor te Health Connect.",
+        sv = "Nomi läser dagens steg och aktiva kalorier, importerar din tillgängliga vikthistorik " +
+            "och skickar väntande vikter och hela din matlogg till Health Connect.",
+        tr = "Nomi bugünkü adımları ve aktif kalorileri okur, erişilebilen kilo geçmişini içe " +
+            "aktarır ve bekleyen kilolarla tüm beslenme günlüğünü Health Connect'e gönderir.",
     ),
     "Health Connect isn't available on this device. Nomi works fully without it." to NomiTranslation(
         de = "Health Connect ist auf diesem Gerät nicht verfügbar. Nomi funktioniert auch ohne " +
@@ -217,22 +210,26 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Ingenting delas förrän du godkänner de nödvändiga kategorierna.",
         tr = "Gerekli kategorileri onaylamadan hiçbir şey paylaşılmaz.",
     ),
-    "Some required permissions are missing. Approve them to finish connecting." to
+    "Allowed categories keep syncing. Approve the missing permissions to enable everything." to
         NomiTranslation(
-            de = "Einige erforderliche Berechtigungen fehlen. Gib sie frei, um die Verbindung " +
-                "abzuschließen.",
-            es = "Faltan algunos permisos necesarios. Apruébalos para terminar de conectar.",
-            fr = "Certaines autorisations requises manquent. Approuve-les pour finaliser la " +
-                "connexion.",
-            it = "Mancano alcune autorizzazioni necessarie. Concedile per completare il " +
-                "collegamento.",
-            nl = "Er ontbreken enkele vereiste machtigingen. Keur ze goed om de verbinding af " +
-                "te ronden.",
-            pt = "Faltam algumas permissões necessárias. Aprova-as para concluir a ligação.",
-            sq = "Mungojnë disa leje të nevojshme. Miratoji për ta përfunduar lidhjen.",
-            sv = "Vissa nödvändiga behörigheter saknas. Godkänn dem för att slutföra " +
-                "anslutningen.",
-            tr = "Bazı gerekli izinler eksik. Bağlantıyı tamamlamak için bunları onayla.",
+            de = "Freigegebene Kategorien werden weiter synchronisiert. Gib die fehlenden " +
+                "Berechtigungen frei, um alles zu aktivieren.",
+            es = "Las categorías permitidas se siguen sincronizando. Aprueba los permisos que " +
+                "faltan para activarlo todo.",
+            fr = "Les catégories autorisées continuent à se synchroniser. Accorde les " +
+                "autorisations manquantes pour tout activer.",
+            it = "Le categorie consentite continuano a sincronizzarsi. Concedi le autorizzazioni " +
+                "mancanti per attivare tutto.",
+            nl = "Toegestane categorieën blijven synchroniseren. Geef de ontbrekende " +
+                "machtigingen om alles in te schakelen.",
+            pt = "As categorias permitidas continuam a sincronizar. Aprova as permissões em falta " +
+                "para ativar tudo.",
+            sq = "Kategoritë e lejuara vazhdojnë të sinkronizohen. Mirato lejet që mungojnë për " +
+                "të aktivizuar gjithçka.",
+            sv = "Tillåtna kategorier fortsätter att synkroniseras. Godkänn de behörigheter som " +
+                "saknas för att aktivera allt.",
+            tr = "İzin verilen kategoriler eşitlenmeye devam eder. Her şeyi etkinleştirmek için " +
+                "eksik izinleri onayla.",
         ),
     "Connected. You can change access at any time in Health Connect." to NomiTranslation(
         de = "Verbunden. Du kannst den Zugriff jederzeit in Health Connect ändern.",

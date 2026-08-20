@@ -35,11 +35,25 @@ interface WeightDao {
 
     @Query(
         """
-        SELECT external_id FROM weight_entries
+        SELECT * FROM weight_entries
         WHERE source = :source AND external_id IN (:externalIds)
+        ORDER BY id ASC
         """,
     )
-    suspend fun existingExternalIds(source: String, externalIds: List<String>): List<String>
+    suspend fun entriesByExternalIds(
+        source: String,
+        externalIds: List<String>,
+    ): List<WeightEntryEntity>
+
+    @Query(
+        """
+        SELECT * FROM weight_entries
+        WHERE source != :source
+          AND (external_id IS NULL OR TRIM(external_id) = '')
+        ORDER BY measured_at_epoch_millis ASC, id ASC
+        """,
+    )
+    suspend fun pendingHealthConnectSync(source: String): List<WeightEntryEntity>
 
     @Query(
         """

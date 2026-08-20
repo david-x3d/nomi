@@ -141,7 +141,7 @@ class DataStoreAppPreferencesStore(
 
     override suspend fun setHealthNutritionSync(state: HealthNutritionSyncState) {
         dataStore.edit { values ->
-            if (state.syncedVersions.isEmpty()) {
+            if (state.isEmpty) {
                 values.remove(Keys.HEALTH_NUTRITION_SYNC)
             } else {
                 values[Keys.HEALTH_NUTRITION_SYNC] = json.encodeToString(state)

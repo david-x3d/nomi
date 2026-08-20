@@ -260,7 +260,7 @@ fun HealthConnectScreen(
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                nomiString("Nomi reads weight from the last 30 days, reads today's steps and active calories, and writes back the weights you enter plus the calories, protein, carbs and fat of everything you log."),
+                nomiString("Nomi reads today's steps and active calories, imports your accessible weight history, and sends pending weights plus your complete food log to Health Connect."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
@@ -268,7 +268,7 @@ fun HealthConnectScreen(
                     HealthConnectPermissionStatus.UNAVAILABLE -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.")
                     HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString("Health Connect must be installed or updated before Nomi can connect.")
                     HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve the required categories.")
-                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Some required permissions are missing. Approve them to finish connecting.")
+                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Allowed categories keep syncing. Approve the missing permissions to enable everything.")
                     HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected. You can change access at any time in Health Connect.")
                 },
             )
@@ -283,7 +283,10 @@ fun HealthConnectScreen(
                 }
             }
 
-            if (health.status == HealthConnectPermissionStatus.CONNECTED) {
+            val canSyncGrantedCategories =
+                health.status == HealthConnectPermissionStatus.CONNECTED ||
+                    health.status == HealthConnectPermissionStatus.PARTIAL
+            if (canSyncGrantedCategories) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = nomiCardShape(),
@@ -329,7 +332,9 @@ fun HealthConnectScreen(
                 Button(onClick = onSyncNow, enabled = !health.isSyncing) {
                     Text(nomiString("Sync now"))
                 }
-            } else if (
+            }
+
+            if (
                 health.status == HealthConnectPermissionStatus.DISCONNECTED ||
                 health.status == HealthConnectPermissionStatus.PARTIAL
             ) {

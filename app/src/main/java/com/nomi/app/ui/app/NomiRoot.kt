@@ -200,16 +200,16 @@ private fun NomiMain(
         pendingReminderIndex = null
     }
 
-    // Asks for exactly the set the connection status is judged against. Spelling the features out
-    // here once let the request fall behind what Nomi had started requiring, and a request for
-    // permissions that are all granted already returns instantly: the button appeared dead while
-    // the missing category kept the connection incomplete.
-    val healthPermissions = remember {
+    // Asks from the same feature definition the sync uses, including optional history access when
+    // this provider supports it. Keeping one source of truth prevents a newly added category from
+    // making the button appear dead while the connection remains incomplete.
+    val healthConnectAvailability = container.healthConnect.availability
+    val healthPermissions = remember(healthConnectAvailability) {
         container.healthConnect.permissionsFor(NomiHealthFeatures)
     }
     val healthPermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
-    ) { viewModel.refreshProviderAndHealthStatus() }
+    ) { viewModel.healthConnectPermissionsChanged() }
 
     LaunchedEffect(viewModel) {
         viewModel.events.collectLatest { event ->

@@ -64,24 +64,54 @@ data class NutritionSyncPlan(
 }
 
 /**
+ * Selects every day needed for a full-history repair.
+ *
+ * Current entry days make old food eligible for backfill. Ledger-only days are just as important:
+ * they let the plan delete a Health Connect record when its Nomi food row was removed after a
+ * previous sync. Sorting makes the resulting plan and persisted ledger independent of input order.
+ */
+fun nutritionSyncDatesForFullHistory(
+    entries: Iterable<HealthNutritionEntry>,
+    synced: Map<String, Map<String, Long>>,
+): Set<String> = (
+    entries.asSequence().map(HealthNutritionEntry::localDate) + synced.keys.asSequence()
+).toSortedSet()
+
+/** Durable record starts used to delete a removed food by owned-data time range on every provider. */
+fun nutritionSyncStartTimes(
+    entries: Iterable<HealthNutritionEntry>,
+): Map<String, Map<String, Long>> = entries
+    .sortedWith(compareBy({ it.localDate }, { it.logId }))
+    .groupBy(HealthNutritionEntry::localDate)
+    .mapValues { (_, dayEntries) ->
+        dayEntries.associate { entry -> entry.logId.toString() to entry.startTime.toEpochMilli() }
+    }
+
+/**
  * Diffs the food log against what was last written to Health Connect.
  *
- * Only [windowDates] are considered in both directions: an older day is neither rewritten nor
- * cleaned up, because its records are still correct and re-reading months of history on every
- * sync would cost far more than it is worth. Days that have fallen out of the window are dropped
- * from the returned bookkeeping so it stays bounded.
+ * Only [windowDates] are considered in both directions. An ordinary background sync can pass a
+ * small rolling window; an explicit full-history sync can use [nutritionSyncDatesForFullHistory]
+ * to include old entries and ledger-only days. Days outside the selected dates are dropped from
+ * the returned bookkeeping.
+ *
+ * [forceRewrite] re-emits every live entry in the selected dates even when its version is already
+ * in the ledger. It is intended for an explicit repair/manual sync and defaults to false so normal
+ * background syncs remain incremental. Rewrites keep [HealthNutritionEntry.clientRecordId], so
+ * Health Connect updates the existing Nomi record instead of creating a duplicate.
  */
 fun planNutritionSync(
     entries: List<HealthNutritionEntry>,
     windowDates: Set<String>,
     synced: Map<String, Map<String, Long>>,
+    forceRewrite: Boolean = false,
 ): NutritionSyncPlan {
     val current = entries.filter { it.localDate in windowDates }
         .sortedWith(compareBy({ it.localDate }, { it.logId }))
         .groupBy(HealthNutritionEntry::localDate)
 
     val write = current.values.flatten().filter { entry ->
-        synced[entry.localDate]?.get(entry.logId.toString()) != entry.version
+        forceRewrite || synced[entry.localDate]?.get(entry.logId.toString()) != entry.version
     }
 
     val deleteClientRecordIds = synced.filterKeys { it in windowDates }
