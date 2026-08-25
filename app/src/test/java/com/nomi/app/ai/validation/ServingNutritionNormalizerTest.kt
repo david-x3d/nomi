@@ -4,6 +4,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.prompt.AiPrompts
 import kotlinx.serialization.json.Json
@@ -15,6 +16,105 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ServingNutritionNormalizerTest {
+    @Test
+    fun `per-100-g research scales soup to 100 400 and 50 gram portions`() {
+        val expected = mapOf(100.0 to 1.0, 400.0 to 4.0, 50.0 to 0.5)
+        expected.forEach { (grams, factor) ->
+            val normalized = normalize(
+                raw = sourceItem(
+                    loggedQuantity = grams,
+                    loggedUnit = "g",
+                    // Simulates a response format that repeats the user's amount in the legacy
+                    // source-serving fields while correctly classifying the nutrition basis.
+                    sourceQuantity = grams,
+                    sourceUnit = "g",
+                    calories = 56.0,
+                    protein = 4.4,
+                    carbs = 5.1,
+                    fat = 1.7,
+                ).copy(
+                    nutritionBasis = ResearchNutritionBasis.PER_100_G,
+                    sourceBasisText = "Nährwerte pro 100 g",
+                    fiberGrams = 2.2,
+                    sugarGrams = 1.3,
+                    saturatedFatGrams = 0.6,
+                    sodiumMilligrams = 320.0,
+                ),
+                requestedQuantity = grams,
+                requestedUnit = "g",
+            )
+
+            assertEquals(56.0 * factor, normalized.calories, 1e-12)
+            assertEquals(4.4 * factor, normalized.proteinGrams, 1e-12)
+            assertEquals(5.1 * factor, normalized.carbohydrateGrams, 1e-12)
+            assertEquals(1.7 * factor, normalized.fatGrams, 1e-12)
+            assertEquals(2.2 * factor, normalized.fiberGrams!!, 1e-12)
+            assertEquals(1.3 * factor, normalized.sugarGrams!!, 1e-12)
+            assertEquals(0.6 * factor, normalized.saturatedFatGrams!!, 1e-12)
+            assertEquals(320.0 * factor, normalized.sodiumMilligrams!!, 1e-12)
+            assertEquals(factor, normalized.servingValidation!!.scaleFactor, 1e-12)
+            ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
+        }
+    }
+
+    @Test
+    fun `values already reported for the complete portion are not scaled twice`() {
+        val normalized = normalize(
+            raw = sourceItem(400.0, "g", 400.0, "g").copy(
+                calories = 224.0,
+                proteinGrams = 17.6,
+                carbohydrateGrams = 20.4,
+                fatGrams = 6.8,
+                nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+                sourceBasisText = "per 400 g serving",
+            ),
+            requestedQuantity = 400.0,
+            requestedUnit = "g",
+        )
+
+        assertEquals(224.0, normalized.calories, 0.0)
+        assertEquals(1.0, normalized.servingValidation!!.scaleFactor, 0.0)
+    }
+
+    @Test
+    fun `cached per-100-g dataset is recomputed for a new user portion`() {
+        val cachedPer100 = sourceItem(100.0, "g", 100.0, "g").copy(
+            calories = 56.0,
+            proteinGrams = 4.4,
+            carbohydrateGrams = 5.1,
+            fatGrams = 1.7,
+            nutritionBasis = ResearchNutritionBasis.PER_100_G,
+        )
+
+        val reused = ServingNutritionNormalizer.normalizeSourceServingTo(
+            sourceServingItem = cachedPer100,
+            loggedQuantity = 400.0,
+            loggedUnit = "g",
+            loggedGramsEquivalent = 400.0,
+        )
+
+        assertEquals(224.0, reused.calories, 1e-12)
+        assertEquals(17.6, reused.proteinGrams, 1e-12)
+        assertEquals(4.0, reused.servingValidation!!.scaleFactor, 0.0)
+    }
+
+    @Test
+    fun `legacy explicit serving and classified per-100 response formats normalize identically`() {
+        val legacy = normalize(sourceItem(400.0, "g", 100.0, "g", 56.0, 4.4, 5.1, 1.7), 400.0, "g")
+        val classified = normalize(
+            sourceItem(400.0, "g", 400.0, "g", 56.0, 4.4, 5.1, 1.7).copy(
+                nutritionBasis = ResearchNutritionBasis.PER_100_G,
+                sourceBasisText = "per 100 g",
+            ),
+            400.0,
+            "g",
+        )
+
+        assertEquals(legacy.calories, classified.calories, 0.0)
+        assertEquals(legacy.proteinGrams, classified.proteinGrams, 0.0)
+        assertEquals(legacy.servingValidation, classified.servingValidation)
+    }
+
     @Test
     fun `355 ml source serving is normalized before scaling to logged 250 ml`() {
         val normalized = normalize(

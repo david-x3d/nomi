@@ -247,6 +247,10 @@ object AiPrompts {
         Before returning JSON, verify for every item: if sourceServingQuantity=100 and
         sourceServingUnit is "g" or "ml", then every nutrient field is the PER-100 value from
         the cited source, regardless of `quantity`.
+        `nutritionBasis` is REQUIRED and must be exactly `PER_100_G`, `PER_100_ML`, or
+        `SOURCE_SERVING`. For verified research, `sourceBasisText` is REQUIRED and must copy the
+        cited page's exact table heading or nearby phrase that states the basis (for example
+        "Nährwerte pro 100 g"). Never derive either field from the user's logged quantity.
         COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT. When the logged amount is
         a count (piece/Stück) but the source serving is mass, `gramsEquivalent` MUST be the total
         grams for the entire logged count, not grams per piece. When the source serving is a count
@@ -310,6 +314,8 @@ object AiPrompts {
             "sourceServingQuantity": positive number,
             "sourceServingUnit": string,
             "sourceServingGramsEquivalent": positive number|null,
+            "nutritionBasis": "PER_100_G"|"PER_100_ML"|"SOURCE_SERVING",
+            "sourceBasisText": non-empty string|null,
             "sourceCountry": ISO-3166 alpha-2 country code|null,
             "sourcePackageQuantity": positive number|null,
             "sourcePackageUnit": string|null,
@@ -386,6 +392,8 @@ object AiPrompts {
         - `quantity` and `unit` MUST repeat the amount the user logged, unchanged.
         - `sourceServingQuantity` MUST be 100 and `sourceServingUnit` MUST be "g" for foods or
           "ml" for drinks.
+        - `nutritionBasis` MUST be `PER_100_G` for foods or `PER_100_ML` for drinks, and
+          `sourceBasisText` MUST be null because this estimate has no cited table heading.
         - `calories`, `proteinGrams`, `carbohydrateGrams`, `fatGrams`, and `fiberGrams` MUST be
           the values for 100 g / 100 ml, NOT for the logged amount. Nomi scales them itself, so
           pre-scaled values would be counted twice.
@@ -433,6 +441,9 @@ object AiPrompts {
             "sourceName": "Estimate",
             "sourceServingQuantity": 100,
             "sourceServingUnit": "g"|"ml",
+            "sourceServingGramsEquivalent": positive number|null,
+            "nutritionBasis": "PER_100_G"|"PER_100_ML",
+            "sourceBasisText": null,
             "isEstimate": true,
             "uncertaintyPercent": number,
             "confidence": number|null,

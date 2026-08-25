@@ -4,6 +4,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.model.ServingSizeValidation
 import java.util.Locale
 import kotlin.math.abs
@@ -279,12 +280,27 @@ object ServingNutritionNormalizer {
             )
         }
 
-        val sourceQuantity = item.sourceServingQuantity
+        val declaredBasis = item.nutritionBasis
+        val sourceQuantity = when (declaredBasis) {
+            ResearchNutritionBasis.PER_100_G,
+            ResearchNutritionBasis.PER_100_ML,
+            -> 100.0
+            ResearchNutritionBasis.SOURCE_SERVING, null -> item.sourceServingQuantity
+        }
             ?: throw AiValidationException("Nutrition source serving amount is missing")
-        val sourceUnit = item.sourceServingUnit?.takeIf(String::isNotBlank)
+        val sourceUnit = when (declaredBasis) {
+            ResearchNutritionBasis.PER_100_G -> "g"
+            ResearchNutritionBasis.PER_100_ML -> "ml"
+            ResearchNutritionBasis.SOURCE_SERVING, null -> item.sourceServingUnit
+        }?.takeIf(String::isNotBlank)
             ?: throw AiValidationException("Nutrition source serving unit is missing")
         requireFinitePositive(sourceQuantity, "source serving amount")
-        item.sourceServingGramsEquivalent?.let {
+        val declaredSourceGramsEquivalent = when (declaredBasis) {
+            ResearchNutritionBasis.PER_100_G -> 100.0
+            ResearchNutritionBasis.PER_100_ML -> null
+            ResearchNutritionBasis.SOURCE_SERVING, null -> item.sourceServingGramsEquivalent
+        }
+        declaredSourceGramsEquivalent?.let {
             requireFinitePositive(it, "source serving grams")
         }
 
@@ -330,7 +346,7 @@ object ServingNutritionNormalizer {
             ?: estimatedAppleGramsEquivalent
             ?: estimatedJamGramsEquivalent
             ?: estimatedVolumeGramsEquivalent
-        val estimatedSourceGramsEquivalent = item.sourceServingGramsEquivalent ?: run {
+        val estimatedSourceGramsEquivalent = declaredSourceGramsEquivalent ?: run {
             val source = measure(sourceQuantity, sourceUnit)
             val logged = measure(loggedQuantity, loggedUnit)
             source.baseAmount.takeIf {
@@ -371,6 +387,9 @@ object ServingNutritionNormalizer {
             unit = loggedUnit,
             gramsEquivalent = loggedGramsEquivalent,
             sourceServingGramsEquivalent = estimatedSourceGramsEquivalent,
+            sourceServingQuantity = sourceQuantity,
+            sourceServingUnit = sourceUnit,
+            nutritionBasis = declaredBasis ?: ResearchNutritionBasis.SOURCE_SERVING,
             calories = validation.caloriesPer100 * loggedFactor,
             proteinGrams = validation.proteinGramsPer100 * loggedFactor,
             carbohydrateGrams = validation.carbohydrateGramsPer100 * loggedFactor,
@@ -383,7 +402,7 @@ object ServingNutritionNormalizer {
                 estimatedAppleGramsEquivalent != null ||
                 estimatedJamGramsEquivalent != null ||
                 estimatedVolumeGramsEquivalent != null ||
-                (item.sourceServingGramsEquivalent == null && estimatedSourceGramsEquivalent != null),
+                (declaredSourceGramsEquivalent == null && estimatedSourceGramsEquivalent != null),
             assumptions = (
                 item.assumptions + listOfNotNull(
                     MEDIUM_APPLE_MASS_ASSUMPTION.takeIf {

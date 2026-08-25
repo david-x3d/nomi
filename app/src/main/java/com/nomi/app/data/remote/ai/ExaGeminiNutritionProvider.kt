@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
@@ -438,6 +439,7 @@ internal fun geminiNutritionPrompt(
     appendLine("Return one item per parsed item, in the same order. Choose only sourceId/supportingSourceIds listed above.")
     appendLine("Identify the exact brand, product, variant, restaurant item, and country. Prefer the current official manufacturer/restaurant source for the user's market, then official databases, then reliable nutrition databases. If sources conflict, select the official exact-market values and state the conflict in assumptions.")
     appendLine("The calories and nutrients must reproduce the selected source's basis exactly (per 100 g/ml, per serving, or per item). Do not scale them to what the user ate. Nomi performs final serving arithmetic in Kotlin.")
+    appendLine("Set nutritionBasis to PER_100_G, PER_100_ML, or SOURCE_SERVING. Copy the exact nearby table heading/text that names that basis into sourceBasisText. sourceBasisText must occur verbatim in the selected Exa document; never copy the user's requested amount as the source basis. Only the explicitly unverified restaurant-size estimate may use null sourceBasisText.")
     appendLine("For every item, return calorieExplanation as a concise user-facing sentence in the user's input language. Explain the main calorie drivers from the returned macros and portion: fat contributes 9 kcal/g, carbohydrates and protein 4 kcal/g. Mention a large portion when it materially raises the total. This is a result summary, not hidden chain-of-thought; do not invent ingredients or health claims.")
     appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
@@ -476,6 +478,8 @@ internal data class GeminiNutritionItem(
     val sourceServingQuantity: Double,
     val sourceServingUnit: String,
     val sourceServingGramsEquivalent: Double? = null,
+    val nutritionBasis: ResearchNutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+    val sourceBasisText: String? = null,
     /** Exact mass of the user's logged count, when Exa evidence states a weight per piece. */
     val loggedServingGramsEquivalent: Double? = null,
     val sourceCountry: String? = null,
@@ -532,7 +536,13 @@ private fun groundGeminiExtraction(
         val groundedPrimary = try {
             requireNutritionEvidence(extracted, parsed, declaredSources)
             primary
-        } catch (_: AiValidationException) {
+        } catch (failure: AiValidationException) {
+            // A source-ID mismatch can be repaired by finding the document that supports the
+            // same values. A serving-basis contradiction cannot: treating it as an unverified
+            // full-portion estimate would recreate the under-scaling bug with the same numbers.
+            if (failure.message?.contains("nutrition basis", ignoreCase = true) == true ||
+                failure.message?.contains("Per-100 nutrition", ignoreCase = true) == true
+            ) throw failure
             // Gemini occasionally returns the adjacent source ID in a multi-item order (for
             // example an Extra Sauce page for a Cheeseburger). Correct only when another Exa
             // document independently passes the same strict product, calorie and macro checks.
@@ -561,6 +571,8 @@ private fun groundGeminiExtraction(
                 sourceServingQuantity = parsed.quantity,
                 sourceServingUnit = parsed.unit,
                 sourceServingGramsEquivalent = parsed.gramsEquivalent,
+                nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+                sourceBasisText = null,
                 isEstimate = true,
                 assumptions = (extracted.assumptions +
                     "Live research ran for this item, but the retrieved page excerpt did not " +
@@ -604,6 +616,8 @@ private fun GeminiNutritionItem.toAnalyzedItem(
     sourceServingQuantity = sourceServingQuantity,
     sourceServingUnit = sourceServingUnit,
     sourceServingGramsEquivalent = sourceServingGramsEquivalent,
+    nutritionBasis = nutritionBasis,
+    sourceBasisText = sourceBasisText,
     sourceProductName = sourceProductName,
     sourceCountry = sourceCountry,
     sourcePackageQuantity = sourcePackageQuantity,
@@ -623,6 +637,7 @@ private fun requireNutritionEvidence(
     val corpus = documents.joinToString("\n") { document ->
         document.title + "\n" + document.content
     }
+    requireGroundedNutritionBasis(item, corpus)
     requireEntityEvidence(item, corpus)
     if (!NUTRITION_WORDS.containsMatchIn(corpus)) {
         throw AiValidationException("The selected Exa source contains no recognizable nutrition evidence")
@@ -657,6 +672,44 @@ private fun requireNutritionEvidence(
         throw AiValidationException("The selected Exa source does not support Gemini's macro values")
     }
 }
+
+/**
+ * Binds the model's serving-basis classification to exact retrieved page text. Nutrient values
+ * were already grounded, but without this check a model could pair a real per-100 table with the
+ * user's 400 g request and make correct arithmetic operate on the wrong semantic basis.
+ */
+private fun requireGroundedNutritionBasis(item: GeminiNutritionItem, corpus: String) {
+    val basisText = item.sourceBasisText?.trim()?.takeIf(String::isNotBlank) ?: return
+    val normalizedEvidence = corpus.normalizedBasisEvidence()
+    val normalizedBasisText = basisText.normalizedBasisEvidence()
+    if (!normalizedEvidence.contains(normalizedBasisText)) {
+        throw AiValidationException("Gemini's nutrition basis text does not occur in the selected Exa source")
+    }
+    val expectedMarker = when (item.nutritionBasis) {
+        ResearchNutritionBasis.PER_100_G -> PER_100_G_BASIS
+        ResearchNutritionBasis.PER_100_ML -> PER_100_ML_BASIS
+        ResearchNutritionBasis.SOURCE_SERVING -> null
+    }
+    if (expectedMarker != null && !expectedMarker.containsMatchIn(normalizedBasisText)) {
+        throw AiValidationException("Gemini's nutrition basis classification disagrees with its source text")
+    }
+    if (item.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
+        (PER_100_G_BASIS.containsMatchIn(normalizedBasisText) ||
+            PER_100_ML_BASIS.containsMatchIn(normalizedBasisText))
+    ) {
+        throw AiValidationException("Per-100 nutrition was mislabeled as a complete source serving")
+    }
+}
+
+private fun String.normalizedBasisEvidence(): String = lowercase(Locale.ROOT)
+    .replace('\u00a0', ' ')
+    .replace(',', '.')
+    .replace(Regex("(\\d+)\\.0+\\b"), "$1")
+    .replace(Regex("\\s+"), " ")
+    .trim()
+
+private val PER_100_G_BASIS = Regex("(?:(?:per|pro|je|pour|por|/)\\s*)?100(?:\\.0+)?\\s*g\\b")
+private val PER_100_ML_BASIS = Regex("(?:(?:per|pro|je|pour|por|/)\\s*)?100(?:\\.0+)?\\s*ml\\b")
 
 private fun requireEntityEvidence(item: GeminiNutritionItem, corpus: String) {
     val claimedProduct = item.sourceProductName?.trim()?.takeIf(String::isNotBlank)
@@ -743,11 +796,26 @@ private fun debugTrace(
         listOf(item.sourceId) + item.supportingSourceIds
     }.distinct(),
     extractedBasis = extraction?.items.orEmpty().map { item ->
-        "${item.name}: ${item.calories} kcal, P ${item.proteinGrams} g, C ${item.carbohydrateGrams} g, F ${item.fatGrams} g per ${item.sourceServingQuantity} ${item.sourceServingUnit}"
+        "${item.name}: basis=${item.nutritionBasis}, basisText=${item.sourceBasisText}, " +
+            "declaredSource=${item.sourceServingQuantity} ${item.sourceServingUnit}, " +
+            "raw={kcal=${item.calories}, protein=${item.proteinGrams}, " +
+            "carbs=${item.carbohydrateGrams}, fat=${item.fatGrams}, fiber=${item.fiberGrams}, " +
+            "sugar=${item.sugarGrams}, saturatedFat=${item.saturatedFatGrams}, " +
+            "sodiumMg=${item.sodiumMilligrams}}"
     },
     normalization = result?.items.orEmpty().map { item ->
         val validation = item.servingValidation
-        "${item.name}: scale=${validation?.scaleFactor}, final=${item.calories} kcal, P ${item.proteinGrams} g, C ${item.carbohydrateGrams} g, F ${item.fatGrams} g for ${item.quantity} ${item.unit}"
+        "${item.name}: requested=${item.quantity} ${item.unit}, researchBasis=${item.nutritionBasis}, " +
+            "source=${validation?.sourceQuantity} ${validation?.sourceUnit}, " +
+            "per100={kcal=${validation?.caloriesPer100}, protein=${validation?.proteinGramsPer100}, " +
+            "carbs=${validation?.carbohydrateGramsPer100}, fat=${validation?.fatGramsPer100}, " +
+            "fiber=${validation?.fiberGramsPer100}, sugar=${validation?.sugarGramsPer100}, " +
+            "saturatedFat=${validation?.saturatedFatGramsPer100}, " +
+            "sodiumMg=${validation?.sodiumMilligramsPer100}}, factor=${validation?.scaleFactor}, " +
+            "final={kcal=${item.calories}, protein=${item.proteinGrams}, " +
+            "carbs=${item.carbohydrateGrams}, fat=${item.fatGrams}, fiber=${item.fiberGrams}, " +
+            "sugar=${item.sugarGrams}, saturatedFat=${item.saturatedFatGrams}, " +
+            "sodiumMg=${item.sodiumMilligrams}}"
     },
     searchLatencyMillis = searchLatency,
     geminiLatencyMillis = extractionLatency,
@@ -842,6 +910,7 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
             "fiberGrams", "sugarGrams", "saturatedFatGrams", "sodiumMilligrams",
             "sourceId", "supportingSourceIds", "sourceProductName",
             "sourceServingQuantity", "sourceServingUnit", "sourceServingGramsEquivalent",
+            "nutritionBasis", "sourceBasisText",
             "loggedServingGramsEquivalent",
             "sourceCountry", "sourcePackageQuantity", "sourcePackageUnit", "isEstimate",
             "uncertaintyPercent", "confidence", "assumptions",
@@ -865,6 +934,11 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
         put("sourceServingQuantity", positiveNumber())
         put("sourceServingUnit", nonEmptyString())
         put("sourceServingGramsEquivalent", nullableNumber(exclusiveMinimum = 0.0))
+        put("nutritionBasis", buildJsonObject {
+            put("type", "string")
+            put("enum", stringArray("PER_100_G", "PER_100_ML", "SOURCE_SERVING"))
+        })
+        put("sourceBasisText", nullableString())
         put("loggedServingGramsEquivalent", nullableNumber(exclusiveMinimum = 0.0))
         put("sourceCountry", nullableString())
         put("sourcePackageQuantity", nullableNumber(exclusiveMinimum = 0.0))

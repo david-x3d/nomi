@@ -75,6 +75,14 @@ enum class NutritionVerificationStatus {
     UNKNOWN,
 }
 
+/** Machine-readable basis for provider nutrition values; the logged amount is always separate. */
+@Serializable
+enum class ResearchNutritionBasis {
+    PER_100_G,
+    PER_100_ML,
+    SOURCE_SERVING,
+}
+
 @Serializable
 data class AnalyzedFoodItem(
     val name: String,
@@ -105,6 +113,10 @@ data class AnalyzedFoodItem(
     val sourceServingQuantity: Double? = null,
     val sourceServingUnit: String? = null,
     val sourceServingGramsEquivalent: Double? = null,
+    /** Explicit provider contract; legacy cached/provider responses may leave this null. */
+    val nutritionBasis: ResearchNutritionBasis? = null,
+    /** Exact source text naming the basis, e.g. "Nährwerte pro 100 g". */
+    val sourceBasisText: String? = null,
     /** Exact product text returned by the cited source, never a guessed substitute. */
     val sourceProductName: String? = null,
     /** Cited host reported by the provider; Nomi verifies it against [sourceUrl]. */

@@ -48,6 +48,7 @@ class OpenAiCompatibleProviders(
     private val visionCredential: () -> AiRuntimeCredential,
     private val localeCountryProvider: () -> String? = { Locale.getDefault().country },
     private val calorieBiasProvider: () -> CalorieEstimateBias = { CalorieEstimateBias.NONE },
+    private val nutritionDebugSink: suspend (NutritionScalingDebugTrace) -> Unit = {},
 ) : FoodParsingProvider,
     NutritionResearchProvider,
     NutritionEstimateProvider,
@@ -159,6 +160,18 @@ class OpenAiCompatibleProviders(
             )
         }
         val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciledAnalysis)
+        runCatching {
+            nutritionDebugSink(
+                nutritionScalingDebugTrace(
+                    provider = nutritionConfig.kind.name,
+                    model = nutritionConfig.model,
+                    intent = reconciledIntent,
+                    raw = reconciledAnalysis,
+                    normalized = normalized,
+                    source = "web-research",
+                ),
+            )
+        }
         return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
 
@@ -214,6 +227,18 @@ class OpenAiCompatibleProviders(
             withCalorieBias(labeled),
         )
         val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciled)
+        runCatching {
+            nutritionDebugSink(
+                nutritionScalingDebugTrace(
+                    provider = nutritionConfig.kind.name,
+                    model = nutritionConfig.model,
+                    intent = reconciledIntent,
+                    raw = reconciled,
+                    normalized = normalized,
+                    source = "estimate",
+                ),
+            )
+        }
         return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
 
@@ -303,6 +328,63 @@ class OpenAiCompatibleProviders(
         return AiResponseValidator.validate(result)
     }
 }
+
+@Serializable
+data class NutritionScalingDebugTrace(
+    val provider: String,
+    val model: String,
+    val source: String,
+    val originalInput: String,
+    val items: List<NutritionScalingDebugItem>,
+)
+
+@Serializable
+data class NutritionScalingDebugItem(
+    val requestedAmount: String,
+    val researchBasis: String,
+    val rawValues: String,
+    val normalizedPer100: String,
+    val scalingFactor: Double?,
+    val finalPortionValues: String,
+)
+
+private fun nutritionScalingDebugTrace(
+    provider: String,
+    model: String,
+    intent: ParsedFoodIntent,
+    raw: FoodAnalysis,
+    normalized: FoodAnalysis,
+    source: String,
+) = NutritionScalingDebugTrace(
+    provider = provider,
+    model = model,
+    source = source,
+    originalInput = intent.originalText,
+    items = normalized.items.mapIndexed { index, item ->
+        val rawItem = raw.items[index]
+        val validation = item.servingValidation
+        NutritionScalingDebugItem(
+            requestedAmount = "${item.quantity} ${item.unit}",
+            researchBasis = "${rawItem.nutritionBasis ?: "legacy-source-serving"}; " +
+                "${rawItem.sourceServingQuantity} ${rawItem.sourceServingUnit}; " +
+                "text=${rawItem.sourceBasisText}",
+            rawValues = rawItem.debugNutritionValues(),
+            normalizedPer100 = validation?.debugPer100Values().orEmpty(),
+            scalingFactor = validation?.scaleFactor,
+            finalPortionValues = item.debugNutritionValues(),
+        )
+    },
+)
+
+private fun AnalyzedFoodItem.debugNutritionValues(): String =
+    "kcal=$calories, protein=$proteinGrams, carbs=$carbohydrateGrams, fat=$fatGrams, " +
+        "fiber=$fiberGrams, sugar=$sugarGrams, saturatedFat=$saturatedFatGrams, " +
+        "sodiumMg=$sodiumMilligrams"
+
+private fun com.nomi.app.ai.model.ServingSizeValidation.debugPer100Values(): String =
+    "kcal=$caloriesPer100, protein=$proteinGramsPer100, carbs=$carbohydrateGramsPer100, " +
+        "fat=$fatGramsPer100, fiber=$fiberGramsPer100, sugar=$sugarGramsPer100, " +
+        "saturatedFat=$saturatedFatGramsPer100, sodiumMg=$sodiumMilligramsPer100"
 
 /**
  * Finds results that cannot yet bridge a source mass serving and a logged piece/portion (or the

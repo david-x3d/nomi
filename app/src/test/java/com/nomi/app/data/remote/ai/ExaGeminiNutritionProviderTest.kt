@@ -9,6 +9,7 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.QuantityOrigin
 import com.nomi.app.ai.model.QuantityResolutionMetadata
 import com.nomi.app.ai.model.QuantitySemantic
+import com.nomi.app.ai.model.ResearchNutritionBasis
 import kotlinx.coroutines.runBlocking
 import com.nomi.app.ai.validation.AiValidationException
 import org.junit.Assert.assertEquals
@@ -181,6 +182,69 @@ class ExaGeminiNutritionProviderTest {
         ).researchNutrition(servingCase.intent())
         assertEquals(160.0, servingResult.items.single().calories, 0.001)
         assertEquals(17.2, servingResult.items.single().carbohydrateGrams, 0.001)
+    }
+
+    @Test
+    fun `grounded per-100 basis overrides a provider field that repeats the logged 400 grams`() = runBlocking {
+        val case = SuccessCase(
+            text = "400 g Puszta-Hütte Gulaschsuppe",
+            name = "Puszta-Hütte Gulaschsuppe",
+            quantity = 400.0,
+            sourceAmount = 100.0,
+            calories = 56.0,
+            protein = 4.4,
+            carbs = 5.1,
+            fat = 1.7,
+            expectedCalories = 224.0,
+        )
+        val providerResponse = item(case).copy(
+            // The old contract trusted these two fields and therefore stored 56 kcal for 400 g.
+            sourceServingQuantity = 400.0,
+            sourceServingGramsEquivalent = 400.0,
+            nutritionBasis = ResearchNutritionBasis.PER_100_G,
+            sourceBasisText = "per 100 g",
+        )
+
+        val result = provider(
+            sources = listOf(source(case.name, content = evidence(case))),
+            extraction = extraction(providerResponse),
+        ).researchNutrition(case.intent()).items.single()
+
+        assertEquals(400.0, result.quantity, 0.0)
+        assertEquals(100.0, result.sourceServingQuantity!!, 0.0)
+        assertEquals(224.0, result.calories, 1e-12)
+        assertEquals(17.6, result.proteinGrams, 1e-12)
+        assertEquals(4.0, result.servingValidation!!.scaleFactor, 0.0)
+    }
+
+    @Test
+    fun `per-100 source text cannot be labeled as a complete portion`() {
+        val case = SuccessCase(
+            text = "400 g soup",
+            name = "Soup",
+            quantity = 400.0,
+            sourceAmount = 100.0,
+            calories = 56.0,
+            protein = 4.4,
+            carbs = 5.1,
+            fat = 1.7,
+            expectedCalories = 224.0,
+        )
+        val mislabeled = item(case).copy(
+            sourceServingQuantity = 400.0,
+            nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+            sourceBasisText = "per 100 g",
+        )
+
+        val error = assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                provider(
+                    sources = listOf(source(case.name, content = evidence(case))),
+                    extraction = extraction(mislabeled),
+                ).researchNutrition(case.intent())
+            }
+        }
+        assertTrue(error.message!!.contains("mislabeled"))
     }
 
     @Test
@@ -640,6 +704,11 @@ class ExaGeminiNutritionProviderTest {
         sourceServingQuantity = case.sourceAmount,
         sourceServingUnit = case.sourceUnit,
         sourceServingGramsEquivalent = case.sourceAmount.takeIf { case.sourceUnit == "g" },
+        nutritionBasis = when {
+            case.sourceAmount == 100.0 && case.sourceUnit == "g" -> ResearchNutritionBasis.PER_100_G
+            case.sourceAmount == 100.0 && case.sourceUnit == "ml" -> ResearchNutritionBasis.PER_100_ML
+            else -> ResearchNutritionBasis.SOURCE_SERVING
+        },
         sourceCountry = case.country,
         sourcePackageQuantity = packageQuantity,
         sourcePackageUnit = packageQuantity?.let { "g" },

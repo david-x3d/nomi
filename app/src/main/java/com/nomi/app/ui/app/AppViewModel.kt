@@ -56,6 +56,7 @@ import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
+import com.nomi.app.data.remote.ai.NutritionScalingDebugTrace
 import com.nomi.app.data.remote.ai.ProviderTemporarilyUnavailableException
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
@@ -936,6 +937,7 @@ class AppViewModel(
         lastLoggingText = text
         val cacheKey = foodAnalysisCacheKey(text)
         recentFoodAnalysisCache.get(cacheKey)?.takeIf { menuDishes == null }?.let { analysis ->
+            recordCachedNutritionTrace("5-minute exact-input cache", analysis)
             saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
             return
         }
@@ -980,6 +982,7 @@ class AppViewModel(
                             decision = NutritionRoute.Decision.LOCAL,
                             detail = "Validated 21-day food research cache hit",
                         )
+                        recordCachedNutritionTrace("21-day validated research cache", cached)
                         saveTextAnalysisAutomatically(cached, current.mealCategory, text)
                     }
                     return@launch
@@ -988,6 +991,7 @@ class AppViewModel(
 
             cachedNutritionAnalysis(intent)?.let { cached ->
                 if (requestId == analysisRequestId) {
+                    recordCachedNutritionTrace("per-100-g local food cache", cached)
                     saveTextAnalysisAutomatically(cached, current.mealCategory, text)
                 }
                 return@launch
@@ -2860,6 +2864,66 @@ class AppViewModel(
             )
         }
     }
+
+    private suspend fun recordNutritionScalingTrace(trace: NutritionScalingDebugTrace) {
+        if (!preferences.value.aiDebugEnabled) return
+        runCatching {
+            repository.recordAiDebugEvent(
+                AiDebugEventEntity(
+                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
+                    providerId = trace.provider,
+                    model = trace.model,
+                    durationMillis = 0,
+                    cacheHit = false,
+                    sourceSummary = trace.source,
+                    parsedResultJson = container.openAiClient.json.encodeToString(trace),
+                    validationStatus = "PORTION_NORMALIZED",
+                    safeMessage = trace.items.joinToString(" | ") { item ->
+                        "${item.requestedAmount}; ${item.researchBasis}; " +
+                            "factor=${item.scalingFactor}; final=${item.finalPortionValues}"
+                    }.take(4_000),
+                    createdAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+
+    private fun recordCachedNutritionTrace(cacheKind: String, analysis: FoodAnalysis) {
+        if (!preferences.value.aiDebugEnabled) return
+        viewModelScope.launch {
+            runCatching {
+                val summaries = analysis.items.map { item ->
+                    val basis = item.servingValidation
+                    "${item.name}: requested=${item.quantity} ${item.unit}, " +
+                        "researchBasis=${item.nutritionBasis}, " +
+                        "per100={kcal=${basis?.caloriesPer100}, protein=${basis?.proteinGramsPer100}, " +
+                        "carbs=${basis?.carbohydrateGramsPer100}, fat=${basis?.fatGramsPer100}, " +
+                        "fiber=${basis?.fiberGramsPer100}, sugar=${basis?.sugarGramsPer100}, " +
+                        "saturatedFat=${basis?.saturatedFatGramsPer100}, " +
+                        "sodiumMg=${basis?.sodiumMilligramsPer100}}, factor=${basis?.scaleFactor}, " +
+                        "final={kcal=${item.calories}, protein=${item.proteinGrams}, " +
+                        "carbs=${item.carbohydrateGrams}, fat=${item.fatGrams}, " +
+                        "fiber=${item.fiberGrams}, sugar=${item.sugarGrams}, " +
+                        "saturatedFat=${item.saturatedFatGrams}, sodiumMg=${item.sodiumMilligrams}}"
+                }
+                repository.recordAiDebugEvent(
+                    AiDebugEventEntity(
+                        pipeline = ProviderPipeline.FOOD_RESEARCH.name,
+                        providerId = "nomi-local",
+                        model = cacheKind,
+                        durationMillis = 0,
+                        cacheHit = true,
+                        sourceSummary = cacheKind,
+                        parsedResultJson = summaries.joinToString("\n").take(16_000),
+                        validationStatus = "PORTION_NORMALIZED",
+                        safeMessage = summaries.joinToString(" | ").take(4_000),
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }
+        }
+    }
+
     private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =
         OpenAiCompatibleProviders(
             client = container.openAiClient,
@@ -2872,6 +2936,7 @@ class AppViewModel(
             visionConfig = config,
             visionCredential = { credential },
             calorieBiasProvider = { preferences.value.calorieEstimateBias },
+            nutritionDebugSink = ::recordNutritionScalingTrace,
         )
 
     private fun mapToday(

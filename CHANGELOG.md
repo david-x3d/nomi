@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v2.0.5 — 2026-08-25
+
+### Correct nutrition totals for every logged portion
+
+- Scales per-100-g and per-100-ml research values to the user's authoritative logged amount across calories, macros, and optional nutrients.
+- Separates the research basis from the requested portion so provider responses cannot silently label per-100 values as full-portion totals.
+- Grounds the Exa/Gemini basis against exact text from the selected source and rejects contradictory basis classifications instead of reusing them as estimates.
+- Preserves values that a source genuinely publishes for the complete serving, preventing double scaling.
+- Invalidates older persistent research-cache entries from the previous basis contract and deterministically rescales reusable per-100 food data for new portions.
+- Adds developer diagnostics for requested amount, research basis, raw values, normalized per-100 values, factor, and final stored portion values, including cache hits.
+- Adds regressions for 50 g, 100 g, 400 g, complete-portion values, cached per-100 data, provider response variants, micronutrients, and basis contradictions.
+
+### Verification
+
+- All 430 unit tests, Android lint, the release build, APK version, and APK v2 signature verification passed.
+- APK SHA-256: `6036A779DAD5A8899DFA630BD90D364D3C6A5EED0C704947C5838E20F7B76E7E`
+
 ## Nomi v2.0.4 — 2026-08-20
 
 ### Health Connect sync restored and backfilled

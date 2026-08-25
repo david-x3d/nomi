@@ -4,6 +4,8 @@ import com.nomi.app.ai.model.FoodAnalysis
 import java.util.Locale
 
 internal const val FOOD_RESEARCH_CACHE_TTL_MILLIS = 21L * 24L * 60L * 60L * 1_000L
+/** Bump whenever the serialized nutrition-basis contract changes. */
+internal const val FOOD_RESEARCH_CACHE_SCHEMA_VERSION = 2
 
 internal fun FoodAnalysis.canPersistForResearchReuse(): Boolean =
     items.isNotEmpty() && items.all { item -> !item.isEstimate && !item.sourceUrl.isNullOrBlank() }
@@ -19,6 +21,7 @@ data class FoodAnalysisCacheKey(
 ) {
     /** Stable Room primary key; the separators cannot occur in normalized UI/provider fields. */
     fun storageKey(): String = listOf(
+        "nutrition-v$FOOD_RESEARCH_CACHE_SCHEMA_VERSION",
         normalizedInput,
         localeCountry,
         interpretationProviderIdentity,
