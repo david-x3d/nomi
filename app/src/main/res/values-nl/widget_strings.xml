@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Maak de installatie van Nomi af om je dag hier te zien.</string>
+    <string name="widget_of_target">van %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s over</string>
+    <string name="widget_kcal_over">%1$s boven je doel</string>
+    <string name="widget_label_protein">Eiwitten</string>
+    <string name="widget_label_carbs">Koolhydraten</string>
+    <string name="widget_label_fat">Vet</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">De calorieën van vandaag in één oogopslag.</string>
+    <string name="widget_description_large">Calorieën, eiwitten, koolhydraten en vet voor vandaag.</string>
+    <string name="widget_title_small">Calorieën</string>
+    <string name="widget_title_large">Calorieën en macro’s</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Richte Nomi fertig ein, um hier deinen Tag zu sehen.</string>
+    <string name="widget_of_target">von %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s übrig</string>
+    <string name="widget_kcal_over">%1$s über dem Ziel</string>
+    <string name="widget_label_protein">Eiweiß</string>
+    <string name="widget_label_carbs">Kohlenhydrate</string>
+    <string name="widget_label_fat">Fett</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Deine Kalorien von heute auf einen Blick.</string>
+    <string name="widget_description_large">Kalorien, Eiweiß, Kohlenhydrate und Fett für heute.</string>
+    <string name="widget_title_small">Kalorien</string>
+    <string name="widget_title_large">Kalorien &amp; Makros</string>
+</resources>

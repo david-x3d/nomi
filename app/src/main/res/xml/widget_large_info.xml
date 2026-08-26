@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nomi 4x2 widget descriptor. Updates are driven by the app, a midnight alarm and
+     date/time broadcasts, so updatePeriodMillis stays at 0 to avoid pointless wakes. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:resizeMode="none"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/widget_today_large"
+    android:previewLayout="@layout/widget_today_large"
+    android:updatePeriodMillis="0"
+    android:description="@string/widget_description_large" />

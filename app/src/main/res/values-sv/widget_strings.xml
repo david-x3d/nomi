@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Slutför installationen av Nomi för att se din dag här.</string>
+    <string name="widget_of_target">av %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s kvar</string>
+    <string name="widget_kcal_over">%1$s över målet</string>
+    <string name="widget_label_protein">Protein</string>
+    <string name="widget_label_carbs">Kolhydrater</string>
+    <string name="widget_label_fat">Fett</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Dagens kalorier på ett ögonkast.</string>
+    <string name="widget_description_large">Dagens kalorier, protein, kolhydrater och fett.</string>
+    <string name="widget_title_small">Kalorier</string>
+    <string name="widget_title_large">Kalorier och makron</string>
+</resources>

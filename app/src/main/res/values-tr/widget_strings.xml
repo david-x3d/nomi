@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Nomi kurulumunu tamamla ki gününü burada görebilsin.</string>
+    <string name="widget_of_target">hedef %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s kaldı</string>
+    <string name="widget_kcal_over">hedefi %1$s aştı</string>
+    <string name="widget_label_protein">Protein</string>
+    <string name="widget_label_carbs">Karbonhidrat</string>
+    <string name="widget_label_fat">Yağ</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Bugünün kalorileri bir bakışta.</string>
+    <string name="widget_description_large">Bugünün kalorisi, proteini, karbonhidratı ve yağı.</string>
+    <string name="widget_title_small">Kalori</string>
+    <string name="widget_title_large">Kalori ve makrolar</string>
+</resources>

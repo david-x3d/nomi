@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Terminez la configuration de Nomi pour voir votre journée ici.</string>
+    <string name="widget_of_target">sur %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s restantes</string>
+    <string name="widget_kcal_over">%1$s au-dessus de l\'objectif</string>
+    <string name="widget_label_protein">Protéines</string>
+    <string name="widget_label_carbs">Glucides</string>
+    <string name="widget_label_fat">Lipides</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Vos calories du jour en un coup d\'œil.</string>
+    <string name="widget_description_large">Calories, protéines, glucides et lipides du jour.</string>
+    <string name="widget_title_small">Calories</string>
+    <string name="widget_title_large">Calories et macros</string>
+</resources>

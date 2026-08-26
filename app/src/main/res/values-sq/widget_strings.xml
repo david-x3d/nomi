@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_setup_hint">Përfundo konfigurimin e Nomi për ta parë ditën tënde këtu.</string>
+    <string name="widget_of_target">nga %1$s kcal</string>
+    <string name="widget_kcal_left">mbeten %1$s</string>
+    <string name="widget_kcal_over">%1$s mbi objektiv</string>
+    <string name="widget_label_protein">Proteina</string>
+    <string name="widget_label_carbs">Karbohidrate</string>
+    <string name="widget_label_fat">Yndyrna</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Kaloritë e ditës në një shikim.</string>
+    <string name="widget_description_large">Kalori, proteina, karbohidrate dhe yndyrna për sot.</string>
+    <string name="widget_title_small">Kalori</string>
+    <string name="widget_title_large">Kalori dhe makro</string>
+</resources>

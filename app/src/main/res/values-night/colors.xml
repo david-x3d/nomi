@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark counterparts of the widget colors in values/colors.xml, mirroring the dark fallback
+         scheme in NomiTheme.kt (surfaceContainer as the card surface). -->
+    <color name="widget_surface">#261E1B</color>
+    <color name="widget_on_surface">#F2DFD9</color>
+    <color name="widget_text_secondary">#D8C2BA</color>
+    <color name="widget_accent">#FFB68C</color>
+    <color name="widget_accent_track">#7E3000</color>
+    <color name="widget_protein">#A1D0C6</color>
+    <color name="widget_protein_track">#1F514A</color>
+    <color name="widget_carb">#D7C68C</color>
+    <color name="widget_carb_track">#51471A</color>
+    <color name="widget_fat">#A18C85</color>
+    <color name="widget_fat_track">#3B332F</color>
+</resources>

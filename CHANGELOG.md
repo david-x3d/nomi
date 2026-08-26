@@ -1,5 +1,27 @@
 # Changelog
 
+## Nomi v2.0.6 — 2026-08-26
+
+### Home-screen widgets
+
+- Adds two home-screen widgets: a 2x2 showing today's calories against the target, and a 4x2 adding protein, carbohydrate and fat progress.
+- Reads today's totals and the active nutrition plan from the local database; both widgets open Nomi when tapped and show a setup hint until onboarding finishes.
+- Refreshes on data changes while the app runs, on the system widget update broadcast, on an inexact midnight alarm, and on date, time-zone, boot and package-replaced broadcasts. updatePeriodMillis stays 0 so the OS never wakes the process to redraw unchanged numbers.
+- Skips all work when no plan exists and no widget is placed, arming only the midnight rollover.
+- Localizes every widget string across all nine supported languages, and names the two widgets separately in the picker instead of listing "Nomi" twice.
+
+### Widget layout corrections
+
+- Fixes the calorie figure being cut off along its lower edge: autosizing text inside a wrap_content height measures the view for the previous text size, so grouped numbers such as "1,240" lost their descenders. Both hero numerals now use a fixed height.
+- Fixes the fat bar missing from the 4x2 widget: stacked macro rows needed roughly 190dp while a 4x2 cell offers about 140dp. Protein, carbohydrates and fat now sit in three side-by-side columns that fit, and the content is centred vertically.
+- Applies Material 3 Expressive weighting: a heavier hero numeral, a larger 28dp surface radius, and thicker fully rounded progress bars.
+
+### Verification
+
+- All 437 unit tests, Android lint, the release build, APK version, and APK v2 signature verification passed.
+- Both widgets were placed and confirmed on a Pixel 10 Pro XL emulator running API 37.1.
+- APK SHA-256: `AECD5481D8D434ED5627EA0AEB851ECA65E74C5AE0641AD17F77B0923AA31307`
+
 ## Nomi v2.0.5 — 2026-08-25
 
 ### Correct nutrition totals for every logged portion

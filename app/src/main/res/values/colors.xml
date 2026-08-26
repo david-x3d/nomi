@@ -2,4 +2,19 @@
 <resources>
     <color name="nomi_seed">#1E3651</color>
     <color name="nomi_splash_background">#FFF8E8</color>
+
+    <!-- Home-screen widgets. Values mirror the light fallback scheme in NomiTheme.kt; the dark
+         variants live in values-night. Widgets resolve these at inflation time from the
+         launcher's configuration, so they follow the system theme without extra code. -->
+    <color name="widget_surface">#FFF8F5</color>
+    <color name="widget_on_surface">#241A17</color>
+    <color name="widget_text_secondary">#53433E</color>
+    <color name="widget_accent">#A84000</color>
+    <color name="widget_accent_track">#FFDBC9</color>
+    <color name="widget_protein">#386A62</color>
+    <color name="widget_protein_track">#BCECE1</color>
+    <color name="widget_carb">#6B5E2F</color>
+    <color name="widget_carb_track">#F4E2A7</color>
+    <color name="widget_fat">#85736D</color>
+    <color name="widget_fat_track">#E9D7D1</color>
 </resources>

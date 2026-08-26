@@ -2,4 +2,27 @@
 <resources>
     <!-- The product name is the same in every language. -->
     <string name="app_name" translatable="false">Nomi</string>
+
+    <!-- Home-screen widgets. -->
+    <string name="widget_setup_hint">Finish setting up Nomi to see your day here.</string>
+    <string name="widget_of_target">of %1$s kcal</string>
+    <string name="widget_kcal_left">%1$s left</string>
+    <string name="widget_kcal_over">%1$s over target</string>
+    <string name="widget_label_protein">Protein</string>
+    <string name="widget_label_carbs">Carbs</string>
+    <string name="widget_label_fat">Fat</string>
+    <string name="widget_macro_grams">%1$s / %2$s g</string>
+    <string name="widget_description_small">Today\'s calories at a glance.</string>
+    <string name="widget_description_large">Today\'s calories, protein, carbs and fat.</string>
+    <string name="widget_title_small">Calories</string>
+    <string name="widget_title_large">Calories &amp; macros</string>
+
+    <!-- Placeholder texts baked into the layouts until the first data update. -->
+    <string name="widget_preview_value" translatable="false">1,240</string>
+    <string name="widget_preview_hero" translatable="false">1,240</string>
+    <string name="widget_preview_of_target" translatable="false">of 1,820 kcal</string>
+    <string name="widget_preview_left" translatable="false">580 left</string>
+    <string name="widget_preview_macro_protein" translatable="false">96 / 130 g</string>
+    <string name="widget_preview_macro_carb" translatable="false">142 / 195 g</string>
+    <string name="widget_preview_macro_fat" translatable="false">42 / 56 g</string>
 </resources>
