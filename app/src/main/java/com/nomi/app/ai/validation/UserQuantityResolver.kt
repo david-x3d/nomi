@@ -88,13 +88,10 @@ object UserQuantityResolver {
         }
         val explicit = detectExplicitQuantities(cleanText)
         val assignments = assignDetections(cleanText, enrichedItems, explicit)
-        val localeIsGermany = localeCountry.equals("DE", ignoreCase = true)
-
         val items = enrichedItems.mapIndexed { index, item ->
             val resolution = item.quantityResolution
                 ?.takeIf { it.origin == QuantityOrigin.MENU_EXPLICIT }
                 ?: assignments[index]
-                ?: germanRedBullDefault(cleanText, item, parsed.items.size, localeIsGermany)
             if (resolution == null) {
                 // Clear any provider-forged resolution metadata.
                 item.copy(quantityResolution = null)
@@ -164,7 +161,7 @@ object UserQuantityResolver {
             QuantityOrigin.MENU_EXPLICIT ->
                 "The menu's explicit serving quantity was preserved by deterministic app logic."
             QuantityOrigin.GERMAN_LOCAL_DEFAULT ->
-                "German Red Bull can default: 250 ml because no explicit size was provided."
+                "A locale-specific default quantity was preserved by deterministic app logic."
             QuantityOrigin.SOURCE_OR_INFERRED ->
                 "Quantity came from source or provider inference."
         }).distinct().takeLast(12),
@@ -359,25 +356,6 @@ object UserQuantityResolver {
             if (after >= 0) after - range.last else null
         }.minOrNull()
         return closest ?: (10_000 + abs(itemIndex - detectionIndex))
-    }
-
-    private fun germanRedBullDefault(
-        text: String,
-        item: ParsedFoodItem,
-        itemCount: Int,
-        localeIsGermany: Boolean,
-    ): QuantityResolutionMetadata? {
-        if (!localeIsGermany) return null
-        val itemText = listOfNotNull(item.brand, item.name).joinToString(" ")
-        val isRedBull = itemText.contains("red bull", ignoreCase = true) ||
-            (itemCount == 1 && text.contains("red bull", ignoreCase = true))
-        if (!isRedBull) return null
-        return QuantityResolutionMetadata(
-            origin = QuantityOrigin.GERMAN_LOCAL_DEFAULT,
-            semantic = QuantitySemantic.LOCAL_CAN_DEFAULT,
-            canonicalQuantity = 250.0,
-            canonicalUnit = "ml",
-        )
     }
 
     private fun QuantityResolutionMetadata.withSourcePackage(

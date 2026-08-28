@@ -274,6 +274,8 @@ class ExaGeminiNutritionProviderTest {
                     sourceServingQuantity = 100.0,
                     sourceServingUnit = "g",
                     sourceServingGramsEquivalent = 100.0,
+                    nutritionBasis = ResearchNutritionBasis.PER_100_G,
+                    sourceBasisText = "Nährwerte pro 100 g",
                     loggedServingGramsEquivalent = 18.2,
                     sourceCountry = "DE",
                     sourcePackageQuantity = 182.0,
@@ -317,7 +319,12 @@ class ExaGeminiNutritionProviderTest {
                         "555 kcal, Protein 8 g, Kohlenhydrate 55 g, Fett 33 g",
                 ),
             ),
-            extraction = extraction(item(case).copy(loggedServingGramsEquivalent = 36.4)),
+            extraction = extraction(
+                item(case).copy(
+                    loggedServingGramsEquivalent = 36.4,
+                    sourceBasisText = "Nährwerte pro 100 g",
+                ),
+            ),
         ).researchNutrition(case.intent())
 
         assertEquals(36.4, result.items.single().gramsEquivalent!!, 0.0)
@@ -348,6 +355,42 @@ class ExaGeminiNutritionProviderTest {
 
         assertEquals(officialUrl, result.items.single().sourceUrl)
         assertEquals(100.0, result.items.single().calories, 0.001)
+    }
+
+    @Test
+    fun `generic values cannot replace a conflicting manufacturer nutrition table`() {
+        val case = SuccessCase(
+            text = "100 g Exact Product",
+            name = "Exact Product",
+            brand = "Example Brand",
+            quantity = 100.0,
+            sourceAmount = 100.0,
+            calories = 180.0,
+            protein = 3.0,
+            carbs = 30.0,
+            fat = 8.0,
+            expectedCalories = 180.0,
+        )
+        val research = provider(
+            sources = listOf(
+                source(
+                    case.name,
+                    "https://nutrition-database.test/exact-product",
+                    evidence(case),
+                ),
+                source(
+                    "Example Brand Exact Product",
+                    "https://example-brand.test/exact-product",
+                    "Example Brand Exact Product nutrition per 100 g: " +
+                        "120 kcal, protein 9 g, carbs 12 g, fat 4 g",
+                ),
+            ),
+            extraction = extraction(item(case, sourceId = "exa-1")),
+        )
+
+        assertThrows(AiValidationException::class.java) {
+            runBlocking { research.researchNutrition(case.intent()) }
+        }
     }
 
     @Test
@@ -394,9 +437,9 @@ class ExaGeminiNutritionProviderTest {
             listOf(source("Different Product", content = "Nutrition Different Product: 100 kcal, protein 10 g, carbs 20 g, fat 3 g")),
             extraction(item(case)),
         )
-        val estimated = runBlocking { unsupported.researchNutrition(case.intent()) }.items.single()
-        assertTrue(estimated.isEstimate)
-        assertEquals(null, estimated.sourceUrl)
+        assertThrows(AiValidationException::class.java) {
+            runBlocking { unsupported.researchNutrition(case.intent()) }
+        }
     }
 
     @Test
@@ -423,7 +466,17 @@ class ExaGeminiNutritionProviderTest {
                     content = "McDonald's Pommes mittel nutrition page without a readable values table",
                 ),
             ),
-            extraction = extraction(item(case)),
+            extraction = extraction(
+                item(case).copy(
+                    sourceServingQuantity = case.quantity,
+                    sourceServingUnit = case.unit,
+                    sourceServingGramsEquivalent = case.grams,
+                    nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+                    sourceBasisText = null,
+                    isEstimate = true,
+                    uncertaintyPercent = 20.0,
+                ),
+            ),
         ).researchNutrition(case.intent()).items.single()
 
         assertTrue(result.isEstimate)
@@ -683,6 +736,7 @@ class ExaGeminiNutritionProviderTest {
         sourceProductName = name,
         sourceServingQuantity = 1.0,
         sourceServingUnit = "serving",
+        sourceBasisText = "per 1 serving",
         sourceCountry = "DE",
         isEstimate = false,
         confidence = 0.98,
@@ -709,6 +763,7 @@ class ExaGeminiNutritionProviderTest {
             case.sourceAmount == 100.0 && case.sourceUnit == "ml" -> ResearchNutritionBasis.PER_100_ML
             else -> ResearchNutritionBasis.SOURCE_SERVING
         },
+        sourceBasisText = "per ${case.sourceAmount} ${case.sourceUnit}",
         sourceCountry = case.country,
         sourcePackageQuantity = packageQuantity,
         sourcePackageUnit = packageQuantity?.let { "g" },

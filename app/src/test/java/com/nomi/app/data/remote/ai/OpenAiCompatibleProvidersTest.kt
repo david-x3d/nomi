@@ -102,6 +102,31 @@ class OpenAiCompatibleProvidersTest {
     }
 
     @Test
+    fun `fetched manufacturer source outranks a model-selected generic citation`() {
+        val officialUrl = "https://example-brand.com/products/exact-product"
+        val genericUrl = "https://nutrition-database.example/generic-product"
+        val branded = analyzedItem(sourceName = "Nutrition database").copy(
+            brand = "Example Brand",
+            sourceProductName = "Exact product",
+            sourceDomain = "nutrition-database.example",
+            isEstimate = false,
+        )
+
+        val grounded = groundWithWebSearchEvidence(
+            analysis = FoodAnalysis(items = listOf(branded)),
+            evidenceUrls = linkedSetOf(genericUrl, officialUrl),
+            fetchedUrls = setOf(genericUrl, officialUrl),
+            requiresFetchedBrandedSource = true,
+        ).items.single()
+
+        assertEquals(officialUrl, grounded.sourceUrl)
+        assertEquals("example-brand.com", grounded.sourceName)
+        assertEquals("example-brand.com", grounded.sourceDomain)
+        assertEquals(listOf(genericUrl), grounded.supportingSourceUrls)
+        assertFalse(grounded.isEstimate)
+    }
+
+    @Test
     fun brandedSnippetCannotBorrowAnUnrelatedCompletedFetch() {
         val branded = analyzedItem(sourceName = "Official manufacturer").copy(
             brand = "Example Brand",

@@ -137,8 +137,7 @@ class AiPromptsTest {
         assertTrue(prompt.contains("CRITICAL SERVING-BASIS RULE"))
         assertTrue(prompt.contains("MUST NEVER describe the user's"))
         assertTrue(prompt.contains("pre-scale them to the consumed amount"))
-        assertTrue(prompt.contains("calories=172"))
-        assertTrue(prompt.contains("WRONG: calories=566"))
+        assertTrue(prompt.contains("copy those values unchanged"))
         assertTrue(prompt.contains("scale them a second time"))
     }
 

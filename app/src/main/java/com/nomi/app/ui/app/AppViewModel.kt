@@ -1375,30 +1375,32 @@ class AppViewModel(
             runCatching {
                 val cached = repository.foodByBarcode(barcode)
                 var servingLabel: String? = null
-                val analyzedItem = if (cached != null) {
+                val analyzedItem = if (cached != null && !cached.isEstimated) {
                     cached.toAnalyzedItem("Local barcode cache")
                 } else {
                     val product = container.openFoodFacts.findByBarcode(barcode)
                     servingLabel = product?.servingSize
-                    product?.toAnalyzedItemOrNull() ?: run {
-                        val label = product?.name?.takeIf { it.isNotBlank() }
-                            ?: "Product with barcode $barcode"
-                        val basisUnit = product?.nutritionBasisUnit ?: "g"
-                        researchNutrition(
-                        ParsedFoodIntent(
-                            originalText = "Barcode lookup",
-                            items = listOf(
-                                ParsedFoodItem(
-                                    name = label,
-                                    brand = product?.brand,
-                                    quantity = 100.0,
-                                    unit = basisUnit,
-                                    gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+                    product?.toAnalyzedItemOrNull()
+                        ?: cached?.toAnalyzedItem("Local barcode estimate")
+                        ?: run {
+                            val label = product?.name?.takeIf { it.isNotBlank() }
+                                ?: "Product with barcode $barcode"
+                            val basisUnit = product?.nutritionBasisUnit ?: "g"
+                            researchNutrition(
+                                ParsedFoodIntent(
+                                    originalText = "Barcode lookup",
+                                    items = listOf(
+                                        ParsedFoodItem(
+                                            name = label,
+                                            brand = product?.brand,
+                                            quantity = 100.0,
+                                            unit = basisUnit,
+                                            gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
+                                        ),
+                                    ),
                                 ),
-                            ),
-                        ),
-                        ).items.single()
-                    }
+                            ).items.single()
+                        }
                 }
                 cacheAnalyzedFood(analyzedItem, barcode)
                 val sourceItem = analyzedItem.asBarcodeSourceServing()
@@ -3200,6 +3202,7 @@ class AppViewModel(
                 servingUnit = sourceServingUnit,
                 calorieExplanation = calorieExplanation,
                 retrievedAtEpochMillis = now,
+                verifiedAtEpochMillis = now.takeUnless { isEstimate },
             ),
             isEstimated = isEstimate,
             inputMethod = inputMethod,
@@ -3368,25 +3371,45 @@ class AppViewModel(
                     it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
             }
             ?: repository.foodByIdentity(normalized, normalizedBrand)
-        if (existing != null) return existing.id
         val factor = 100.0 / grams
         val now = System.currentTimeMillis()
+        val nutritionPer100 = NutritionValues(
+            caloriesKcal = item.calories * factor,
+            proteinGrams = item.proteinGrams * factor,
+            carbohydrateGrams = item.carbohydrateGrams * factor,
+            fatGrams = item.fatGrams * factor,
+            fiberGrams = item.fiberGrams?.times(factor),
+            sugarGrams = item.sugarGrams?.times(factor),
+            saturatedFatGrams = item.saturatedFatGrams?.times(factor),
+            sodiumMilligrams = item.sodiumMilligrams?.times(factor),
+        )
+        if (existing != null) {
+            // A generic estimate must never pin a barcode/name forever after a package or
+            // manufacturer source supplies verified values. User-created foods remain owned by
+            // the user and are never rewritten by research.
+            if (existing.isEstimated && !item.isEstimate && !existing.isUserCreated) {
+                repository.updateFood(
+                    existing.copy(
+                        canonicalName = item.name.trim().take(300),
+                        normalizedName = normalized.take(300),
+                        brand = item.brand?.trim()?.take(200),
+                        barcode = barcode ?: existing.barcode,
+                        nutritionPer100g = nutritionPer100,
+                        isEstimated = false,
+                        lastVerifiedAtEpochMillis = now,
+                        updatedAtEpochMillis = now,
+                    ),
+                )
+            }
+            return existing.id
+        }
         return repository.addFood(
             FoodEntity(
                 canonicalName = item.name.trim().take(300),
                 normalizedName = normalized.take(300),
                 brand = item.brand?.trim()?.take(200),
                 barcode = barcode,
-                nutritionPer100g = NutritionValues(
-                    caloriesKcal = item.calories * factor,
-                    proteinGrams = item.proteinGrams * factor,
-                    carbohydrateGrams = item.carbohydrateGrams * factor,
-                    fatGrams = item.fatGrams * factor,
-                    fiberGrams = item.fiberGrams?.times(factor),
-                    sugarGrams = item.sugarGrams?.times(factor),
-                    saturatedFatGrams = item.saturatedFatGrams?.times(factor),
-                    sodiumMilligrams = item.sodiumMilligrams?.times(factor),
-                ),
+                nutritionPer100g = nutritionPer100,
                 isUserCreated = item.sourceName == "Manual entry",
                 isEstimated = item.isEstimate,
                 lastVerifiedAtEpochMillis = now.takeUnless { item.isEstimate },

@@ -5,7 +5,7 @@ import java.util.Locale
 
 internal const val FOOD_RESEARCH_CACHE_TTL_MILLIS = 21L * 24L * 60L * 60L * 1_000L
 /** Bump whenever the serialized nutrition-basis contract changes. */
-internal const val FOOD_RESEARCH_CACHE_SCHEMA_VERSION = 2
+internal const val FOOD_RESEARCH_CACHE_SCHEMA_VERSION = 3
 
 internal fun FoodAnalysis.canPersistForResearchReuse(): Boolean =
     items.isNotEmpty() && items.all { item -> !item.isEstimate && !item.sourceUrl.isNullOrBlank() }

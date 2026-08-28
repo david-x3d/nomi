@@ -532,24 +532,31 @@ private fun groundGeminiExtraction(
             byId[sourceId]
                 ?: throw AiValidationException("Gemini selected a supporting source that Exa did not return")
         }.filter { it.sourceId != primary.sourceId }.take(5)
-        val declaredSources = listOf(primary) + supporting
-        val groundedPrimary = try {
-            requireNutritionEvidence(extracted, parsed, declaredSources)
-            primary
-        } catch (failure: AiValidationException) {
-            // A source-ID mismatch can be repaired by finding the document that supports the
-            // same values. A serving-basis contradiction cannot: treating it as an unverified
-            // full-portion estimate would recreate the under-scaling bug with the same numbers.
-            if (failure.message?.contains("nutrition basis", ignoreCase = true) == true ||
-                failure.message?.contains("Per-100 nutrition", ignoreCase = true) == true
-            ) throw failure
-            // Gemini occasionally returns the adjacent source ID in a multi-item order (for
-            // example an Extra Sauce page for a Cheeseburger). Correct only when another Exa
-            // document independently passes the same strict product, calorie and macro checks.
-            documents.firstOrNull { candidate ->
-                runCatching {
-                    requireNutritionEvidence(extracted, parsed, listOf(candidate))
-                }.isSuccess
+        // A nutrient table and its identity/basis must coexist in one document. Combining a
+        // generic page with a product page made unrelated values appear product-specific. Prefer
+        // an exact official brand domain when it independently supports the complete reading,
+        // then honour the model's selected source, then try the remaining documents.
+        val officialProductDocuments = documents.filter { candidate ->
+            candidate.isOfficialBrandDocument(parsed.brand) &&
+                candidate.containsNutritionTable() &&
+                candidate.supportsRequestedIdentity(parsed)
+        }
+        val eligibleDocuments = officialProductDocuments.ifEmpty { documents }
+        val candidates = eligibleDocuments.sortedBy { candidate ->
+            when {
+                candidate.isOfficialBrandDocument(parsed.brand) -> 0
+                candidate.sourceId == primary.sourceId -> 1
+                else -> 2
+            }
+        }
+        var evidenceFailure: AiValidationException? = null
+        val groundedPrimary = candidates.firstOrNull { candidate ->
+            try {
+                requireNutritionEvidence(extracted, parsed, candidate)
+                true
+            } catch (failure: AiValidationException) {
+                evidenceFailure = failure
+                false
             }
         }
         if (groundedPrimary == null) {
@@ -558,6 +565,23 @@ private fun groundGeminiExtraction(
             if (allZero) {
                 throw AiValidationException(
                     "A zero-calorie result needs explicit zero-calorie evidence from Exa",
+                )
+            }
+            val parsedQuantity = parsed.quantity
+            val parsedUnit = parsed.unit
+            val explicitWholeServingEstimate = extracted.isEstimate &&
+                extracted.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
+                extracted.sourceBasisText.isNullOrBlank() &&
+                parsedQuantity != null && !parsedUnit.isNullOrBlank() &&
+                equivalentServing(
+                    extracted.sourceServingQuantity,
+                    extracted.sourceServingUnit,
+                    parsedQuantity,
+                    parsedUnit,
+                )
+            if (!explicitWholeServingEstimate) {
+                throw evidenceFailure ?: AiValidationException(
+                    "No single product-specific source supports the reported nutrition and basis",
                 )
             }
             return@mapIndexed extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
@@ -632,13 +656,11 @@ private fun GeminiNutritionItem.toAnalyzedItem(
 private fun requireNutritionEvidence(
     item: GeminiNutritionItem,
     parsed: ParsedFoodItem,
-    documents: List<ExaNutritionDocument>,
+    document: ExaNutritionDocument,
 ) {
-    val corpus = documents.joinToString("\n") { document ->
-        document.title + "\n" + document.content
-    }
+    val corpus = document.title + "\n" + document.content
     requireGroundedNutritionBasis(item, corpus)
-    requireEntityEvidence(item, corpus)
+    requireEntityEvidence(item, parsed, corpus)
     if (!NUTRITION_WORDS.containsMatchIn(corpus)) {
         throw AiValidationException("The selected Exa source contains no recognizable nutrition evidence")
     }
@@ -679,7 +701,13 @@ private fun requireNutritionEvidence(
  * user's 400 g request and make correct arithmetic operate on the wrong semantic basis.
  */
 private fun requireGroundedNutritionBasis(item: GeminiNutritionItem, corpus: String) {
-    val basisText = item.sourceBasisText?.trim()?.takeIf(String::isNotBlank) ?: return
+    val basisText = item.sourceBasisText?.trim()?.takeIf(String::isNotBlank)
+    if (basisText == null) {
+        if (!item.isEstimate) {
+            throw AiValidationException("Verified nutrition is missing its source basis text")
+        }
+        return
+    }
     val normalizedEvidence = corpus.normalizedBasisEvidence()
     val normalizedBasisText = basisText.normalizedBasisEvidence()
     if (!normalizedEvidence.contains(normalizedBasisText)) {
@@ -711,7 +739,11 @@ private fun String.normalizedBasisEvidence(): String = lowercase(Locale.ROOT)
 private val PER_100_G_BASIS = Regex("(?:(?:per|pro|je|pour|por|/)\\s*)?100(?:\\.0+)?\\s*g\\b")
 private val PER_100_ML_BASIS = Regex("(?:(?:per|pro|je|pour|por|/)\\s*)?100(?:\\.0+)?\\s*ml\\b")
 
-private fun requireEntityEvidence(item: GeminiNutritionItem, corpus: String) {
+private fun requireEntityEvidence(
+    item: GeminiNutritionItem,
+    parsed: ParsedFoodItem,
+    corpus: String,
+) {
     val claimedProduct = item.sourceProductName?.trim()?.takeIf(String::isNotBlank)
         ?: throw AiValidationException("Gemini did not identify the product printed by the selected source")
     val normalizedCorpus = corpus.lowercase(Locale.ROOT)
@@ -727,7 +759,18 @@ private fun requireEntityEvidence(item: GeminiNutritionItem, corpus: String) {
     if (productTokens.count(normalizedCorpus::contains) < requiredProductMatches) {
         throw AiValidationException("The selected Exa source does not support the claimed product")
     }
-    val brandTokens = item.brand.orEmpty().lowercase(Locale.ROOT).let { brand ->
+    val requestedProductTokens = ENTITY_TOKEN.findAll(parsed.name.lowercase(Locale.ROOT))
+        .map(MatchResult::value)
+        .filterNot(ENTITY_STOP_WORDS::contains)
+        .distinct()
+        .toList()
+    val requiredRequestedMatches = minOf(2, requestedProductTokens.size)
+    if (requiredRequestedMatches > 0 &&
+        requestedProductTokens.count(normalizedCorpus::contains) < requiredRequestedMatches
+    ) {
+        throw AiValidationException("The selected Exa source does not support the requested product")
+    }
+    val brandTokens = (parsed.brand ?: item.brand).orEmpty().lowercase(Locale.ROOT).let { brand ->
         ENTITY_TOKEN.findAll(brand).map(MatchResult::value)
             .filterNot(ENTITY_STOP_WORDS::contains)
             .distinct()
@@ -737,6 +780,58 @@ private fun requireEntityEvidence(item: GeminiNutritionItem, corpus: String) {
         throw AiValidationException("The selected Exa source does not support the claimed brand")
     }
 }
+
+private fun ExaNutritionDocument.isOfficialBrandDocument(brand: String?): Boolean {
+    val claimedBrand = brand?.trim()?.takeIf(String::isNotBlank) ?: return false
+    val host = runCatching { URI(url).host }.getOrNull() ?: return false
+    val domainKey = foldForSourceMatch(host.substringBeforeLast('.'))
+        .replace(Regex("[^a-z0-9]"), "")
+    return ENTITY_TOKEN.findAll(foldForSourceMatch(claimedBrand))
+        .map(MatchResult::value)
+        .filter { it.length >= 4 && it !in BRAND_DOMAIN_STOP_WORDS }
+        .any(domainKey::contains)
+}
+
+private fun ExaNutritionDocument.containsNutritionTable(): Boolean {
+    val corpus = title + "\n" + content
+    return NUTRITION_WORDS.containsMatchIn(corpus) &&
+        NUTRITION_VALUE.findAll(corpus).take(2).count() >= 2
+}
+
+private fun ExaNutritionDocument.supportsRequestedIdentity(parsed: ParsedFoodItem): Boolean {
+    val corpus = (title + "\n" + content).lowercase(Locale.ROOT)
+    val nameTokens = ENTITY_TOKEN.findAll(parsed.name.lowercase(Locale.ROOT))
+        .map(MatchResult::value)
+        .filterNot(ENTITY_STOP_WORDS::contains)
+        .distinct()
+        .toList()
+    val requiredNameMatches = minOf(2, nameTokens.size)
+    if (requiredNameMatches > 0 && nameTokens.count(corpus::contains) < requiredNameMatches) {
+        return false
+    }
+    val brandTokens = ENTITY_TOKEN.findAll(parsed.brand.orEmpty().lowercase(Locale.ROOT))
+        .map(MatchResult::value)
+        .filterNot(ENTITY_STOP_WORDS::contains)
+        .distinct()
+        .toList()
+    return brandTokens.isEmpty() || brandTokens.any(corpus::contains)
+}
+
+private fun foldForSourceMatch(value: String): String = java.text.Normalizer
+    .normalize(value.lowercase(Locale.ROOT), java.text.Normalizer.Form.NFKD)
+    .replace(Regex("\\p{M}+"), "")
+
+private fun equivalentServing(
+    firstQuantity: Double,
+    firstUnit: String,
+    secondQuantity: Double,
+    secondUnit: String,
+): Boolean = firstUnit.trim().equals(secondUnit.trim(), ignoreCase = true) &&
+    abs(firstQuantity - secondQuantity) <= maxOf(1e-6, abs(secondQuantity) * 1e-6)
+
+private val BRAND_DOMAIN_STOP_WORDS = setOf(
+    "brand", "company", "group", "foods", "food", "gmbh", "ltd", "inc",
+)
 
 private val ENTITY_TOKEN = Regex("[\\p{L}\\p{N}]{2,}")
 private val ENTITY_STOP_WORDS = setOf(

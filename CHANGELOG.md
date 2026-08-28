@@ -1,5 +1,23 @@
 # Changelog
 
+## Nomi v2.0.7 — 2026-08-28
+
+### Reliable nutrition quantity scaling
+
+- Makes the quantity entered by the user authoritative throughout parsing, research, normalization, persistence and display.
+- Keeps per-100-g, per-100-ml and per-serving nutrition bases distinct, scaling calories, macros and optional nutrients through one shared normalization path.
+- Removes food-, brand- and quantity-specific fallbacks, including implicit mass/volume conversions that lacked an explicit serving equivalence.
+- Prioritizes grounded manufacturer or package nutrition over unrelated generic estimates and prevents evidence from separate documents from being combined into a verified result.
+- Refreshes estimated barcode cache entries when product-specific data is available and records verification metadata with persisted nutrition sources.
+- Invalidates cached research from the previous normalization contract.
+
+### Verification
+
+- All 100 focused regression tests passed across normalization, quantity resolution, prompting and both research-provider paths.
+- Coverage includes different quantities, mass and volume units, serving counts, all nutrition fields, ambiguous unit bridges and manufacturer-versus-generic evidence.
+- Release compilation, lint-vital analysis, signing and APK assembly passed. The full Gradle test task remains unavailable because this host blocks the loopback sockets used by Gradle test workers.
+- APK SHA-256: `F59FFF43748CB4C143700DB6935A5ED5E6BB6B7BB8A6C49E48A21A3EA082C5C4`
+
 ## Nomi v2.0.6 — 2026-08-26
 
 ### Home-screen widgets

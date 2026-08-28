@@ -475,16 +475,20 @@ internal fun groundWithWebSearchEvidence(
         return analysis.copy(items = analysis.items.map { it.copy(isEstimate = true) })
     }
     val fetchedSites = fetchedUrls.mapNotNull(::canonicalResearchSite).toSet()
-    val fetchedOfficialSourceIsCanonical = citationsBySite.size == 1 &&
-        analysis.items.singleOrNull()?.hasFetchedOfficialBrandSource(
-            citationsBySite = citationsBySite,
-            fetchedUrls = fetchedUrls,
-        ) == true
+    val fetchedOfficialSourceIsCanonical = analysis.items.singleOrNull()?.hasFetchedOfficialBrandSource(
+        citationsBySite = citationsBySite,
+        fetchedUrls = fetchedUrls,
+    ) == true
     val singleSiteOnly = citationsBySite.size < 2 && !fetchedOfficialSourceIsCanonical
     return analysis.copy(
         items = analysis.items.map { item ->
             val claimedSite = canonicalClaimedResearchSite(item.sourceDomain)
-            val primaryEntry = citationsBySite.entries.firstOrNull { (site, _) ->
+            val officialBrandEntry = item.brand?.let { brand ->
+                citationsBySite.entries.firstOrNull { (site, _) ->
+                    site in fetchedSites && site.looksLikeOfficialBrandDomain(brand)
+                }
+            }
+            val primaryEntry = officialBrandEntry ?: citationsBySite.entries.firstOrNull { (site, _) ->
                 site == claimedSite
             } ?: citationsBySite.entries.first()
             val primaryUrl = primaryEntry.value
@@ -499,10 +503,15 @@ internal fun groundWithWebSearchEvidence(
             // A branded product whose own page was never opened is one site's claim about
             // another site's product, which is exactly what "estimated" means here.
             val unfetchedBrandedSource = requiresFetchedBrandedSource &&
-                !item.brand.isNullOrBlank() && claimedSite !in fetchedSites
+                !item.brand.isNullOrBlank() && primaryEntry.key !in fetchedSites
             item.copy(
-                sourceName = item.sourceName?.takeIf(String::isNotBlank) ?: primarySourceName,
+                sourceName = if (officialBrandEntry != null && claimedSite != primaryEntry.key) {
+                    primarySourceName
+                } else {
+                    item.sourceName?.takeIf(String::isNotBlank) ?: primarySourceName
+                },
                 sourceUrl = primaryUrl,
+                sourceDomain = primaryEntry.key,
                 supportingSourceUrls = supportingUrls,
                 isEstimate = item.isEstimate || singleSiteOnly || unfetchedBrandedSource,
             )
@@ -515,13 +524,12 @@ private fun AnalyzedFoodItem.hasFetchedOfficialBrandSource(
     fetchedUrls: Set<String>,
 ): Boolean {
     val claimedBrand = brand?.trim()?.takeIf(String::isNotBlank) ?: return false
-    val claimedSite = canonicalClaimedResearchSite(sourceDomain) ?: return false
     val fetchedSites = fetchedUrls.mapNotNull(::canonicalResearchSite).toSet()
     return !sourceProductName.isNullOrBlank() &&
         !isEstimate &&
-        citationsBySite.containsKey(claimedSite) &&
-        claimedSite in fetchedSites &&
-        claimedSite.looksLikeOfficialBrandDomain(claimedBrand)
+        citationsBySite.keys.any { site ->
+            site in fetchedSites && site.looksLikeOfficialBrandDomain(claimedBrand)
+        }
 }
 
 private fun String.looksLikeOfficialBrandDomain(brand: String): Boolean {

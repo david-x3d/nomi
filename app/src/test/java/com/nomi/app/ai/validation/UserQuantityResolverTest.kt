@@ -138,28 +138,13 @@ class UserQuantityResolverTest {
     }
 
     @Test
-    fun `German unspecified Red Bull cans and Editions default to 250 ml`() {
-        listOf(
-            "1 Dose Red Bull",
-            "eine Dose Red Bull",
-            "Red Bull Juneberry",
-            "1 Red Bull",
-        ).forEach { text ->
-            val item = resolve(text, locale = "DE", name = "Red Bull Juneberry")
-            assertEquals("Failed for $text", 250.0, item.quantity!!, 0.0)
+    fun `unresolved quantities remain provider inferred without product-specific defaults`() {
+        listOf("DE", "US").forEach { locale ->
+            val item = resolve("one packaged item", locale = locale, name = "Packaged item")
+            assertEquals(999.0, item.quantity!!, 0.0)
             assertEquals("ml", item.unit)
-            assertEquals(QuantityOrigin.GERMAN_LOCAL_DEFAULT, item.quantityResolution!!.origin)
-            assertEquals(QuantitySemantic.LOCAL_CAN_DEFAULT, item.quantityResolution!!.semantic)
+            assertNull(item.quantityResolution)
         }
-    }
-
-    @Test
-    fun `Red Bull default is not applied outside Germany`() {
-        val item = resolve("1 Dose Red Bull", locale = "US", name = "Red Bull")
-
-        assertEquals(999.0, item.quantity!!, 0.0)
-        assertEquals("ml", item.unit)
-        assertNull(item.quantityResolution)
     }
 
     @Test
@@ -209,11 +194,11 @@ class UserQuantityResolverTest {
     }
 
     @Test
-    fun `German 250 ml default scales a 355 ml source serving instead of copying it`() {
+    fun `explicit logged amount scales a different source serving without copying it`() {
         val parsed = reconciledIntent(
-            text = "Red Bull Juneberry",
+            text = "250 ml packaged drink",
             locale = "DE",
-            name = "Red Bull Juneberry",
+            name = "Packaged drink",
         )
         val provider = FoodAnalysis(
             listOf(
@@ -291,7 +276,6 @@ class UserQuantityResolverTest {
         assertTrue(prompt.contains("official German manufacturer"))
         assertTrue(prompt.contains("major German retailer"))
         assertTrue(prompt.contains("sourcePackageQuantity"))
-        assertTrue(prompt.contains("Red Bull"))
         assertTrue(prompt.contains("PRODUCT IDENTITY"))
         assertTrue(prompt.contains("Ferrero chocolate-covered wafer bar"))
         assertTrue(prompt.contains("any accessible website"))

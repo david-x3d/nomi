@@ -17,6 +17,61 @@ import org.junit.Test
 
 class ServingNutritionNormalizerTest {
     @Test
+    fun `nutrition basis and unit matrix scales every nutrient to the authoritative amount`() {
+        data class Case(
+            val quantity: Double,
+            val unit: String,
+            val sourceQuantity: Double,
+            val sourceUnit: String,
+            val basis: ResearchNutritionBasis,
+            val factor: Double,
+        )
+
+        val cases = listOf(
+            Case(37.5, "g", 100.0, "g", ResearchNutritionBasis.PER_100_G, 0.375),
+            Case(0.25, "kg", 100.0, "g", ResearchNutritionBasis.PER_100_G, 2.5),
+            Case(330.0, "ml", 100.0, "ml", ResearchNutritionBasis.PER_100_ML, 3.3),
+            Case(0.5, "l", 100.0, "ml", ResearchNutritionBasis.PER_100_ML, 5.0),
+            Case(3.0, "servings", 2.0, "servings", ResearchNutritionBasis.SOURCE_SERVING, 1.5),
+        )
+
+        cases.forEach { case ->
+            val normalized = normalize(
+                raw = sourceItem(
+                    loggedQuantity = case.quantity,
+                    loggedUnit = case.unit,
+                    sourceQuantity = case.sourceQuantity,
+                    sourceUnit = case.sourceUnit,
+                    calories = 80.0,
+                    protein = 8.0,
+                    carbs = 10.0,
+                    fat = 2.0,
+                ).copy(
+                    nutritionBasis = case.basis,
+                    fiberGrams = 4.0,
+                    sugarGrams = 5.0,
+                    saturatedFatGrams = 1.0,
+                    sodiumMilligrams = 120.0,
+                ),
+                requestedQuantity = case.quantity,
+                requestedUnit = case.unit,
+            )
+
+            assertEquals(case.quantity, normalized.quantity, 0.0)
+            assertEquals(case.unit, normalized.unit)
+            assertEquals(80.0 * case.factor, normalized.calories, 1e-10)
+            assertEquals(8.0 * case.factor, normalized.proteinGrams, 1e-10)
+            assertEquals(10.0 * case.factor, normalized.carbohydrateGrams, 1e-10)
+            assertEquals(2.0 * case.factor, normalized.fatGrams, 1e-10)
+            assertEquals(4.0 * case.factor, normalized.fiberGrams!!, 1e-10)
+            assertEquals(5.0 * case.factor, normalized.sugarGrams!!, 1e-10)
+            assertEquals(1.0 * case.factor, normalized.saturatedFatGrams!!, 1e-10)
+            assertEquals(120.0 * case.factor, normalized.sodiumMilligrams!!, 1e-10)
+            ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
+        }
+    }
+
+    @Test
     fun `per-100-g research scales soup to 100 400 and 50 gram portions`() {
         val expected = mapOf(100.0 to 1.0, 400.0 to 4.0, 50.0 to 0.5)
         expected.forEach { (grams, factor) ->
@@ -327,56 +382,24 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `spoon to mass falls back visibly when no density is available`() {
-        val estimated = normalize(
-            raw = sourceItem(1.0, "EL", 100.0, "g"),
-            requestedQuantity = 1.0,
-            requestedUnit = "EL",
-        )
-        assertEquals(15.0, estimated.gramsEquivalent!!, 0.0)
-        assertEquals(15.0, estimated.calories, 1e-12)
-        assertTrue(estimated.isEstimate)
-        assertTrue(estimated.assumptions.any { it.contains("1 g per ml") })
+    fun `cross-dimension amount requires an explicit product-specific bridge`() {
+        assertThrows(AiValidationException::class.java) {
+            normalize(
+                raw = sourceItem(1.0, "tbsp", 100.0, "g"),
+                requestedQuantity = 1.0,
+                requestedUnit = "tbsp",
+            )
+        }
 
-        val withMass = normalize(
-            raw = sourceItem(1.0, "EL", 100.0, "g").copy(gramsEquivalent = 12.0),
-            requestedQuantity = 1.0,
-            requestedUnit = "EL",
-        )
-        assertEquals(12.0, withMass.calories, 1e-12)
-        assertEquals(12.0, withMass.servingValidation!!.loggedBaseAmount, 0.0)
-    }
-
-    @Test
-    fun `German jam spoon uses labeled food specific mass estimate`() {
         val normalized = normalize(
-            raw = sourceItem(1.5, "Löffel", 100.0, "g")
-                .copy(name = "Himbeer Marmelade"),
+            raw = sourceItem(1.5, "tbsp", 100.0, "g").copy(gramsEquivalent = 27.0),
             requestedQuantity = 1.5,
-            requestedUnit = "Löffel",
-            requestedName = "Himbeer Marmelade",
-        )
-
-        assertEquals(30.0, normalized.gramsEquivalent!!, 1e-12)
-        assertEquals(30.0, normalized.calories, 1e-12)
-        assertTrue(normalized.isEstimate)
-        assertTrue(normalized.assumptions.any { it.contains("20 g per German tablespoon") })
-        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
-    }
-
-    @Test
-    fun `provider supplied jam spoon mass wins over fallback`() {
-        val normalized = normalize(
-            raw = sourceItem(1.5, "EL", 100.0, "g")
-                .copy(name = "Himbeer Marmelade", gramsEquivalent = 27.0),
-            requestedQuantity = 1.5,
-            requestedUnit = "EL",
-            requestedName = "Himbeer Marmelade",
+            requestedUnit = "tbsp",
         )
 
         assertEquals(27.0, normalized.gramsEquivalent!!, 0.0)
         assertEquals(27.0, normalized.calories, 1e-12)
-        assertFalse(normalized.assumptions.any { it.contains("20 g per German tablespoon") })
+        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
     }
 
     @Test
@@ -440,7 +463,7 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `apple logged as one Stueck scales a gram source through its exact gram equivalent`() {
+    fun `count scales a mass source through its exact total gram equivalent`() {
         val normalized = normalize(
             raw = sourceItem(
                 loggedQuantity = 1.0,
@@ -466,7 +489,7 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `one generic apple without gram equivalent uses estimated medium apple mass`() {
+    fun `supplied total gram equivalent is used without a food-specific fallback`() {
         val normalized = normalize(
             raw = sourceItem(
                 loggedQuantity = 1.0,
@@ -477,74 +500,14 @@ class ServingNutritionNormalizerTest {
                 protein = 0.3,
                 carbs = 13.8,
                 fat = 0.2,
-            ).copy(name = "Apple"),
+            ).copy(gramsEquivalent = 150.0),
             requestedQuantity = 1.0,
             requestedUnit = "piece",
-            requestedName = "apple",
-        )
-
-        assertEquals(182.0, normalized.gramsEquivalent!!, 0.0)
-        assertEquals(52.0 * 1.82, normalized.calories, 1e-12)
-        assertEquals(1.0, normalized.quantity, 0.0)
-        assertEquals("piece", normalized.unit)
-        assertTrue(normalized.isEstimate)
-        assertTrue(normalized.assumptions.any { it.contains("182 g per medium apple") })
-        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
-    }
-
-    @Test
-    fun `two generic Apfel pieces preserve count and use total estimated mass`() {
-        val normalized = normalize(
-            raw = sourceItem(
-                loggedQuantity = 2.0,
-                loggedUnit = "Stücke",
-                sourceQuantity = 100.0,
-                sourceUnit = "g",
-                calories = 52.0,
-                protein = 0.3,
-                carbs = 13.8,
-                fat = 0.2,
-            ).copy(name = "Apfel"),
-            requestedQuantity = 2.0,
-            requestedUnit = "Stücke",
-            requestedName = "Äpfel",
-        )
-
-        assertEquals(364.0, normalized.gramsEquivalent!!, 0.0)
-        assertEquals(52.0 * 3.64, normalized.calories, 1e-12)
-        assertEquals(2.0, normalized.quantity, 0.0)
-        assertEquals("Stücke", normalized.unit)
-        assertEquals(364.0, normalized.servingValidation!!.loggedBaseAmount, 0.0)
-        assertTrue(normalized.isEstimate)
-        assertTrue(normalized.assumptions.any { it.contains("182 g per medium apple") })
-        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
-    }
-
-    @Test
-    fun `supplied generic apple gram equivalent wins without fallback estimate`() {
-        val normalized = normalize(
-            raw = sourceItem(
-                loggedQuantity = 1.0,
-                loggedUnit = "piece",
-                sourceQuantity = 100.0,
-                sourceUnit = "g",
-                calories = 52.0,
-                protein = 0.3,
-                carbs = 13.8,
-                fat = 0.2,
-            ).copy(
-                name = "Apple",
-                gramsEquivalent = 150.0,
-            ),
-            requestedQuantity = 1.0,
-            requestedUnit = "piece",
-            requestedName = "apple",
         )
 
         assertEquals(150.0, normalized.gramsEquivalent!!, 0.0)
         assertEquals(52.0 * 1.5, normalized.calories, 1e-12)
         assertFalse(normalized.isEstimate)
-        assertFalse(normalized.assumptions.any { it.contains("182 g per medium apple") })
         ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
     }
 
@@ -605,17 +568,24 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `mass and volume mismatch uses a labeled fallback instead of blocking the log`() {
+    fun `mass and volume mismatch requires an explicit source mass bridge`() {
+        assertThrows(AiValidationException::class.java) {
+            normalize(
+                raw = sourceItem(250.0, "g", 355.0, "ml"),
+                requestedQuantity = 250.0,
+                requestedUnit = "g",
+            )
+        }
+
         val normalized = normalize(
-            raw = sourceItem(250.0, "g", 355.0, "ml"),
+            raw = sourceItem(250.0, "g", 355.0, "ml")
+                .copy(sourceServingGramsEquivalent = 370.0),
             requestedQuantity = 250.0,
             requestedUnit = "g",
         )
 
-        assertEquals(355.0, normalized.sourceServingGramsEquivalent!!, 0.0)
-        assertEquals(100.0 * 250.0 / 355.0, normalized.calories, 1e-12)
-        assertTrue(normalized.isEstimate)
-        assertTrue(normalized.assumptions.any { it.contains("1 g per ml") })
+        assertEquals(370.0, normalized.sourceServingGramsEquivalent!!, 0.0)
+        assertEquals(100.0 * 250.0 / 370.0, normalized.calories, 1e-12)
         ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
     }
 
@@ -802,7 +772,7 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
-    fun `German spoon aliases survive the complete production normalization path`() {
+    fun `spoon aliases use the provider supplied total mass through the complete path`() {
         val cases = listOf(
             Triple("Löffel", 22.5, 30.0),
             Triple("Esslöffel", 22.5, 30.0),
@@ -812,7 +782,7 @@ class ServingNutritionNormalizerTest {
         )
 
         cases.forEach { (unit, expectedMilliliters, expectedGrams) ->
-            val text = "1,5 $unit Himbeer Marmelade"
+            val text = "1,5 $unit Test food"
             val parsed = requireNotNull(LocalFoodIntentParser.parseOrNull(text))
             val reconciledIntent = UserQuantityResolver.reconcileIntent(parsed, "DE")
             assertEquals(expectedMilliliters, reconciledIntent.items.single().quantity!!, 0.0)
@@ -821,7 +791,7 @@ class ServingNutritionNormalizerTest {
             val providerResult = FoodAnalysis(
                 items = listOf(
                     sourceItem(1.0, "serving", 100.0, "g")
-                        .copy(name = "Himbeer Marmelade"),
+                        .copy(name = "Test food", gramsEquivalent = expectedGrams, isEstimate = true),
                 ),
             )
             val reconciledAnalysis = UserQuantityResolver.reconcileAnalysis(
@@ -849,13 +819,11 @@ class ServingNutritionNormalizerTest {
 
         assertTrue(prompt.contains("official German manufacturer"))
         assertTrue(prompt.contains("sourceServingQuantity"))
-        assertTrue(prompt.contains("Do NOT return quantity=355"))
         assertTrue(prompt.contains("per 100 g/ml"))
         assertTrue(prompt.contains("COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT"))
-        assertTrue(prompt.contains("gramsEquivalent=364"))
         assertTrue(prompt.contains("1 EL/Essloeffel/tbsp/tablespoon = 15 ml"))
         assertTrue(prompt.contains("unqualified German Löffel/Loeffel means EL"))
-        assertTrue(prompt.contains("1.5 EL jam may use gramsEquivalent=30"))
+        assertTrue(prompt.contains("Never equate milliliters and grams silently"))
     }
 
     @Test

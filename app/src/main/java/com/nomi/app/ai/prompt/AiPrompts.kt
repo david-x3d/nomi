@@ -238,12 +238,9 @@ object AiPrompts {
         exactly that serving. Whenever reliable per-100-g or per-100-ml nutrition exists,
         ALWAYS return sourceServingQuantity=100 with the nutrient values PER 100 g/ml. Do NOT
         pre-scale them to the consumed amount; Nomi performs all portion scaling itself.
-        Example: the user logged 329 g steak and the source publishes per 100 g
-        172 kcal, 21 g protein, 0 g carbohydrates, 9.5 g fat.
-        CORRECT: quantity=329, unit="g", sourceServingQuantity=100, sourceServingUnit="g",
-        calories=172, proteinGrams=21, carbohydrateGrams=0, fatGrams=9.5.
-        WRONG: calories=566, proteinGrams=69, fatGrams=31.3 - those are already scaled to
-        329 g, so Nomi would scale them a second time. Never do this.
+        If the source publishes per-100 values, copy those values unchanged and keep the user's
+        amount only in `quantity`/`unit`. Returning values multiplied by the user's amount would
+        make Nomi scale them a second time. Never do this.
         Before returning JSON, verify for every item: if sourceServingQuantity=100 and
         sourceServingUnit is "g" or "ml", then every nutrient field is the PER-100 value from
         the cited source, regardless of `quantity`.
@@ -255,10 +252,9 @@ object AiPrompts {
         a count (piece/Stück) but the source serving is mass, `gramsEquivalent` MUST be the total
         grams for the entire logged count, not grams per piece. When the source serving is a count
         but the logged amount is mass, `sourceServingGramsEquivalent` MUST be the total grams for
-        the entire source count. For example, two estimated medium apples researched from per-100-g
-        values require quantity=2, unit="pieces", gramsEquivalent=364, isEstimate=true, and a clear
-        assumption. Never omit the applicable total gram equivalent in a count-vs-mass result, and
-        never change an explicit logged count while supplying it.
+        the entire source count. Never omit the applicable total gram equivalent in a
+        count-vs-mass result, never substitute a generic item weight, and never change an explicit
+        logged count while supplying it.
         UNIT NORMALIZATION IS EXACT: 1 mg = 0.001 g, 1 kg = 1000 g,
         1 EL/Essloeffel/tbsp/tablespoon = 15 ml, and
         1 TL/Teeloeffel/tsp/teaspoon = 5 ml. An unqualified German Löffel/Loeffel means EL
@@ -267,9 +263,7 @@ object AiPrompts {
         `gramsEquivalent` MUST be the total mass for the entire logged amount. Prefer an official
         product serving weight or reputable food-specific density. If neither exists, provide a
         clearly labeled reasonable food-specific estimate, set `isEstimate=true`, and explain it
-        in assumptions. Example: 1.5 EL is exactly 22.5 ml; jam is commonly about 20 g per EL, so
-        1.5 EL jam may use gramsEquivalent=30 with an explicit density assumption. Never equate
-        milliliters and grams silently.
+        in assumptions. Never equate milliliters and grams silently.
 
         QUANTITY PRECEDENCE IS ABSOLUTE: explicit user quantity/package math > locally appropriate
         default quantity > source serving or package. Structured `quantity` and `unit` are
@@ -278,17 +272,9 @@ object AiPrompts {
         lists 380 g, keep the user's calculated amount and report 380 g only in the optional
         `sourcePackageQuantity`/`sourcePackageUnit` fields.
 
-        Example: for a logged 250 ml drink whose US source lists a 12 US fl oz / 355 ml can,
-        return quantity=250, unit="ml", sourceServingQuantity=12,
-        sourceServingUnit="US fl oz", and the nutrient fields for the full 12 fl oz source
-        serving. Do NOT return quantity=355 and do NOT claim the full can nutrition is for 250 ml.
-
-        For Germany, when the structured input resolves an unspecified Red Bull can or Red Bull
-        Edition (including Juneberry) to 250 ml, keep exactly 250 ml. Explicit 355 ml, 473 ml, or
-        half of a 250 ml can always wins. Normalize any differently sized international source
-        serving to per 100 ml before applying the structured quantity. Do not use a source package
-        as the logged amount. `sourcePackageQuantity` is informational and distinct from
-        `sourceServingQuantity`.
+        A differently sized source package must be normalized from its own declared serving before
+        applying the logged amount. Do not use a source package as the logged amount;
+        `sourcePackageQuantity` is informational and distinct from `sourceServingQuantity`.
 
         Return only:
         {
