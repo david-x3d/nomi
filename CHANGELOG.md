@@ -15,7 +15,7 @@
 
 - All 100 focused regression tests passed across normalization, quantity resolution, prompting and both research-provider paths.
 - Coverage includes different quantities, mass and volume units, serving counts, all nutrition fields, ambiguous unit bridges and manufacturer-versus-generic evidence.
-- Release compilation, lint-vital analysis, signing and APK assembly passed. The full Gradle test task remains unavailable because this host blocks the loopback sockets used by Gradle test workers.
+- Release compilation, lint-vital analysis, signing and APK assembly passed. The full Gradle test task was not run for this release. The reason recorded here originally, that this host blocks the loopback sockets used by Gradle test workers, was a misdiagnosis: the host's default temp directory rejects the AF_UNIX socket the JDK opens for NIO selector pipes. Pointing `jdk.net.unixdomain.tmpdir` at a directory that accepts it lets the task run normally, for the daemon and for forked test workers alike.
 - APK SHA-256: `F59FFF43748CB4C143700DB6935A5ED5E6BB6B7BB8A6C49E48A21A3EA082C5C4`
 
 ## Nomi v2.0.6 — 2026-08-26
