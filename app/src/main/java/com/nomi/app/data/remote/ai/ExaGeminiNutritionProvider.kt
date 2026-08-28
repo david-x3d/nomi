@@ -442,6 +442,7 @@ internal fun geminiNutritionPrompt(
     appendLine("Set nutritionBasis to PER_100_G, PER_100_ML, or SOURCE_SERVING. Copy the exact nearby table heading/text that names that basis into sourceBasisText. sourceBasisText must occur verbatim in the selected Exa document; never copy the user's requested amount as the source basis. Only the explicitly unverified restaurant-size estimate may use null sourceBasisText.")
     appendLine("For every item, return calorieExplanation as a concise user-facing sentence in the user's input language. Explain the main calorie drivers from the returned macros and portion: fat contributes 9 kcal/g, carbohydrates and protein 4 kcal/g. Mention a large portion when it materially raises the total. This is a result summary, not hidden chain-of-thought; do not invent ingredients or health claims.")
     appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
+    appendLine("Generic-food fallback: when the request names only a food itself, with no brand, package or barcode identity, a reputable generic nutrition source or food database is a valid selection and no exact manufacturer product is required. Select one coherent source instead of merging conflicting ones, and set sourceProductName to the food title that source prints. If no single retrieved page supports the whole reading, return that source's per-100 values with nutritionBasis PER_100_G or PER_100_ML, sourceServingQuantity 100, the matching sourceServingUnit, isEstimate=true, and name the limitation in assumptions. Keep the logged quantity and unit unchanged, and never bridge mass and volume without an explicit stated equivalence.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
     appendLine("Return every schema property. Use null for unavailable nullable values and [] for unavailable list values.")
@@ -579,23 +580,20 @@ private fun groundGeminiExtraction(
                     parsedQuantity,
                     parsedUnit,
                 )
-            if (!explicitWholeServingEstimate) {
+            val genericPer100Estimate = !explicitWholeServingEstimate &&
+                extracted.qualifiesAsGenericPer100Estimate(parsed, documents)
+            if (!explicitWholeServingEstimate && !genericPer100Estimate) {
                 throw evidenceFailure ?: AiValidationException(
                     "No single product-specific source supports the reported nutrition and basis",
                 )
             }
-            return@mapIndexed extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
+            // Nothing below may keep a citation or a product identity: no single document
+            // supported the complete reading, so the item is offered as an explicit estimate.
+            val ungrounded = extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
                 sourceName = null,
                 sourceUrl = null,
                 supportingSourceUrls = emptyList(),
                 sourceProductName = null,
-                // The remaining values are an estimate for the requested restaurant/item
-                // portion. Keep its basis identical to the logged basis so the deterministic
-                // normalizer does not try to convert an unknown size through g/ml.
-                sourceServingQuantity = parsed.quantity,
-                sourceServingUnit = parsed.unit,
-                sourceServingGramsEquivalent = parsed.gramsEquivalent,
-                nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
                 sourceBasisText = null,
                 isEstimate = true,
                 assumptions = (extracted.assumptions +
@@ -604,6 +602,23 @@ private fun groundGeminiExtraction(
                     .distinct()
                     .takeLast(12),
             )
+            return@mapIndexed if (genericPer100Estimate) {
+                // A generic food carries a self-contained per-100 basis. Keep it exactly as
+                // researched so the deterministic normalizer scales it to the logged amount;
+                // rewriting it to the logged serving would republish a per-100 reading as a
+                // whole-portion total, which is the bug this basis exists to prevent.
+                ungrounded
+            } else {
+                // The remaining values are an estimate for the requested restaurant/item
+                // portion. Keep its basis identical to the logged basis so the deterministic
+                // normalizer does not try to convert an unknown size through g/ml.
+                ungrounded.copy(
+                    sourceServingQuantity = parsed.quantity,
+                    sourceServingUnit = parsed.unit,
+                    sourceServingGramsEquivalent = parsed.gramsEquivalent,
+                    nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+                )
+            }
         }
         val groundedSupporting = supporting
             .takeIf { groundedPrimary.sourceId == primary.sourceId }
@@ -779,6 +794,47 @@ private fun requireEntityEvidence(
     if (brandTokens.isNotEmpty() && brandTokens.none(normalizedCorpus::contains)) {
         throw AiValidationException("The selected Exa source does not support the claimed brand")
     }
+}
+
+/**
+ * Decides whether an ungrounded reading may still be offered as a generic-food estimate.
+ *
+ * A generic food ("steak", "rice", "banana") has no manufacturer, package or barcode to verify
+ * against, so research legitimately settles on a reputable generic per-100 figure whose exact
+ * digits appear in no single retrieved excerpt. Refusing those outright leaves ordinary foods
+ * unloggable, so they are accepted as an explicit estimate instead.
+ *
+ * The strictness is kept where it means something. Anything claiming a specific identity - a
+ * brand on the request or in the reading, or a source package size - still needs one document
+ * that supports the whole reading, so a branded product can never fall back to a generic number.
+ * The reading must also be a genuine, self-contained per-100 basis: exactly 100 of its own unit,
+ * with finite, non-negative nutrients. That keeps the scaling deterministic and stops a whole
+ * serving from entering through the per-100 door. Finally at least one retrieved document has to
+ * be a nutrition page about the requested food, so an unsupported product claim cannot slip
+ * through as a generic estimate.
+ */
+private fun GeminiNutritionItem.qualifiesAsGenericPer100Estimate(
+    parsed: ParsedFoodItem,
+    documents: List<ExaNutritionDocument>,
+): Boolean {
+    val claimsBrand = !parsed.brand.isNullOrBlank() || !brand.isNullOrBlank()
+    val claimsPackage = sourcePackageQuantity != null || !sourcePackageUnit.isNullOrBlank()
+    if (claimsBrand || claimsPackage) return false
+    val expectedUnit = when (nutritionBasis) {
+        ResearchNutritionBasis.PER_100_G -> "g"
+        ResearchNutritionBasis.PER_100_ML -> "ml"
+        ResearchNutritionBasis.SOURCE_SERVING -> return false
+    }
+    if (!sourceServingUnit.trim().equals(expectedUnit, ignoreCase = true)) return false
+    if (abs(sourceServingQuantity - 100.0) > 1e-6) return false
+    if (!calories.isFinite() || calories <= 0.0) return false
+    if (listOf(proteinGrams, carbohydrateGrams, fatGrams).any { !it.isFinite() || it < 0.0 }) {
+        return false
+    }
+    // Research must at least have retrieved a nutrition page about the food that was requested.
+    // Without one, nothing connects the reading to what the user logged, and accepting it would
+    // launder an unsupported product claim into a generic number.
+    return documents.any { it.supportsRequestedIdentity(parsed) && it.containsNutritionTable() }
 }
 
 private fun ExaNutritionDocument.isOfficialBrandDocument(brand: String?): Boolean {

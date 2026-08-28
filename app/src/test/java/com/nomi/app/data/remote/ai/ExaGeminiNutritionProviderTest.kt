@@ -653,6 +653,220 @@ class ExaGeminiNutritionProviderTest {
         assertEquals(NutritionVerificationStatus.VERIFIED, result.items.single().verificationStatus)
     }
 
+    // region generic-food fallback
+    //
+    // A generic food ("steak", "rice", "banana") has no manufacturer to verify against. Research
+    // legitimately returns a reputable generic per-100 reading whose exact digits need not appear
+    // in any one retrieved excerpt. These cases pin that such an item still resolves, scaled to
+    // the logged amount, while a branded product keeps the strict single-source requirement.
+
+    /** Two generic pages that disagree, so no single document verifies the model's reading. */
+    private fun genericSteakSources() = listOf(
+        source(
+            title = "Beef steak nutrition facts",
+            url = "https://generic-nutrition.test/beef-steak",
+            content = "Beef steak, cooked. Nutrition per 100 g: 271 kcal, protein 25 g, " +
+                "carbohydrates 0 g, fat 19 g",
+        ),
+        source(
+            title = "Steak nutrition overview",
+            url = "https://food-database.test/steak",
+            content = "Steak (average cut). Per 100 g: 210 kcal, protein 29 g, " +
+                "carbohydrates 0 g, fat 10 g",
+        ),
+    )
+
+    /** A coherent generic per-100 reading that no single retrieved page reproduces exactly. */
+    private fun genericSteakEstimate(sourceId: String = "exa-1") = GeminiNutritionItem(
+        name = "Steak",
+        calories = 250.0,
+        proteinGrams = 26.0,
+        carbohydrateGrams = 0.0,
+        fatGrams = 16.0,
+        sourceId = sourceId,
+        sourceProductName = "Steak",
+        sourceServingQuantity = 100.0,
+        sourceServingUnit = "g",
+        sourceServingGramsEquivalent = 100.0,
+        nutritionBasis = ResearchNutritionBasis.PER_100_G,
+        sourceBasisText = "per 100 g",
+        sourceCountry = "DE",
+        isEstimate = true,
+        confidence = 0.7,
+    )
+
+    private fun genericIntent(text: String, name: String, quantity: Double, unit: String = "g") =
+        ParsedFoodIntent(
+            originalText = text,
+            language = "en",
+            items = listOf(
+                ParsedFoodItem(
+                    name = name,
+                    quantity = quantity,
+                    unit = unit,
+                    gramsEquivalent = quantity.takeIf { unit == "g" },
+                    quantityResolution = QuantityResolutionMetadata(
+                        origin = QuantityOrigin.USER_EXPLICIT,
+                        semantic = QuantitySemantic.DIRECT_AMOUNT,
+                        canonicalQuantity = quantity,
+                        canonicalUnit = unit,
+                        enteredQuantity = quantity,
+                        enteredUnit = unit,
+                    ),
+                ),
+            ),
+        )
+
+    @Test
+    fun `a generic food resolves to a scaled estimate when no single source verifies it`() =
+        runBlocking {
+            val loggedGrams = 276.0
+            val result = provider(
+                sources = genericSteakSources(),
+                extraction = extraction(genericSteakEstimate()),
+            ).researchNutrition(genericIntent("276 g steak", "steak", loggedGrams))
+
+            val item = result.items.single()
+            assertEquals(loggedGrams, item.quantity, 1e-9)
+            assertEquals("g", item.unit)
+            // Per-100 values scaled by the logged amount, by the deterministic normalizer.
+            val factor = loggedGrams / 100.0
+            assertEquals(250.0 * factor, item.calories, 1e-6)
+            assertEquals(26.0 * factor, item.proteinGrams, 1e-6)
+            assertEquals(0.0, item.carbohydrateGrams, 1e-6)
+            assertEquals(16.0 * factor, item.fatGrams, 1e-6)
+            // An ungrounded generic reading is offered as an estimate, never as verified.
+            // It cites nothing, so it takes the same UNKNOWN status as any uncited estimate.
+            assertTrue(item.isEstimate)
+            assertEquals(NutritionVerificationStatus.UNKNOWN, item.verificationStatus)
+        }
+
+    @Test
+    fun `a generic food keeps its per-100 basis instead of becoming a whole serving`() =
+        runBlocking {
+            val loggedGrams = 276.0
+            val item = provider(
+                sources = genericSteakSources(),
+                extraction = extraction(genericSteakEstimate()),
+            ).researchNutrition(genericIntent("276 g steak", "steak", loggedGrams))
+                .items
+                .single()
+
+            // The regression this guards: relabeling a per-100 reading as a whole logged serving
+            // would make 250 kcal the total for 276 g instead of the per-100 basis.
+            assertEquals(ResearchNutritionBasis.PER_100_G, item.nutritionBasis)
+            assertEquals(100.0, item.sourceServingQuantity!!, 1e-9)
+            assertEquals("g", item.sourceServingUnit)
+            assertTrue(item.calories > 250.0)
+        }
+
+    @Test
+    fun `generic foods scale linearly across arbitrary gram quantities`() = runBlocking {
+        listOf(1.0, 37.0, 99.0, 100.0, 276.0, 501.5, 1234.0).forEach { loggedGrams ->
+            val item = provider(
+                sources = genericSteakSources(),
+                extraction = extraction(genericSteakEstimate()),
+            ).researchNutrition(genericIntent("$loggedGrams g steak", "steak", loggedGrams))
+                .items
+                .single()
+
+            val factor = loggedGrams / 100.0
+            assertEquals(loggedGrams, item.quantity, 1e-9)
+            assertEquals("$loggedGrams g", 250.0 * factor, item.calories, 1e-6)
+            assertEquals("$loggedGrams g", 26.0 * factor, item.proteinGrams, 1e-6)
+            assertEquals("$loggedGrams g", 16.0 * factor, item.fatGrams, 1e-6)
+        }
+    }
+
+    @Test
+    fun `an ungrounded generic result cites no source it could not verify`() = runBlocking {
+        val item = provider(
+            sources = genericSteakSources(),
+            extraction = extraction(genericSteakEstimate()),
+        ).researchNutrition(genericIntent("276 g steak", "steak", 276.0))
+            .items
+            .single()
+
+        // One coherent reading, never a merge of the two disagreeing pages.
+        assertEquals(null, item.sourceUrl)
+        assertEquals(emptyList<String>(), item.supportingSourceUrls)
+    }
+
+    @Test
+    fun `a branded product is still rejected when no single source verifies it`() {
+        val brandedEstimate = genericSteakEstimate().copy(
+            name = "Test Brand Ribeye",
+            brand = "Test Brand",
+            sourceProductName = "Test Brand Ribeye",
+        )
+        val intent = genericIntent("276 g Test Brand Ribeye", "Test Brand Ribeye", 276.0)
+        val brandedIntent = intent.copy(
+            items = listOf(intent.items.single().copy(brand = "Test Brand")),
+        )
+
+        assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                provider(
+                    sources = genericSteakSources(),
+                    extraction = extraction(brandedEstimate),
+                ).researchNutrition(brandedIntent)
+            }
+        }
+    }
+
+    @Test
+    fun `a package-specific claim is still rejected when no single source verifies it`() {
+        assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                provider(
+                    sources = genericSteakSources(),
+                    extraction = extraction(
+                        genericSteakEstimate().copy(
+                            sourcePackageQuantity = 380.0,
+                            sourcePackageUnit = "g",
+                        ),
+                    ),
+                ).researchNutrition(genericIntent("276 g steak", "steak", 276.0))
+            }
+        }
+    }
+
+    @Test
+    fun `a generic estimate still cannot claim physically impossible nutrition`() {
+        assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                provider(
+                    sources = genericSteakSources(),
+                    extraction = extraction(genericSteakEstimate().copy(calories = 9000.0)),
+                ).researchNutrition(genericIntent("276 g steak", "steak", 276.0))
+            }
+        }
+    }
+
+    @Test
+    fun `a generic food still verifies normally when one source supports it`() = runBlocking {
+        val case = SuccessCase(
+            text = "276 g steak",
+            name = "steak",
+            quantity = 276.0,
+            sourceAmount = 100.0,
+            calories = 271.0,
+            protein = 25.0,
+            carbs = 0.0,
+            fat = 19.0,
+            expectedCalories = 271.0 * 2.76,
+        )
+        val item = provider(
+            sources = listOf(source(case.name, content = evidence(case))),
+            extraction = extraction(item(case).copy(isEstimate = false)),
+        ).researchNutrition(case.intent()).items.single()
+
+        assertEquals(case.expectedCalories, item.calories, 1e-6)
+        assertFalse(item.isEstimate)
+        assertEquals(NutritionVerificationStatus.VERIFIED, item.verificationStatus)
+    }
+    // endregion
+
     private fun provider(
         sources: List<ExaSearchResult>,
         extraction: GeminiNutritionExtraction,
