@@ -1,5 +1,25 @@
 # Changelog
 
+## Nomi v2.0.8 — 2026-08-28
+
+### Generic foods log again at any amount
+
+- Restores a research path for foods with no brand, package or barcode identity, which v2.0.7 removed when it gated the last estimate fallback behind a whole-serving basis equal to the logged amount.
+- A generic food logged at any amount other than exactly 100 g failed outright, because at 100 g the per-100 table is the answer and grounding succeeds without a fallback.
+- Accepts a generic reading as an explicit estimate only when it claims no brand and no source package size, declares a genuine self-contained per-100 basis, and at least one retrieved document is a nutrition page about the food that was requested.
+- Keeps the researched per-100 basis untouched on that path so the deterministic normalizer scales it to the logged amount; it is never rewritten into a whole-portion total.
+- Drops the citation and product name for an ungrounded generic result and marks it an estimate, so nothing unverified is presented as verified.
+- Leaves branded, packaged and barcode products under the existing rule that one source must support the complete reading.
+- Adds the matching generic-food instruction to the research prompt, which previously only asked for an exact product identity.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 443 tests across 56 classes.
+- Adds eight regression scenarios covering generic foods at arbitrary gram amounts, per-100 basis preservation, source citation, physical plausibility, and continued rejection of unsupported branded and package claims.
+- Scaling is pinned across 1 g, 37 g, 99 g, 100 g, 276 g, 501.5 g and 1234 g.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `8F7E7B8D674D49891B36257C82175E17E43DE075B46C5D47B014674644A9FF32`
+
 ## Nomi v2.0.7 — 2026-08-28
 
 ### Reliable nutrition quantity scaling
