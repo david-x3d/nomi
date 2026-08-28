@@ -20,6 +20,8 @@ import com.nomi.app.ai.parsing.LocalFoodIntentParser
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.FoodDisplayName
+import com.nomi.app.ai.validation.NutritionFailureReason
+import com.nomi.app.ai.validation.NutritionResearchException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
@@ -78,6 +80,7 @@ import com.nomi.app.domain.usecase.NutritionRoute
 import com.nomi.app.domain.usecase.PortionEditApplier
 import com.nomi.app.domain.usecase.PortionEditParser
 import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
+import com.nomi.app.domain.usecase.acceptsVerifiedUpgradeFrom
 import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.domain.usecase.toPortionContext
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
@@ -132,6 +135,7 @@ import io.ktor.client.call.NoTransformationFoundException
 import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
+import io.ktor.http.HttpStatusCode
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -2827,8 +2831,17 @@ class AppViewModel(
                     }.take(4_000),
                     parsedResultJson = container.exaGeminiClient.json.encodeToString(trace),
                     validationStatus = trace.status,
-                    failureCategory = trace.failureReason?.let { "EXA_GEMINI_REJECTED" },
-                    safeMessage = trace.failureReason,
+                    // The typed per-item reasons are what make one bad item in a meal
+                    // diagnosable; the whole-request reason is the fallback for a pass that
+                    // never got as far as resolving items.
+                    failureCategory = trace.itemFailures.firstOrNull()?.reason
+                        ?: trace.failureReason?.let { "EXA_GEMINI_REJECTED" },
+                    safeMessage = (
+                        trace.itemFailures.map { failure ->
+                            "item ${failure.itemIndex + 1} ${failure.itemName}: " +
+                                "${failure.reason} - ${failure.detail}"
+                        } + listOfNotNull(trace.failureReason)
+                        ).joinToString(" | ").takeIf(String::isNotBlank),
                     createdAtEpochMillis = System.currentTimeMillis(),
                 ),
             )
@@ -2854,8 +2867,10 @@ class AppViewModel(
                     cacheHit = false,
                     sourceSummary = sourceUrls.joinToString(" | ").take(4_000),
                     validationStatus = status,
-                    failureCategory = error?.javaClass?.simpleName,
-                    safeMessage = error?.safeProviderFailureMessage()
+                    failureCategory = error?.nutritionFailureReason()?.name
+                        ?: error?.javaClass?.simpleName,
+                    safeMessage = error?.researchFailureDetail()
+                        ?: error?.safeProviderFailureMessage()
                         ?: if (analysis != null) {
                             "The configured fallback provider returned validated nutrition."
                         } else {
@@ -3384,10 +3399,7 @@ class AppViewModel(
             sodiumMilligrams = item.sodiumMilligrams?.times(factor),
         )
         if (existing != null) {
-            // A generic estimate must never pin a barcode/name forever after a package or
-            // manufacturer source supplies verified values. User-created foods remain owned by
-            // the user and are never rewritten by research.
-            if (existing.isEstimated && !item.isEstimate && !existing.isUserCreated) {
+            if (existing.acceptsVerifiedUpgradeFrom(item.isEstimate)) {
                 repository.updateFood(
                     existing.copy(
                         canonicalName = item.name.trim().take(300),
@@ -3427,12 +3439,41 @@ class AppViewModel(
     private fun inUserLanguage(english: String): String =
         NomiTranslations.translate(english, currentLanguage())
 
+    private fun inUserLanguage(english: String, vararg arguments: Any?): String =
+        NomiTranslations.format(english, currentLanguage(), *arguments)
+
     private fun currentLanguage(): NomiLanguage =
         NomiLanguage.fromTag(preferences.value.languageTag)
             ?: NomiLanguage.matching(Locale.getDefault())
 
-    /** Research validation is actionable to developers, but raw source-ID language is not UI. */
+    /**
+     * Turns a research failure into something the user can act on.
+     *
+     * Raw source-ID language is not UI, but neither is one sentence for every cause. A typed
+     * [NutritionResearchException] names the item that failed and why, so the message can say
+     * which food it was and what would fix it. Everything else keeps its existing wording,
+     * including the provider-level timeout, rate-limit and model errors that
+     * [safeAiMessage] already tells apart.
+     */
     private fun researchFailureMessage(error: Throwable): String {
+        val research = error.causeChain().filterIsInstance<NutritionResearchException>().firstOrNull()
+        if (research != null) {
+            val food = research.itemName?.trim()?.takeIf(String::isNotBlank)
+            val template = if (food == null) {
+                // Retrieval and contract failures belong to the whole request, not to one food.
+                requestLevelFailureMessage(research.reason)
+            } else {
+                researchFailureTemplate(research.reason)
+            }
+            return when {
+                template == null ->
+                    // Transport failures already carry their own distinct wording, which names
+                    // the provider and the status code; a food name adds nothing to those.
+                    inUserLanguage(error.safeAiMessage())
+                food == null -> inUserLanguage(template)
+                else -> inUserLanguage(template, food)
+            }
+        }
         val technicalEvidenceFailure = error is AiValidationException && listOf(
             "Exa source",
             "nutrition evidence",
@@ -3752,6 +3793,12 @@ private fun Throwable.safeProviderFailureMessage(): String? {
         return "Nomi couldn't read the stored API key. Remove it in Settings and enter it again."
     }
     causes.filterIsInstance<ProviderTemporarilyUnavailableException>().firstOrNull()?.let { error ->
+        // A retried 429 is a quota problem, not an outage. Waiting is the answer to one and
+        // reporting an outage is the answer to the other, so they do not share a sentence.
+        if (error.statusCode == HTTP_TOO_MANY_REQUESTS) {
+            return "${error.providerName} rejected the request for exceeding its rate limit, " +
+                "even after automatic retries. Wait a moment and try again."
+        }
         return "${error.providerName} is temporarily unavailable (HTTP ${error.statusCode}) " +
             "after automatic retries. Try again shortly."
     }
@@ -3812,6 +3859,109 @@ private fun Throwable.safeProviderFailureMessage(): String? {
         causeMessageContains("timeout", "timed out") -> "The provider took too long. Try again."
         else -> null
     }
+}
+
+/**
+ * The user-facing sentence for a nutrition failure that belongs to one named item.
+ *
+ * Each cause needs a different answer from the user, so each gets its own sentence with the food
+ * in it. Transport causes return null: they already have wording that names the provider and the
+ * status code, and the food name adds nothing to a rate limit.
+ */
+internal fun researchFailureTemplate(reason: NutritionFailureReason): String? = when (reason) {
+    NutritionFailureReason.MISSING_PORTION_WEIGHT ->
+        "Nomi found nutrition for \"{0}\" but not what that amount weighs. Enter it in g or ml."
+    NutritionFailureReason.SOURCE_IDENTITY_MISMATCH ->
+        "Nomi only found sources for a different product than \"{0}\". Check the name, or add " +
+            "the brand."
+    NutritionFailureReason.NO_SUITABLE_SOURCE ->
+        "Nomi found no nutrition source for \"{0}\". Try again or describe it more precisely."
+    NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES ->
+        "Nomi couldn't confirm the nutrition numbers for \"{0}\". Try again or edit the entry."
+    NutritionFailureReason.INVALID_NUTRITION_BASIS ->
+        "The nutrition Nomi found for \"{0}\" is given for a serving it cannot convert to your " +
+            "amount. Try g or ml."
+    NutritionFailureReason.PARSING_FAILURE ->
+        "Nomi couldn't read the nutrition answer for \"{0}\". Try again."
+    NutritionFailureReason.PROVIDER_TIMEOUT,
+    NutritionFailureReason.PROVIDER_RATE_LIMITED,
+    NutritionFailureReason.MODEL_UNAVAILABLE,
+    NutritionFailureReason.PROVIDER_UNREACHABLE,
+    -> null
+}
+
+/**
+ * The user-facing sentence for a failure that belongs to the whole request rather than to one
+ * food: retrieval came back with nothing usable, or the answer did not match the contract.
+ */
+private fun requestLevelFailureMessage(reason: NutritionFailureReason): String? = when (reason) {
+    NutritionFailureReason.NO_SUITABLE_SOURCE ->
+        "Nomi found no usable nutrition sources for that entry. Try again in a moment."
+    NutritionFailureReason.PARSING_FAILURE ->
+        "Nomi couldn't read the nutrition answer for that entry. Try again."
+    NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+    NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
+    NutritionFailureReason.INVALID_NUTRITION_BASIS,
+    NutritionFailureReason.MISSING_PORTION_WEIGHT,
+    ->
+        // These always belong to a named item; reaching here means the name was lost, so the
+        // old shared sentence is the honest answer rather than a guess about which food it was.
+        "Nomi couldn't verify nutrition for every product. Try again or edit the entry."
+    // Transport causes keep their own provider wording.
+    NutritionFailureReason.PROVIDER_TIMEOUT,
+    NutritionFailureReason.PROVIDER_RATE_LIMITED,
+    NutritionFailureReason.MODEL_UNAVAILABLE,
+    NutritionFailureReason.PROVIDER_UNREACHABLE,
+    -> null
+}
+
+/** The typed research detail behind a failure, for the debug log rather than the screen. */
+private fun Throwable.researchFailureDetail(): String? =
+    causeChain().filterIsInstance<NutritionResearchException>().firstOrNull()?.message
+
+private const val HTTP_TOO_MANY_REQUESTS = 429
+
+/**
+ * The typed cause behind a nutrition failure, whatever layer raised it.
+ *
+ * Validation already carries its own [NutritionResearchException]; transport failures arrive as
+ * Ktor and IO exceptions and are classified here, so a debug event records "PROVIDER_TIMEOUT"
+ * rather than a class name that says nothing about what went wrong.
+ */
+internal fun Throwable.nutritionFailureReason(): NutritionFailureReason? {
+    val causes = causeChain()
+    causes.filterIsInstance<NutritionResearchException>().firstOrNull()?.let { return it.reason }
+    causes.filterIsInstance<ProviderTemporarilyUnavailableException>().firstOrNull()?.let { error ->
+        return if (error.statusCode == HTTP_TOO_MANY_REQUESTS) {
+            NutritionFailureReason.PROVIDER_RATE_LIMITED
+        } else {
+            NutritionFailureReason.PROVIDER_UNREACHABLE
+        }
+    }
+    causes.filterIsInstance<ResponseException>().firstOrNull()?.let { error ->
+        return when (error.response.status.value) {
+            HTTP_TOO_MANY_REQUESTS -> NutritionFailureReason.PROVIDER_RATE_LIMITED
+            HttpStatusCode.RequestTimeout.value -> NutritionFailureReason.PROVIDER_TIMEOUT
+            HttpStatusCode.NotFound.value -> NutritionFailureReason.MODEL_UNAVAILABLE
+            else -> NutritionFailureReason.PROVIDER_UNREACHABLE
+        }
+    }
+    if (causes.any {
+            it is HttpRequestTimeoutException || it is ConnectTimeoutException ||
+                it is SocketTimeoutException
+        } || causeMessageContains("timeout", "timed out")
+    ) {
+        return NutritionFailureReason.PROVIDER_TIMEOUT
+    }
+    if (causes.any { it is SerializationException } ||
+        causes.any { it is NoTransformationFoundException }
+    ) {
+        return NutritionFailureReason.PARSING_FAILURE
+    }
+    if (causes.any { it is UnknownHostException || it is ConnectException || it is IOException }) {
+        return NutritionFailureReason.PROVIDER_UNREACHABLE
+    }
+    return null
 }
 
 private fun Throwable.causeChain(): List<Throwable> =

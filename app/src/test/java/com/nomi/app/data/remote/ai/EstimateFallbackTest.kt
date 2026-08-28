@@ -72,7 +72,8 @@ class EstimateFallbackTest {
         assertEquals(1.0, item.quantity, 0.0)
         assertEquals("piece", item.unit)
         assertTrue(item.isEstimate)
-        assertEquals(NutritionVerificationStatus.UNKNOWN, item.verificationStatus)
+        // An uncited estimate reads as ESTIMATED, not UNKNOWN: research produced and labeled it.
+        assertEquals(NutritionVerificationStatus.ESTIMATED, item.verificationStatus)
         assertNull(item.sourceUrl)
     }
 

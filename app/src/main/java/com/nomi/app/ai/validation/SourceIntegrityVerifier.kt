@@ -26,10 +26,14 @@ object SourceIntegrityVerifier {
             ?.takeIf(String::isNotBlank)
         val domainConflict = citedHost != null && claimedDomain != null && claimedDomain != citedHost
 
+        // An item that already declares itself an estimate is an estimate, cited or not. Reading
+        // an uncited estimate as UNKNOWN told the user nothing about a value research had in fact
+        // produced and labeled; UNKNOWN is reserved for a reading that claims to be verified and
+        // then cites nothing to stand on.
         val status = when {
+            item.isEstimate -> NutritionVerificationStatus.ESTIMATED
             citedHost == null -> NutritionVerificationStatus.UNKNOWN
             domainConflict -> NutritionVerificationStatus.ESTIMATED
-            item.isEstimate -> NutritionVerificationStatus.ESTIMATED
             item.sourceProductName.isNullOrBlank() -> NutritionVerificationStatus.ESTIMATED
             else -> NutritionVerificationStatus.VERIFIED
         }

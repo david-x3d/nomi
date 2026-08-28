@@ -441,13 +441,27 @@ object ServingNutritionNormalizer {
         requireClose(first.baseAmount, second.baseAmount, message)
     }
 
+    /**
+     * Two servings that do not share a dimension cannot be scaled into one another, but the two
+     * ways that happens need different answers. A counted amount on either side is missing a
+     * weight nobody supplied, which the user can settle by entering grams; anything else is a
+     * basis the source and the request simply do not share.
+     */
     private fun requireCompatible(first: Measure, second: Measure) {
-        if (first.dimension != second.dimension) {
-            throw AiValidationException(
-                "Source serving '${first.originalUnit}' is not compatible with logged unit " +
-                    "'${second.originalUnit}'",
-            )
-        }
+        if (first.dimension == second.dimension) return
+        throw NutritionResearchException(
+            reason = if (second.dimension.isCounted) {
+                // The user logged a count, so the missing fact is what one of them weighs, which
+                // an amount in g or ml settles.
+                NutritionFailureReason.MISSING_PORTION_WEIGHT
+            } else {
+                // The logged amount is already a real mass or volume; it is the source's own
+                // basis that cannot be converted into it.
+                NutritionFailureReason.INVALID_NUTRITION_BASIS
+            },
+            detail = "Source serving '${first.originalUnit}' is not compatible with logged unit " +
+                "'${second.originalUnit}'",
+        )
     }
 
     /**
@@ -585,6 +599,9 @@ object ServingNutritionNormalizer {
     private sealed interface Dimension {
         val storageName: String
         val per100Label: String get() = "units"
+
+        /** A count or an unrecognized household unit: real, but with no weight of its own. */
+        val isCounted: Boolean get() = this is Piece || this is Custom
 
         data object Mass : Dimension {
             override val storageName = "mass_g"

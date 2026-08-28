@@ -735,10 +735,10 @@ class ExaGeminiNutritionProviderTest {
             assertEquals(26.0 * factor, item.proteinGrams, 1e-6)
             assertEquals(0.0, item.carbohydrateGrams, 1e-6)
             assertEquals(16.0 * factor, item.fatGrams, 1e-6)
-            // An ungrounded generic reading is offered as an estimate, never as verified.
-            // It cites nothing, so it takes the same UNKNOWN status as any uncited estimate.
+            // An ungrounded generic reading is offered as an estimate, never as verified. It
+            // cites nothing, but it is still a labeled estimate rather than an unknown value.
             assertTrue(item.isEstimate)
-            assertEquals(NutritionVerificationStatus.UNKNOWN, item.verificationStatus)
+            assertEquals(NutritionVerificationStatus.ESTIMATED, item.verificationStatus)
         }
 
     @Test

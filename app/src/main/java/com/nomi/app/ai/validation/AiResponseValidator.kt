@@ -15,7 +15,8 @@ import com.nomi.app.ai.model.QuantitySemantic
 import com.nomi.app.ai.model.VisionFoodResult
 import kotlin.math.abs
 
-class AiValidationException(message: String) : IllegalArgumentException(message)
+/** Open so a failure can carry a typed cause; see [NutritionResearchException]. */
+open class AiValidationException(message: String) : IllegalArgumentException(message)
 
 object AiResponseValidator {
     private const val MAX_ITEMS = 50

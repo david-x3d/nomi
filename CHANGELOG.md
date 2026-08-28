@@ -1,5 +1,37 @@
 # Changelog
 
+## Nomi v2.0.9 — 2026-08-28
+
+### One failed food no longer fails the whole meal, and says why
+
+- Resolves each logged item independently through grounding, quantity reconciliation, normalization and source verification, instead of aborting the entire analysis at the first item that could not be grounded.
+- Retries only the items that failed, once, with their own retrieval and a prompt that names what the first pass was missing; items that already resolved keep their first-pass reading.
+- Adds a typed failure cause carried with the failure: no suitable source, source/product identity mismatch, unsupported nutrition values, invalid nutrition basis, missing portion weight, parsing failure, provider timeout, rate limit, unavailable model, and unreachable provider.
+- Reports the failing food by name with a cause-specific sentence, translated into every supported language, in place of the single "Nomi couldn't verify nutrition for every product" message.
+- Records the typed cause and the per-item detail in the AI debug log, so one bad item in a meal is diagnosable.
+
+### Ordinary foods that could not be logged
+
+- Stops requiring two words of the requested food name to appear in one retrieved document. A preparation word such as "gekocht" or "gebraten" is frequently absent from the nutrition page for the same food, which rejected the request outright and blocked the generic fallback with it. A majority of the request's words is now enough, while the claimed product title, the exact calorie and macro figures, and any requested brand must still match.
+- Decides branded versus generic from the request and from any package size the reading claims, not from the research model's brand field. A model writing a word such as "Generic" into that field no longer blocks the generic path, and its unverified brand and package claims are dropped rather than published.
+- Accepts a generic reading on a printed per-serving basis as well as per 100 g and per 100 ml, provided the reading is one the deterministic normalizer can scale.
+- Refuses any generic reading whose own basis text contradicts the basis it declared, so a per-100 table can never be republished as a whole-portion total through the estimate path.
+- Asks research for the weight of a counted portion, or for a source whose own basis is per item, when the logged unit is a count and the basis is per 100 g or per 100 ml.
+
+### Clearer provider and estimate reporting
+
+- Distinguishes a retried rate limit from an outage, which previously shared one "temporarily unavailable" sentence.
+- Reads an explicitly labelled estimate as ESTIMATED rather than UNKNOWN. UNKNOWN now means a reading that claims to be verified and cites nothing.
+- Splits an incompatible serving into two causes: a counted logged amount with no weight, which entering grams settles, and a source basis that cannot be converted into a real mass or volume.
+- Extracts the catalogue upgrade rule into one tested decision: verified data replaces a stored estimate, a fresh estimate never overwrites anything, and a food the user created is never rewritten by research.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 470 tests across 59 classes, with no failures, errors or skips.
+- Adds 27 regression tests covering a generic single food at arbitrary gram amounts, a generic multi-item meal, a branded product with valid manufacturer evidence, a branded product with mismatching evidence, one failed item among several valid ones with its narrowed retry, search and extraction timeouts, per-100 scaling at 1 g, 7.5 g, 42 g, 137 g, 250 g and 999 g, per-100-ml scaling that never becomes grams, and the cache rules that keep a stale estimate from outliving verified product data.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `BADDA6D489C0A54F479708014E69FAB6FE38915BC8EF38F88BB8AD9C9309E63C`
+
 ## Nomi v2.0.8 — 2026-08-28
 
 ### Generic foods log again at any amount

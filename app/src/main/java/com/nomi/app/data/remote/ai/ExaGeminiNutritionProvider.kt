@@ -10,6 +10,8 @@ import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
+import com.nomi.app.ai.validation.NutritionFailureReason
+import com.nomi.app.ai.validation.NutritionResearchException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
@@ -279,13 +281,97 @@ internal class ExaGeminiNutritionProvider(
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        val searchQueries = nutritionSearchQueries(reconciledIntent)
+        val resolved = arrayOfNulls<AnalyzedFoodItem>(reconciledIntent.items.size)
+
+        val firstPass = runResearchPass(
+            intent = reconciledIntent,
+            localeCountry = localeCountry,
+            targetIndexes = reconciledIntent.items.indices.toList(),
+            publishSources = true,
+            focusedRetry = false,
+            startedAt = startedAt,
+        )
+        firstPass.resolutions.filterIsInstance<ItemResolution.Resolved>().forEach {
+            resolved[it.index] = it.item
+        }
+        var failures = firstPass.resolutions.filterIsInstance<ItemFailure>()
+        var confidence = firstPass.overallConfidence
+
+        // A meal is not all-or-nothing. Items that were resolved stay resolved, and only the ones
+        // that failed are searched and extracted again, on their own, where their evidence is not
+        // competing with the rest of the plate and the prompt can name what the first pass was
+        // missing. One narrowed attempt, so a hopeless lookup costs one extra round trip rather
+        // than looping.
+        if (failures.isNotEmpty()) {
+            // A retry that fails outright leaves the first pass's typed failures standing, since
+            // those are the actionable ones. Cancellation is not a retry outcome and propagates.
+            val retry = try {
+                runResearchPass(
+                    intent = reconciledIntent,
+                    localeCountry = localeCountry,
+                    targetIndexes = failures.map(ItemFailure::index),
+                    publishSources = false,
+                    focusedRetry = true,
+                    startedAt = startedAt,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                null
+            }
+            if (retry != null) {
+                val stillFailing = failures.associateBy(ItemFailure::index).toMutableMap()
+                retry.resolutions.forEach { resolution ->
+                    when (resolution) {
+                        is ItemResolution.Resolved -> {
+                            resolved[resolution.index] = resolution.item
+                            stillFailing -= resolution.index
+                        }
+                        is ItemFailure -> stillFailing[resolution.index] = resolution
+                    }
+                }
+                failures = stillFailing.values.sortedBy(ItemFailure::index)
+                confidence = listOfNotNull(confidence, retry.overallConfidence).minOrNull()
+            }
+        }
+
+        failures.firstOrNull()?.let { failure ->
+            throw NutritionResearchException(
+                reason = failure.reason,
+                itemName = failure.name,
+                itemIndex = failure.index,
+                detail = failures.joinToString("; ", transform = ItemFailure::describe),
+            )
+        }
+        return AiResponseValidator.validate(
+            FoodAnalysis(items = resolved.map(::requireNotNull), overallConfidence = confidence),
+        )
+    }
+
+    /**
+     * One retrieval-plus-extraction round for a chosen subset of the logged items.
+     *
+     * Each item is grounded, reconciled and normalized on its own, so one unusable source cannot
+     * discard the arithmetic that already succeeded for everything else on the plate.
+     */
+    @Suppress("LongParameterList")
+    private suspend fun runResearchPass(
+        intent: ParsedFoodIntent,
+        localeCountry: String?,
+        targetIndexes: List<Int>,
+        publishSources: Boolean,
+        focusedRetry: Boolean,
+        startedAt: Long,
+    ): ResearchPass {
+        val passIntent = intent.copy(items = targetIndexes.map(intent.items::get))
+        val searchQueries = nutritionSearchQueries(passIntent)
         val searchQuery = searchQueries.joinToString(" || ")
         var searchLatency = 0L
         var extractionLatency = 0L
         var documents = emptyList<ExaNutritionDocument>()
         var extraction: GeminiNutritionExtraction? = null
-        return try {
+        var resolutions = emptyList<ItemResolution>()
+        try {
             lateinit var searchResponses: List<ExaSearchResponse>
             searchLatency = measureTimeMillis {
                 val credential = exaCredential()
@@ -306,9 +392,14 @@ internal class ExaGeminiNutritionProvider(
                 results = searchResponses.flatMap(ExaSearchResponse::results),
             ).toNutritionDocuments()
             if (documents.isEmpty()) {
-                throw AiValidationException("Exa returned no usable nutrition sources")
+                throw NutritionResearchException(
+                    reason = NutritionFailureReason.NO_SUITABLE_SOURCE,
+                    detail = "Exa returned no usable nutrition sources",
+                )
             }
-            runCatching { searchProgressSink(documents.map(ExaNutritionDocument::url)) }
+            if (publishSources) {
+                runCatching { searchProgressSink(documents.map(ExaNutritionDocument::url)) }
+            }
 
             extractionLatency = measureTimeMillis {
                 extraction = geminiExtractor.extract(
@@ -316,42 +407,48 @@ internal class ExaGeminiNutritionProvider(
                     credential = geminiCredential(),
                     systemPrompt = GEMINI_NUTRITION_SYSTEM_PROMPT,
                     userPrompt = geminiNutritionPrompt(
-                        intent = reconciledIntent,
+                        intent = passIntent,
                         documents = documents,
                         localeCountry = localeCountry,
+                        focusedRetry = focusedRetry,
                     ),
                 )
             }
             val extracted = requireNotNull(extraction)
             extracted.error?.trim()?.takeIf(String::isNotBlank)?.let { reason ->
-                throw AiValidationException(
-                    "Exa and Gemini could not verify nutrition data: ${reason.take(200)}",
+                throw NutritionResearchException(
+                    reason = NutritionFailureReason.NO_SUITABLE_SOURCE,
+                    detail = "Exa and Gemini could not verify nutrition data: ${reason.take(200)}",
                 )
             }
-            if (extracted.items.size != reconciledIntent.items.size) {
-                throw AiValidationException(
-                    "Gemini must return exactly one nutrition result for each logged item",
+            if (extracted.items.size != passIntent.items.size) {
+                throw NutritionResearchException(
+                    reason = NutritionFailureReason.PARSING_FAILURE,
+                    detail = "Gemini must return exactly one nutrition result for each logged item",
                 )
             }
-            val grounded = groundGeminiExtraction(reconciledIntent, extracted, documents)
-            val reconciled = UserQuantityResolver.reconcileAnalysis(reconciledIntent, grounded)
-            val normalized = ServingNutritionNormalizer.normalize(reconciledIntent, reconciled)
-            val validated = SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
+            resolutions = targetIndexes.mapIndexed { position, index ->
+                resolveItem(intent, index, extracted.items[position], documents)
+            }
             debugSink(
                 debugTrace(
                     model = geminiConfig.model,
-                    originalInput = reconciledIntent.originalText,
+                    originalInput = passIntent.originalText,
                     searchQuery = searchQuery,
                     documents = documents,
                     extraction = extracted,
-                    result = validated,
+                    result = FoodAnalysis(
+                        items = resolutions.filterIsInstance<ItemResolution.Resolved>()
+                            .map(ItemResolution.Resolved::item),
+                    ),
                     searchLatency = searchLatency,
                     extractionLatency = extractionLatency,
                     totalLatency = System.currentTimeMillis() - startedAt,
-                    status = "VALIDATED",
+                    status = if (resolutions.any { it is ItemFailure }) "PARTIAL" else "VALIDATED",
+                    itemFailures = resolutions.itemFailureDescriptions(),
                 ),
             )
-            validated
+            return ResearchPass(resolutions, extracted.overallConfidence)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
@@ -359,7 +456,7 @@ internal class ExaGeminiNutritionProvider(
                 debugSink(
                     debugTrace(
                         model = geminiConfig.model,
-                        originalInput = reconciledIntent.originalText,
+                        originalInput = passIntent.originalText,
                         searchQuery = searchQuery,
                         documents = documents,
                         extraction = extraction,
@@ -369,13 +466,82 @@ internal class ExaGeminiNutritionProvider(
                         totalLatency = System.currentTimeMillis() - startedAt,
                         status = "REJECTED",
                         failureReason = error.message?.take(300),
+                        itemFailures = resolutions.itemFailureDescriptions(),
                     ),
                 )
             }
             throw error
         }
     }
+
+    /**
+     * Grounds, reconciles and normalizes exactly one logged item.
+     *
+     * Everything the whole-analysis pipeline used to do collectively happens here for a single
+     * item, so a rejection can name the item it belongs to and the reason it failed instead of
+     * aborting the meal with one shared message.
+     */
+    private fun resolveItem(
+        intent: ParsedFoodIntent,
+        index: Int,
+        extracted: GeminiNutritionItem,
+        documents: List<ExaNutritionDocument>,
+    ): ItemResolution {
+        val parsed = intent.items[index]
+        return try {
+            val itemIntent = intent.copy(items = listOf(parsed))
+            val grounded = groundExtractedItem(parsed, extracted, documents)
+            val reconciled = UserQuantityResolver.reconcileAnalysis(
+                itemIntent,
+                FoodAnalysis(items = listOf(grounded)),
+            )
+            val normalized = ServingNutritionNormalizer.normalize(itemIntent, reconciled)
+            val validated = SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
+            ItemResolution.Resolved(index, validated.items.single())
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: NutritionResearchException) {
+            ItemFailure(index, parsed.name, failure.reason, failure.detail)
+        } catch (failure: AiValidationException) {
+            ItemFailure(
+                index,
+                parsed.name,
+                NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
+                failure.message.orEmpty(),
+            )
+        }
+    }
 }
+
+private data class ResearchPass(
+    val resolutions: List<ItemResolution>,
+    val overallConfidence: Double?,
+)
+
+private sealed interface ItemResolution {
+    val index: Int
+
+    data class Resolved(override val index: Int, val item: AnalyzedFoodItem) : ItemResolution
+}
+
+private data class ItemFailure(
+    override val index: Int,
+    val name: String,
+    val reason: NutritionFailureReason,
+    val detail: String,
+) : ItemResolution {
+    fun describe(): String = "item ${index + 1} " + name + ": " + reason.name + " - " + detail
+
+    fun toDebugFailure(): ExaGeminiItemFailure = ExaGeminiItemFailure(
+        itemIndex = index,
+        itemName = name,
+        reason = reason.name,
+        detail = detail,
+    )
+}
+
+private fun List<ItemResolution>.itemFailureDescriptions(): List<ExaGeminiItemFailure> =
+    filterIsInstance<ItemFailure>().map(ItemFailure::toDebugFailure)
 
 internal fun nutritionSearchQuery(intent: ParsedFoodIntent): String =
     buildString {
@@ -422,6 +588,8 @@ internal fun geminiNutritionPrompt(
     documents: List<ExaNutritionDocument>,
     localeCountry: String?,
     json: Json = Json { encodeDefaults = true; explicitNulls = false },
+    /** Set on the second attempt for items the first pass could not resolve. */
+    focusedRetry: Boolean = false,
 ): String = buildString {
     appendLine("Original user input (exact): ${intent.originalText}")
     appendLine("User locale country: ${localeCountry?.takeIf(String::isNotBlank) ?: "unknown"}")
@@ -442,10 +610,15 @@ internal fun geminiNutritionPrompt(
     appendLine("Set nutritionBasis to PER_100_G, PER_100_ML, or SOURCE_SERVING. Copy the exact nearby table heading/text that names that basis into sourceBasisText. sourceBasisText must occur verbatim in the selected Exa document; never copy the user's requested amount as the source basis. Only the explicitly unverified restaurant-size estimate may use null sourceBasisText.")
     appendLine("For every item, return calorieExplanation as a concise user-facing sentence in the user's input language. Explain the main calorie drivers from the returned macros and portion: fat contributes 9 kcal/g, carbohydrates and protein 4 kcal/g. Mention a large portion when it materially raises the total. This is a result summary, not hidden chain-of-thought; do not invent ingredients or health claims.")
     appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
-    appendLine("Generic-food fallback: when the request names only a food itself, with no brand, package or barcode identity, a reputable generic nutrition source or food database is a valid selection and no exact manufacturer product is required. Select one coherent source instead of merging conflicting ones, and set sourceProductName to the food title that source prints. If no single retrieved page supports the whole reading, return that source's per-100 values with nutritionBasis PER_100_G or PER_100_ML, sourceServingQuantity 100, the matching sourceServingUnit, isEstimate=true, and name the limitation in assumptions. Keep the logged quantity and unit unchanged, and never bridge mass and volume without an explicit stated equivalence.")
+    appendLine("Generic-food fallback: when the request names only a food itself, with no brand, package or barcode identity, a reputable generic nutrition source or food database is a valid selection and no exact manufacturer product is required. Select one coherent source instead of merging conflicting ones, and set sourceProductName to the food title that source prints. If no single retrieved page supports the whole reading, return that one source's values on their own basis - per-100 values as PER_100_G/PER_100_ML with sourceServingQuantity 100 and the matching sourceServingUnit, or a printed serving as SOURCE_SERVING with that serving's exact amount and unit - with isEstimate=true and the limitation named in assumptions. Keep the logged quantity and unit unchanged, and never bridge mass and volume without an explicit stated equivalence.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
+    appendLine("A counted logged unit cannot be scaled from a per-100 g/ml basis without that weight. When the logged unit is a count and no evidence states a unit weight, prefer a retrieved source whose own basis is per item/piece/serving and set nutritionBasis SOURCE_SERVING with that serving. For a request that names no brand, package or barcode, you may instead give a typical unit weight for the generic food in loggedServingGramsEquivalent; that reading is unverified, so set isEstimate=true and say so in assumptions. Never do this for a branded or packaged product.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
     appendLine("Return every schema property. Use null for unavailable nullable values and [] for unavailable list values.")
+    if (focusedRetry) {
+        appendLine()
+        appendLine("This is a second, narrowed attempt. A first pass over the whole meal could not resolve the item(s) above, so these documents were retrieved for them alone. Re-read them carefully: choose the single source that best supports this exact food, copy its basis text verbatim, and supply the missing weight bridge if the logged unit is a count. If nothing supports a verified reading, return the honest estimate the fallbacks above describe rather than an error.")
+    }
 }
 
 private const val GEMINI_NUTRITION_SYSTEM_PROMPT =
@@ -519,113 +692,131 @@ private fun ExaSearchResponse.toNutritionDocuments(): List<ExaNutritionDocument>
 
 private const val MAX_EXA_DOCUMENT_CHARS = 4_500
 
-private fun groundGeminiExtraction(
-    intent: ParsedFoodIntent,
-    extraction: GeminiNutritionExtraction,
+/**
+ * Binds one extracted reading to the retrieved evidence, or offers it as an explicit estimate.
+ *
+ * A nutrient table and its identity/basis must coexist in one document. Combining a generic page
+ * with a product page made unrelated values appear product-specific. An exact official brand
+ * domain that independently supports the complete reading is preferred, then the model's own
+ * selection, then the remaining documents.
+ */
+private fun groundExtractedItem(
+    parsed: ParsedFoodItem,
+    extracted: GeminiNutritionItem,
     documents: List<ExaNutritionDocument>,
-): FoodAnalysis {
+): AnalyzedFoodItem {
     val byId = documents.associateBy(ExaNutritionDocument::sourceId)
-    val items = extraction.items.mapIndexed { index, extracted ->
-        val parsed = intent.items[index]
-        val primary = byId[extracted.sourceId]
-            ?: throw AiValidationException("Gemini selected a source that Exa did not return")
-        val supporting = extracted.supportingSourceIds.distinct().map { sourceId ->
-            byId[sourceId]
-                ?: throw AiValidationException("Gemini selected a supporting source that Exa did not return")
-        }.filter { it.sourceId != primary.sourceId }.take(5)
-        // A nutrient table and its identity/basis must coexist in one document. Combining a
-        // generic page with a product page made unrelated values appear product-specific. Prefer
-        // an exact official brand domain when it independently supports the complete reading,
-        // then honour the model's selected source, then try the remaining documents.
-        val officialProductDocuments = documents.filter { candidate ->
-            candidate.isOfficialBrandDocument(parsed.brand) &&
-                candidate.containsNutritionTable() &&
-                candidate.supportsRequestedIdentity(parsed)
-        }
-        val eligibleDocuments = officialProductDocuments.ifEmpty { documents }
-        val candidates = eligibleDocuments.sortedBy { candidate ->
-            when {
-                candidate.isOfficialBrandDocument(parsed.brand) -> 0
-                candidate.sourceId == primary.sourceId -> 1
-                else -> 2
-            }
-        }
-        var evidenceFailure: AiValidationException? = null
-        val groundedPrimary = candidates.firstOrNull { candidate ->
-            try {
-                requireNutritionEvidence(extracted, parsed, candidate)
-                true
-            } catch (failure: AiValidationException) {
-                evidenceFailure = failure
-                false
-            }
-        }
-        if (groundedPrimary == null) {
-            val allZero = extracted.calories == 0.0 && extracted.proteinGrams == 0.0 &&
-                extracted.carbohydrateGrams == 0.0 && extracted.fatGrams == 0.0
-            if (allZero) {
-                throw AiValidationException(
-                    "A zero-calorie result needs explicit zero-calorie evidence from Exa",
-                )
-            }
-            val parsedQuantity = parsed.quantity
-            val parsedUnit = parsed.unit
-            val explicitWholeServingEstimate = extracted.isEstimate &&
-                extracted.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
-                extracted.sourceBasisText.isNullOrBlank() &&
-                parsedQuantity != null && !parsedUnit.isNullOrBlank() &&
-                equivalentServing(
-                    extracted.sourceServingQuantity,
-                    extracted.sourceServingUnit,
-                    parsedQuantity,
-                    parsedUnit,
-                )
-            val genericPer100Estimate = !explicitWholeServingEstimate &&
-                extracted.qualifiesAsGenericPer100Estimate(parsed, documents)
-            if (!explicitWholeServingEstimate && !genericPer100Estimate) {
-                throw evidenceFailure ?: AiValidationException(
-                    "No single product-specific source supports the reported nutrition and basis",
-                )
-            }
-            // Nothing below may keep a citation or a product identity: no single document
-            // supported the complete reading, so the item is offered as an explicit estimate.
-            val ungrounded = extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
-                sourceName = null,
-                sourceUrl = null,
-                supportingSourceUrls = emptyList(),
-                sourceProductName = null,
-                sourceBasisText = null,
-                isEstimate = true,
-                assumptions = (extracted.assumptions +
-                    "Live research ran for this item, but the retrieved page excerpt did not " +
-                    "contain every number needed for independent verification; shown as an estimate.")
-                    .distinct()
-                    .takeLast(12),
+    val primary = byId[extracted.sourceId]
+        ?: throw NutritionResearchException(
+            reason = NutritionFailureReason.NO_SUITABLE_SOURCE,
+            itemName = parsed.name,
+            detail = "Gemini selected a source that Exa did not return",
+        )
+    val supporting = extracted.supportingSourceIds.distinct().map { sourceId ->
+        byId[sourceId]
+            ?: throw NutritionResearchException(
+                reason = NutritionFailureReason.NO_SUITABLE_SOURCE,
+                itemName = parsed.name,
+                detail = "Gemini selected a supporting source that Exa did not return",
             )
-            return@mapIndexed if (genericPer100Estimate) {
-                // A generic food carries a self-contained per-100 basis. Keep it exactly as
-                // researched so the deterministic normalizer scales it to the logged amount;
-                // rewriting it to the logged serving would republish a per-100 reading as a
-                // whole-portion total, which is the bug this basis exists to prevent.
-                ungrounded
-            } else {
-                // The remaining values are an estimate for the requested restaurant/item
-                // portion. Keep its basis identical to the logged basis so the deterministic
-                // normalizer does not try to convert an unknown size through g/ml.
-                ungrounded.copy(
-                    sourceServingQuantity = parsed.quantity,
-                    sourceServingUnit = parsed.unit,
-                    sourceServingGramsEquivalent = parsed.gramsEquivalent,
-                    nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
-                )
-            }
+    }.filter { it.sourceId != primary.sourceId }.take(5)
+
+    val officialProductDocuments = documents.filter { candidate ->
+        candidate.isOfficialBrandDocument(parsed.brand) &&
+            candidate.containsNutritionTable() &&
+            candidate.supportsRequestedIdentity(parsed)
+    }
+    val eligibleDocuments = officialProductDocuments.ifEmpty { documents }
+    val candidates = eligibleDocuments.sortedBy { candidate ->
+        when {
+            candidate.isOfficialBrandDocument(parsed.brand) -> 0
+            candidate.sourceId == primary.sourceId -> 1
+            else -> 2
         }
+    }
+    var evidenceFailure: NutritionResearchException? = null
+    val groundedPrimary = candidates.firstOrNull { candidate ->
+        try {
+            requireNutritionEvidence(extracted, parsed, candidate)
+            true
+        } catch (failure: NutritionResearchException) {
+            evidenceFailure = failure
+            false
+        }
+    }
+    if (groundedPrimary != null) {
         val groundedSupporting = supporting
             .takeIf { groundedPrimary.sourceId == primary.sourceId }
             .orEmpty()
-        extracted.toAnalyzedItem(parsed, groundedPrimary, groundedSupporting)
+        return extracted.toAnalyzedItem(parsed, groundedPrimary, groundedSupporting)
     }
-    return FoodAnalysis(items = items, overallConfidence = extraction.overallConfidence)
+
+    val allZero = extracted.calories == 0.0 && extracted.proteinGrams == 0.0 &&
+        extracted.carbohydrateGrams == 0.0 && extracted.fatGrams == 0.0
+    if (allZero) {
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
+            itemName = parsed.name,
+            detail = "A zero-calorie result needs explicit zero-calorie evidence from Exa",
+        )
+    }
+    val parsedQuantity = parsed.quantity
+    val parsedUnit = parsed.unit
+    val explicitWholeServingEstimate = extracted.isEstimate &&
+        extracted.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
+        extracted.sourceBasisText.isNullOrBlank() &&
+        parsedQuantity != null && !parsedUnit.isNullOrBlank() &&
+        equivalentServing(
+            extracted.sourceServingQuantity,
+            extracted.sourceServingUnit,
+            parsedQuantity,
+            parsedUnit,
+        )
+    val genericEstimate = !explicitWholeServingEstimate &&
+        extracted.qualifiesAsGenericEstimate(parsed, documents)
+    if (!explicitWholeServingEstimate && !genericEstimate) {
+        throw evidenceFailure ?: NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "No single product-specific source supports the reported nutrition and basis",
+        )
+    }
+    // Nothing below may keep a citation or a product identity: no single document supported the
+    // complete reading, so the item is offered as an explicit estimate. The claimed brand and
+    // package go with it - an unverified number must not carry a specific product's name.
+    val ungrounded = extracted.toAnalyzedItem(parsed, primary, emptyList()).copy(
+        brand = parsed.brand,
+        sourceName = null,
+        sourceUrl = null,
+        supportingSourceUrls = emptyList(),
+        sourceProductName = null,
+        sourceBasisText = null,
+        sourcePackageQuantity = null,
+        sourcePackageUnit = null,
+        isEstimate = true,
+        assumptions = (
+            extracted.assumptions +
+                "Live research ran for this item, but the retrieved page excerpt did not " +
+                "contain every number needed for independent verification; shown as an estimate."
+            ).distinct().takeLast(12),
+    )
+    return if (genericEstimate) {
+        // A generic food carries its own self-contained basis. Keep it exactly as researched so
+        // the deterministic normalizer scales it to the logged amount; rewriting it to the logged
+        // serving would republish a per-100 reading as a whole-portion total, which is the bug
+        // this basis exists to prevent.
+        ungrounded
+    } else {
+        // The remaining values are an estimate for the requested restaurant/item portion. Keep
+        // its basis identical to the logged basis so the deterministic normalizer does not try to
+        // convert an unknown size through g/ml.
+        ungrounded.copy(
+            sourceServingQuantity = parsed.quantity,
+            sourceServingUnit = parsed.unit,
+            sourceServingGramsEquivalent = parsed.gramsEquivalent,
+            nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+        )
+    }
 }
 
 private fun GeminiNutritionItem.toAnalyzedItem(
@@ -674,10 +865,14 @@ private fun requireNutritionEvidence(
     document: ExaNutritionDocument,
 ) {
     val corpus = document.title + "\n" + document.content
-    requireGroundedNutritionBasis(item, corpus)
+    requireGroundedNutritionBasis(item, parsed, corpus)
     requireEntityEvidence(item, parsed, corpus)
     if (!NUTRITION_WORDS.containsMatchIn(corpus)) {
-        throw AiValidationException("The selected Exa source contains no recognizable nutrition evidence")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.NO_SUITABLE_SOURCE,
+            itemName = parsed.name,
+            detail = "The selected Exa source contains no recognizable nutrition evidence",
+        )
     }
     val values = NUTRITION_VALUE.findAll(corpus).mapNotNull { match ->
         match.groupValues[1].replace(',', '.').toDoubleOrNull()?.let { value ->
@@ -691,13 +886,19 @@ private fun requireNutritionEvidence(
         if (!values.matches(loggedGrams, "g") &&
             (perLoggedPiece == null || !values.matches(perLoggedPiece, "g"))
         ) {
-            throw AiValidationException(
-                "The selected Exa source does not support Gemini's weight per logged piece",
+            throw NutritionResearchException(
+                reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
+                itemName = parsed.name,
+                detail = "The selected Exa source does not support Gemini's weight per logged piece",
             )
         }
     }
     if (!values.matches(item.calories, "kcal")) {
-        throw AiValidationException("The selected Exa source does not support Gemini's calorie value")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not support Gemini's calorie value",
+        )
     }
     val supportedMacros = listOf(item.proteinGrams, item.carbohydrateGrams, item.fatGrams)
         .count { values.matches(it, "g") }
@@ -706,7 +907,11 @@ private fun requireNutritionEvidence(
     if ((!allZero && supportedMacros < 2) ||
         (allZero && !ZERO_CALORIE_EVIDENCE.containsMatchIn(corpus))
     ) {
-        throw AiValidationException("The selected Exa source does not support Gemini's macro values")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not support Gemini's macro values",
+        )
     }
 }
 
@@ -715,32 +920,61 @@ private fun requireNutritionEvidence(
  * were already grounded, but without this check a model could pair a real per-100 table with the
  * user's 400 g request and make correct arithmetic operate on the wrong semantic basis.
  */
-private fun requireGroundedNutritionBasis(item: GeminiNutritionItem, corpus: String) {
+private fun requireGroundedNutritionBasis(
+    item: GeminiNutritionItem,
+    parsed: ParsedFoodItem,
+    corpus: String,
+) {
     val basisText = item.sourceBasisText?.trim()?.takeIf(String::isNotBlank)
     if (basisText == null) {
         if (!item.isEstimate) {
-            throw AiValidationException("Verified nutrition is missing its source basis text")
+            throw NutritionResearchException(
+                reason = NutritionFailureReason.INVALID_NUTRITION_BASIS,
+                itemName = parsed.name,
+                detail = "Verified nutrition is missing its source basis text",
+            )
         }
         return
     }
     val normalizedEvidence = corpus.normalizedBasisEvidence()
     val normalizedBasisText = basisText.normalizedBasisEvidence()
     if (!normalizedEvidence.contains(normalizedBasisText)) {
-        throw AiValidationException("Gemini's nutrition basis text does not occur in the selected Exa source")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.INVALID_NUTRITION_BASIS,
+            itemName = parsed.name,
+            detail = "Gemini's nutrition basis text does not occur in the selected Exa source",
+        )
     }
-    val expectedMarker = when (item.nutritionBasis) {
-        ResearchNutritionBasis.PER_100_G -> PER_100_G_BASIS
-        ResearchNutritionBasis.PER_100_ML -> PER_100_ML_BASIS
-        ResearchNutritionBasis.SOURCE_SERVING -> null
+    if (!item.basisTextAgreesWithDeclaredBasis()) {
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.INVALID_NUTRITION_BASIS,
+            itemName = parsed.name,
+            detail = if (item.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING) {
+                "Per-100 nutrition was mislabeled as a complete source serving"
+            } else {
+                "Gemini's nutrition basis classification disagrees with its source text"
+            },
+        )
     }
-    if (expectedMarker != null && !expectedMarker.containsMatchIn(normalizedBasisText)) {
-        throw AiValidationException("Gemini's nutrition basis classification disagrees with its source text")
-    }
-    if (item.nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
-        (PER_100_G_BASIS.containsMatchIn(normalizedBasisText) ||
-            PER_100_ML_BASIS.containsMatchIn(normalizedBasisText))
-    ) {
-        throw AiValidationException("Per-100 nutrition was mislabeled as a complete source serving")
+}
+
+/**
+ * Whether the model's own basis text says the same thing as the basis it declared.
+ *
+ * This is the reading's internal consistency, separate from whether that text was found in the
+ * evidence. A reading that quotes "per 100 g" and then declares the whole logged portion as its
+ * serving has contradicted itself, and no estimate label makes that safe to publish: the numbers
+ * would be republished as a total for an amount they never described.
+ */
+private fun GeminiNutritionItem.basisTextAgreesWithDeclaredBasis(): Boolean {
+    val basisText = sourceBasisText?.trim()?.takeIf(String::isNotBlank)
+        ?.normalizedBasisEvidence() ?: return true
+    return when (nutritionBasis) {
+        ResearchNutritionBasis.PER_100_G -> PER_100_G_BASIS.containsMatchIn(basisText)
+        ResearchNutritionBasis.PER_100_ML -> PER_100_ML_BASIS.containsMatchIn(basisText)
+        ResearchNutritionBasis.SOURCE_SERVING ->
+            !PER_100_G_BASIS.containsMatchIn(basisText) &&
+                !PER_100_ML_BASIS.containsMatchIn(basisText)
     }
 }
 
@@ -760,73 +994,116 @@ private fun requireEntityEvidence(
     corpus: String,
 ) {
     val claimedProduct = item.sourceProductName?.trim()?.takeIf(String::isNotBlank)
-        ?: throw AiValidationException("Gemini did not identify the product printed by the selected source")
+        ?: throw NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "Gemini did not identify the product printed by the selected source",
+        )
     val normalizedCorpus = corpus.lowercase(Locale.ROOT)
-    val productTokens = ENTITY_TOKEN.findAll(claimedProduct.lowercase(Locale.ROOT))
-        .map(MatchResult::value)
-        .filterNot(ENTITY_STOP_WORDS::contains)
-        .distinct()
-        .toList()
+    val productTokens = entityTokens(claimedProduct)
     if (productTokens.isEmpty()) {
-        throw AiValidationException("The selected Exa source does not identify the claimed product")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not identify the claimed product",
+        )
     }
     val requiredProductMatches = minOf(2, productTokens.size)
     if (productTokens.count(normalizedCorpus::contains) < requiredProductMatches) {
-        throw AiValidationException("The selected Exa source does not support the claimed product")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not support the claimed product",
+        )
     }
-    val requestedProductTokens = ENTITY_TOKEN.findAll(parsed.name.lowercase(Locale.ROOT))
-        .map(MatchResult::value)
-        .filterNot(ENTITY_STOP_WORDS::contains)
-        .distinct()
-        .toList()
-    val requiredRequestedMatches = minOf(2, requestedProductTokens.size)
-    if (requiredRequestedMatches > 0 &&
-        requestedProductTokens.count(normalizedCorpus::contains) < requiredRequestedMatches
-    ) {
-        throw AiValidationException("The selected Exa source does not support the requested product")
+    if (!normalizedCorpus.describesRequestedFood(parsed)) {
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not support the requested product",
+        )
     }
-    val brandTokens = (parsed.brand ?: item.brand).orEmpty().lowercase(Locale.ROOT).let { brand ->
-        ENTITY_TOKEN.findAll(brand).map(MatchResult::value)
-            .filterNot(ENTITY_STOP_WORDS::contains)
-            .distinct()
-            .toList()
-    }
+    val brandTokens = entityTokens((parsed.brand ?: item.brand).orEmpty())
     if (brandTokens.isNotEmpty() && brandTokens.none(normalizedCorpus::contains)) {
-        throw AiValidationException("The selected Exa source does not support the claimed brand")
+        throw NutritionResearchException(
+            reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
+            itemName = parsed.name,
+            detail = "The selected Exa source does not support the claimed brand",
+        )
     }
 }
+
+/**
+ * Whether a page is about the food that was actually requested.
+ *
+ * Part of a food name identifies it and the rest describes it. "Chicken breast, grilled" and
+ * "cooked rice" are the same foods as "chicken breast" and "rice", and a nutrition page is under
+ * no obligation to repeat the preparation word. Which part is the head depends on the language -
+ * German puts it first and English last, and it is not reliably the longest word either - so the
+ * rule is a plain majority: at least half of the request's words have to appear.
+ *
+ * That is deliberately weaker than the two-token rule it replaces, which rejected ordinary
+ * requests outright. It is not the only thing binding a reading to its evidence: on the verified
+ * path the document must also print the claimed product title and the exact calorie and macro
+ * figures, and a request that names a brand must match that brand too. This check only has to
+ * establish that research answered the question that was asked.
+ */
+private fun String.describesRequestedFood(parsed: ParsedFoodItem): Boolean {
+    val tokens = entityTokens(parsed.name)
+    if (tokens.isEmpty()) return true
+    return tokens.count(::contains) * 2 >= tokens.size
+}
+
+private fun entityTokens(value: String): List<String> = ENTITY_TOKEN
+    .findAll(value.lowercase(Locale.ROOT))
+    .map(MatchResult::value)
+    .filterNot(ENTITY_STOP_WORDS::contains)
+    .distinct()
+    .toList()
 
 /**
  * Decides whether an ungrounded reading may still be offered as a generic-food estimate.
  *
  * A generic food ("steak", "rice", "banana") has no manufacturer, package or barcode to verify
- * against, so research legitimately settles on a reputable generic per-100 figure whose exact
- * digits appear in no single retrieved excerpt. Refusing those outright leaves ordinary foods
+ * against, so research legitimately settles on a reputable generic figure whose exact digits
+ * appear in no single retrieved excerpt. Refusing those outright leaves ordinary foods
  * unloggable, so they are accepted as an explicit estimate instead.
  *
- * The strictness is kept where it means something. Anything claiming a specific identity - a
- * brand on the request or in the reading, or a source package size - still needs one document
- * that supports the whole reading, so a branded product can never fall back to a generic number.
- * The reading must also be a genuine, self-contained per-100 basis: exactly 100 of its own unit,
- * with finite, non-negative nutrients. That keeps the scaling deterministic and stops a whole
- * serving from entering through the per-100 door. Finally at least one retrieved document has to
- * be a nutrition page about the requested food, so an unsupported product claim cannot slip
- * through as a generic estimate.
+ * The strictness is kept where it means something. Whether a request is generic is decided by the
+ * request and by what the reading claims to have read off a package - never by the brand field.
+ * A request that names a brand, or a reading that reports a package size, still needs one document
+ * supporting the whole reading, so a branded or packaged product can never be answered with a
+ * generic number. The model's own brand string is ignored here, because a reading that could not
+ * be verified has no standing to assert a product identity, and consulting it let a model that
+ * wrote "Generic" into that field block the very path this exists for.
+ *
+ * The reading must also be one Nomi can scale deterministically, and it must not contradict
+ * itself: an exact per-100 of its own unit, or a source serving with a real amount and unit, with
+ * a basis text that agrees with the declared basis. That keeps a whole serving from entering
+ * through the per-100 door, and a per-100 table from being republished as a whole portion, while
+ * still allowing a per-serving generic table. Finally at least one retrieved document has to be a
+ * nutrition page about the requested food, so an unsupported product claim cannot slip through as
+ * a generic estimate.
  */
-private fun GeminiNutritionItem.qualifiesAsGenericPer100Estimate(
+private fun GeminiNutritionItem.qualifiesAsGenericEstimate(
     parsed: ParsedFoodItem,
     documents: List<ExaNutritionDocument>,
 ): Boolean {
-    val claimsBrand = !parsed.brand.isNullOrBlank() || !brand.isNullOrBlank()
-    val claimsPackage = sourcePackageQuantity != null || !sourcePackageUnit.isNullOrBlank()
-    if (claimsBrand || claimsPackage) return false
-    val expectedUnit = when (nutritionBasis) {
-        ResearchNutritionBasis.PER_100_G -> "g"
-        ResearchNutritionBasis.PER_100_ML -> "ml"
-        ResearchNutritionBasis.SOURCE_SERVING -> return false
+    if (!parsed.brand.isNullOrBlank()) return false
+    if (sourcePackageQuantity != null || !sourcePackageUnit.isNullOrBlank()) return false
+    if (!basisTextAgreesWithDeclaredBasis()) return false
+    val basisIsScalable = when (nutritionBasis) {
+        ResearchNutritionBasis.PER_100_G ->
+            sourceServingUnit.trim().equals("g", ignoreCase = true) &&
+                abs(sourceServingQuantity - 100.0) <= 1e-6
+        ResearchNutritionBasis.PER_100_ML ->
+            sourceServingUnit.trim().equals("ml", ignoreCase = true) &&
+                abs(sourceServingQuantity - 100.0) <= 1e-6
+        ResearchNutritionBasis.SOURCE_SERVING ->
+            sourceServingQuantity.isFinite() && sourceServingQuantity > 0.0 &&
+                sourceServingUnit.isNotBlank()
     }
-    if (!sourceServingUnit.trim().equals(expectedUnit, ignoreCase = true)) return false
-    if (abs(sourceServingQuantity - 100.0) > 1e-6) return false
+    if (!basisIsScalable) return false
     if (!calories.isFinite() || calories <= 0.0) return false
     if (listOf(proteinGrams, carbohydrateGrams, fatGrams).any { !it.isFinite() || it < 0.0 }) {
         return false
@@ -856,20 +1133,8 @@ private fun ExaNutritionDocument.containsNutritionTable(): Boolean {
 
 private fun ExaNutritionDocument.supportsRequestedIdentity(parsed: ParsedFoodItem): Boolean {
     val corpus = (title + "\n" + content).lowercase(Locale.ROOT)
-    val nameTokens = ENTITY_TOKEN.findAll(parsed.name.lowercase(Locale.ROOT))
-        .map(MatchResult::value)
-        .filterNot(ENTITY_STOP_WORDS::contains)
-        .distinct()
-        .toList()
-    val requiredNameMatches = minOf(2, nameTokens.size)
-    if (requiredNameMatches > 0 && nameTokens.count(corpus::contains) < requiredNameMatches) {
-        return false
-    }
-    val brandTokens = ENTITY_TOKEN.findAll(parsed.brand.orEmpty().lowercase(Locale.ROOT))
-        .map(MatchResult::value)
-        .filterNot(ENTITY_STOP_WORDS::contains)
-        .distinct()
-        .toList()
+    if (!corpus.describesRequestedFood(parsed)) return false
+    val brandTokens = entityTokens(parsed.brand.orEmpty())
     return brandTokens.isEmpty() || brandTokens.any(corpus::contains)
 }
 
@@ -921,10 +1186,20 @@ internal data class ExaGeminiDebugTrace(
     val totalLatencyMillis: Long,
     val status: String,
     val failureReason: String? = null,
+    /** One entry per item that could not be resolved, so a bad item in a meal is diagnosable. */
+    val itemFailures: List<ExaGeminiItemFailure> = emptyList(),
 )
 
 @Serializable
 internal data class ExaGeminiDebugSource(val sourceId: String, val title: String, val url: String)
+
+@Serializable
+internal data class ExaGeminiItemFailure(
+    val itemIndex: Int,
+    val itemName: String,
+    val reason: String,
+    val detail: String,
+)
 
 private fun debugTrace(
     model: String,
@@ -938,6 +1213,7 @@ private fun debugTrace(
     totalLatency: Long,
     status: String,
     failureReason: String? = null,
+    itemFailures: List<ExaGeminiItemFailure> = emptyList(),
 ): ExaGeminiDebugTrace = ExaGeminiDebugTrace(
     model = model,
     originalInput = originalInput,
@@ -973,6 +1249,7 @@ private fun debugTrace(
     totalLatencyMillis = totalLatency,
     status = status,
     failureReason = failureReason,
+    itemFailures = itemFailures,
 )
 
 @Serializable

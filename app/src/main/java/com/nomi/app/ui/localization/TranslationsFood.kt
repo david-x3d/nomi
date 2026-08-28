@@ -720,6 +720,164 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Nomi hittade inga näringsvärden för den ändringen. Försök igen.",
         tr = "Nomi bu değişiklik için besin değeri bulamadı. Tekrar dene.",
     ),
+    // A retrieval or contract failure belongs to the whole entry, not to one of its foods.
+    "Nomi found no usable nutrition sources for that entry. Try again in a moment." to
+        NomiTranslation(
+            de = "Nomi hat für diese Eingabe keine brauchbaren Nährwertquellen " +
+                "gefunden. Versuch es gleich noch einmal.",
+            es = "Nomi no ha encontrado fuentes nutricionales utilizables para esta entrada. " +
+                "Inténtalo de nuevo en un momento.",
+            fr = "Nomi n’a trouvé aucune source nutritionnelle exploitable pour cette " +
+                "entrée. Réessaie dans un instant.",
+            it = "Nomi non ha trovato fonti nutrizionali utilizzabili per questa voce. " +
+                "Riprova tra un attimo.",
+            nl = "Nomi vond geen bruikbare voedingsbronnen voor dit item. Probeer het zo " +
+                "meteen opnieuw.",
+            pt = "A Nomi não encontrou fontes nutricionais utilizáveis para esta " +
+                "entrada. Tenta de novo daqui a pouco.",
+            sq = "Nomi nuk gjeti burime ushqyese të përdorshme për këtë " +
+                "regjistrim. Provo sërish pas pak.",
+            sv = "Nomi hittade inga användbara näringskällor för den " +
+                "här posten. Försök igen om en stund.",
+            tr = "Nomi bu kayıt için kullanılabilir bir besin değeri " +
+                "kaynağı bulamadı. Birazdan tekrar dene.",
+        ),
+    "Nomi couldn't read the nutrition answer for that entry. Try again." to NomiTranslation(
+        de = "Nomi konnte die Nährwertantwort für diese Eingabe nicht lesen. " +
+            "Versuch es erneut.",
+        es = "Nomi no ha podido leer la respuesta nutricional de esta entrada. " +
+            "Inténtalo de nuevo.",
+        fr = "Nomi n’a pas pu lire la réponse nutritionnelle pour cette entrée. " +
+            "Réessaie.",
+        it = "Nomi non è riuscito a leggere la risposta nutrizionale per questa voce. " +
+            "Riprova.",
+        nl = "Nomi kon het voedingsantwoord voor dit item niet lezen. Probeer opnieuw.",
+        pt = "A Nomi não conseguiu ler a resposta nutricional desta entrada. Tenta de novo.",
+        sq = "Nomi nuk mundi ta lexojë përgjigjen ushqyese për këtë " +
+            "regjistrim. Provo sërish.",
+        sv = "Nomi kunde inte läsa näringssvaret för den här posten. " +
+            "Försök igen.",
+        tr = "Nomi bu kayıt için besin değeri yanıtını " +
+            "okuyamadı. Tekrar dene.",
+    ),
+    // One failed item in a meal used to be reported with the same sentence as every other
+    // cause. These name the food and say what would fix it.
+    "Nomi found nutrition for \"{0}\" but not what that amount weighs. Enter it in g or ml." to
+        NomiTranslation(
+            de = "Nomi hat Nährwerte für \"{0}\" gefunden, aber nicht das Gewicht dieser Menge. " +
+                "Gib sie in g oder ml an.",
+            es = "Nomi ha encontrado la nutrición de \"{0}\", pero no cuánto pesa esa cantidad. " +
+                "Indícala en g o ml.",
+            fr = "Nomi a trouvé les valeurs nutritionnelles de \"{0}\", mais pas le poids de " +
+                "cette quantité. Indique-la en g ou ml.",
+            it = "Nomi ha trovato i valori nutrizionali di \"{0}\", ma non quanto pesa quella " +
+                "quantità. Indicala in g o ml.",
+            nl = "Nomi vond voedingswaarde voor \"{0}\", maar niet hoeveel die hoeveelheid " +
+                "weegt. Geef het op in g of ml.",
+            pt = "A Nomi encontrou valores nutricionais para \"{0}\", mas não quanto pesa essa " +
+                "quantidade. Indica-a em g ou ml.",
+            sq = "Nomi gjeti vlerat ushqyese për \"{0}\", por jo sa peshon ajo sasi. " +
+                "Shkruaje në g ose ml.",
+            sv = "Nomi hittade näringsvärden för \"{0}\", men inte vad den mängden väger. " +
+                "Ange den i g eller ml.",
+            tr = "Nomi \"{0}\" için besin değerlerini buldu ama bu miktarın ağırlığını bulamadı. " +
+                "Miktarı g veya ml olarak gir.",
+        ),
+    "Nomi only found sources for a different product than \"{0}\". Check the name, or add the " +
+        "brand." to NomiTranslation(
+        de = "Nomi hat nur Quellen zu einem anderen Produkt als \"{0}\" gefunden. Prüfe den " +
+            "Namen oder ergänze die Marke.",
+        es = "Nomi solo ha encontrado fuentes de un producto distinto de \"{0}\". Revisa el " +
+            "nombre o añade la marca.",
+        fr = "Nomi n’a trouvé que des sources portant sur un autre produit que \"{0}\". Vérifie " +
+            "le nom ou ajoute la marque.",
+        it = "Nomi ha trovato solo fonti su un prodotto diverso da \"{0}\". Controlla il nome " +
+            "oppure aggiungi la marca.",
+        nl = "Nomi vond alleen bronnen over een ander product dan \"{0}\". Controleer de naam " +
+            "of voeg het merk toe.",
+        pt = "A Nomi só encontrou fontes de um produto diferente de \"{0}\". Verifica o nome ou " +
+            "acrescenta a marca.",
+        sq = "Nomi gjeti burime vetëm për një produkt tjetër nga \"{0}\". Kontrollo emrin ose " +
+            "shto markën.",
+        sv = "Nomi hittade bara källor om en annan produkt än \"{0}\". Kontrollera namnet eller " +
+            "lägg till varumärket.",
+        tr = "Nomi yalnızca \"{0}\" dışında bir ürüne ait kaynaklar buldu. Adı kontrol et ya da " +
+            "markayı ekle.",
+    ),
+    "Nomi found no nutrition source for \"{0}\". Try again or describe it more precisely." to
+        NomiTranslation(
+            de = "Nomi hat keine Nährwertquelle für \"{0}\" gefunden. Versuch es erneut oder " +
+                "beschreibe es genauer.",
+            es = "Nomi no ha encontrado ninguna fuente nutricional para \"{0}\". Inténtalo de " +
+                "nuevo o descríbelo con más precisión.",
+            fr = "Nomi n’a trouvé aucune source nutritionnelle pour \"{0}\". Réessaie ou " +
+                "décris-le plus précisément.",
+            it = "Nomi non ha trovato alcuna fonte nutrizionale per \"{0}\". Riprova oppure " +
+                "descrivilo in modo più preciso.",
+            nl = "Nomi vond geen voedingsbron voor \"{0}\". Probeer opnieuw of beschrijf het " +
+                "preciezer.",
+            pt = "A Nomi não encontrou nenhuma fonte nutricional para \"{0}\". Tenta de novo ou " +
+                "descreve-o com mais precisão.",
+            sq = "Nomi nuk gjeti asnjë burim ushqyes për \"{0}\". Provo sërish ose përshkruaje " +
+                "më saktë.",
+            sv = "Nomi hittade ingen näringskälla för \"{0}\". Försök igen eller beskriv det " +
+                "mer exakt.",
+            tr = "Nomi \"{0}\" için besin değeri kaynağı bulamadı. Tekrar dene ya da daha " +
+                "ayrıntılı anlat.",
+        ),
+    "Nomi couldn't confirm the nutrition numbers for \"{0}\". Try again or edit the entry." to
+        NomiTranslation(
+            de = "Nomi konnte die Nährwerte für \"{0}\" nicht bestätigen. Versuch es erneut oder " +
+                "bearbeite die Eingabe.",
+            es = "Nomi no ha podido confirmar los valores nutricionales de \"{0}\". Inténtalo de " +
+                "nuevo o edita la entrada.",
+            fr = "Nomi n’a pas pu confirmer les valeurs nutritionnelles de \"{0}\". Réessaie ou " +
+                "modifie l’entrée.",
+            it = "Nomi non è riuscito a confermare i valori nutrizionali di \"{0}\". Riprova " +
+                "oppure modifica la voce.",
+            nl = "Nomi kon de voedingswaarden voor \"{0}\" niet bevestigen. Probeer opnieuw of " +
+                "bewerk het item.",
+            pt = "A Nomi não conseguiu confirmar os valores nutricionais de \"{0}\". Tenta de " +
+                "novo ou edita a entrada.",
+            sq = "Nomi nuk mundi t’i konfirmojë vlerat ushqyese për \"{0}\". Provo sërish ose " +
+                "redakto regjistrimin.",
+            sv = "Nomi kunde inte bekräfta näringsvärdena för \"{0}\". Försök igen eller " +
+                "redigera posten.",
+            tr = "Nomi \"{0}\" için besin değerlerini doğrulayamadı. Tekrar dene ya da kaydı " +
+                "düzenle.",
+        ),
+    "The nutrition Nomi found for \"{0}\" is given for a serving it cannot convert to your " +
+        "amount. Try g or ml." to NomiTranslation(
+        de = "Die Nährwerte, die Nomi für \"{0}\" gefunden hat, gelten für eine Portion, die " +
+            "sich nicht in deine Menge umrechnen lässt. Versuch g oder ml.",
+        es = "La nutrición que Nomi ha encontrado para \"{0}\" corresponde a una ración que no " +
+            "puede convertir a tu cantidad. Prueba con g o ml.",
+        fr = "Les valeurs que Nomi a trouvées pour \"{0}\" portent sur une portion qu’il ne peut " +
+            "pas convertir en ta quantité. Essaie en g ou ml.",
+        it = "I valori che Nomi ha trovato per \"{0}\" si riferiscono a una porzione che non può " +
+            "convertire nella tua quantità. Prova con g o ml.",
+        nl = "De voedingswaarde die Nomi voor \"{0}\" vond, geldt voor een portie die niet naar " +
+            "jouw hoeveelheid om te rekenen is. Probeer g of ml.",
+        pt = "Os valores que a Nomi encontrou para \"{0}\" referem-se a uma dose que não " +
+            "consegue converter na tua quantidade. Experimenta g ou ml.",
+        sq = "Vlerat që Nomi gjeti për \"{0}\" janë për një porcion që nuk mund të kthehet në " +
+            "sasinë tënde. Provo me g ose ml.",
+        sv = "Näringsvärdena Nomi hittade för \"{0}\" gäller en portion som inte går att räkna " +
+            "om till din mängd. Testa g eller ml.",
+        tr = "Nomi’nin \"{0}\" için bulduğu besin değerleri, senin miktarına çevrilemeyen bir " +
+            "porsiyon için verilmiş. g ya da ml dene.",
+    ),
+    "Nomi couldn't read the nutrition answer for \"{0}\". Try again." to NomiTranslation(
+        de = "Nomi konnte die Nährwertantwort für \"{0}\" nicht lesen. Versuch es erneut.",
+        es = "Nomi no ha podido leer la respuesta nutricional de \"{0}\". Inténtalo de nuevo.",
+        fr = "Nomi n’a pas pu lire la réponse nutritionnelle pour \"{0}\". Réessaie.",
+        it = "Nomi non è riuscito a leggere la risposta nutrizionale per \"{0}\". Riprova.",
+        nl = "Nomi kon het voedingsantwoord voor \"{0}\" niet lezen. Probeer opnieuw.",
+        pt = "A Nomi não conseguiu ler a resposta nutricional de \"{0}\". Tenta de novo.",
+        sq = "Nomi nuk mundi ta lexojë përgjigjen ushqyese për \"{0}\". Provo sërish.",
+        sv = "Nomi kunde inte läsa näringssvaret för \"{0}\". Försök igen.",
+        tr = "Nomi \"{0}\" için besin değeri yanıtını okuyamadı. Tekrar dene.",
+    ),
     "Nomi couldn't verify nutrition for every product. Try again or edit the entry." to
         NomiTranslation(
             de = "Nomi konnte nicht für alle Produkte passende Nährwerte belegen. Versuche es " +
