@@ -1,5 +1,22 @@
 # Changelog
 
+## Nomi v2.1 — 2026-08-30
+
+### Export each day's foods, calories, protein and carbs as JSON
+
+- Adds **Settings → Your data → Export diary**, which writes a pretty-printed JSON file of every logged day.
+- Each day lists the date, the foods eaten that day with name, brand, amount, unit and meal, and that day's calorie, protein and carbohydrate totals.
+- Each food row carries its own kcal, protein and carbohydrate so the day totals can be checked against the items.
+- Days with no logs are omitted. Days are ordered by date; foods keep the order they were logged.
+- The diary is a readable export, not a restoreable backup: it does not contain API keys, profile data, plans, weights or catalog rows. The existing backup export is unchanged.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 473 tests across 60 classes, with no failures, errors or skips.
+- Adds three tests covering an empty diary, grouping and summing foods across two days, and a JSON round-trip of the envelope.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `33B30B41EA79393EBBA392A9FFA66E011911745B17A0BC8555001EE0FBFD60D2`
+
 ## Nomi v2.0.9 — 2026-08-28
 
 ### One failed food no longer fails the whole meal, and says why

@@ -149,6 +149,8 @@ private fun NomiMain(
     val selectedDocumentOpenError = nomiString("The selected document could not be opened")
     val backupExportedMessage = nomiString("Backup exported")
     val backupExportFailedMessage = nomiString("Nomi couldn't export the backup")
+    val diaryExportedMessage = nomiString("Diary exported")
+    val diaryExportFailedMessage = nomiString("Nomi couldn't export the diary")
     val invalidBackupMessage = nomiString("That isn't a valid Nomi backup")
     val notificationPermissionMessage = nomiString("Notification permission is needed for reminders")
     val backupRestoredMessage = nomiString("Backup restored")
@@ -176,6 +178,17 @@ private fun NomiMain(
                     ?: error(selectedDocumentOpenError)
             }.onSuccess { showMessage(backupExportedMessage) }
                 .onFailure { showMessage(it.message ?: backupExportFailedMessage) }
+        }
+    }
+    val diaryExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                resolver.openOutputStream(uri, "wt")?.use { container.diaryExportService.exportTo(it) }
+                    ?: error(selectedDocumentOpenError)
+            }.onSuccess { showMessage(diaryExportedMessage) }
+                .onFailure { showMessage(it.message ?: diaryExportFailedMessage) }
         }
     }
     val importLauncher = rememberLauncherForActivityResult(
@@ -352,6 +365,7 @@ private fun NomiMain(
                         } else viewModel.toggleReminder(index, enabled)
                     },
                     onExport = { exportLauncher.launch("nomi-backup-${LocalDate.now()}.json") },
+                    onExportDiary = { diaryExportLauncher.launch("nomi-diary-${LocalDate.now()}.json") },
                     onImport = { importLauncher.launch(arrayOf("application/json", "text/json", "text/plain")) },
                     onDeveloper = { navController.navigate(Routes.DEVELOPER) },
                 )
@@ -828,6 +842,7 @@ private fun MainNavigationSuite(
     onHealth: () -> Unit,
     onReminder: (Int, Boolean) -> Unit,
     onExport: () -> Unit,
+    onExportDiary: () -> Unit,
     onImport: () -> Unit,
     onDeveloper: () -> Unit,
 ) {
@@ -988,6 +1003,7 @@ private fun MainNavigationSuite(
                         haptics.confirmed(); onReminderTime(index, hour, minute)
                     },
                     onExport = { haptics.selected(); onExport() },
+                    onExportDiary = { haptics.selected(); onExportDiary() },
                     onImport = { haptics.selected(); onImport() },
                     onDeveloper = { haptics.selected(); onDeveloper() },
                 )

@@ -144,6 +144,14 @@ interface FoodLogDao {
     @Query(
         """
         SELECT * FROM food_logs
+        ORDER BY local_date, logged_at_epoch_millis, id
+        """,
+    )
+    suspend fun allLogs(): List<FoodLogEntity>
+
+    @Query(
+        """
+        SELECT * FROM food_logs
         WHERE local_date BETWEEN :startLocalDate AND :endLocalDate
         ORDER BY local_date DESC, logged_at_epoch_millis DESC, id DESC
         """,

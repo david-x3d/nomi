@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -100,6 +101,7 @@ fun SettingsScreen(
     onGoalsCardStyleChanged: (GoalsCardStyle) -> Unit,
     onReminderTimeChanged: (index: Int, hour: Int, minute: Int) -> Unit,
     onExport: () -> Unit,
+    onExportDiary: () -> Unit,
     onImport: () -> Unit,
     onDeveloper: () -> Unit,
     modifier: Modifier = Modifier,
@@ -317,6 +319,15 @@ fun SettingsScreen(
                 }
             }
             item { SectionTitle(nomiString("Your data")) }
+            item {
+                SettingsLink(
+                    icon = { Icon(Icons.Default.Description, contentDescription = null) },
+                    title = nomiString("Export diary"),
+                    supporting = nomiString("JSON of each day's foods, calories, protein and carbs"),
+                    onClick = onExportDiary,
+                    iconColor = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             item {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Upload, contentDescription = null) },

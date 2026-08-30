@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v2.0.5](https://img.shields.io/badge/release-v2.0.5-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.0.5)
+[![Release v2.1](https://img.shields.io/badge/release-v2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.1)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
@@ -58,6 +58,7 @@
 - 📊 Track calories, macros, micronutrients, weight, goals, and progress.
 - 🌍 Use the app in ten languages with metric and US customary quantities.
 - 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
+- 📤 Export a JSON diary of each day's foods, calories, protein and carbs, or a restoreable backup without API keys.
 
 ## 🌍 Languages
 
@@ -107,6 +108,7 @@ Nomi is a native Jetpack Compose app built with Material 3 Expressive. It suppor
 - Meal text or a selected image is sent only when an AI-powered action needs it.
 - The configured provider's own privacy policy and pricing apply to those requests.
 - Exported backups do not contain API keys or diagnostic events.
+- Exported diaries list foods and daily calorie, protein and carbohydrate totals. They do not contain API keys.
 
 ## 🧰 Requirements
 

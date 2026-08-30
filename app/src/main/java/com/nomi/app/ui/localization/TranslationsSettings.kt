@@ -223,6 +223,23 @@ internal val settingsTranslations: Map<String, NomiTranslation> = mapOf(
         nl = "Je gegevens", pt = "Os teus dados", sq = "Të dhënat e tua", sv = "Dina data",
         tr = "Verilerin",
     ),
+    "Export diary" to NomiTranslation(
+        de = "Tagebuch exportieren", es = "Exportar diario",
+        fr = "Exporter le journal", it = "Esporta il diario", nl = "Dagboek exporteren",
+        pt = "Exportar diário", sq = "Eksporto ditarin",
+        sv = "Exportera dagbok", tr = "Günlüğü dışa aktar",
+    ),
+    "JSON of each day's foods, calories, protein and carbs" to NomiTranslation(
+        de = "JSON mit den Lebensmitteln, Kalorien, Protein und Kohlenhydraten jedes Tages",
+        es = "JSON con los alimentos, calorías, proteínas y carbohidratos de cada día",
+        fr = "JSON des aliments, calories, protéines et glucides de chaque jour",
+        it = "JSON con gli alimenti, le calorie, le proteine e i carboidrati di ogni giorno",
+        nl = "JSON met de voedingsmiddelen, calorieën, eiwitten en koolhydraten van elke dag",
+        pt = "JSON com os alimentos, calorias, proteínas e hidratos de carbono de cada dia",
+        sq = "JSON me ushqimet, kaloritë, proteinat dhe karbohidratet e çdo dite",
+        sv = "JSON med varje dags livsmedel, kalorier, protein och kolhydrater",
+        tr = "Her günün yiyecekleri, kalorisi, proteini ve karbonhidratı için JSON",
+    ),
     "Export backup" to NomiTranslation(
         de = "Sicherung exportieren", es = "Exportar copia de seguridad",
         fr = "Exporter la sauvegarde", it = "Esporta il backup", nl = "Back-up exporteren",

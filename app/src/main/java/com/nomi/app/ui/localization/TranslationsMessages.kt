@@ -17,6 +17,12 @@ internal val messageTranslations: Map<String, NomiTranslation> = mapOf(
     "The selected document could not be opened" to NomiTranslation(
         de = "Das ausgewählte Dokument konnte nicht geöffnet werden", es = "No se pudo abrir el documento seleccionado", fr = "Impossible d’ouvrir le document sélectionné", it = "Impossibile aprire il documento selezionato", nl = "Het geselecteerde document kon niet worden geopend", pt = "Não foi possível abrir o documento selecionado", sq = "Dokumenti i zgjedhur nuk mund të hapej", sv = "Det valda dokumentet kunde inte öppnas", tr = "Seçilen belge açılamadı",
     ),
+    "Diary exported" to NomiTranslation(
+        de = "Tagebuch exportiert", es = "Diario exportado", fr = "Journal exporté", it = "Diario esportato", nl = "Dagboek geëxporteerd", pt = "Diário exportado", sq = "Ditari u eksportua", sv = "Dagboken exporterades", tr = "Günlük dışa aktarıldı",
+    ),
+    "Nomi couldn't export the diary" to NomiTranslation(
+        de = "Nomi konnte das Tagebuch nicht exportieren", es = "Nomi no pudo exportar el diario", fr = "Nomi n’a pas pu exporter le journal", it = "Nomi non è riuscito a esportare il diario", nl = "Nomi kon het dagboek niet exporteren", pt = "A Nomi não conseguiu exportar o diário", sq = "Nomi nuk mundi ta eksportonte ditarin", sv = "Nomi kunde inte exportera dagboken", tr = "Nomi günlüğü dışa aktaramadı",
+    ),
     "Backup exported" to NomiTranslation(
         de = "Sicherung exportiert", es = "Copia de seguridad exportada", fr = "Sauvegarde exportée", it = "Backup esportato", nl = "Back-up geëxporteerd", pt = "Cópia de segurança exportada", sq = "Kopja rezervë u eksportua", sv = "Säkerhetskopian exporterades", tr = "Yedek dışa aktarıldı",
     ),

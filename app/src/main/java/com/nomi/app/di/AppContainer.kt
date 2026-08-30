@@ -3,6 +3,7 @@ package com.nomi.app.di
 import android.content.Context
 import com.nomi.app.BuildConfig
 import com.nomi.app.data.backup.NomiBackupService
+import com.nomi.app.data.export.NomiDiaryExportService
 import com.nomi.app.data.local.NomiDatabase
 import com.nomi.app.data.preferences.DataStoreAppPreferencesStore
 import com.nomi.app.data.remote.ai.ExaGeminiHttpClient
@@ -27,5 +28,8 @@ class AppContainer(context: Context) {
     internal val exaGeminiClient: ExaGeminiHttpClient by lazy { ExaGeminiHttpClient() }
     val openFoodFacts: OpenFoodFactsClient by lazy { OpenFoodFactsClient() }
     val backupService: NomiBackupService by lazy { NomiBackupService(database, preferencesStore, BuildConfig.VERSION_NAME) }
+    val diaryExportService: NomiDiaryExportService by lazy {
+        NomiDiaryExportService(database, BuildConfig.VERSION_NAME)
+    }
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(appContext) }
 }
