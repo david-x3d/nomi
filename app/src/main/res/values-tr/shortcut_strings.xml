@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_photo_short">Foto</string>
+    <string name="shortcut_photo_long">Yemek fotoğrafı çek</string>
+    <string name="shortcut_menu_short">Menü</string>
+    <string name="shortcut_menu_long">Menü tara</string>
+</resources>

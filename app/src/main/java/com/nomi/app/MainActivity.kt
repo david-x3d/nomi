@@ -1,5 +1,6 @@
 package com.nomi.app
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.Display
@@ -9,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModelProvider
 import com.nomi.app.di.NomiViewModelFactory
+import com.nomi.app.integration.assistant.NomiExternalIntents
 import com.nomi.app.ui.NomiApp
 import com.nomi.app.ui.app.AppStartState
 import com.nomi.app.ui.app.AppViewModel
@@ -29,11 +31,42 @@ class MainActivity : ComponentActivity() {
         setContent {
             NomiApp(container = container, viewModel = viewModel)
         }
+        consumeLaunchIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeLaunchIntent(intent)
     }
 
     override fun onStart() {
         super.onStart()
         viewModel.refreshProviderAndHealthStatus()
+    }
+
+    private fun consumeLaunchIntent(intent: Intent?) {
+        if (intent == null) return
+        val uri = intent.data
+        val query = buildMap {
+            uri?.queryParameterNames?.forEach { name ->
+                uri.getQueryParameter(name)?.let { put(name, it) }
+            }
+        }
+        val extras = buildMap {
+            intent.extras?.keySet()?.forEach { key ->
+                intent.getStringExtra(key)?.let { put(key, it) }
+            }
+        }
+        val command = NomiExternalIntents.parse(
+            action = intent.action,
+            scheme = uri?.scheme,
+            host = uri?.host,
+            query = query,
+            extras = extras,
+            mimeType = intent.type,
+        ) ?: return
+        viewModel.handleExternalCommand(command)
     }
 
     /**

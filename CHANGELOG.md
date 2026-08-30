@@ -1,5 +1,21 @@
 # Changelog
 
+## Nomi v2.1.1 — 2026-08-30
+
+### Log food from Assistant and long-press shortcuts
+
+- Accepts “add a banana in Nomi” (and the same idea in German and the other interface languages) through Assistant App Actions, a `nomi://log` link, shared text, or a Google search action, then runs the existing food-logging pipeline.
+- After a voice-originated log saves, Nomi speaks and shows how many calories remain today, or how far over the target the day is.
+- Long-pressing the launcher icon offers two shortcuts: photograph a meal, or scan a restaurant menu.
+- “How many calories left in Nomi” reads today’s remaining calories without logging anything.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 487 tests across 63 classes, with no failures, errors or skips.
+- Adds tests covering spoken meal commands, Assistant and deep-link parsing, and remaining-calorie wording.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `A28651F507C7C8B8AB70B3BBC371EAEDE125FF5FE2D1DDF84B3FE64E0A4B8F5F`
+
 ## Nomi v2.1 — 2026-08-30
 
 ### Export each day's foods, calories, protein and carbs as JSON

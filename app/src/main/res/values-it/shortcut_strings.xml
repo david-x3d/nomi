@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_photo_short">Foto</string>
+    <string name="shortcut_photo_long">Fotografa un pasto</string>
+    <string name="shortcut_menu_short">Menu</string>
+    <string name="shortcut_menu_long">Scansiona il menu</string>
+</resources>

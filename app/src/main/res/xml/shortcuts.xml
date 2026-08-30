@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_photo"
+        android:shortcutId="photo"
+        android:shortcutLongLabel="@string/shortcut_photo_long"
+        android:shortcutShortLabel="@string/shortcut_photo_short">
+        <intent
+            android:action="com.nomi.app.action.CAPTURE_PHOTO"
+            android:targetClass="com.nomi.app.MainActivity"
+            android:targetPackage="com.nomi.app" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_menu"
+        android:shortcutId="menu"
+        android:shortcutLongLabel="@string/shortcut_menu_long"
+        android:shortcutShortLabel="@string/shortcut_menu_short">
+        <intent
+            android:action="com.nomi.app.action.SCAN_MENU"
+            android:targetClass="com.nomi.app.MainActivity"
+            android:targetPackage="com.nomi.app" />
+    </shortcut>
+    <capability android:name="actions.intent.RECORD_FOOD_OBSERVATION">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.nomi.app.MainActivity"
+            android:targetPackage="com.nomi.app">
+            <url android:scheme="nomi" android:host="log" />
+            <parameter
+                android:name="foodObservation.aboutFood.name"
+                android:key="food" />
+        </intent>
+    </capability>
+    <capability android:name="actions.intent.GET_FOOD_OBSERVATION">
+        <intent
+            android:action="com.nomi.app.action.SPEAK_CALORIES"
+            android:targetClass="com.nomi.app.MainActivity"
+            android:targetPackage="com.nomi.app" />
+    </capability>
+</shortcuts>

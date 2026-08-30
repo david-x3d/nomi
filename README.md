@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v2.1](https://img.shields.io/badge/release-v2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.1)
+[![Release v2.1.1](https://img.shields.io/badge/release-v2.1.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.1.1)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
@@ -48,8 +48,8 @@
 
 ## ✨ Features
 
-- 🗣️ Log food with natural language by typing or on-device dictation.
-- 📷 Recognize meals and nutrition labels from photos.
+- 🗣️ Log food with natural language by typing, on-device dictation, or Assistant (“add a banana in Nomi”).
+- 📷 Recognize meals and nutrition labels from photos. Long-press the icon for photo or menu scan.
 - 🍽️ Scan full restaurant menus, search the extracted dishes, and select multiple items.
 - 🔎 Research branded products and restaurant meals using configurable AI providers.
 - ⚖️ Preserve explicit quantities and scale nutrition deterministically.
