@@ -83,6 +83,7 @@ import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
 import com.nomi.app.domain.usecase.acceptsVerifiedUpgradeFrom
 import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.domain.usecase.toPortionContext
+import com.nomi.app.integration.assistant.AssistantLogBridge
 import com.nomi.app.integration.assistant.NomiExternalCommand
 import com.nomi.app.integration.assistant.RemainingCaloriesPhrase
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
@@ -130,7 +131,6 @@ import com.nomi.app.ui.today.LoggedAmountEditUiState
 import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.MicronutrientProgress
-import com.nomi.app.widget.NomiWidgetSnapshot
 import com.nomi.app.ui.today.TodayFoodEntry
 import com.nomi.app.ui.today.TodayUiState
 import com.nomi.app.ui.today.reeditableText
@@ -520,14 +520,9 @@ class AppViewModel(
     private fun announceRemainingCalories(additionalKcal: Double = 0.0) {
         val consumed = dayLogSnapshot.sumOf { it.nutritionSnapshot.caloriesKcal } + additionalKcal
         val target = currentPlan.value?.calorieTargetKcal ?: todayState.value.calorieTarget
-        val formatted = NomiWidgetSnapshot.formatKcal(
-            RemainingCaloriesPhrase.deltaKcal(consumed, target).toDouble(),
-            currentLanguage().locale,
-        )
-        mutableCalorieAnnouncement.value = inUserLanguage(
-            RemainingCaloriesPhrase.templateKey(consumed, target),
-            formatted,
-        )
+        val text = RemainingCaloriesPhrase.spoken(consumed, target, currentLanguage())
+        mutableCalorieAnnouncement.value = text
+        AssistantLogBridge.complete(text)
     }
 
     fun completeOnboarding(draft: OnboardingDraft, plan: NutritionPlan) {

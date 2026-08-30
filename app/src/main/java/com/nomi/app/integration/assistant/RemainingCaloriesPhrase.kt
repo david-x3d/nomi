@@ -1,5 +1,8 @@
 package com.nomi.app.integration.assistant
 
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.NomiTranslations
+import com.nomi.app.widget.NomiWidgetSnapshot
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -12,4 +15,12 @@ object RemainingCaloriesPhrase {
 
     fun deltaKcal(consumedKcal: Double, targetKcal: Double): Int =
         abs(targetKcal - consumedKcal).roundToInt()
+
+    fun spoken(consumedKcal: Double, targetKcal: Double, language: NomiLanguage): String {
+        val formatted = NomiWidgetSnapshot.formatKcal(
+            deltaKcal(consumedKcal, targetKcal).toDouble(),
+            language.locale,
+        )
+        return NomiTranslations.format(templateKey(consumedKcal, targetKcal), language, formatted)
+    }
 }

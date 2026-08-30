@@ -129,6 +129,21 @@
                 android:resource="@xml/widget_large_info" />
         </receiver>
 
+        <service
+            android:name=".integration.assistant.NomiAppFunctionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE">
+            <property
+                android:name="android.app.appfunctions.schema"
+                android:value="app_functions_schema.xsd" />
+            <property
+                android:name="android.app.appfunctions.v2"
+                android:value="nomi_app_functions.xml" />
+            <intent-filter>
+                <action android:name="android.app.appfunctions.AppFunctionService" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".widget.WidgetRefreshReceiver"
             android:exported="true">

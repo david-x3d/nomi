@@ -1,5 +1,19 @@
 # Changelog
 
+## Nomi v2.1.2 — 2026-08-30
+
+### Gemini can log food in Nomi instead of Google Keep
+
+- Exposes Nomi to Gemini through Android App Functions (`logFood` and `remainingCalories`), so “add a banana in Nomi” is handled by Nomi rather than Keep/Notes.
+- Gemini receives the calories left today as the function result after the food is researched and saved.
+- Requires Android 16 or newer for Gemini to call the functions. Older versions keep the existing deep links and launcher shortcuts.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 487 tests across 63 classes, with no failures, errors or skips.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `51BD4FCA4C0CFBA5F1E94AA5D041A7E750A18E2EE7837DA44EE270447154A85E`
+
 ## Nomi v2.1.1 — 2026-08-30
 
 ### Log food from Assistant and long-press shortcuts
