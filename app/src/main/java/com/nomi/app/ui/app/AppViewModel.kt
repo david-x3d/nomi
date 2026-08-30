@@ -83,9 +83,6 @@ import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
 import com.nomi.app.domain.usecase.acceptsVerifiedUpgradeFrom
 import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.domain.usecase.toPortionContext
-import com.nomi.app.integration.assistant.AssistantLogBridge
-import com.nomi.app.integration.assistant.NomiExternalCommand
-import com.nomi.app.integration.assistant.RemainingCaloriesPhrase
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.integration.health.HealthFeatures
 import com.nomi.app.integration.health.HealthNutritionDeleteRange
@@ -192,6 +189,8 @@ sealed interface AppEvent {
     data object OnboardingSaved : AppEvent
 }
 
+enum class LauncherShortcut { PHOTO, MENU }
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppViewModel(
     private val container: AppContainer,
@@ -235,14 +234,10 @@ class AppViewModel(
     private val mutableEvents = MutableSharedFlow<AppEvent>(extraBufferCapacity = 8)
     val events = mutableEvents.asSharedFlow()
 
-    private val mutableAssistantNav = MutableStateFlow<NomiExternalCommand?>(null)
-    val assistantNav = mutableAssistantNav.asStateFlow()
+    private val mutableLauncherShortcut = MutableStateFlow<LauncherShortcut?>(null)
+    val launcherShortcut = mutableLauncherShortcut.asStateFlow()
 
-    private val mutableCalorieAnnouncement = MutableStateFlow<String?>(null)
-    val calorieAnnouncement = mutableCalorieAnnouncement.asStateFlow()
-
-    private var pendingExternalCommand: NomiExternalCommand? = null
-    private var speakCaloriesAfterSave = false
+    private var pendingLauncherShortcut: LauncherShortcut? = null
 
     private val mutableOnboardingSaving = MutableStateFlow(false)
     val onboardingSaving = mutableOnboardingSaving.asStateFlow()
@@ -474,55 +469,27 @@ class AppViewModel(
     }
 
     fun onMainVisible() {
-        flushPendingExternalCommand()
+        val shortcut = pendingLauncherShortcut ?: return
+        if (startState.value != AppStartState.Main) return
+        pendingLauncherShortcut = null
+        applyLauncherShortcut(shortcut)
     }
 
-    fun handleExternalCommand(command: NomiExternalCommand) {
+    fun openLauncherShortcut(shortcut: LauncherShortcut) {
         if (startState.value != AppStartState.Main) {
-            pendingExternalCommand = command
+            pendingLauncherShortcut = shortcut
             return
         }
-        performExternalCommand(command)
+        applyLauncherShortcut(shortcut)
     }
 
-    fun clearAssistantNav() {
-        mutableAssistantNav.value = null
+    fun clearLauncherShortcut() {
+        mutableLauncherShortcut.value = null
     }
 
-    fun clearCalorieAnnouncement() {
-        mutableCalorieAnnouncement.value = null
-    }
-
-    private fun flushPendingExternalCommand() {
-        val command = pendingExternalCommand ?: return
-        if (startState.value != AppStartState.Main) return
-        pendingExternalCommand = null
-        performExternalCommand(command)
-    }
-
-    private fun performExternalCommand(command: NomiExternalCommand) {
-        when (command) {
-            is NomiExternalCommand.LogFood -> {
-                selectToday()
-                beginLogging(AddFoodMethod.VOICE, command.text)
-                speakCaloriesAfterSave = true
-                analyzeText()
-            }
-            NomiExternalCommand.CapturePhoto -> mutableAssistantNav.value = command
-            NomiExternalCommand.ScanMenu -> {
-                beginMenuScan()
-                mutableAssistantNav.value = command
-            }
-            NomiExternalCommand.SpeakCalories -> announceRemainingCalories()
-        }
-    }
-
-    private fun announceRemainingCalories(additionalKcal: Double = 0.0) {
-        val consumed = dayLogSnapshot.sumOf { it.nutritionSnapshot.caloriesKcal } + additionalKcal
-        val target = currentPlan.value?.calorieTargetKcal ?: todayState.value.calorieTarget
-        val text = RemainingCaloriesPhrase.spoken(consumed, target, currentLanguage())
-        mutableCalorieAnnouncement.value = text
-        AssistantLogBridge.complete(text)
+    private fun applyLauncherShortcut(shortcut: LauncherShortcut) {
+        if (shortcut == LauncherShortcut.MENU) beginMenuScan()
+        mutableLauncherShortcut.value = shortcut
     }
 
     fun completeOnboarding(draft: OnboardingDraft, plan: NutritionPlan) {
@@ -558,7 +525,6 @@ class AppViewModel(
     fun setProgressRange(value: ProgressRange) { progressRange.value = value }
 
     fun beginLogging(method: AddFoodMethod, initialText: String = "") {
-        speakCaloriesAfterSave = false
         cancelAnalysis()
         pendingMenuDishes = emptyList()
         pendingMenuLoggingText = null
@@ -1148,8 +1114,7 @@ class AppViewModel(
                         )
                     }
                     repository.addLogs(logs)
-                    logs
-                }.onSuccess { savedLogs ->
+                }.onSuccess {
                     // The rewritten entry exists now, so the one it replaces can go.
                     mutableEditedEntryId.value?.let { replaced ->
                         mutableEditedEntryId.value = null
@@ -1159,11 +1124,6 @@ class AppViewModel(
                     dismissPortionEdit()
                     mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
                     mutableEvents.emit(AppEvent.FoodSaved)
-                    if (speakCaloriesAfterSave) {
-                        speakCaloriesAfterSave = false
-                        val added = savedLogs.sumOf { it.nutritionSnapshot.caloriesKcal }
-                        announceRemainingCalories(added)
-                    }
                     // The UI has enough time to finish its longer shimmer, then this transient
                     // wording is discarded so old rows never replay the effect.
                     viewModelScope.launch {

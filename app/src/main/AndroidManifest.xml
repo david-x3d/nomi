@@ -46,24 +46,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <intent-filter>
-                <action android:name="com.nomi.app.action.LOG_FOOD" />
                 <action android:name="com.nomi.app.action.CAPTURE_PHOTO" />
                 <action android:name="com.nomi.app.action.SCAN_MENU" />
-                <action android:name="com.nomi.app.action.SPEAK_CALORIES" />
-                <action android:name="android.intent.action.SEARCH" />
-                <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
                 <category android:name="android.intent.category.DEFAULT" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="nomi" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
             </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
@@ -128,21 +113,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_large_info" />
         </receiver>
-
-        <service
-            android:name=".integration.assistant.NomiAppFunctionService"
-            android:exported="true"
-            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE">
-            <property
-                android:name="android.app.appfunctions.schema"
-                android:value="app_functions_schema.xsd" />
-            <property
-                android:name="android.app.appfunctions.v2"
-                android:value="nomi_app_functions.xml" />
-            <intent-filter>
-                <action android:name="android.app.appfunctions.AppFunctionService" />
-            </intent-filter>
-        </service>
 
         <receiver
             android:name=".widget.WidgetRefreshReceiver"

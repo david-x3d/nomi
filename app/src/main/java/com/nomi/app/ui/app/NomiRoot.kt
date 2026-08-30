@@ -42,7 +42,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -73,8 +72,6 @@ import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.enabledMicronutrients
 import com.nomi.app.di.AppContainer
-import com.nomi.app.integration.assistant.NomiExternalCommand
-import com.nomi.app.integration.assistant.NomiSpeech
 import com.nomi.app.integration.camera.MealImagePreprocessor
 import com.nomi.app.integration.camera.deleteOwnedCameraCapture
 import com.nomi.app.integration.health.NomiHealthFeatures
@@ -87,7 +84,6 @@ import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
-import com.nomi.app.ui.localization.LocalNomiLanguage
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingScreen
@@ -143,11 +139,6 @@ private fun NomiMain(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    val language = LocalNomiLanguage.current
-    val speech = remember { NomiSpeech(context) }
-    DisposableEffect(speech) {
-        onDispose { speech.shutdown() }
-    }
     val haptics = rememberNomiHaptics()
     val resolver = context.contentResolver
     val scope = rememberCoroutineScope()
@@ -247,28 +238,20 @@ private fun NomiMain(
         }
     }
 
-    val assistantNav by viewModel.assistantNav.collectAsStateWithLifecycle()
-    LaunchedEffect(assistantNav) {
-        when (assistantNav) {
-            NomiExternalCommand.CapturePhoto -> {
+    val launcherShortcut by viewModel.launcherShortcut.collectAsStateWithLifecycle()
+    LaunchedEffect(launcherShortcut) {
+        when (launcherShortcut) {
+            LauncherShortcut.PHOTO -> {
                 navController.navigate(Routes.PHOTO)
-                viewModel.clearAssistantNav()
+                viewModel.clearLauncherShortcut()
             }
-            NomiExternalCommand.ScanMenu -> {
+            LauncherShortcut.MENU -> {
                 menuAddingPage = false
                 navController.navigate(Routes.MENU_CAPTURE)
-                viewModel.clearAssistantNav()
+                viewModel.clearLauncherShortcut()
             }
-            else -> Unit
+            null -> Unit
         }
-    }
-
-    val calorieAnnouncement by viewModel.calorieAnnouncement.collectAsStateWithLifecycle()
-    LaunchedEffect(calorieAnnouncement) {
-        val text = calorieAnnouncement ?: return@LaunchedEffect
-        speech.speak(text, language.locale)
-        snackbarHostState.showSnackbar(text)
-        viewModel.clearCalorieAnnouncement()
     }
 
     Box(modifier.fillMaxSize()) {

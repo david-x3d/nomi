@@ -10,10 +10,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModelProvider
 import com.nomi.app.di.NomiViewModelFactory
-import com.nomi.app.integration.assistant.NomiExternalIntents
 import com.nomi.app.ui.NomiApp
 import com.nomi.app.ui.app.AppStartState
 import com.nomi.app.ui.app.AppViewModel
+import com.nomi.app.ui.app.LauncherShortcut
 import com.nomi.app.ui.display.DisplayModeSpec
 import com.nomi.app.ui.display.fastestModeIdForCurrentResolution
 
@@ -46,27 +46,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun consumeLaunchIntent(intent: Intent?) {
-        if (intent == null) return
-        val uri = intent.data
-        val query = buildMap {
-            uri?.queryParameterNames?.forEach { name ->
-                uri.getQueryParameter(name)?.let { put(name, it) }
-            }
-        }
-        val extras = buildMap {
-            intent.extras?.keySet()?.forEach { key ->
-                intent.getStringExtra(key)?.let { put(key, it) }
-            }
-        }
-        val command = NomiExternalIntents.parse(
-            action = intent.action,
-            scheme = uri?.scheme,
-            host = uri?.host,
-            query = query,
-            extras = extras,
-            mimeType = intent.type,
-        ) ?: return
-        viewModel.handleExternalCommand(command)
+        val shortcut = when (intent?.action) {
+            ACTION_CAPTURE_PHOTO -> LauncherShortcut.PHOTO
+            ACTION_SCAN_MENU -> LauncherShortcut.MENU
+            else -> null
+        } ?: return
+        viewModel.openLauncherShortcut(shortcut)
+    }
+
+    companion object {
+        const val ACTION_CAPTURE_PHOTO: String = "com.nomi.app.action.CAPTURE_PHOTO"
+        const val ACTION_SCAN_MENU: String = "com.nomi.app.action.SCAN_MENU"
     }
 
     /**

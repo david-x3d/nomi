@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 113
-        versionName = "2.1.2"
+        versionCode = 114
+        versionName = "2.1.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -140,8 +140,6 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode)
     implementation(libs.androidx.health.connect)
-    implementation(libs.androidx.appfunctions)
-    ksp(libs.androidx.appfunctions.compiler)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.ktor3)

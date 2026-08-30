@@ -1,5 +1,18 @@
 # Changelog
 
+## Nomi v2.1.3 — 2026-08-30
+
+### Remove Gemini and Assistant logging
+
+- Drops App Functions, deep links, shared-text logging and spoken calorie replies. Gemini cannot call third-party apps from the Connected Apps list, so that path is gone.
+- Keeps the launcher long-press shortcuts: photograph a meal, or scan a restaurant menu.
+
+### Verification
+
+- The full Gradle unit test suite ran and passed: 473 tests across 60 classes, with no failures, errors or skips.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- APK SHA-256: `DE135F8E5EB20D6D8AB6D43018A17690014ECA78AFBF79DDC9930604E30AF7FD`
+
 ## Nomi v2.1.2 — 2026-08-30
 
 ### Gemini can log food in Nomi instead of Google Keep

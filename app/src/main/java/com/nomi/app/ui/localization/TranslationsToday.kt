@@ -294,16 +294,7 @@ internal val todayTranslations: Map<String, NomiTranslation> = mapOf(
         it = "kcal rimaste oggi", nl = "kcal over vandaag", pt = "kcal restantes hoje",
         sq = "kcal të mbetura sot", sv = "kcal kvar idag", tr = "bugün kalan kcal",
     ),
-    "{0} kcal left today" to NomiTranslation(
-        de = "{0} kcal heute übrig", es = "{0} kcal restantes hoy", fr = "{0} kcal restantes aujourd’hui",
-        it = "{0} kcal rimaste oggi", nl = "{0} kcal over vandaag", pt = "{0} kcal restantes hoje",
-        sq = "{0} kcal të mbetura sot", sv = "{0} kcal kvar idag", tr = "bugün {0} kcal kaldı",
-    ),
-    "{0} kcal over target" to NomiTranslation(
-        de = "{0} kcal über dem Ziel", es = "{0} kcal por encima del objetivo", fr = "{0} kcal au-dessus de l’objectif",
-        it = "{0} kcal sopra l’obiettivo", nl = "{0} kcal boven het doel", pt = "{0} kcal acima do objetivo",
-        sq = "{0} kcal mbi objektivin", sv = "{0} kcal över målet", tr = "hedefin {0} kcal üzerinde",
-    ),
+
     "kcal over today" to NomiTranslation(
         de = "kcal heute darüber", es = "kcal de más hoy", fr = "kcal en trop aujourd’hui",
         it = "kcal in più oggi", nl = "kcal te veel vandaag", pt = "kcal a mais hoje",
