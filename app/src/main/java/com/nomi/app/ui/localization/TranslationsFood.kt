@@ -2,6 +2,17 @@ package com.nomi.app.ui.localization
 
 /** The nutrition detail sheet, the food logging flow and the portion editor. */
 internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
+    "Portion weights are estimated from the photo, using clues such as plate size. Check and adjust the amounts." to NomiTranslation(
+        de = "Die Portionsgewichte werden anhand des Fotos geschätzt, etwa mithilfe der Tellergröße. Prüfe die Mengen und passe sie bei Bedarf an.",
+        es = "El peso de las porciones se estima a partir de la foto, usando pistas como el tamaño del plato. Revisa y ajusta las cantidades.",
+        fr = "Le poids des portions est estimé à partir de la photo, avec des indices comme la taille de l’assiette. Vérifie et ajuste les quantités.",
+        it = "Il peso delle porzioni è stimato dalla foto, usando indizi come la dimensione del piatto. Controlla e modifica le quantità.",
+        nl = "Het portiegewicht wordt geschat op basis van de foto, met aanwijzingen zoals de bordgrootte. Controleer de hoeveelheden en pas ze aan.",
+        pt = "O peso das porções é estimado pela foto, com pistas como o tamanho do prato. Verifica e ajusta as quantidades.",
+        sq = "Pesha e racioneve vlerësohet nga fotoja, duke përdorur të dhëna si madhësia e pjatës. Kontrollo dhe rregullo sasitë.",
+        sv = "Portionsvikterna uppskattas från fotot med ledtrådar som tallrikens storlek. Kontrollera och justera mängderna.",
+        tr = "Porsiyon ağırlıkları, tabak boyutu gibi ipuçlarıyla fotoğraftan tahmin edilir. Miktarları kontrol edip düzenle.",
+    ),
     // Meal categories
     "Breakfast" to NomiTranslation(
         de = "Frühstück", es = "Desayuno", fr = "Petit-déjeuner", it = "Colazione",

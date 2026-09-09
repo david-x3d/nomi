@@ -271,6 +271,8 @@ data class VisionFoodItem(
     val estimatedQuantity: Double? = null,
     val unit: String? = null,
     val estimatedGrams: Double? = null,
+    /** Visible scale cues and assumptions behind the estimated total weight. */
+    val weightEstimationBasis: String? = null,
     val confidence: Double? = null,
 )
 

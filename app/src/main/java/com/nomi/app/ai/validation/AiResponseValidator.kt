@@ -140,6 +140,7 @@ object AiResponseValidator {
             validateText(item.name, "detected food name", required = true, maxChars = MAX_NAME_CHARS)
             validateText(item.unit, "detected unit", maxChars = MAX_UNIT_CHARS)
             validateTextList(item.visibleIngredients, "visible ingredients")
+            validateText(item.weightEstimationBasis, "weight estimation basis", maxChars = MAX_DETAIL_CHARS)
             item.estimatedQuantity?.let { requireFinitePositive(it, "quantity", MAX_QUANTITY) }
             item.estimatedGrams?.let { requireFinitePositive(it, "grams", MAX_PORTION_GRAMS) }
             item.confidence?.let(::requireConfidence)

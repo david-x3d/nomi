@@ -1809,10 +1809,17 @@ private fun PhotoReviewNote(
                 keyboardActions = KeyboardActions(onDone = { if (state.canContinue) onConfirm() }),
             )
             Text(
-                text = nomiString("Fix anything Nomi misread, then look up the nutrition."),
+                text = nomiString("Portion weights are estimated from the photo, using clues such as plate size. Check and adjust the amounts."),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            state.notes.forEach { note ->
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Button(
                 onClick = onConfirm,
                 enabled = state.canContinue,

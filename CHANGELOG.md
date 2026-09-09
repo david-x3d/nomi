@@ -1,5 +1,24 @@
 # Changelog
 
+## Nomi v2.2.0 — 2026-09-09
+
+### Photo weight estimates
+
+- Uses visible plate size, bowls, cutlery, food height, coverage and perspective to estimate total edible food weight.
+- Makes estimated grams editable in photo review and retains visible piece counts as context.
+- Shows the AI's scale assumptions and uncertainty in both photo-review interfaces, with a translated estimate notice in all ten languages.
+- Keeps photo-derived portion notes with researched nutrition and preserves drink volumes separately from mass.
+- Adds regression coverage for portion scaling, user corrections, piece totals, unknown weights, volume units and compatible vision responses.
+
+### Verification
+
+- All 481 unit tests passed across 61 classes, with no failures, errors or skips.
+- Release compilation, lint-vital checks and APK assembly passed.
+- The APK signature matches the previous stable release (v2.1.3).
+- Photo recognition accuracy was not benchmarked against weighed meals; results remain estimates.
+
+SHA-256: `C090295E48B8DE5BD46E95A134428D8E034D933916A2B7C5E69B66434872F44E`
+
 ## Nomi v2.1.3 — 2026-08-30
 
 ### Remove Gemini and Assistant logging

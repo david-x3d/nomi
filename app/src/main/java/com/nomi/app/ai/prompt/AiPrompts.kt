@@ -611,7 +611,29 @@ object AiPrompts {
         - `confidence`: your honest confidence for that item.
 
         Count countable things exactly rather than approximating: eight pieces of sashimi is
-        eight, not "some". Use everyday objects in frame for scale where you can.
+        eight, not "some".
+
+        ESTIMATE THE WEIGHT FROM VISIBLE SCALE CUES for each food, including countable pieces.
+        Use plate diameter, bowl or cup size, cutlery (fork, spoon, knife), or clearly identifiable
+        packaging as references. Compare food coverage with the usable inner plate area, and
+        consider mound height, thickness, bowl fill level, piece count, perspective, stacking,
+        and the food's likely density/preparation. A wide thin layer and a tall heap do not weigh
+        the same. Estimate each separate component without double-counting toppings or sides.
+        Report edible food only: exclude the plate, container, bones and other inedible parts.
+        Prefer a clearly readable scale weight or printed portion weight when it actually applies
+        to the food shown; a package's net weight is not automatically the amount served.
+        A plate has no known diameter just because it looks like a dinner plate. If you assume a
+        typical size (for example 26 cm), explicitly call it an assumption, never a measurement.
+        Without a useful size reference, still give a rough estimate when possible, using visible
+        portion shape and typical piece size, but lower confidence and state the missing scale.
+        If even a rough weight is not defensible, return estimatedGrams=null and explain why.
+        Avoid false precision: use sensible rounded grams, not decimal-level precision.
+        For uncountable solid foods, set estimatedQuantity=estimatedGrams and unit="g" when a
+        weight is available. For drinks preserve an estimated volume in ml; never equate ml with g.
+        Add `weightEstimationBasis`: one short user-facing sentence naming the visible reference,
+        any assumed dimensions, and the main uncertainty; not hidden reasoning. Include the
+        visible piece count here when applicable. Every photo-derived weight is an estimate,
+        not a measured weight, and an exact nutrition table later does not make that weight exact.
 
         List dips, sauces, and drinks as their own items when they are visible, and put anything
         served on the side but plainly not eaten into `notes` instead of `items` - for example a
@@ -633,6 +655,7 @@ object AiPrompts {
             "estimatedQuantity": positive number|null,
             "unit": string|null,
             "estimatedGrams": positive number|null,
+            "weightEstimationBasis": string|null,
             "confidence": number|null
           }],
           "notes": [string]

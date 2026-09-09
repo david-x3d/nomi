@@ -8,6 +8,8 @@ import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
+import com.nomi.app.ui.logging.toPhotoParsedItem
+import com.nomi.app.ui.logging.toPhotoMealDescription
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.MenuDish
@@ -1259,16 +1261,8 @@ class AppViewModel(
                 }
             }.onSuccess { vision ->
                 if (requestId != analysisRequestId) return@onSuccess
-                val recognized = vision.items.map { item ->
-                    ParsedFoodItem(
-                        name = item.name,
-                        quantity = item.estimatedQuantity,
-                        unit = item.unit,
-                        gramsEquivalent = item.estimatedGrams,
-                        assumptions = item.visibleIngredients,
-                    )
-                }
-                val description = recognized.toMealDescription()
+                val recognized = vision.items.map { it.toPhotoParsedItem() }
+                val description = recognized.toPhotoMealDescription()
                 recordRoute(
                     route = NutritionRoute.PHOTO_DESCRIPTION,
                     decision = NutritionRoute.Decision.DIRECT,
@@ -1280,7 +1274,9 @@ class AppViewModel(
                     recognizedDescription = description,
                     recognizedItems = recognized,
                     mealCategory = category,
-                    notes = vision.notes,
+                    notes = (vision.notes + vision.items.mapNotNull { item ->
+                        item.weightEstimationBasis?.takeIf(String::isNotBlank)?.let { "${item.name}: $it" }
+                    }).distinct(),
                 )
             }.onFailure { error ->
                 if (error is CancellationException) throw error
@@ -1352,7 +1348,13 @@ class AppViewModel(
                     originalText = description,
                     sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
                 )
-                researchNutrition(intent).also {
+                researchNutrition(intent).let { analysis ->
+                    // Keep the visual portion caveat even when nutrition came from an exact table.
+                    analysis.copy(items = analysis.items.mapIndexed { index, item ->
+                        item.copy(assumptions = (item.assumptions +
+                            intent.items.getOrNull(index)?.assumptions.orEmpty()).distinct())
+                    })
+                }.also {
                     recordRoute(
                         route = NutritionRoute.NEW_RESEARCH,
                         decision = NutritionRoute.Decision.DIRECT,
@@ -1386,20 +1388,6 @@ class AppViewModel(
         }
     }
 
-    /**
-     * Writes recognized foods the way a person would have typed them, so the review field holds
-     * an ordinary sentence rather than a report. An item without a usable amount contributes
-     * only its name; inventing "1 piece" would put a quantity in the user's mouth.
-     */
-    private fun List<ParsedFoodItem>.toMealDescription(): String = joinToString(", ") { item ->
-        val quantity = item.quantity?.takeIf { it.isFinite() && it > 0.0 }
-        val unit = item.unit?.trim()?.takeIf(String::isNotBlank)
-        when {
-            quantity != null && unit != null -> "${quantity.cleanNumber()} $unit ${item.name}"
-            quantity != null -> "${quantity.cleanNumber()} ${item.name}"
-            else -> item.name
-        }
-    }
     fun lookupBarcode(barcode: String) {
         cancelAnalysis()
         val requestId = ++barcodeLookupRequestId

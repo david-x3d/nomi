@@ -248,7 +248,7 @@ private fun PhotoReviewContent(
         }
         item {
             Text(
-                nomiString("Nomi read your photo as the words below. Fix anything it got wrong before it looks up the nutrition."),
+                nomiString("Portion weights are estimated from the photo, using clues such as plate size. Check and adjust the amounts."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
