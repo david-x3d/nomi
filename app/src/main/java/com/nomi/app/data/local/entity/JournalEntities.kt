@@ -54,6 +54,8 @@ data class FoodLogEntity(
     val amount: Double,
     val unit: String,
     val grams: Double? = null,
+    @ColumnInfo(name = "resolved_volume_ml") val resolvedVolumeMl: Double? = null,
+    @ColumnInfo(name = "resolution_source") val resolutionSource: String? = null,
     /** Values for this exact logged portion, never dynamically joined from [FoodEntity]. */
     @Embedded(prefix = "nutrition_snapshot_") val nutritionSnapshot: NutritionValues,
     /** Source metadata captured at logging time and safe if the source row changes or disappears. */
@@ -129,6 +131,8 @@ data class SavedMealItemEntity(
     val amount: Double,
     val unit: String,
     val grams: Double? = null,
+    @ColumnInfo(name = "resolved_volume_ml") val resolvedVolumeMl: Double? = null,
+    @ColumnInfo(name = "resolution_source") val resolutionSource: String? = null,
     /** Concrete portion values keep a saved meal usable even after catalog eviction. */
     @Embedded(prefix = "nutrition_snapshot_") val nutritionSnapshot: NutritionValues,
     @Embedded(prefix = "source_snapshot_") val sourceSnapshot: NutritionSourceSnapshot,

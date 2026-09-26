@@ -175,7 +175,7 @@ object PortionChangeValidator {
         }
     }
 
-    private fun normalizeUnit(rawUnit: String): String = rawUnit
+    private fun normalizeUnit(rawUnit: String): String = com.nomi.app.ai.model.QuantityUnits.normalize(rawUnit)
         .trim()
         .lowercase(Locale.ROOT)
         .replace('\u00e4', 'a')

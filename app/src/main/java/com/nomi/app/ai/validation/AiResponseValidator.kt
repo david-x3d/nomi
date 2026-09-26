@@ -66,6 +66,7 @@ object AiResponseValidator {
             validateTextList(item.assumptions, "assumptions")
             item.quantity?.let { requireFinitePositive(it, "quantity", MAX_QUANTITY) }
             item.gramsEquivalent?.let { requireFinitePositive(it, "grams", MAX_PORTION_GRAMS) }
+            item.resolvedVolumeMl?.let { requireFinitePositive(it, "volume", MAX_PORTION_GRAMS) }
             item.quantityResolution?.let { resolution ->
                 validateQuantityResolution(item.quantity, item.unit, resolution)
             }
@@ -250,6 +251,12 @@ object AiResponseValidator {
         validateTextList(item.assumptions, "assumptions")
         requireFinitePositive(item.quantity, "quantity", MAX_QUANTITY)
         item.gramsEquivalent?.let { requireFinitePositive(it, "grams", MAX_PORTION_GRAMS) }
+        item.resolvedVolumeMl?.let { requireFinitePositive(it, "volume", MAX_PORTION_GRAMS) }
+        item.sourceUnitWeightGrams?.let { requireFinitePositive(it, "unit weight", MAX_PORTION_GRAMS) }
+        item.sourceUnitVolumeMl?.let { requireFinitePositive(it, "unit volume", MAX_PORTION_GRAMS) }
+        if ((item.sourceUnitWeightGrams != null || item.sourceUnitVolumeMl != null) && item.sourceUnit.isNullOrBlank()) {
+            throw AiValidationException("Product unit weight or volume must name its unit")
+        }
         item.sourceServingQuantity?.let { requireFinitePositive(it, "source serving", MAX_QUANTITY) }
         item.sourceServingGramsEquivalent?.let { requireFinitePositive(it, "source serving grams", MAX_PORTION_GRAMS) }
         item.sourcePackageQuantity?.let { requireFinitePositive(it, "source package", MAX_QUANTITY) }
@@ -287,11 +294,8 @@ object AiResponseValidator {
             required = true,
             maxChars = MAX_UNIT_CHARS,
         )
-        if (resolution.origin != QuantityOrigin.MENU_EXPLICIT &&
-            resolution.canonicalUnit != "g" && resolution.canonicalUnit != "ml"
-        ) {
-            throw AiValidationException("Resolved quantity must use canonical g or ml")
-        }
+        resolution.resolvedWeightGrams?.let { requireFinitePositive(it, "resolved weight", MAX_PORTION_GRAMS) }
+        resolution.resolvedVolumeMl?.let { requireFinitePositive(it, "resolved volume", MAX_PORTION_GRAMS) }
         if (itemQuantity == null || itemUnit == null ||
             relativeDifference(itemQuantity, resolution.canonicalQuantity) > 1e-7 ||
             !itemUnit.equals(resolution.canonicalUnit, ignoreCase = true)

@@ -55,12 +55,19 @@ data class ParsedFoodItem(
     val brand: String? = null,
     val quantity: Double? = null,
     val unit: String? = null,
+    /** Legacy storage name for the optional resolved total mass; never the user quantity. */
     val gramsEquivalent: Double? = null,
+    val resolvedVolumeMl: Double? = null,
     val preparation: String? = null,
     val assumptions: List<String> = emptyList(),
     /** Deterministic user/local quantity decision. Provider JSON is never trusted for this. */
     val quantityResolution: QuantityResolutionMetadata? = null,
-)
+) {
+    val userQuantity get() = quantityResolution?.userQuantity ?: quantity
+    val userUnit get() = quantityResolution?.userUnit ?: unit?.let(QuantityUnits::normalize)
+    val normalizedUnit get() = unit?.let(QuantityUnits::normalize)
+    val resolvedWeightGrams get() = gramsEquivalent
+}
 
 @Serializable
 data class FoodAnalysis(
@@ -89,7 +96,9 @@ data class AnalyzedFoodItem(
     val brand: String? = null,
     val quantity: Double,
     val unit: String,
+    /** Legacy storage name for the optional resolved total mass; never the user quantity. */
     val gramsEquivalent: Double? = null,
+    val resolvedVolumeMl: Double? = null,
     val calories: Double,
     val proteinGrams: Double,
     val carbohydrateGrams: Double,
@@ -141,7 +150,19 @@ data class AnalyzedFoodItem(
     val requiresServingValidation: Boolean = false,
     /** Copied from the reconciled parsed intent, never accepted from provider output. */
     val quantityResolution: QuantityResolutionMetadata? = null,
-)
+    /** Product data for ONE unit named by sourceUnit, independent of the nutrition-table basis. */
+    val sourceUnit: String? = null,
+    val sourceUnitWeightGrams: Double? = null,
+    val sourceUnitVolumeMl: Double? = null,
+    /** Evidence URL/description for the conversion; estimates are explicitly labelled. */
+    val resolutionSource: String? = null,
+) {
+    val userQuantity get() = quantityResolution?.userQuantity ?: quantity
+    val userUnit get() = quantityResolution?.userUnit ?: QuantityUnits.normalize(unit)
+    val normalizedUnit get() = QuantityUnits.normalize(unit)
+    val resolvedWeightGrams get() = gramsEquivalent
+    val isEstimated get() = isEstimate
+}
 
 @Serializable
 data class ServingSizeValidation(
@@ -204,7 +225,16 @@ data class QuantityResolutionMetadata(
     val sourcePackageQuantity: Double? = null,
     val sourcePackageUnit: String? = null,
     val sourcePackageConflict: Boolean = false,
-)
+    val resolvedWeightGrams: Double? = null,
+    val resolvedVolumeMl: Double? = null,
+    val resolutionSource: String? = null,
+    val isEstimated: Boolean = false,
+) {
+    // Named semantic accessors reuse the existing fields instead of a second quantity system.
+    val userQuantity get() = enteredQuantity ?: canonicalQuantity
+    val userUnit get() = QuantityUnits.normalize(enteredUnit ?: canonicalUnit)
+    val normalizedUnit get() = QuantityUnits.normalize(canonicalUnit)
+}
 
 @Serializable
 data class VisionFoodResult(

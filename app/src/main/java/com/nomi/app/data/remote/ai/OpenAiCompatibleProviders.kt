@@ -399,7 +399,10 @@ internal fun unresolvedWebAmountItemIndexes(analysis: FoodAnalysis): List<Int> =
         val needsLoggedMass = sourceIsMass && !loggedIsMass && item.gramsEquivalent == null
         val needsSourceMass = !sourceIsMass && loggedIsMass &&
             item.sourceServingGramsEquivalent == null
-        index.takeIf { needsLoggedMass || needsSourceMass }
+        val sourceIsVolume = sourceUnit.lowercase(Locale.ROOT) in setOf("ml", "l", "cl")
+        val loggedIsCount = com.nomi.app.ai.model.QuantityUnits.isCount(item.unit)
+        val needsLoggedVolume = sourceIsVolume && loggedIsCount && item.resolvedVolumeMl == null
+        index.takeIf { needsLoggedMass || needsSourceMass || needsLoggedVolume }
     }
 
 /**
@@ -428,6 +431,8 @@ internal fun mergeWebAmountResolution(
             item.copy(
                 gramsEquivalent = item.gramsEquivalent
                     ?: resolved.gramsEquivalent.takeIfPositive(),
+                resolvedVolumeMl = item.resolvedVolumeMl ?: resolved.resolvedVolumeMl.takeIfPositive(),
+                resolutionSource = item.resolutionSource ?: resolved.resolutionSource,
                 sourceServingGramsEquivalent = item.sourceServingGramsEquivalent
                     ?: resolved.sourceServingGramsEquivalent.takeIfPositive(),
                 sourcePackageQuantity = item.sourcePackageQuantity

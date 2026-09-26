@@ -198,9 +198,9 @@ class QuantityDisplayFormatterTest {
             german,
         )
 
-        assertEquals("30 g", display.primary)
-        assertEquals("1,5 EL", display.context)
-        assertEquals("1,5 EL · 30 g", display.withContext)
+        assertEquals("1,5 EL", display.primary)
+        assertEquals(null, display.context)
+        assertEquals("1,5 EL", display.withContext)
     }
     @Test
     fun `canonical spoon entry keeps entered EL and shows estimated grams`() {

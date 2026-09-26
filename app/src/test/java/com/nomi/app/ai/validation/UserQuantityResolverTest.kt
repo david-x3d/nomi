@@ -29,14 +29,16 @@ class UserQuantityResolverTest {
     }
 
     @Test
-    fun `German tablespoon and teaspoon aliases use metric volume`() {
+    fun `German tablespoon and teaspoon aliases preserve quantity with resolved volume`() {
         val tablespoon = resolve("1,5 EL Marmelade", name = "Marmelade")
         val teaspoon = resolve("1,5 Teelöffel Marmelade", name = "Marmelade")
 
-        assertEquals(22.5, tablespoon.quantity!!, 0.0)
-        assertEquals("ml", tablespoon.unit)
-        assertEquals(7.5, teaspoon.quantity!!, 0.0)
-        assertEquals("ml", teaspoon.unit)
+        assertEquals(1.5, tablespoon.quantity!!, 0.0)
+        assertEquals("tbsp", tablespoon.unit)
+        assertEquals(22.5, tablespoon.resolvedVolumeMl!!, 0.0)
+        assertEquals(1.5, teaspoon.quantity!!, 0.0)
+        assertEquals("tsp", teaspoon.unit)
+        assertEquals(7.5, teaspoon.resolvedVolumeMl!!, 0.0)
     }
     @Test
     fun `55 percent of explicitly stated 320 g package is exactly 176 g`() {
@@ -121,7 +123,9 @@ class UserQuantityResolverTest {
             locale = "DE",
             name = "Red Bull",
         )
-        assertEquals(355.0, germanCan.quantity!!, 0.0)
+        assertEquals(1.0, germanCan.quantity!!, 0.0)
+        assertEquals("can", germanCan.unit)
+        assertEquals(355.0, germanCan.resolvedVolumeMl!!, 0.0)
     }
 
     @Test
@@ -140,7 +144,7 @@ class UserQuantityResolverTest {
     @Test
     fun `unresolved quantities remain provider inferred without product-specific defaults`() {
         listOf("DE", "US").forEach { locale ->
-            val item = resolve("one packaged item", locale = locale, name = "Packaged item")
+            val item = resolve("packaged food", locale = locale, name = "Packaged food")
             assertEquals(999.0, item.quantity!!, 0.0)
             assertEquals("ml", item.unit)
             assertNull(item.quantityResolution)
@@ -231,7 +235,7 @@ class UserQuantityResolverTest {
             canonicalUnit = "g",
         )
         val parsed = ParsedFoodIntent(
-            originalText = "an apple",
+            originalText = "apple",
             items = listOf(
                 ParsedFoodItem(
                     name = "apple",
@@ -242,7 +246,7 @@ class UserQuantityResolverTest {
             ),
         )
 
-        val reconciled = UserQuantityResolver.reconcileParsedIntent("an apple", parsed, "DE")
+        val reconciled = UserQuantityResolver.reconcileParsedIntent("apple", parsed, "DE")
         assertNull(reconciled.items.single().quantityResolution)
         assertEquals(1.0, reconciled.items.single().quantity!!, 0.0)
     }

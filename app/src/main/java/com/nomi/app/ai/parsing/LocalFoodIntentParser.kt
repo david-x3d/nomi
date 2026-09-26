@@ -3,6 +3,7 @@ package com.nomi.app.ai.parsing
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import java.util.Locale
+import com.nomi.app.ai.validation.UserQuantityResolver
 
 /**
  * A deliberately narrow parser for the most obvious single-food entries.
@@ -44,6 +45,7 @@ object LocalFoodIntentParser {
         if (text.isBlank() || text.length > MAX_INPUT_LENGTH) return null
 
         parseExplicitAmount(text)?.let { return it }
+        UserQuantityResolver.parseCountIntentOrNull(text)?.let { return it }
         if (unsafeCharacters.containsMatchIn(text)) return null
 
         val tokens = text.split(' ')

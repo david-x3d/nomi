@@ -51,7 +51,6 @@ class LocalFoodIntentParserTest {
     @Test
     fun `quantities packages brands lists and phrases use provider parser`() {
         listOf(
-            "2 apples",
 
             "55% of a 320g package of fish",
             "half of a 200g bag",

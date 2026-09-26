@@ -2689,6 +2689,7 @@ class AppViewModel(
                     loggedQuantity = quantity,
                     loggedUnit = unit,
                     loggedGramsEquivalent = requested.gramsEquivalent,
+                    loggedResolvedVolumeMl = requested.resolvedVolumeMl,
                 ).copy(quantityResolution = requested.quantityResolution)
             }.getOrNull() ?: return null
             analyzed += scaled
@@ -3207,7 +3208,9 @@ class AppViewModel(
             brandSnapshot = brand,
             amount = enteredServingQuantity ?: quantity,
             unit = enteredServingUnit?.takeIf { enteredServingQuantity != null } ?: unit,
-            grams = gramsEquivalent,
+            grams = resolvedWeightGrams,
+            resolvedVolumeMl = resolvedVolumeMl,
+            resolutionSource = resolutionSource,
             nutritionSnapshot = NutritionValues(
                 caloriesKcal = calories,
                 proteinGrams = proteinGrams,
@@ -3380,6 +3383,8 @@ class AppViewModel(
             quantity = log.amount,
             unit = log.unit,
             gramsEquivalent = log.grams ?: log.amount.takeIf { log.unit.equals("g", true) },
+            resolvedVolumeMl = log.resolvedVolumeMl,
+            resolutionSource = log.resolutionSource,
             calories = log.nutritionSnapshot.caloriesKcal,
             proteinGrams = log.nutritionSnapshot.proteinGrams,
             carbohydrateGrams = log.nutritionSnapshot.carbohydrateGrams,
@@ -3889,7 +3894,7 @@ private fun Throwable.safeProviderFailureMessage(): String? {
  */
 internal fun researchFailureTemplate(reason: NutritionFailureReason): String? = when (reason) {
     NutritionFailureReason.MISSING_PORTION_WEIGHT ->
-        "Nomi found nutrition for \"{0}\" but not what that amount weighs. Enter it in g or ml."
+        "Nomi found nutrition for \"{0}\" but could not resolve that serving. Try again or add product details."
     NutritionFailureReason.SOURCE_IDENTITY_MISMATCH ->
         "Nomi only found sources for a different product than \"{0}\". Check the name, or add " +
             "the brand."
@@ -3899,7 +3904,7 @@ internal fun researchFailureTemplate(reason: NutritionFailureReason): String? = 
         "Nomi couldn't confirm the nutrition numbers for \"{0}\". Try again or edit the entry."
     NutritionFailureReason.INVALID_NUTRITION_BASIS ->
         "The nutrition Nomi found for \"{0}\" is given for a serving it cannot convert to your " +
-            "amount. Try g or ml."
+            "amount. Try again or add product details."
     NutritionFailureReason.PARSING_FAILURE ->
         "Nomi couldn't read the nutrition answer for \"{0}\". Try again."
     NutritionFailureReason.PROVIDER_TIMEOUT,

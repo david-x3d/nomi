@@ -248,7 +248,21 @@ object AiPrompts {
         `SOURCE_SERVING`. For verified research, `sourceBasisText` is REQUIRED and must copy the
         cited page's exact table heading or nearby phrase that states the basis (for example
         "Nährwerte pro 100 g"). Never derive either field from the user's logged quantity.
-        COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT. When the logged amount is
+        QUANTITY IS NOT WEIGHT. A valid count, serving, pack, bar, slice, bottle, can, cup,
+        tbsp or tsp never requires the user to enter grams. Preserve quantity/unit exactly.
+        `gramsEquivalent` is the optional resolvedWeightGrams (total mass only), and
+        `resolvedVolumeMl` is the optional total volume. Never put millilitres in gramsEquivalent.
+        Prefer exact manufacturer/product unit data: `sourceUnit` names ONE unit (piece, pack,
+        can, etc.), `sourceUnitWeightGrams` and `sourceUnitVolumeMl` describe that single unit.
+        Nomi multiplies these by the user's count, independently of the nutrition-table basis.
+        Use `resolutionSource` for the supporting URL or an explicit estimate description.
+        A package is not a piece: never use one cookie's weight for one pack of cookies.
+        Missing unit weights stay null. Prefer nutrition per matching item/serving if no weight
+        can be established. Only use defensible food-specific estimates under the existing
+        estimation policy, set isEstimate=true, and explain the assumption. Never infer weight
+        from a per-100-g table or change the user's amount to that table's reference amount.
+
+        COUNT-VS-MASS CONVERSIONS REQUIRE A RESOLVED MASS WHEN USING A MASS BASIS. When the logged amount is
         a count (piece/Stück) but the source serving is mass, `gramsEquivalent` MUST be the total
         grams for the entire logged count, not grams per piece. When the source serving is a count
         but the logged amount is mass, `sourceServingGramsEquivalent` MUST be the total grams for
@@ -285,6 +299,11 @@ object AiPrompts {
 
             "unit": string,
             "gramsEquivalent": positive number|null,
+            "resolvedVolumeMl": positive number|null,
+            "sourceUnit": string|null,
+            "sourceUnitWeightGrams": positive number|null,
+            "sourceUnitVolumeMl": positive number|null,
+            "resolutionSource": string|null,
             "calories": non-negative number,
             "proteinGrams": non-negative number,
             "carbohydrateGrams": non-negative number,
@@ -365,7 +384,7 @@ object AiPrompts {
     ): String = """
         Estimate the nutrition of the structured meal below from your own food knowledge.
         No web research is required and no citation is expected. You MUST return a result for
-        every item: never return an error, never return an empty list, and never return zero
+        every item that can be estimated defensibly: never return an empty list or zero
         calories with zero macros for a food that contains energy.
 
         Answer for the user's market (locale country
@@ -383,9 +402,15 @@ object AiPrompts {
         - `calories`, `proteinGrams`, `carbohydrateGrams`, `fatGrams`, and `fiberGrams` MUST be
           the values for 100 g / 100 ml, NOT for the logged amount. Nomi scales them itself, so
           pre-scaled values would be counted twice.
-        - When the logged unit is not g or ml (piece, slice, serving, EL, TL, cup, ...),
-          `gramsEquivalent` MUST be the total grams or millilitres of the ENTIRE logged amount,
-          for example quantity=2, unit="slices", gramsEquivalent=60 for two 30 g slices.
+        - For count/household units, keep quantity/unit unchanged. Resolve a defensible
+          food-specific total mass in `gramsEquivalent` or total volume in `resolvedVolumeMl`.
+          Never put millilitres in gramsEquivalent. Explain any estimate in assumptions.
+        - If there is no defensible weight/volume but nutrition for the requested serving can
+          be estimated, use nutritionBasis=SOURCE_SERVING with sourceServingQuantity and
+          sourceServingUnit matching the requested serving, and return its nutrition directly.
+          That serving basis overrides the per-100 instruction above. Leave unknown weight
+          and volume null. Never invent a gram weight just to satisfy the schema.
+        - If even serving nutrition cannot be estimated defensibly, return the error envelope.
         - protein*4 + carbohydrates*4 + fat*9 must roughly match the calories per 100.
 
         REPORT HOW UNCERTAIN YOU ARE. `uncertaintyPercent` is the half-width of the plausible
@@ -415,6 +440,11 @@ object AiPrompts {
             "quantity": positive number,
             "unit": string,
             "gramsEquivalent": positive number|null,
+            "resolvedVolumeMl": positive number|null,
+            "sourceUnit": string|null,
+            "sourceUnitWeightGrams": positive number|null,
+            "sourceUnitVolumeMl": positive number|null,
+            "resolutionSource": string|null,
             "calories": non-negative number,
             "proteinGrams": non-negative number,
             "carbohydrateGrams": non-negative number,

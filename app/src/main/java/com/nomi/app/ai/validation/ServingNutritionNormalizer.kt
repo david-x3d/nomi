@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.model.ServingSizeValidation
+import com.nomi.app.ai.model.QuantityUnits
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.round
@@ -63,11 +64,14 @@ object ServingNutritionNormalizer {
         loggedQuantity: Double,
         loggedUnit: String,
         loggedGramsEquivalent: Double? = null,
+        loggedResolvedVolumeMl: Double? = null,
     ): AnalyzedFoodItem {
         val prepared = sourceServingItem.copy(
             quantity = loggedQuantity,
             unit = loggedUnit,
             gramsEquivalent = loggedGramsEquivalent,
+            resolvedVolumeMl = loggedResolvedVolumeMl,
+            quantityResolution = null,
             servingValidation = null,
             requiresServingValidation = false,
         )
@@ -81,6 +85,7 @@ object ServingNutritionNormalizer {
                         quantity = loggedQuantity,
                         unit = loggedUnit,
                         gramsEquivalent = loggedGramsEquivalent,
+                        resolvedVolumeMl = loggedResolvedVolumeMl,
                     ),
                 ),
             ),
@@ -102,6 +107,9 @@ object ServingNutritionNormalizer {
         val previous = requireNotNull(item.servingValidation)
         val resolvedLoggedGramsEquivalent = loggedGramsEquivalent
             ?: inferPieceGramsEquivalent(item, loggedQuantity, loggedUnit)
+        val volume = item.resolvedVolumeMl?.let {
+            if (normalizeUnit(item.unit) == normalizeUnit(loggedUnit)) it * loggedQuantity / item.quantity else null
+        }
         val (sourceMeasure, loggedMeasure) = reconcileServingMeasures(
             sourceQuantity = previous.sourceQuantity,
             sourceUnit = previous.sourceUnit,
@@ -109,6 +117,7 @@ object ServingNutritionNormalizer {
             loggedQuantity = loggedQuantity,
             loggedUnit = loggedUnit,
             loggedGramsEquivalent = resolvedLoggedGramsEquivalent,
+            loggedVolumeMl = volume,
         )
         if (sourceMeasure.dimension.storageName != previous.dimension) {
             throw AiValidationException("A portion edit cannot change the validated serving basis")
@@ -124,6 +133,12 @@ object ServingNutritionNormalizer {
             quantity = loggedQuantity,
             unit = loggedUnit,
             gramsEquivalent = resolvedLoggedGramsEquivalent,
+            resolvedVolumeMl = volume,
+            quantityResolution = item.quantityResolution?.copy(
+                canonicalQuantity = loggedQuantity, canonicalUnit = loggedUnit,
+                enteredQuantity = loggedQuantity, enteredUnit = loggedUnit,
+                resolvedWeightGrams = resolvedLoggedGramsEquivalent, resolvedVolumeMl = volume,
+            ),
             calories = previous.caloriesPer100 * loggedFactor,
             proteinGrams = previous.proteinGramsPer100 * loggedFactor,
             carbohydrateGrams = previous.carbohydrateGramsPer100 * loggedFactor,
@@ -159,7 +174,8 @@ object ServingNutritionNormalizer {
                 sourceGramsEquivalent = item.sourceServingGramsEquivalent,
                 loggedQuantity = item.quantity,
                 loggedUnit = item.unit,
-                loggedGramsEquivalent = item.gramsEquivalent,
+                loggedGramsEquivalent = item.resolvedWeightGrams,
+                loggedVolumeMl = item.resolvedVolumeMl,
             )
 
             requireClose(sourceQuantity, validation.sourceQuantity, "source serving amount changed")
@@ -297,7 +313,8 @@ object ServingNutritionNormalizer {
         // Cross-dimension arithmetic is valid only with an explicit, food-specific bridge from
         // the parser, package, manufacturer, or researched serving. A generic density or a
         // food-name table silently substitutes unrelated nutrition and is never safe here.
-        val loggedGramsEquivalent = requested?.gramsEquivalent ?: item.gramsEquivalent
+        val loggedGramsEquivalent = requested?.resolvedWeightGrams ?: item.resolvedWeightGrams
+        val volume = requested?.resolvedVolumeMl ?: item.resolvedVolumeMl
         val sourceGramsEquivalent = declaredSourceGramsEquivalent
         val (sourceMeasure, loggedMeasure) = reconcileServingMeasures(
             sourceQuantity = sourceQuantity,
@@ -306,6 +323,7 @@ object ServingNutritionNormalizer {
             loggedQuantity = loggedQuantity,
             loggedUnit = loggedUnit,
             loggedGramsEquivalent = loggedGramsEquivalent,
+            loggedVolumeMl = volume,
         )
         val per100Factor = 100.0 / sourceMeasure.baseAmount
         val loggedFactor = loggedMeasure.baseAmount / 100.0
@@ -332,6 +350,11 @@ object ServingNutritionNormalizer {
             quantity = loggedQuantity,
             unit = loggedUnit,
             gramsEquivalent = loggedGramsEquivalent,
+            resolvedVolumeMl = volume,
+            quantityResolution = item.quantityResolution?.copy(
+                resolvedWeightGrams = loggedGramsEquivalent, resolvedVolumeMl = volume,
+                resolutionSource = item.resolutionSource, isEstimated = item.isEstimate,
+            ),
             sourceServingGramsEquivalent = sourceGramsEquivalent,
             sourceServingQuantity = sourceQuantity,
             sourceServingUnit = sourceUnit,
@@ -444,15 +467,14 @@ object ServingNutritionNormalizer {
     /**
      * Two servings that do not share a dimension cannot be scaled into one another, but the two
      * ways that happens need different answers. A counted amount on either side is missing a
-     * weight nobody supplied, which the user can settle by entering grams; anything else is a
+     * conversion the research must resolve; anything else is a
      * basis the source and the request simply do not share.
      */
     private fun requireCompatible(first: Measure, second: Measure) {
         if (first.dimension == second.dimension) return
         throw NutritionResearchException(
             reason = if (second.dimension.isCounted) {
-                // The user logged a count, so the missing fact is what one of them weighs, which
-                // an amount in g or ml settles.
+                // The quantity is valid; research has not resolved its nutritional basis.
                 NutritionFailureReason.MISSING_PORTION_WEIGHT
             } else {
                 // The logged amount is already a real mass or volume; it is the source's own
@@ -478,6 +500,7 @@ object ServingNutritionNormalizer {
         loggedQuantity: Double,
         loggedUnit: String,
         loggedGramsEquivalent: Double?,
+        loggedVolumeMl: Double? = null,
     ): ServingMeasures {
         val source = measure(sourceQuantity, sourceUnit)
         val logged = measure(loggedQuantity, loggedUnit)
@@ -496,6 +519,10 @@ object ServingNutritionNormalizer {
             if (loggedMass != null) return ServingMeasures(source, loggedMass)
         }
 
+        if (source.dimension == Dimension.Volume && loggedVolumeMl != null) {
+            requireFinitePositive(loggedVolumeMl, "resolved volume")
+            return ServingMeasures(source, Measure(Dimension.Volume, loggedVolumeMl, logged.originalUnit))
+        }
         requireCompatible(source, logged)
         return ServingMeasures(source, logged)
     }
@@ -521,7 +548,7 @@ object ServingNutritionNormalizer {
         val currentGrams = item.gramsEquivalent ?: return null
         val current = measure(item.quantity, item.unit)
         val updated = measure(loggedQuantity, loggedUnit)
-        if (current.dimension != Dimension.Piece || updated.dimension != Dimension.Piece) return null
+        if (current.dimension != updated.dimension || !current.dimension.isCounted) return null
         requireFinitePositive(currentGrams, "logged serving grams")
         return currentGrams * updated.baseAmount / current.baseAmount
     }
@@ -547,8 +574,7 @@ object ServingNutritionNormalizer {
             "fl oz", "us fl oz", "floz", "fluid ounce", "fluid ounces" ->
                 Dimension.Volume to US_FLUID_OUNCE_ML
             "piece", "pieces", "pc", "pcs", "each", "stuck", "stucke",
-            "item", "items", "serving", "servings", "portion", "portions", "portionen",
-            "bar", "bars", "riegel" ->
+            "item", "items" ->
                 Dimension.Piece to 1.0
             else -> Dimension.Custom(unit) to 1.0
         }
@@ -559,7 +585,7 @@ object ServingNutritionNormalizer {
         )
     }
 
-    private fun normalizeUnit(value: String): String = value
+    private fun normalizeUnit(value: String): String = QuantityUnits.normalize(value)
         .trim()
         .lowercase(Locale.ROOT)
         .replace("fl. oz.", "fl oz")

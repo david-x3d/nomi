@@ -100,6 +100,13 @@ object PortionEditApplier {
                     quantity = newQuantity,
                     unit = newUnit,
                     gramsEquivalent = newGrams,
+                    resolvedVolumeMl = item.resolvedVolumeMl?.times(factor),
+                    quantityResolution = item.quantityResolution?.copy(
+                        canonicalQuantity = newQuantity, canonicalUnit = newUnit,
+                        enteredQuantity = newQuantity, enteredUnit = newUnit,
+                        resolvedWeightGrams = newGrams,
+                        resolvedVolumeMl = item.resolvedVolumeMl?.times(factor),
+                    ),
                     calories = item.calories * factor,
                     proteinGrams = item.proteinGrams * factor,
                     carbohydrateGrams = item.carbohydrateGrams * factor,

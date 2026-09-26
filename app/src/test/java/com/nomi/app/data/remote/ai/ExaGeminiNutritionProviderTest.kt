@@ -28,6 +28,48 @@ class ExaGeminiNutritionProviderTest {
     )
 
     @Test
+    fun `manufacturer can volume scales per hundred ml without inventing grams`() = runBlocking {
+        val case = SuccessCase(
+            text = "2 cans Coke", name = "Coke", brand = "Coke", quantity = 2.0,
+            unit = "can", grams = null, sourceAmount = 100.0, sourceUnit = "ml",
+            calories = 42.0, protein = 0.0, carbs = 10.5, fat = 0.0,
+            expectedCalories = 277.2,
+        )
+        val result = provider(
+            sources = listOf(source("Official Coke", "https://coke.test/original",
+                evidence(case) + "; one can contains 330 ml")),
+            extraction = extraction(item(case).copy(sourceUnit = "can", sourceUnitVolumeMl = 330.0)),
+        ).researchNutrition(case.intent()).items.single()
+        assertEquals(2.0, result.quantity, 0.0)
+        assertEquals("can", result.unit)
+        assertEquals(660.0, result.resolvedVolumeMl!!, 1e-10)
+        assertEquals(null, result.resolvedWeightGrams)
+        assertEquals(277.2, result.calories, 1e-10)
+    }
+
+    @Test
+    fun `manufacturer unit weight logs one Oreo without user grams`() = runBlocking {
+        val case = SuccessCase(
+            text = "1 Oreo", name = "Oreo", brand = "Oreo", quantity = 1.0,
+            unit = "piece", grams = null, sourceAmount = 100.0, sourceUnit = "g",
+            calories = 474.0, protein = 5.0, carbs = 68.0, fat = 19.0,
+            expectedCalories = 53.562,
+        )
+        val result = provider(
+            sources = listOf(source("Official Oreo", "https://oreo.test/original",
+                evidence(case) + "; one Oreo piece weighs 11.3 g")),
+            extraction = extraction(item(case).copy(
+                sourceUnit = "piece", sourceUnitWeightGrams = 11.3,
+            )),
+        ).researchNutrition(case.intent()).items.single()
+        assertEquals(1.0, result.quantity, 0.0)
+        assertEquals("piece", result.unit)
+        assertEquals(11.3, result.resolvedWeightGrams!!, 1e-10)
+        assertEquals(53.562, result.calories, 1e-10)
+        assertFalse(result.isEstimate)
+    }
+
+    @Test
     fun `retrieved source URLs are published before Gemini extraction completes`() = runBlocking {
         val case = SuccessCase(
             text = "100 g Test Food",
@@ -449,7 +491,7 @@ class ExaGeminiNutritionProviderTest {
             name = "Pommes mittel",
             brand = "McDonald's",
             quantity = 1.0,
-            unit = "medium",
+            unit = "piece",
             grams = null,
             sourceAmount = 100.0,
             sourceUnit = "g",
@@ -481,7 +523,7 @@ class ExaGeminiNutritionProviderTest {
 
         assertTrue(result.isEstimate)
         assertEquals(1.0, result.sourceServingQuantity!!, 0.0)
-        assertEquals("medium", result.sourceServingUnit)
+        assertEquals("piece", result.sourceServingUnit)
         assertEquals(337.0, result.calories, 0.0)
     }
 
@@ -553,19 +595,19 @@ class ExaGeminiNutritionProviderTest {
             originalText = "einen McDonald's Cheeseburger eine mittlere Pommes und eine mittlere Coca-Cola",
             language = "de",
             items = listOf(
-                ParsedFoodItem("Cheeseburger", brand = "McDonald's", quantity = 1.0, unit = "serving"),
+                ParsedFoodItem("Cheeseburger", brand = "McDonald's", quantity = 1.0, unit = "piece"),
                 ParsedFoodItem(
                     "Pommes",
                     brand = "McDonald's",
                     quantity = 1.0,
-                    unit = "serving",
+                    unit = "piece",
                     assumptions = listOf("mittlere Portion"),
                 ),
                 ParsedFoodItem(
                     "Coca-Cola",
                     brand = "Coca-Cola",
                     quantity = 1.0,
-                    unit = "serving",
+                    unit = "piece",
                     assumptions = listOf("mittlere Größe"),
                 ),
             ),
@@ -578,17 +620,17 @@ class ExaGeminiNutritionProviderTest {
                     "Cheeseburger" in query -> source(
                         "McDonald's Cheeseburger",
                         "https://mcdonalds.test/cheeseburger",
-                        "Official nutrition Cheeseburger per 1 serving: 304 kcal, protein 15 g, carbs 31 g, fat 13 g",
+                        "Official nutrition Cheeseburger per 1 piece: 304 kcal, protein 15 g, carbs 31 g, fat 13 g",
                     )
                     "Pommes" in query -> source(
                         "McDonald's mittlere Pommes",
                         "https://mcdonalds.test/pommes-mittel",
-                        "Official nutrition Pommes mittel per 1 serving: 337 kcal, protein 4 g, carbs 42 g, fat 16 g",
+                        "Official nutrition Pommes mittel per 1 piece: 337 kcal, protein 4 g, carbs 42 g, fat 16 g",
                     )
                     else -> source(
                         "McDonald's Coca-Cola mittel",
                         "https://mcdonalds.test/coca-cola-mittel",
-                        "Official nutrition Coca-Cola mittel per 1 serving: 170 kcal, protein 0 g, carbs 42 g, fat 0 g",
+                        "Official nutrition Coca-Cola mittel per 1 piece: 170 kcal, protein 0 g, carbs 42 g, fat 0 g",
                     )
                 }
                 ExaSearchResponse(results = listOf(result))
@@ -949,8 +991,8 @@ class ExaGeminiNutritionProviderTest {
         sourceId = sourceId,
         sourceProductName = name,
         sourceServingQuantity = 1.0,
-        sourceServingUnit = "serving",
-        sourceBasisText = "per 1 serving",
+        sourceServingUnit = "piece",
+        sourceBasisText = "per 1 piece",
         sourceCountry = "DE",
         isEstimate = false,
         confidence = 0.98,

@@ -56,6 +56,16 @@ object QuantityDisplayFormatter {
     private const val EPSILON = 1e-6
 
     fun format(request: QuantityDisplayRequest, locale: Locale): QuantityDisplayText {
+        // A resolved weight is a calculation detail, never the primary displayed count.
+        // Explicit package fractions retain their existing metric + fraction presentation.
+        if (request.semantic == QuantityDisplaySemantic.DIRECT_AMOUNT &&
+            (com.nomi.app.ai.model.QuantityUnits.isCount(request.unit) || isSpoonUnit(request.unit))
+        ) {
+            return QuantityDisplayText(
+                primary = formatNonCanonical(request.quantity, request.unit, packageKind(request.unit), locale),
+                sourceConflictNote = conflictNote(request, locale),
+            )
+        }
         val packageKind = packageKind(request.containerUnit)
             ?: packageKind(request.unit)
             ?: when (request.semantic) {

@@ -785,12 +785,13 @@ class ServingNutritionNormalizerTest {
             val text = "1,5 $unit Test food"
             val parsed = requireNotNull(LocalFoodIntentParser.parseOrNull(text))
             val reconciledIntent = UserQuantityResolver.reconcileIntent(parsed, "DE")
-            assertEquals(expectedMilliliters, reconciledIntent.items.single().quantity!!, 0.0)
-            assertEquals("ml", reconciledIntent.items.single().unit)
+            val requested = reconciledIntent.items.single()
+            assertEquals(expectedMilliliters, requested.resolvedVolumeMl!!, 0.0)
+            assertEquals(1.5, requested.userQuantity!!, 0.0)
 
             val providerResult = FoodAnalysis(
                 items = listOf(
-                    sourceItem(1.0, "serving", 100.0, "g")
+                    sourceItem(requested.quantity!!, requested.unit!!, 100.0, "g")
                         .copy(name = "Test food", gramsEquivalent = expectedGrams, isEstimate = true),
                 ),
             )
@@ -820,7 +821,7 @@ class ServingNutritionNormalizerTest {
         assertTrue(prompt.contains("official German manufacturer"))
         assertTrue(prompt.contains("sourceServingQuantity"))
         assertTrue(prompt.contains("per 100 g/ml"))
-        assertTrue(prompt.contains("COUNT-VS-MASS CONVERSIONS MUST INCLUDE A TOTAL GRAM EQUIVALENT"))
+        assertTrue(prompt.contains("COUNT-VS-MASS CONVERSIONS REQUIRE A RESOLVED MASS"))
         assertTrue(prompt.contains("1 EL/Essloeffel/tbsp/tablespoon = 15 ml"))
         assertTrue(prompt.contains("unqualified German Löffel/Loeffel means EL"))
         assertTrue(prompt.contains("Never equate milliliters and grams silently"))

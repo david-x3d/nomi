@@ -29,7 +29,7 @@ class AiPromptsTest {
     }
 
     @Test
-    fun `estimate prompt always answers and keeps the per 100 serving contract`() {
+    fun `estimate prompt allows unresolved weight and keeps an explicit serving basis`() {
         val prompt = AiPrompts.estimateNutrition(
             intent = ParsedFoodIntent(
                 originalText = "2 Scheiben Toast",
@@ -41,7 +41,8 @@ class AiPromptsTest {
             localeCountry = "DE",
         )
 
-        assertTrue(prompt.contains("never return an error"))
+        assertTrue(prompt.contains("Never invent a gram weight"))
+        assertTrue(prompt.contains("nutritionBasis=SOURCE_SERVING"))
         assertTrue(prompt.contains("No web research is required"))
         assertTrue(prompt.contains("`sourceServingQuantity` MUST be 100"))
         assertTrue(prompt.contains("NOT for the logged amount"))

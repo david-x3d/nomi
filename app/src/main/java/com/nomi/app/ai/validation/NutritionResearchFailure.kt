@@ -4,7 +4,7 @@ package com.nomi.app.ai.validation
  * Why one logged item could not be given nutrition.
  *
  * Nutrition research fails for causes that need completely different answers from the user: a
- * rate-limited provider needs a retry, a missing piece weight needs an amount in grams, and a
+ * rate-limited provider needs a retry, a missing unit conversion needs further research, and a
  * mismatched product needs a better name. Collapsing them into one "could not verify nutrition"
  * message made every failure look the same and left nothing to act on, so the cause travels with
  * the failure instead of being flattened at the throw site.

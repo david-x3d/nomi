@@ -42,7 +42,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         AiDebugEventEntity::class,
         FoodResearchCacheEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -124,6 +124,16 @@ abstract class NomiDatabase : RoomDatabase() {
             }
         }
 
+        /** Optional conversion metadata; existing counts and gram amounts are unchanged. */
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("food_logs", "saved_meal_items").forEach { table ->
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `resolved_volume_ml` REAL")
+                    db.execSQL("ALTER TABLE `$table` ADD COLUMN `resolution_source` TEXT")
+                }
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
@@ -136,6 +146,7 @@ abstract class NomiDatabase : RoomDatabase() {
                 MIGRATION_3_4,
                 MIGRATION_4_5,
                 MIGRATION_5_6,
+                MIGRATION_6_7,
             ).build()
 
         /**

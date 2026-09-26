@@ -47,7 +47,7 @@ class GermanProductResolverTest {
         assertEquals("Duplo White", resolved.name)
         assertEquals("Ferrero", resolved.brand)
         assertEquals(2.0, resolved.quantity!!, 0.0)
-        assertEquals("pieces", resolved.unit)
+        assertEquals("piece", resolved.unit)
     }
 
     @Test

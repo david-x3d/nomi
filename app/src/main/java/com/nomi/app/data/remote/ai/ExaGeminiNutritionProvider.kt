@@ -611,6 +611,7 @@ internal fun geminiNutritionPrompt(
     appendLine("For every item, return calorieExplanation as a concise user-facing sentence in the user's input language. Explain the main calorie drivers from the returned macros and portion: fat contributes 9 kcal/g, carbohydrates and protein 4 kcal/g. Mention a large portion when it materially raises the total. This is a result summary, not hidden chain-of-thought; do not invent ingredients or health claims.")
     appendLine("Restaurant-size fallback: if the retrieved documents identify the requested item and size but do not expose enough numbers to convert that size to g/ml, return a best nutrition estimate for exactly the parsed logged quantity and unit instead of an error. In that case set sourceServingQuantity to the parsed quantity, sourceServingUnit to the parsed unit verbatim, sourceServingGramsEquivalent to the parsed gramsEquivalent (otherwise null), isEstimate=true, and explain the missing size bridge in assumptions. This exception applies only after live search and only to the unverified estimate; do not attach invented evidence.")
     appendLine("Generic-food fallback: when the request names only a food itself, with no brand, package or barcode identity, a reputable generic nutrition source or food database is a valid selection and no exact manufacturer product is required. Select one coherent source instead of merging conflicting ones, and set sourceProductName to the food title that source prints. If no single retrieved page supports the whole reading, return that one source's values on their own basis - per-100 values as PER_100_G/PER_100_ML with sourceServingQuantity 100 and the matching sourceServingUnit, or a printed serving as SOURCE_SERVING with that serving's exact amount and unit - with isEstimate=true and the limitation named in assumptions. Keep the logged quantity and unit unchanged, and never bridge mass and volume without an explicit stated equivalence.")
+    appendLine("The user's quantity/unit are authoritative, including packs, slices, bottles, cans, cups and spoons. Prefer exact manufacturer data for ONE matching sourceUnit in sourceUnitWeightGrams/sourceUnitVolumeMl; Nomi multiplies it by the user's quantity. A pack is never a piece. resolvedVolumeMl is a total volume, never grams. Unknown weights stay null; use a matching SOURCE_SERVING basis or the existing clearly labelled estimation fallback, not a request for grams.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("A counted logged unit cannot be scaled from a per-100 g/ml basis without that weight. When the logged unit is a count and no evidence states a unit weight, prefer a retrieved source whose own basis is per item/piece/serving and set nutritionBasis SOURCE_SERVING with that serving. For a request that names no brand, package or barcode, you may instead give a typical unit weight for the generic food in loggedServingGramsEquivalent; that reading is unverified, so set isEstimate=true and say so in assumptions. Never do this for a branded or packaged product.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
@@ -656,6 +657,10 @@ internal data class GeminiNutritionItem(
     val sourceBasisText: String? = null,
     /** Exact mass of the user's logged count, when Exa evidence states a weight per piece. */
     val loggedServingGramsEquivalent: Double? = null,
+    val resolvedVolumeMl: Double? = null,
+    val sourceUnit: String? = null,
+    val sourceUnitWeightGrams: Double? = null,
+    val sourceUnitVolumeMl: Double? = null,
     val sourceCountry: String? = null,
     val sourcePackageQuantity: Double? = null,
     val sourcePackageUnit: String? = null,
@@ -831,6 +836,11 @@ private fun GeminiNutritionItem.toAnalyzedItem(
     unit = parsed.unit?.takeIf(String::isNotBlank)
         ?: throw AiValidationException("The parsed logged unit is missing"),
     gramsEquivalent = parsed.gramsEquivalent ?: loggedServingGramsEquivalent,
+    resolvedVolumeMl = parsed.resolvedVolumeMl ?: resolvedVolumeMl,
+    sourceUnit = sourceUnit,
+    sourceUnitWeightGrams = sourceUnitWeightGrams,
+    sourceUnitVolumeMl = sourceUnitVolumeMl,
+    resolutionSource = if (isEstimate) "estimated unit conversion" else primary.url,
     calories = calories,
     proteinGrams = proteinGrams,
     carbohydrateGrams = carbohydrateGrams,
@@ -890,6 +900,26 @@ private fun requireNutritionEvidence(
                 reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
                 itemName = parsed.name,
                 detail = "The selected Exa source does not support Gemini's weight per logged piece",
+            )
+        }
+    }
+    listOf(item.sourceUnitWeightGrams to "g", item.sourceUnitVolumeMl to "ml").forEach { (amount, unit) ->
+        if (amount != null && !values.matches(amount, unit)) {
+            throw NutritionResearchException(
+                reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
+                itemName = parsed.name,
+                detail = "The product evidence does not support the declared unit conversion",
+            )
+        }
+    }
+    item.resolvedVolumeMl?.let { volume ->
+        val perUnit = parsed.quantity?.takeIf { it > 0.0 }?.let { volume / it }
+        if (parsed.resolvedVolumeMl == null && !values.matches(volume, "ml") &&
+            (perUnit == null || !values.matches(perUnit, "ml"))) {
+            throw NutritionResearchException(
+                reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
+                itemName = parsed.name,
+                detail = "The product evidence does not support the declared volume",
             )
         }
     }
@@ -1168,7 +1198,7 @@ private fun List<EvidenceValue>.matches(expected: Double, unit: String): Boolean
 private val NUTRITION_WORDS = Regex(
     "(?i)nutrition|nutrient|n.hrwert|naehrwert|kcal|calories|kalorien|protein|eiwei|carbohydrate|kohlenhydrat|fat|fett",
 )
-private val NUTRITION_VALUE = Regex("(?i)(\\d+(?:[.,]\\d+)?)\\s*(kcal|g|mg)\\b")
+private val NUTRITION_VALUE = Regex("(?i)(\\d+(?:[.,]\\d+)?)\\s*(kcal|ml|g|mg)\\b")
 private val ZERO_CALORIE_EVIDENCE = Regex("(?i)0(?:[.,]0+)?\\s*kcal|zero[- ]calorie|kalorienfrei")
 
 @Serializable
@@ -1339,7 +1369,8 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
             "sourceId", "supportingSourceIds", "sourceProductName",
             "sourceServingQuantity", "sourceServingUnit", "sourceServingGramsEquivalent",
             "nutritionBasis", "sourceBasisText",
-            "loggedServingGramsEquivalent",
+            "loggedServingGramsEquivalent", "resolvedVolumeMl", "sourceUnit",
+            "sourceUnitWeightGrams", "sourceUnitVolumeMl",
             "sourceCountry", "sourcePackageQuantity", "sourcePackageUnit", "isEstimate",
             "uncertaintyPercent", "confidence", "assumptions",
         ),
@@ -1368,6 +1399,10 @@ private fun geminiNutritionItemSchema(): JsonObject = buildJsonObject {
         })
         put("sourceBasisText", nullableString())
         put("loggedServingGramsEquivalent", nullableNumber(exclusiveMinimum = 0.0))
+        put("resolvedVolumeMl", nullableNumber(exclusiveMinimum = 0.0))
+        put("sourceUnit", nullableString())
+        put("sourceUnitWeightGrams", nullableNumber(exclusiveMinimum = 0.0))
+        put("sourceUnitVolumeMl", nullableNumber(exclusiveMinimum = 0.0))
         put("sourceCountry", nullableString())
         put("sourcePackageQuantity", nullableNumber(exclusiveMinimum = 0.0))
         put("sourcePackageUnit", nullableString())

@@ -354,7 +354,7 @@ class NutritionResearchDiagnosisTest {
         // The retried item scaled through the weight the second attempt supplied.
         assertEquals(130.0 * 1.8, analysis.items[1].calories, 1e-9)
         assertEquals(1.0, analysis.items[1].quantity, 1e-9)
-        assertEquals("piece", analysis.items[1].unit)
+        assertEquals("serving", analysis.items[1].unit)
     }
 
     // endregion

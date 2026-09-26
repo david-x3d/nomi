@@ -412,6 +412,7 @@ class NomiRepository(
             amount = newAmount,
             unit = unit,
             grams = log.grams?.times(factor),
+            resolvedVolumeMl = log.resolvedVolumeMl?.times(factor),
             nutritionSnapshot = log.nutritionSnapshot.scaledBy(factor),
             updatedAtEpochMillis = updatedAtEpochMillis,
         )
@@ -546,6 +547,8 @@ class NomiRepository(
                 amount = log.amount,
                 unit = log.unit,
                 grams = log.grams,
+                resolvedVolumeMl = log.resolvedVolumeMl,
+                resolutionSource = log.resolutionSource,
                 nutritionSnapshot = log.nutritionSnapshot,
                 sourceSnapshot = log.sourceSnapshot,
                 isEstimated = log.isEstimated,
@@ -581,6 +584,8 @@ class NomiRepository(
                     amount = item.amount,
                     unit = item.unit,
                     grams = item.grams,
+                    resolvedVolumeMl = item.resolvedVolumeMl,
+                    resolutionSource = item.resolutionSource,
                     nutritionSnapshot = item.nutritionSnapshot,
                     sourceSnapshot = item.sourceSnapshot,
                     isEstimated = item.isEstimated,
@@ -689,6 +694,7 @@ class NomiRepository(
     private fun validateLog(log: FoodLogEntity) {
         require(log.displayNameSnapshot.isNotBlank()) { "A food name is required" }
         require(log.amount > 0.0) { "Logged amount must be positive" }
+        require(log.resolvedVolumeMl == null || (log.resolvedVolumeMl.isFinite() && log.resolvedVolumeMl > 0.0)) { "Resolved volume must be positive" }
         require(log.grams == null || log.grams > 0.0) { "Logged gram weight must be positive" }
         validateNutrition(log.nutritionSnapshot)
         validateLocalDate(log.localDate)

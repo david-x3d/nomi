@@ -7,6 +7,7 @@ import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.QuantityOrigin
 import com.nomi.app.ai.model.QuantityResolutionMetadata
+import com.nomi.app.ai.model.QuantityUnits
 import com.nomi.app.ai.model.QuantitySemantic
 import com.nomi.app.ai.parsing.GermanProductResolver
 import java.util.Locale
@@ -50,6 +51,35 @@ object UserQuantityResolver {
     private val directAmountPattern = Regex(
         """(?iu)$decimal\s*[-–—]?\s*$amountUnit\b""",
     )
+
+    private val countNumber = "(?:\\d+(?:[.,]\\d+)?|one|two|three|four|five|six|a|an|ein(?:e[nrms]?)?|zwei|drei|half|halb(?:e[nrms]?)?|½)"
+    private val countUnit = "(?:pieces?|items?|pcs?|servings?|portions?|portionen|packs?|packages?|packets?|packungen?|bars?|riegel|slices?|scheiben?|bottles?|flaschen?|cans?|dosen?|cups?|tassen?|st(?:ü|ue|u)cke?)"
+    private val countPattern = Regex(
+        """(?iu)(?<![\p{L}\p{N}.,/])($countNumber)\s+(?:(?:of\s+)?(?:a|an|eine)\s+)?(?:($countUnit)\b\s*(?:of\s+)?)?(?=[\p{L}])""",
+    )
+    private val sizedContainerPattern = Regex(
+        """(?iu)(?<![\p{L}\p{N}.,])($countNumber)(?:\s*(x|×)\s*|\s+)(\d+(?:[.,]\d+)?)\s*[-–]?\s*(ml|l|g|kg)\b\s*[-–]?\s*($countUnit)?\b""",
+    )
+
+    /** Local fast path shares exactly the same count detection as provider reconciliation. */
+    fun parseCountIntentOrNull(text: String): ParsedFoodIntent? {
+        val detection = detectExplicitQuantities(text).singleOrNull() ?: return null
+        if (detection.range.first != 0 || detection.metadata.semantic != QuantitySemantic.DIRECT_AMOUNT) return null
+        val food = text.substring(detection.range.last + 1).trim()
+        if (!Regex("""[\p{L}][\p{L}'’.-]*(?:\s+[\p{L}][\p{L}'’.-]*){0,5}""").matches(food)) return null
+        if (food.split(' ').any { it.lowercase(Locale.ROOT) in setOf("and", "und", "with", "mit", "plus", "from", "von") }) return null
+        return ParsedFoodIntent(text, items = listOf(ParsedFoodItem(name = food).withResolution(detection.metadata)))
+    }
+
+    private fun countValue(raw: String): Double = when (raw.lowercase(Locale.ROOT)) {
+        "two", "zwei" -> 2.0
+        "three", "drei" -> 3.0
+        "four" -> 4.0
+        "five" -> 5.0
+        "six" -> 6.0
+        "half", "½", "halb", "halbe", "halben", "halber", "halbes" -> 0.5
+        else -> raw.replace(',', '.').toDoubleOrNull() ?: 1.0
+    }
 
     private val menuHouseholdServingPattern = Regex(
         """(?iu)(\d+(?:[.,]\d+)?)\s*(st(?:\u00fc|ue|u)ck(?:e)?|pieces?|kugel(?:n)?|scoops?)\b""",
@@ -136,13 +166,38 @@ object UserQuantityResolver {
             result.sourcePackageQuantity,
             result.sourcePackageUnit,
         )
+        val quantity = requested.quantity ?: result.quantity
+        val unit = requested.unit?.takeIf(String::isNotBlank) ?: result.unit
+        val sameAmount = (abs(result.quantity - quantity) < MATCH_TOLERANCE &&
+            QuantityUnits.normalize(result.unit) == QuantityUnits.normalize(unit)) ||
+            equivalentPackage(result.quantity, result.unit, quantity, unit)
+        val sourceUnitMatches = result.sourceUnit?.let(QuantityUnits::normalize) == QuantityUnits.normalize(unit)
+        val packageSize = if (QuantityUnits.normalize(unit) == "pack" && result.sourcePackageQuantity != null && result.sourcePackageUnit != null) {
+            runCatching { canonicalMeasure(result.sourcePackageQuantity, result.sourcePackageUnit) }.getOrNull()
+        } else null
+        val weight = requested.gramsEquivalent
+            ?: result.sourceUnitWeightGrams?.times(quantity)?.takeIf { sourceUnitMatches }
+            ?: packageSize?.quantity?.times(quantity)?.takeIf { packageSize.unit == "g" }
+            ?: result.gramsEquivalent.takeIf { sameAmount }
+        val volume = requested.resolvedVolumeMl
+            ?: result.sourceUnitVolumeMl?.times(quantity)?.takeIf { sourceUnitMatches }
+            ?: packageSize?.quantity?.times(quantity)?.takeIf { packageSize.unit == "ml" }
+            ?: result.resolvedVolumeMl.takeIf { sameAmount }
+        val source = resolution?.resolutionSource
+            ?: result.resolutionSource
+            ?: (if (result.isEstimate) "estimated serving" else result.sourceUrl ?: result.sourceName)
         return result.copy(
             quantity = requested.quantity ?: result.quantity,
             unit = requested.unit?.takeIf(String::isNotBlank) ?: result.unit,
-            gramsEquivalent = requested.gramsEquivalent ?: result.gramsEquivalent,
+            gramsEquivalent = weight,
+            resolvedVolumeMl = volume,
+            resolutionSource = source,
             servingValidation = null,
             requiresServingValidation = false,
-            quantityResolution = reconciledResolution,
+            quantityResolution = reconciledResolution?.copy(
+                resolvedWeightGrams = weight, resolvedVolumeMl = volume,
+                resolutionSource = source, isEstimated = result.isEstimate,
+            ),
         )
     }
 
@@ -151,8 +206,11 @@ object UserQuantityResolver {
     ): ParsedFoodItem = copy(
         quantity = resolution.canonicalQuantity,
         unit = resolution.canonicalUnit,
-        gramsEquivalent = resolution.canonicalQuantity.takeIf {
+        gramsEquivalent = resolution.resolvedWeightGrams ?: resolution.canonicalQuantity.takeIf {
             resolution.canonicalUnit == "g"
+        },
+        resolvedVolumeMl = resolution.resolvedVolumeMl ?: resolution.canonicalQuantity.takeIf {
+            resolution.canonicalUnit == "ml"
         },
         quantityResolution = resolution,
         assumptions = (assumptions + when (resolution.origin) {
@@ -206,12 +264,36 @@ object UserQuantityResolver {
             }
         }.sortedBy { it.range.first }
 
+        val containers = sizedContainerPattern.findAll(text)
+            .filter { match -> packageDetections.none { match.range.overlaps(it.range) } }
+            .mapNotNull { match ->
+                val quantity = countValue(match.groupValues[1])
+                val size = canonicalMeasure(match.groupValues[3].number(), match.groupValues[4])
+                val explicitUnit = match.groupValues[5].takeIf(String::isNotBlank)
+                // Without x or a container word this is two separate amounts, not a pack size.
+                if (explicitUnit == null && match.groupValues[2].isBlank()) return@mapNotNull null
+                val unit = explicitUnit?.let(QuantityUnits::normalize)
+                    ?: if (size.unit == "ml" && text.substring(match.range.last + 1).trim().startsWith("Red Bull", true)) "can" else "serving"
+                DetectedResolution(match.range, QuantityResolutionMetadata(
+                    origin = QuantityOrigin.USER_EXPLICIT,
+                    semantic = QuantitySemantic.DIRECT_AMOUNT,
+                    canonicalQuantity = quantity, canonicalUnit = unit,
+                    enteredQuantity = quantity, enteredUnit = unit,
+                    resolvedWeightGrams = (size.quantity * quantity).takeIf { size.unit == "g" },
+                    resolvedVolumeMl = (size.quantity * quantity).takeIf { size.unit == "ml" },
+                    resolutionSource = "user-stated container size",
+                ))
+            }.toList()
+
         val directDetections = directAmountPattern.findAll(text)
-            .filter { direct -> packageDetections.none { direct.range.overlaps(it.range) } }
+            .filter { direct -> (packageDetections + containers).none { direct.range.overlaps(it.range) } }
             .map { match ->
                 val enteredQuantity = match.groupValues[1].number()
                 val enteredUnit = match.groupValues[2]
-                val amount = canonicalMeasure(enteredQuantity, enteredUnit)
+                val measure = canonicalMeasure(enteredQuantity, enteredUnit)
+                val semanticUnit = QuantityUnits.normalize(enteredUnit)
+                val preserveUnit = semanticUnit in setOf("tbsp", "tsp")
+                val amount = if (preserveUnit) CanonicalMeasure(enteredQuantity, semanticUnit) else measure
                 DetectedResolution(
                     range = match.range,
                     metadata = QuantityResolutionMetadata(
@@ -221,12 +303,29 @@ object UserQuantityResolver {
                         canonicalUnit = amount.unit,
                         enteredQuantity = enteredQuantity,
                         enteredUnit = enteredUnit,
+                        resolvedWeightGrams = measure.quantity.takeIf { measure.unit == "g" },
+                        resolvedVolumeMl = measure.quantity.takeIf { measure.unit == "ml" },
+                        resolutionSource = "user quantity / unit conversion",
                         isApproximate = enteredUnit.normalizedUnit() in
                             setOf("loffel", "loeffel", "spoon", "spoons"),
                     ),
                 )
             }
-        return (packageDetections + directDetections).sortedBy { it.range.first }
+        val measures = packageDetections + containers + directDetections.toList()
+        val counts = countPattern.findAll(text)
+            .filter { match -> measures.none { match.range.overlaps(it.range) } }
+            .map { match ->
+                val quantity = countValue(match.groupValues[1])
+                requireFinitePositive(quantity, "quantity")
+                val unit = QuantityUnits.normalize(match.groupValues[2].ifBlank { "piece" })
+                DetectedResolution(match.range, QuantityResolutionMetadata(
+                    origin = QuantityOrigin.USER_EXPLICIT,
+                    semantic = QuantitySemantic.DIRECT_AMOUNT,
+                    canonicalQuantity = quantity, canonicalUnit = unit,
+                    enteredQuantity = quantity, enteredUnit = unit,
+                ))
+            }
+        return (measures + counts).sortedBy { it.range.first }
     }
 
     private fun resolveMenuQuantity(dish: MenuDish): QuantityResolutionMetadata? {

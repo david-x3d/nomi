@@ -773,26 +773,26 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
     ),
     // One failed item in a meal used to be reported with the same sentence as every other
     // cause. These name the food and say what would fix it.
-    "Nomi found nutrition for \"{0}\" but not what that amount weighs. Enter it in g or ml." to
+    "Nomi found nutrition for \"{0}\" but could not resolve that serving. Try again or add product details." to
         NomiTranslation(
             de = "Nomi hat Nährwerte für \"{0}\" gefunden, aber nicht das Gewicht dieser Menge. " +
-                "Gib sie in g oder ml an.",
+                "Versuch es erneut oder ergänze Produktdetails.",
             es = "Nomi ha encontrado la nutrición de \"{0}\", pero no cuánto pesa esa cantidad. " +
-                "Indícala en g o ml.",
+                "Inténtalo de nuevo o añade detalles del producto.",
             fr = "Nomi a trouvé les valeurs nutritionnelles de \"{0}\", mais pas le poids de " +
-                "cette quantité. Indique-la en g ou ml.",
+                "cette quantité. Réessaie ou ajoute des détails sur le produit.",
             it = "Nomi ha trovato i valori nutrizionali di \"{0}\", ma non quanto pesa quella " +
-                "quantità. Indicala in g o ml.",
+                "quantità. Riprova o aggiungi dettagli sul prodotto.",
             nl = "Nomi vond voedingswaarde voor \"{0}\", maar niet hoeveel die hoeveelheid " +
-                "weegt. Geef het op in g of ml.",
+                "weegt. Probeer opnieuw of voeg productdetails toe.",
             pt = "A Nomi encontrou valores nutricionais para \"{0}\", mas não quanto pesa essa " +
-                "quantidade. Indica-a em g ou ml.",
+                "quantidade. Tenta de novo ou acrescenta detalhes do produto.",
             sq = "Nomi gjeti vlerat ushqyese për \"{0}\", por jo sa peshon ajo sasi. " +
-                "Shkruaje në g ose ml.",
+                "Provo sërish ose shto hollësi për produktin.",
             sv = "Nomi hittade näringsvärden för \"{0}\", men inte vad den mängden väger. " +
-                "Ange den i g eller ml.",
+                "Försök igen eller lägg till produktdetaljer.",
             tr = "Nomi \"{0}\" için besin değerlerini buldu ama bu miktarın ağırlığını bulamadı. " +
-                "Miktarı g veya ml olarak gir.",
+                "Tekrar dene veya ürün ayrıntıları ekle.",
         ),
     "Nomi only found sources for a different product than \"{0}\". Check the name, or add the " +
         "brand." to NomiTranslation(
@@ -858,25 +858,25 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
                 "düzenle.",
         ),
     "The nutrition Nomi found for \"{0}\" is given for a serving it cannot convert to your " +
-        "amount. Try g or ml." to NomiTranslation(
+        "amount. Try again or add product details." to NomiTranslation(
         de = "Die Nährwerte, die Nomi für \"{0}\" gefunden hat, gelten für eine Portion, die " +
-            "sich nicht in deine Menge umrechnen lässt. Versuch g oder ml.",
+            "sich nicht in deine Menge umrechnen lässt. Versuch es erneut oder ergänze Produktdetails.",
         es = "La nutrición que Nomi ha encontrado para \"{0}\" corresponde a una ración que no " +
-            "puede convertir a tu cantidad. Prueba con g o ml.",
+            "puede convertir a tu cantidad. Inténtalo de nuevo o añade detalles del producto.",
         fr = "Les valeurs que Nomi a trouvées pour \"{0}\" portent sur une portion qu’il ne peut " +
-            "pas convertir en ta quantité. Essaie en g ou ml.",
+            "pas convertir en ta quantité. Réessaie ou ajoute des détails sur le produit.",
         it = "I valori che Nomi ha trovato per \"{0}\" si riferiscono a una porzione che non può " +
-            "convertire nella tua quantità. Prova con g o ml.",
+            "convertire nella tua quantità. Riprova o aggiungi dettagli sul prodotto.",
         nl = "De voedingswaarde die Nomi voor \"{0}\" vond, geldt voor een portie die niet naar " +
-            "jouw hoeveelheid om te rekenen is. Probeer g of ml.",
+            "jouw hoeveelheid om te rekenen is. Probeer opnieuw of voeg productdetails toe.",
         pt = "Os valores que a Nomi encontrou para \"{0}\" referem-se a uma dose que não " +
-            "consegue converter na tua quantidade. Experimenta g ou ml.",
+            "consegue converter na tua quantidade. Tenta de novo ou acrescenta detalhes do produto.",
         sq = "Vlerat që Nomi gjeti për \"{0}\" janë për një porcion që nuk mund të kthehet në " +
-            "sasinë tënde. Provo me g ose ml.",
+            "sasinë tënde. Provo sërish ose shto hollësi për produktin.",
         sv = "Näringsvärdena Nomi hittade för \"{0}\" gäller en portion som inte går att räkna " +
-            "om till din mängd. Testa g eller ml.",
+            "om till din mängd. Försök igen eller lägg till produktdetaljer.",
         tr = "Nomi’nin \"{0}\" için bulduğu besin değerleri, senin miktarına çevrilemeyen bir " +
-            "porsiyon için verilmiş. g ya da ml dene.",
+            "porsiyon için verilmiş. Tekrar dene veya ürün ayrıntıları ekle.",
     ),
     "Nomi couldn't read the nutrition answer for \"{0}\". Try again." to NomiTranslation(
         de = "Nomi konnte die Nährwertantwort für \"{0}\" nicht lesen. Versuch es erneut.",
