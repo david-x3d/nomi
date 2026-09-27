@@ -855,3 +855,58 @@ and is why the profile could only be seeded on the debug build in §12.
 
 There is no outstanding release work. The only things deliberately left undone are the ones §3.8
 and §4 list as out of scope, plus the two limitations named in §6.1 and §10.8.
+
+---
+
+## 15. One commit after the tag — a debug-only fix
+
+`main` is now **one commit ahead of the `v2.4.0` tag**. The published APK is unaffected; here is
+the proof, because "it's only debug" is exactly the kind of claim that should not be taken on
+trust.
+
+### What was wrong
+
+The forced update dialog **could not be dismissed**. `onDismiss` called
+`viewModel.dismissUpdate()`, which clears the ViewModel's `update` StateFlow — but the *forced*
+dialog is computed in composition from a build-time resource and never went through that flow. So
+tapping "Later" did nothing, and a debug build with the override on was stuck behind a dialog with
+no way out. Found while trying to screenshot the History screen, which sits behind it.
+
+### The fix
+
+`NomiRoot` now keeps `forcedUpdateDismissed` in composition state and routes both dialog actions
+through one `dismiss` lambda that clears it *and* the ViewModel. "Later" works.
+
+### Why the published release is unaffected
+
+`rememberForcedUpdateAvailability()` returns `null` in a release build, because
+`nomi_debug_force_update_dialog` is the compile-time constant `false` there (verified on the
+release APK in §13). With `forcedUpdate == null`, `takeUnless` is never consulted and the extra
+state is write-only. The dialog that a shipped APK can show is the real one, driven by
+`viewModel.update`, and its behaviour is unchanged.
+
+So the fix cannot alter a release build's behaviour, and re-releasing to ship it would change the
+artifact's SHA-256 for no user-visible gain. It is committed forward instead. If you would rather
+the tag and `main` match exactly, say so and the release can be redone — but the current published
+APK is already correct.
+
+### More screenshots
+
+`docs/screenshots/history.png` and `docs/screenshots/today-logged.png` were captured the same way,
+against a database seeded with three days of food. `history.png` is worth looking at, because it
+shows the §10 design decisions actually working:
+
+- **Sunday 27 (today)** shows `1016 / 2000 kcal · P 72 · C 116 · F 30` and offers **only
+  "Save meal"** — no copy chips, because copying today onto today would only duplicate the plate
+  (§10.5).
+- **Saturday 26** offers **"Copy Breakfast"** and "Copy Dinner" — one chip per meal actually eaten
+  that day, which is the whole point of resolving the `onCopyMeal` contract (§10.3). It has no
+  snacks, so it has no snacks chip.
+- The chips wrap onto two lines via `FlowRow` instead of running off the edge.
+
+### Seeding a database for screenshots
+
+The release build is not debuggable, so `run-as` only works on the debug build. Rows were inserted
+straight into `food_logs` with `sqlite3`; see §12 for the profile insert. The `food_logs` insert
+needs 24 columns and quoting is easy to get wrong — generate the SQL in Python rather than a shell
+function, because shell positional args past `$9` will silently corrupt it.

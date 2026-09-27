@@ -687,17 +687,28 @@ private fun NomiMain(
         viewModel.checkForUpdate()
     }
     // In a debug build the dialog can be forced on by a build-time resource, so it can be
-    // screenshotted without publishing a release first. `forcedUpdateAvailability` returns null
-    // in a release build, so the real check below is the only thing a shipped APK can show.
-    (rememberForcedUpdateAvailability() ?: updateAvailability as? UpdateAvailability.Available)
-        ?.let { available ->
+    // screenshotted without publishing a release first. `rememberForcedUpdateAvailability`
+    // returns null in a release build, so the real check below is the only thing a shipped APK
+    // can show.
+    //
+    // The forced value has to be dismissed through composition state, not through
+    // `viewModel.dismissUpdate()`: that clears the ViewModel's `update` flow, which the forced
+    // dialog never went through, so tapping "Later" would have done nothing and the debug build
+    // would be stuck behind a dialog that cannot be closed.
+    var forcedUpdateDismissed by rememberSaveable { mutableStateOf(false) }
+    val forcedUpdate = rememberForcedUpdateAvailability()?.takeUnless { forcedUpdateDismissed }
+    (forcedUpdate ?: updateAvailability as? UpdateAvailability.Available)?.let { available ->
+        val dismiss = {
+            forcedUpdateDismissed = true
+            viewModel.dismissUpdate()
+        }
         UpdateAvailableDialog(
             availability = available,
             onViewUpdate = {
-                viewModel.dismissUpdate()
+                dismiss()
                 context.openReleasePage(available.releaseUrl)
             },
-            onDismiss = viewModel::dismissUpdate,
+            onDismiss = dismiss,
         )
     }
 
