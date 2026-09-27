@@ -2114,9 +2114,8 @@ private fun NotesFloatingActionRow(
                                     calorieValue
                                 },
                             )
-                            // Health Connect activity wins when present; otherwise the same slot
-                            // carries Nomi's visibly approximate step estimate. Neither changes
-                            // the eaten figure beside it.
+                            // Always show Nomi's visibly approximate step estimate.
+                            // It does not change the eaten figure beside it.
                             burnedCalories?.let { burned ->
                                 CalorieFigure(
                                     modifier = Modifier.align(Alignment.CenterVertically),
@@ -2586,8 +2585,7 @@ private fun CalorieGoalCard(state: TodayUiState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             // Movement drawn against the same target as the plate above it, so the two waves can
-            // be compared. A step estimate fills the existing slot only when Health Connect has
-            // no total activity value; the two values are never added.
+            // be compared. Always use Nomi’s walking estimate, just like the activity pill.
             state.effectiveBurnedCaloriesKcal?.let { burned ->
                 GoalWave(
                     fraction = state.burnedFraction,
@@ -2607,16 +2605,7 @@ private fun CalorieGoalCard(state: TodayUiState) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (!state.burnedCaloriesAreEstimated) {
-                    Text(
-                        text = listOfNotNull(
-                            state.burnedCaloriesSourceLabel,
-                            state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
-                        ).joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+
             }
         }
     }

@@ -8,47 +8,31 @@ import org.junit.Test
 
 class TodayActivityCaloriesTest {
     @Test
-    fun `reported 191 kcal is labeled Health Connect despite a 40 kcal walking estimate`() {
+    fun `Nomi estimate always wins over Health Connect including screenshot values`() {
         val state = TodayUiState(
             activeCaloriesKcal = 191.0,
             estimatedStepCaloriesKcal = 40.0,
             steps = 2_060,
             calorieTarget = 1_500.0,
         )
-
-        assertEquals(191.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
-        assertEquals("Health Connect", state.burnedCaloriesSourceLabel)
-        assertEquals(191f / 1500f, state.burnedFraction, 0.00001f)
-        assertFalse(state.burnedCaloriesAreEstimated)
-        val fallback = state.copy(activeCaloriesKcal = null)
-        assertEquals(40.0, fallback.effectiveBurnedCaloriesKcal!!, 0.0)
-        assertEquals(null, fallback.burnedCaloriesSourceLabel)
-        assertTrue(fallback.burnedCaloriesAreEstimated)
+        assertEquals(40.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
+        assertEquals(40f / 1500f, state.burnedFraction, 0.00001f)
+        assertTrue(state.burnedCaloriesAreEstimated)
+        assertEquals(40.0, state.copy(activeCaloriesKcal = null).effectiveBurnedCaloriesKcal!!, 0.0)
     }
 
     @Test
-    fun `Health Connect total remains primary and step estimate is not added`() {
-        val state = TodayUiState(
-            activeCaloriesKcal = 420.0,
-            estimatedStepCaloriesKcal = 250.0,
-            calorieTarget = 2_000.0,
-        )
-
-        assertEquals(420.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
-        assertEquals(0.21f, state.burnedFraction, 0.0f)
+    fun `missing estimate never falls back to Health Connect`() {
+        val state = TodayUiState(activeCaloriesKcal = 191.0)
+        assertEquals(null, state.effectiveBurnedCaloriesKcal)
+        assertEquals(0f, state.burnedFraction, 0f)
         assertFalse(state.burnedCaloriesAreEstimated)
     }
 
     @Test
-    fun `step estimate fills only a missing Health Connect value`() {
-        val state = TodayUiState(
-            activeCaloriesKcal = null,
-            estimatedStepCaloriesKcal = 250.0,
-            calorieTarget = 2_000.0,
-        )
-
-        assertEquals(250.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
-        assertEquals(0.125f, state.burnedFraction, 0.0f)
+    fun `zero estimate remains zero even with Health Connect activity`() {
+        val state = TodayUiState(activeCaloriesKcal = 191.0, estimatedStepCaloriesKcal = 0.0)
+        assertEquals(0.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
         assertTrue(state.burnedCaloriesAreEstimated)
     }
 

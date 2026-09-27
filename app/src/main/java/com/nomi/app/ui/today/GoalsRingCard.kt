@@ -121,9 +121,7 @@ private fun CalorieRow(state: TodayUiState) {
  * states what was burned and leaves the arithmetic to the reader, the same way it states what
  * was eaten.
  *
- * Health Connect's complete activity remains the primary figure when available. Nomi's walking
- * estimate becomes the fallback only when Health Connect has no
- * active-calorie record; the two are never added together.
+ * Only Nomi's walking estimate is displayed, consistently with the activity pill.
  */
 @Composable
 private fun BurnedRow(state: TodayUiState) {
@@ -131,7 +129,6 @@ private fun BurnedRow(state: TodayUiState) {
     val burnedKcal = requireNotNull(state.effectiveBurnedCaloriesKcal)
     val supporting = listOfNotNull(
         state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
-        state.burnedCaloriesSourceLabel,
     ).joinToString(" · ")
     Column(
         modifier = Modifier.semantics(mergeDescendants = true) {},

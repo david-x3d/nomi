@@ -238,7 +238,7 @@ data class TodayUiState(
      *
      * Null means no total-activity record exists; it never silently becomes zero. Only today can
      * carry activity because Health Connect is read for the current day and a past date has no
-     * matching figure. [estimatedStepCaloriesKcal] may still provide a labeled walking fallback.
+     * matching figure. The UI displays only [estimatedStepCaloriesKcal].
      */
     val activeCaloriesKcal: Double? = null,
     /** Net walking energy Nomi estimates locally; never added to Health Connect activity. */
@@ -254,18 +254,13 @@ data class TodayUiState(
      * Burned calories measured against the same target as intake, without changing that target.
      *
      * Movement has no goal of its own here, so the second bar borrows the calorie target as its
-     * scale. Health Connect total activity wins; the step estimate is only a fallback and is
-     * never added to it.
+     * scale. Only Nomi’s walking estimate is displayed; Health Connect never replaces it.
      */
     val effectiveBurnedCaloriesKcal: Double?
-        get() = activeCaloriesKcal ?: estimatedStepCaloriesKcal
+        get() = estimatedStepCaloriesKcal
 
     val burnedCaloriesAreEstimated: Boolean
-        get() = activeCaloriesKcal == null && estimatedStepCaloriesKcal != null
-
-    /** Source of the displayed total; do not pair it with a competing walking estimate. */
-    val burnedCaloriesSourceLabel: String?
-        get() = if (activeCaloriesKcal != null) "Health Connect" else null
+        get() = estimatedStepCaloriesKcal != null
 
     val burnedFraction: Float
         get() {
