@@ -109,7 +109,10 @@ import com.nomi.app.ui.capture.MenuScanUiState
 import com.nomi.app.ui.capture.menuDishKey
 import com.nomi.app.ui.capture.mergeMenuDishes
 import com.nomi.app.ui.history.HistoryDay
+import com.nomi.app.ui.history.HistorySelection
+import com.nomi.app.ui.history.HistorySelectionAction
 import com.nomi.app.ui.history.HistoryUiState
+import com.nomi.app.ui.history.logIdsForSelection
 import com.nomi.app.ui.library.LibraryItem
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryUiState
@@ -124,6 +127,7 @@ import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
 import com.nomi.app.ui.progress.ProgressUiState
 import com.nomi.app.ui.progress.WeightPoint
+import com.nomi.app.ui.progress.loggingStreakDays
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.AiProviderSetting
 import com.nomi.app.ui.settings.HealthConnectUiState
@@ -394,7 +398,48 @@ class AppViewModel(
     ) { logs, query, date, plan -> mapHistory(logs, query, date, plan) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 
+    /**
+     * Which rows the user is currently picking out of History, if any.
+     *
+     * Held here rather than inside the screen so the picker survives a configuration change and
+     * so nothing about browsing History depends on it: null is the normal state, and no selection
+     * control is ever drawn for it.
+     */
+    private val _historySelection = MutableStateFlow<HistorySelection?>(null)
+    val historySelection: StateFlow<HistorySelection?> = _historySelection.asStateFlow()
+
+    fun startHistorySelection(day: HistoryDay, action: HistorySelectionAction) {
+        // The picker is scoped to one whole day, so a search filter left over from browsing would
+        // hide the very rows the user is being asked to choose between.
+        historyQuery.value = ""
+        _historySelection.value = HistorySelection(day = day.date, action = action)
+    }
+
+    fun cancelHistorySelection() {
+        _historySelection.value = null
+    }
+
+    /** One tap toggles, so picking a single food takes a single tap on its row. */
+    fun toggleHistorySelection(rowId: Long) {
+        _historySelection.update { active -> active?.toggled(rowId) }
+    }
+
     private val progressRange = MutableStateFlow(ProgressRange.THIRTY_DAYS)
+
+    /**
+     * Every date with something logged, from the whole log rather than the shown range.
+     *
+     * The streak is a fact about the user, not about the window the Progress page happens to be
+     * looking at, so it must not change when the range does. One row per logged day, which for a
+     * daily user is a few hundred short strings.
+     */
+    private val loggedDates: Flow<List<LocalDate>> =
+        repository.loggedDates(today.toString()).stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyList(),
+        )
+
     val progressState: StateFlow<ProgressUiState> = progressRange.flatMapLatest { range ->
         val totalDays = range.dayCount()
         val start = today.minusDays((totalDays - 1).toLong())
@@ -402,7 +447,8 @@ class AppViewModel(
             repository.weights(start.toString(), today.toString()),
             repository.nutritionHistory(start.toString(), today.toString()),
             repository.profile,
-        ) { weights, nutrition, profile ->
+            loggedDates,
+        ) { weights, nutrition, profile, dates ->
             ProgressUiState(
                 range = range,
                 weights = weights.map { WeightPoint(LocalDate.parse(it.localDate), it.weightKg) },
@@ -419,6 +465,8 @@ class AppViewModel(
                 targetWeightKg = profile?.targetWeightKg,
                 loggingDays = nutrition.size,
                 totalDays = totalDays,
+                rangeStart = start,
+                streakDays = loggingStreakDays(dates, today),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
@@ -1875,16 +1923,28 @@ class AppViewModel(
             }
         }
     }
-    fun saveHistoryDayAsMeal(day: HistoryDay, name: String) {
-        if (name.isBlank() || day.entries.isEmpty()) return
+    /**
+     * Saves the rows a History selection picked, and nothing else.
+     *
+     * [logIds] arrives already expanded from the visible rows, so a combined meal contributes all
+     * of its products and a half-picked day contributes half a meal. The saved items keep the
+     * portions that were logged, because [NomiRepository.saveLoggedMeal] snapshots the log rather
+     * than re-deriving anything.
+     */
+    fun saveHistoryRowsAsMeal(day: HistoryDay, logIds: List<Long>, name: String) {
+        if (name.isBlank() || logIds.isEmpty()) return
         viewModelScope.launch {
             runCatching {
+                val category = day.entries.firstOrNull { entry ->
+                    logIds.any { it in entry.logIdsForSelection() }
+                }?.mealCategory
                 repository.saveLoggedMeal(
                     SaveLoggedMealRequest(
                         name = name.trim(),
                         normalizedName = name.trim().lowercase(Locale.ROOT),
-                        logIds = day.entries.map { it.id },
-                        defaultMealCategory = day.entries.first().mealCategory.name,
+                        logIds = logIds,
+                        // A meal built from a lunch stays a lunch when it is logged again.
+                        defaultMealCategory = category?.name,
                         createdAtEpochMillis = System.currentTimeMillis(),
                     ),
                 )
@@ -1892,6 +1952,31 @@ class AppViewModel(
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi saved that meal.")))
             }.onFailure {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save that meal")))
+            }
+        }
+    }
+
+    /**
+     * Copies the rows a History selection picked onto today, and nothing else.
+     *
+     * The repository rewrites each picked row onto today, remapping the group ids so a copied meal
+     * cannot weld itself onto the original, and leaving every portion, macro and meal category
+     * exactly as it was logged.
+     */
+    fun addHistoryRowsToToday(day: HistoryDay, logIds: List<Long>) {
+        if (logIds.isEmpty()) return
+        viewModelScope.launch {
+            runCatching {
+                repository.copyLogsToDate(
+                    logIds = logIds,
+                    targetLocalDate = today.toString(),
+                    targetStartEpochMillis = System.currentTimeMillis(),
+                    targetZoneId = zoneId.id,
+                )
+            }.onSuccess {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi added those foods to today.")))
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't add those foods to today.")))
             }
         }
     }
@@ -1909,6 +1994,12 @@ class AppViewModel(
         }
     }
 
+    /**
+     * Copies a whole day onto today.
+     *
+     * The one-shot action, kept because a whole day is a real thing to eat again; picking out of it
+     * is what "Add items to today" is for.
+     */
     fun copyDayToToday(source: LocalDate) {
         viewModelScope.launch {
             runCatching {
@@ -1919,44 +2010,6 @@ class AppViewModel(
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't copy that day.")))
             }
         }
-    }
-
-    /**
-     * Copies a single meal - not a whole day - onto today.
-     *
-     * [NomiRepository.copyMeal] works per meal category, so the caller has to say which one; a
-     * day-wide "copy meal" would have had to guess, and guessing wrong would silently move the
-     * wrong food onto today's plate.
-     */
-    fun copyMealToToday(source: LocalDate, mealCategory: MealCategory) {
-        viewModelScope.launch {
-            runCatching {
-                repository.copyMeal(
-                    sourceLocalDate = source.toString(),
-                    sourceMealCategory = mealCategory.name,
-                    targetLocalDate = today.toString(),
-                    targetStartEpochMillis = System.currentTimeMillis(),
-                    targetZoneId = zoneId.id,
-                )
-            }.onSuccess {
-                // MealCategory.displayName is the English label, which would leak into every other
-                // language, so the catalogue wording is looked up here instead.
-                mutableEvents.emit(
-                    AppEvent.Message(
-                        inUserLanguage("Nomi copied that {0} to today.", localizedMealName(mealCategory)),
-                    ),
-                )
-            }.onFailure {
-                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't copy that meal.")))
-            }
-        }
-    }
-
-    private fun localizedMealName(mealCategory: MealCategory): String = when (mealCategory) {
-        MealCategory.BREAKFAST -> inUserLanguage("Breakfast")
-        MealCategory.LUNCH -> inUserLanguage("Lunch")
-        MealCategory.DINNER -> inUserLanguage("Dinner")
-        MealCategory.SNACKS -> inUserLanguage("Snacks")
     }
 
     fun addWeight(kilograms: Double, note: String?) {

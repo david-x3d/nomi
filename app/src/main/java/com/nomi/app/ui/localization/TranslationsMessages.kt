@@ -89,11 +89,13 @@ internal val messageTranslations: Map<String, NomiTranslation> = mapOf(
     "Nomi copied that day to today." to NomiTranslation(
         de = "Nomi hat diesen Tag auf heute kopiert.", es = "Nomi copió ese día a hoy.", fr = "Nomi a copié cette journée sur aujourd’hui.", it = "Nomi ha copiato quel giorno su oggi.", nl = "Nomi heeft die dag naar vandaag gekopieerd.", pt = "A Nomi copiou esse dia para hoje.", sq = "Nomi e kopjoi atë ditë te sot.", sv = "Nomi kopierade den dagen till i dag.", tr = "Nomi o günü bugüne kopyaladı.",
     ),
-    "Nomi couldn't copy that meal." to NomiTranslation(
-        de = "Nomi konnte diese Mahlzeit nicht kopieren.", es = "Nomi no pudo copiar esa comida.", fr = "Nomi n’a pas pu copier ce repas.", it = "Nomi non è riuscito a copiare quel pasto.", nl = "Nomi kon die maaltijd niet kopiëren.", pt = "A Nomi não conseguiu copiar essa refeição.", sq = "Nomi nuk mundi ta kopjonte atë vakt.", sv = "Nomi kunde inte kopiera måltiden.", tr = "Nomi bu öğünü kopyalayamadı.",
+    // The per-meal copy messages are gone with the per-meal copy chips. "Copy day" and the two
+    // selection actions are what a history day offers now.
+    "Nomi added those foods to today." to NomiTranslation(
+        de = "Nomi hat diese Lebensmittel zu heute hinzugefügt.", es = "Nomi ha añadido esos alimentos a hoy.", fr = "Nomi a ajouté ces aliments à aujourd’hui.", it = "Nomi ha aggiunto questi alimenti a oggi.", nl = "Nomi heeft die producten aan vandaag toegevoegd.", pt = "A Nomi adicionou esses alimentos a hoje.", sq = "Nomi i shtoi ato ushqimet te sot.", sv = "Nomi lade till de livsmedlen i dag.", tr = "Nomi bu besinleri bugüne ekledi.",
     ),
-    "Nomi copied that {0} to today." to NomiTranslation(
-        de = "Nomi hat {0} auf heute kopiert.", es = "Nomi copió {0} a hoy.", fr = "Nomi a copié {0} sur aujourd’hui.", it = "Nomi ha copiato {0} su oggi.", nl = "Nomi heeft {0} naar vandaag gekopieerd.", pt = "A Nomi copiou {0} para hoje.", sq = "Nomi e kopjoi {0} te sot.", sv = "Nomi kopierade {0} till i dag.", tr = "Nomi {0} öğünü bugüne kopyaladı.",
+    "Nomi couldn't add those foods to today." to NomiTranslation(
+        de = "Nomi konnte diese Lebensmittel nicht zu heute hinzufügen.", es = "Nomi no ha podido añadir esos alimentos a hoy.", fr = "Nomi n’a pas pu ajouter ces aliments à aujourd’hui.", it = "Nomi non è riuscito ad aggiungere questi alimenti a oggi.", nl = "Nomi kon die producten niet aan vandaag toevoegen.", pt = "A Nomi não conseguiu adicionar esses alimentos a hoje.", sq = "Nomi nuk mund t’i shtonte ato ushqimet te sot.", sv = "Nomi kunde inte lägga till de livsmedlen i dag.", tr = "Nomi bu besinleri bugüne ekleyemedi.",
     ),
     "Nomi saved that meal." to NomiTranslation(
         de = "Nomi hat diese Mahlzeit gespeichert.", es = "Nomi guardó esa comida.", fr = "Nomi a enregistré ce repas.", it = "Nomi ha salvato quel pasto.", nl = "Nomi heeft die maaltijd opgeslagen.", pt = "A Nomi guardou essa refeição.", sq = "Nomi e ruajti atë vakt.", sv = "Nomi sparade måltiden.", tr = "Nomi bu öğünü kaydetti.",

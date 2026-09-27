@@ -1,5 +1,6 @@
 package com.nomi.app.data.remote.openfoodfacts
 
+import com.nomi.app.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -22,7 +23,11 @@ class OpenFoodFactsClient(
         // Open Food Facts asks every client to identify itself, and throttles or refuses the
         // generic default agent. Not doing so showed up as products quietly "not found".
         install(UserAgent) {
-            agent = "Nomi/$CLIENT_VERSION (Android; https://github.com/david-x3d/nomi)"
+            // BuildConfig rather than a hand-kept constant: this used to be a literal copy of the
+            // app version, which every release had to remember to bump in a second place and which
+            // had already drifted once. The other three version references in the app all read it
+            // from here.
+            agent = "Nomi/${BuildConfig.VERSION_NAME} (Android; https://github.com/david-x3d/nomi)"
         }
         // Without a timeout a stalled lookup left the barcode flow spinning indefinitely.
         install(HttpTimeout) {
@@ -54,10 +59,6 @@ class OpenFoodFactsClient(
     }
 
     override fun close() = httpClient.close()
-
-    private companion object {
-        const val CLIENT_VERSION = "2.4.0"
-    }
 }
 
 data class BarcodeProduct(

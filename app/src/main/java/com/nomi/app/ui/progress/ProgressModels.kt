@@ -28,4 +28,21 @@ data class ProgressUiState(
     val targetWeightKg: Double? = null,
     val loggingDays: Int = 0,
     val totalDays: Int = 30,
-)
+    /**
+     * The first day of [range].
+     *
+     * Carried because the activity strip has to know where the window *starts*: the first logged
+     * day is not the same date, and a strip anchored on the wrong day misplaces every column.
+     */
+    val rangeStart: LocalDate = LocalDate.now(),
+    /**
+     * Consecutive logged days across the whole log, not across [range].
+     *
+     * Kept as the plain number the milestone maths reads, so the screen can show the real streak
+     * and the 30-day cycle it currently sits in at the same time.
+     */
+    val streakDays: Int = 0,
+) {
+    /** The milestone view of [streakDays]; derived so no caller can hold a stale copy. */
+    val milestone: StreakMilestone get() = streakMilestone(streakDays)
+}

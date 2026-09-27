@@ -576,15 +576,24 @@ private fun NomiMain(
 
             composable(Routes.HISTORY) {
                 val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+                val historySelection by viewModel.historySelection.collectAsStateWithLifecycle()
                 HistoryScreen(
                     state = historyState,
                     today = viewModel.currentDate,
+                    selection = historySelection,
                     onQueryChanged = viewModel::setHistoryQuery,
                     onDateSelected = viewModel::setHistoryDate,
                     onFoodClick = { id -> navController.navigate(Routes.food(id)) },
-                    onCopyMeal = { day, mealCategory -> viewModel.copyMealToToday(day.date, mealCategory) },
                     onCopyDay = { day -> viewModel.copyDayToToday(day.date) },
-                    onSaveMeal = { day, name -> viewModel.saveHistoryDayAsMeal(day, name) },
+                    onStartSelection = viewModel::startHistorySelection,
+                    onCancelSelection = viewModel::cancelHistorySelection,
+                    onToggleSelection = viewModel::toggleHistorySelection,
+                    onSaveMeal = { day, logIds, name ->
+                        viewModel.saveHistoryRowsAsMeal(day, logIds, name)
+                    },
+                    onAddToToday = { day, logIds ->
+                        viewModel.addHistoryRowsToToday(day, logIds)
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }

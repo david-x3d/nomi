@@ -1,5 +1,36 @@
 # Changelog
 
+## Nomi v2.5.0 — 2026-09-27
+
+### History
+
+- The per-meal "Copy Breakfast / Copy Lunch / Copy Dinner / Copy Snack" chips are gone. A four-meal day had five chips above its foods, which made the screen a control panel rather than a browser. Each day now carries one overflow menu instead, with the three actions that actually apply to a day.
+- **Save meal** no longer takes the whole day or nothing. Choosing it turns History's own rows into a picker: tap a food once to select it, tap again to deselect, and the bottom bar counts the selection and names what confirming will do (*Save 3 items*). The name is asked for afterwards, and only the picked foods are saved, at the portions that were logged.
+- **Add items to today** is new, and reuses that same picker rather than being a second one. Only the picked foods are copied to today, with their quantities and macros untouched.
+- A food logged as one combined entry is selected as a whole, so half a meal is never saved or copied as if it were a meal. Different meals are never merged into one.
+- Tapping a food while browsing still opens its nutrition detail. Tapping outside a selection is inert rather than navigating away from a half-made selection, and the system back gesture cancels a selection rather than leaving History looking mid-pick.
+- Entering a selection clears an active search filter, because the picker is scoped to one whole day and a filter could otherwise hide the rows being chosen between.
+
+### Progress
+
+- The streak is now the first thing on the page: the real total, large, with a ring of exactly 30 segments showing the day inside the current 30-day cycle. Both numbers are on screen together and neither contradicts the other.
+- **The 30-day milestone cycle is fixed.** Day 30 reads *30 / 30* instead of *0 / 30*, and day 31 starts the next cycle at *1 / 30*, so the indicator no longer sits stuck at the end of a cycle. Milestones continue 30 → 60 → 90 → 120 → 150. A streak of 67 reads *67 day streak*, *7 / 30*, *Next milestone 90 days*. This is presentation only; persisted streak data is not touched.
+- A milestone trail shows the last few rungs reached and the next ones ahead, in plain words rather than badges.
+- Logging consistency gained a 30-column activity strip showing *when* the range was logged, not only how much: one column per day at 30 days, thirty even slices at a year. A column is a fraction of the days it covers, and a range that does not divide evenly no longer leaves a dead final column.
+- Weight states how much it moved over the range (*1.4 kg down over this range*) in words, instead of leaving the reader to subtract the two figures.
+- Daily averages say what they are an average of, and the macros are a row of figures that can be compared rather than a list to read down.
+- Empty and no-data states are handled explicitly, spacing and card rhythm are tightened, and every new animation collapses to an instant change when the system animation scale is zero.
+
+### Fixes
+
+- The Open Food Facts user agent no longer keeps its own hard-coded copy of the app version, which had to be bumped in a second place on every release and had already drifted. It reads the real version like the app's other three version references do.
+
+### Verification
+
+- 678 unit tests across 76 classes, all passing.
+- The release build refuses to produce an unsigned APK when the signing key is missing, and the published certificate is byte-for-byte the identity v2.4.0 was signed with: `9344CD48425664BF8B010AC6CDAFF835FB4E9524591DDF7A00E98184867EE8BF`.
+- Checked on an emulator in light and dark themes: the History picker, both of its actions, the saved-meal name step, and the redesigned Progress page at 7-day and 30-day ranges.
+
 ## Nomi v2.4.0 — 2026-09-27
 
 ### History

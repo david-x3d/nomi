@@ -9,6 +9,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.nomi.app.data.repository.copiedDayLogs
 import com.nomi.app.data.repository.copiedMealLogs
+import com.nomi.app.data.repository.copiedSelectedLogs
 import com.nomi.app.data.local.entity.FoodLogEntity
 import com.nomi.app.data.local.model.DailyNutritionTotals
 import com.nomi.app.data.local.model.FoodLogWithCatalogReference
@@ -196,6 +197,24 @@ interface FoodLogDao {
         limit: Int = 100,
     ): Flow<List<FoodLogEntity>>
 
+    @Query("SELECT * FROM food_logs WHERE id IN (:ids) ORDER BY logged_at_epoch_millis, id")
+    suspend fun logsByIds(ids: List<Long>): List<FoodLogEntity>
+
+    /**
+     * Every date that has at least one entry, newest first.
+     *
+     * The streak is counted from this rather than from a range's own totals, so switching the
+     * Progress page between 7 days and a year does not change the streak it reports.
+     */
+    @Query(
+        """
+        SELECT DISTINCT local_date FROM food_logs
+        WHERE local_date <= :endLocalDate
+        ORDER BY local_date DESC
+        """,
+    )
+    fun observeLoggedDates(endLocalDate: String): Flow<List<String>>
+
     @Transaction
     suspend fun copyMeal(
         sourceLocalDate: String,
@@ -229,6 +248,34 @@ interface FoodLogDao {
         if (source.isEmpty()) return emptyList()
         return insertLogs(
             copiedDayLogs(
+                source = source,
+                targetLocalDate = targetLocalDate,
+                targetStartEpochMillis = targetStartEpochMillis,
+                targetZoneId = targetZoneId,
+            ),
+        )
+    }
+
+    /**
+     * Copies only the rows the user picked, keeping each picked meal group together.
+     *
+     * The rows are read back by id rather than by day, so a selection made in a filtered or
+     * partial view still copies exactly what was tapped. An empty selection is short-circuited
+     * here rather than in SQL: `id IN ()` is not valid on every SQLite build, and the answer for
+     * "nothing selected" is always "nothing copied".
+     */
+    @Transaction
+    suspend fun copyLogsToDate(
+        logIds: List<Long>,
+        targetLocalDate: String,
+        targetStartEpochMillis: Long,
+        targetZoneId: String,
+    ): List<Long> {
+        if (logIds.isEmpty()) return emptyList()
+        val source = logsByIds(logIds.distinct())
+        if (source.isEmpty()) return emptyList()
+        return insertLogs(
+            copiedSelectedLogs(
                 source = source,
                 targetLocalDate = targetLocalDate,
                 targetStartEpochMillis = targetStartEpochMillis,

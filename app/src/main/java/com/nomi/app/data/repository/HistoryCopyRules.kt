@@ -62,6 +62,7 @@ internal fun copiedDayLogs(
     targetStartEpochMillis: Long,
     targetZoneId: String,
     groupIds: Map<String, String> = emptyMap(),
+    inputMethod: String = COPIED_DAY_INPUT_METHOD,
 ): List<FoodLogEntity> {
     if (source.isEmpty()) return emptyList()
     val copiedGroupIds = LinkedHashMap(groupIds)
@@ -74,7 +75,7 @@ internal fun copiedDayLogs(
             localDate = targetLocalDate,
             loggedAtEpochMillis = targetStartEpochMillis + index,
             zoneId = targetZoneId,
-            inputMethod = COPIED_DAY_INPUT_METHOD,
+            inputMethod = inputMethod,
             createdAtEpochMillis = targetStartEpochMillis,
             updatedAtEpochMillis = targetStartEpochMillis,
         )
@@ -83,6 +84,38 @@ internal fun copiedDayLogs(
 
 internal const val COPIED_DAY_INPUT_METHOD = "copied_day"
 internal const val COPIED_MEAL_INPUT_METHOD = "copied_meal"
+internal const val COPIED_ITEMS_INPUT_METHOD = "copied_items"
+
+/**
+ * Copies exactly the rows the user picked out of a past day onto today.
+ *
+ * This is [copiedDayLogs] over a subset, deliberately: the group remap, the timestamp layout, the
+ * fresh ids and the untouched portions are the same rules a whole-day copy obeys, and a second
+ * implementation would be a second thing to keep correct. The only differences are that the rows
+ * are ordered by when they were eaten first - the query that reads them back does not promise an
+ * order, and the copied plate should read the way it was eaten - and that the rows are stamped as
+ * a pick rather than as a day copy.
+ *
+ * A meal group survives as long as the selection does: two picked products of one lunch are still
+ * two rows sharing one new group id, so Today shows the copied lunch as the one row it was. Nothing
+ * is merged across meals, because a breakfast and a dinner are two different days of the user's
+ * plate, not one.
+ */
+internal fun copiedSelectedLogs(
+    source: List<FoodLogEntity>,
+    targetLocalDate: String,
+    targetStartEpochMillis: Long,
+    targetZoneId: String,
+): List<FoodLogEntity> {
+    if (source.isEmpty()) return emptyList()
+    return copiedDayLogs(
+        source = source.sortedWith(compareBy<FoodLogEntity> { it.loggedAtEpochMillis }.thenBy { it.id }),
+        targetLocalDate = targetLocalDate,
+        targetStartEpochMillis = targetStartEpochMillis,
+        targetZoneId = targetZoneId,
+        inputMethod = COPIED_ITEMS_INPUT_METHOD,
+    )
+}
 
 /**
  * Builds the meal graph for [NomiRepository.saveLoggedMeal] from already-loaded logs.

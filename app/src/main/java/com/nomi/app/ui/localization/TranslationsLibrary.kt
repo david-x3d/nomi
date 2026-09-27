@@ -51,33 +51,120 @@ internal val libraryTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Auswählen", es = "Seleccionar", fr = "Sélectionner", it = "Seleziona",
         nl = "Selecteren", pt = "Selecionar", sq = "Zgjidh", sv = "Välj", tr = "Seç",
     ),
-    // The old day-wide "Copy meal" key is gone: copying works per meal category, so the chip is
-    // now "Copy {0}" and names the meal it will move.
-    "Copy {0}" to NomiTranslation(
-        de = "{0} kopieren", es = "Copiar {0}", fr = "Copier {0}",
-        it = "Copia {0}", nl = "{0} kopiëren", pt = "Copiar {0}",
-        sq = "Kopjo {0}", sv = "Kopiera {0}", tr = "{0} öğünü kopyala",
+    // A history day offers three actions, and they live in one overflow rather than as a row of
+    // chips: the per-meal "Copy {0}" chips are gone, since copying a whole day and picking items out
+    // of it cover the same ground without one chip per meal.
+    "Copy day" to NomiTranslation(
+        de = "Tag kopieren", es = "Copiar día", fr = "Copier la journée",
+        it = "Copia la giornata", nl = "Dag kopiëren", pt = "Copiar dia",
+        sq = "Kopjo ditën", sv = "Kopiera dag", tr = "Günü kopyala",
     ),
-    "Save day as a meal" to NomiTranslation(
-        de = "Tag als Mahlzeit speichern", es = "Guardar el día como comida",
-        fr = "Enregistrer la journée comme repas", it = "Salva la giornata come pasto",
-        nl = "Dag als maaltijd opslaan", pt = "Guardar o dia como refeição",
-        sq = "Ruaj ditën si vakt", sv = "Spara dagen som måltid", tr = "Günü öğün olarak kaydet",
+    "Add items to today" to NomiTranslation(
+        de = "Zu heute hinzufügen", es = "Añadir a hoy", fr = "Ajouter à aujourd’hui",
+        it = "Aggiungi a oggi", nl = "Aan vandaag toevoegen", pt = "Adicionar a hoje",
+        sq = "Shto te sotja", sv = "Lägg till i dag", tr = "Bugüne ekle",
+    ),
+    "Save meal" to NomiTranslation(
+        de = "Mahlzeit speichern", es = "Guardar comida", fr = "Enregistrer le repas",
+        it = "Salva il pasto", nl = "Maaltijd opslaan", pt = "Guardar refeição",
+        sq = "Ruaj vaktin", sv = "Spara måltid", tr = "Öğünü kaydet",
+    ),
+    "Save as a meal" to NomiTranslation(
+        de = "Als Mahlzeit speichern", es = "Guardar como comida", fr = "Enregistrer comme repas",
+        it = "Salva come pasto", nl = "Als maaltijd opslaan", pt = "Guardar como refeição",
+        sq = "Ruaj si vakt", sv = "Spara som måltid", tr = "Öğün olarak kaydet",
     ),
     "Meal name" to NomiTranslation(
         de = "Name der Mahlzeit", es = "Nombre de la comida", fr = "Nom du repas",
         it = "Nome del pasto", nl = "Naam van de maaltijd", pt = "Nome da refeição",
         sq = "Emri i vaktit", sv = "Måltidets namn", tr = "Öğün adı",
     ),
-    "Copy day" to NomiTranslation(
-        de = "Tag kopieren", es = "Copiar día", fr = "Copier la journée",
-        it = "Copia la giornata", nl = "Dag kopiëren", pt = "Copiar dia",
-        sq = "Kopjo ditën", sv = "Kopiera dag", tr = "Günü kopyala",
+    "{0} of this day's foods will be saved." to NomiTranslation(
+        de = "{0} Lebensmittel dieses Tages werden gespeichert.",
+        es = "Se guardarán {0} alimentos de este día.",
+        fr = "{0} aliments de cette journée seront enregistrés.",
+        it = "Verranno salvati {0} alimenti di questa giornata.",
+        nl = "{0} producten van deze dag worden opgeslagen.",
+        pt = "Serão guardados {0} alimentos deste dia.",
+        sq = "Do të ruhen {0} ushqime të këtij dite.",
+        sv = "{0} livsmedel från den här dagen sparas.",
+        tr = "Bu günün {0} besini kaydedilecek.",
     ),
-    "Save meal" to NomiTranslation(
-        de = "Mahlzeit speichern", es = "Guardar comida", fr = "Enregistrer le repas",
-        it = "Salva il pasto", nl = "Maaltijd opslaan", pt = "Guardar refeição",
-        sq = "Ruaj vaktin", sv = "Spara måltid", tr = "Öğünü kaydet",
+    "Actions for this day" to NomiTranslation(
+        de = "Aktionen für diesen Tag", es = "Acciones para este día",
+        fr = "Actions pour cette journée", it = "Azioni per questa giornata",
+        nl = "Acties voor deze dag", pt = "Ações para este dia",
+        sq = "Veprime për këtë ditë", sv = "Åtgärder för den här dagen",
+        tr = "Bu gün için eylemler",
+    ),
+    "Cancel selection" to NomiTranslation(
+        de = "Auswahl abbrechen", es = "Cancelar selección", fr = "Annuler la sélection",
+        it = "Annulla selezione", nl = "Selectie annuleren", pt = "Cancelar seleção",
+        sq = "Anulo përzgjedhjen", sv = "Avbryt markering", tr = "Seçimi iptal et",
+    ),
+    "Tap the foods you want to save." to NomiTranslation(
+        de = "Tippe auf die Lebensmittel, die du speichern willst.",
+        es = "Toca los alimentos que quieras guardar.",
+        fr = "Touchez les aliments à enregistrer.",
+        it = "Tocca gli alimenti da salvare.",
+        nl = "Tik op de producten die je wilt opslaan.",
+        pt = "Toca os alimentos que queres guardar.",
+        sq = "Prek ushqimet që dëshiron të ruash.",
+        sv = "Tryck på livsmedlen du vill spara.",
+        tr = "Kaydetmek istediğin besinlere dokun.",
+    ),
+    "Tap the foods you want to add to today." to NomiTranslation(
+        de = "Tippe auf die Lebensmittel, die du zu heute hinzufügen willst.",
+        es = "Toca los alimentos que quieras añadir a hoy.",
+        fr = "Touchez les aliments à ajouter à aujourd’hui.",
+        it = "Tocca gli alimenti da aggiungere a oggi.",
+        nl = "Tik op de producten die je aan vandaag wilt toevoegen.",
+        pt = "Toca os alimentos que queres adicionar a hoje.",
+        sq = "Prek ushqimet që dëshiron t’i shtosh te sotja.",
+        sv = "Tryck på livsmedlen du vill lägga till i dag.",
+        tr = "Bugüne eklemek istediğin besinlere dokun.",
+    ),
+    // Singular and plural are separate keys: Nomi's catalogue has no plural rule, and a button
+    // reading "Add 1 items to today" is worse than no button.
+    "Save {0} item" to NomiTranslation(
+        de = "{0} Element speichern", es = "Guardar {0} alimento", fr = "Enregistrer {0} aliment",
+        it = "Salva {0} alimento", nl = "{0} product opslaan", pt = "Guardar {0} alimento",
+        sq = "Ruaj {0} ushqim", sv = "Spara {0} livsmedel", tr = "{0} besin kaydet",
+    ),
+    "Save {0} items" to NomiTranslation(
+        de = "{0} Elemente speichern", es = "Guardar {0} alimentos",
+        fr = "Enregistrer {0} aliments", it = "Salva {0} alimenti",
+        nl = "{0} producten opslaan", pt = "Guardar {0} alimentos",
+        sq = "Ruaj {0} ushqime", sv = "Spara {0} livsmedel", tr = "{0} besin kaydet",
+    ),
+    "Add {0} item to today" to NomiTranslation(
+        de = "{0} Element zu heute hinzufügen", es = "Añadir {0} alimento a hoy",
+        fr = "Ajouter {0} aliment à aujourd’hui", it = "Aggiungi {0} alimenti a oggi",
+        nl = "{0} product aan vandaag toevoegen", pt = "Adicionar {0} alimento a hoje",
+        sq = "Shto {0} ushqim te sotja", sv = "Lägg till {0} livsmedel i dag",
+        tr = "{0} besini bugüne ekle",
+    ),
+    "Add {0} items to today" to NomiTranslation(
+        de = "{0} Elemente zu heute hinzufügen", es = "Añadir {0} alimentos a hoy",
+        fr = "Ajouter {0} aliments à aujourd’hui", it = "Aggiungi {0} alimenti a oggi",
+        nl = "{0} producten aan vandaag toevoegen", pt = "Adicionar {0} alimentos a hoje",
+        sq = "Shto {0} ushqime te sotja", sv = "Lägg till {0} livsmedel i dag",
+        tr = "{0} besini bugüne ekle",
+    ),
+    "Select foods" to NomiTranslation(
+        de = "Lebensmittel auswählen", es = "Elige alimentos", fr = "Choisir des aliments",
+        it = "Scegli gli alimenti", nl = "Kies producten", pt = "Escolhe alimentos",
+        sq = "Zgjidh ushqime", sv = "Välj livsmedel", tr = "Besin seç",
+    ),
+    "{0} selected" to NomiTranslation(
+        de = "{0} ausgewählt", es = "{0} seleccionados", fr = "{0} sélectionnés",
+        it = "{0} selezionati", nl = "{0} geselecteerd", pt = "{0} selecionados",
+        sq = "{0} të përzgjedhura", sv = "{0} valda", tr = "{0} seçildi",
+    ),
+    "Nothing selected" to NomiTranslation(
+        de = "Nichts ausgewählt", es = "Nada seleccionado", fr = "Rien de sélectionné",
+        it = "Nessuna selezione", nl = "Niets geselecteerd", pt = "Nada selecionado",
+        sq = "Asgjë e përzgjedhur", sv = "Inget valt", tr = "Hiçbiri seçilmedi",
     ),
     "No foods match “{0}”." to NomiTranslation(
         de = "Keine Lebensmittel passen zu „{0}“.",

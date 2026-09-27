@@ -294,6 +294,54 @@ class HistoryCopyRulesTest {
     }
 
     @Test
+    fun `only the picked logs become items of the saved meal`() {
+        val (meal, items) = savedMealFromLogs(
+            name = "Pick of the day",
+            normalizedName = "",
+            notes = null,
+            defaultMealCategory = null,
+            createdAtEpochMillis = 1L,
+            logs = listOf(
+                log(id = 1, at = 1_000L, name = "oats"),
+                log(id = 3, at = 3_000L, name = "apple"),
+            ),
+        )
+
+        // The repository reads exactly the ids the selection expanded to, so the food in between
+        // cannot end up in the saved meal.
+        assertEquals(listOf("oats", "apple"), items.map { it.displayNameSnapshot })
+        assertEquals(listOf(0, 1), items.map { it.sortOrder })
+        assertEquals("Pick of the day", meal.name)
+    }
+
+    @Test
+    fun `a saved meal keeps the exact portion of every picked food`() {
+        val (_, items) = savedMealFromLogs(
+            name = "Portions",
+            normalizedName = "",
+            notes = null,
+            defaultMealCategory = null,
+            createdAtEpochMillis = 1L,
+            logs = listOf(
+                log(id = 1, at = 1_000L, name = "oats").copy(
+                    amount = 60.0,
+                    grams = 60.0,
+                    nutritionSnapshot = NutritionValues(caloriesKcal = 230.0, proteinGrams = 8.0),
+                ),
+                log(id = 2, at = 2_000L, name = "berries").copy(
+                    amount = 80.0,
+                    grams = 80.0,
+                    nutritionSnapshot = NutritionValues(caloriesKcal = 40.0, proteinGrams = 0.6),
+                ),
+            ),
+        )
+
+        assertEquals(listOf(60.0, 80.0), items.map { it.amount })
+        assertEquals(listOf(230.0, 40.0), items.map { it.nutritionSnapshot.caloriesKcal })
+        assertEquals(listOf(8.0, 0.6), items.map { it.nutritionSnapshot.proteinGrams })
+    }
+
+    @Test
     fun `saving nothing is refused rather than creating an empty meal`() {
         // saveLoggedMeal returns early on a blank name, and the History screen is what stops that
         // from looking like a dead chip. Both halves are asserted here.
@@ -322,6 +370,154 @@ class HistoryCopyRulesTest {
         // which is what the search column would otherwise index.
         assertEquals("", normalizeMealName("   "))
         assertEquals("", normalizeMealName("\t\n "))
+    }
+
+    @Test
+    fun `only the picked rows are copied`() {
+        val copied = copiedSelectedLogs(
+            source = listOf(log(id = 1, at = 1L), log(id = 3, at = 3L)),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 10L,
+            targetZoneId = "UTC",
+        )
+
+        // The picker is what makes this a partial copy, and the list handed in is already only what
+        // was picked.
+        assertEquals(2, copied.size)
+        assertEquals(listOf("food 1", "food 3"), copied.map { it.displayNameSnapshot })
+    }
+
+    @Test
+    fun `a picked row keeps the portion and macros it was logged with`() {
+        val source = log(id = 1, at = 1L).copy(
+            displayNameSnapshot = "Greek yoghurt",
+            amount = 175.0,
+            unit = "g",
+            grams = 175.0,
+            resolvedVolumeMl = 160.0,
+            nutritionSnapshot = NutritionValues(
+                caloriesKcal = 210.0,
+                proteinGrams = 22.0,
+                carbohydrateGrams = 12.0,
+                fatGrams = 8.0,
+            ),
+            isEstimated = true,
+        )
+
+        val copied = copiedSelectedLogs(
+            source = listOf(source),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 1L,
+            targetZoneId = "UTC",
+        ).single()
+
+        // The reason this exists at all: copying a row must not re-derive or round anything. What
+        // was eaten is what is written down.
+        assertEquals(175.0, copied.amount, 0.0)
+        assertEquals("g", copied.unit)
+        assertEquals(175.0, copied.grams!!, 0.0)
+        assertEquals(160.0, copied.resolvedVolumeMl!!, 0.0)
+        assertEquals(210.0, copied.nutritionSnapshot.caloriesKcal, 0.0)
+        assertEquals(22.0, copied.nutritionSnapshot.proteinGrams, 0.0)
+        assertEquals(12.0, copied.nutritionSnapshot.carbohydrateGrams, 0.0)
+        assertEquals(8.0, copied.nutritionSnapshot.fatGrams, 0.0)
+        assertTrue(copied.isEstimated)
+    }
+
+    @Test
+    fun `a picked meal keeps its grouping`() {
+        val copied = copiedSelectedLogs(
+            source = listOf(
+                log(id = 1, at = 1L, group = "lunch-a", meal = "LUNCH"),
+                log(id = 2, at = 2L, group = "lunch-a", meal = "LUNCH"),
+                log(id = 3, at = 3L, group = "lunch-b", meal = "LUNCH"),
+            ),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 1L,
+            targetZoneId = "UTC",
+        )
+
+        val groups = copied.map { it.entryGroupId }
+        // Two products of one meal are still one meal on today's plate...
+        assertEquals(groups[0], groups[1])
+        // ...a different meal stays a different meal, and neither is welded onto the source group,
+        // which would make deleting the copy take the original with it.
+        assertNotEquals(groups[0], groups[2])
+        assertTrue(listOf("lunch-a", "lunch-b").none { it in groups })
+    }
+
+    @Test
+    fun `picked foods from different meals are not merged into one`() {
+        val copied = copiedSelectedLogs(
+            source = listOf(
+                log(id = 1, at = 1L, meal = "BREAKFAST"),
+                log(id = 2, at = 2L, meal = "DINNER"),
+            ),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 1L,
+            targetZoneId = "UTC",
+        )
+
+        // A breakfast and a dinner are two things that were eaten at different times; collapsing
+        // them into one group would invent a single meal that never happened.
+        assertNotEquals(copied[0].entryGroupId, copied[1].entryGroupId)
+        assertEquals(listOf("BREAKFAST", "DINNER"), copied.map { it.mealCategory })
+    }
+
+    @Test
+    fun `ungrouped picked rows never share a group id`() {
+        val copied = copiedSelectedLogs(
+            source = listOf(log(id = 1, at = 1L), log(id = 2, at = 2L)),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 1L,
+            targetZoneId = "UTC",
+        )
+
+        val groups = copied.map { it.entryGroupId }
+        assertEquals(2, groups.distinct().size)
+        assertTrue(groups.all { it != null })
+    }
+
+    @Test
+    fun `picked rows land on today in the order they were eaten`() {
+        val copied = copiedSelectedLogs(
+            // The query that reads them back promises no order, so the rule sorts.
+            source = listOf(
+                log(id = 3, at = 3_000L, name = "rice"),
+                log(id = 1, at = 1_000L, name = "chicken"),
+            ),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 50_000L,
+            targetZoneId = "UTC",
+        )
+
+        assertEquals(listOf("chicken", "rice"), copied.map { it.displayNameSnapshot })
+        assertEquals(listOf(50_000L, 50_001L), copied.map { it.loggedAtEpochMillis })
+    }
+
+    @Test
+    fun `picked rows are stamped as a pick, not as a day copy`() {
+        val copied = copiedSelectedLogs(
+            source = listOf(log(id = 1, at = 1L)),
+            targetLocalDate = "2026-09-27",
+            targetStartEpochMillis = 1L,
+            targetZoneId = "UTC",
+        )
+
+        assertEquals("copied_items", copied.single().inputMethod)
+        assertEquals(0L, copied.single().id)
+    }
+
+    @Test
+    fun `picking nothing copies nothing`() {
+        assertTrue(
+            copiedSelectedLogs(
+                source = emptyList(),
+                targetLocalDate = "2026-09-27",
+                targetStartEpochMillis = 1L,
+                targetZoneId = "UTC",
+            ).isEmpty(),
+        )
     }
 
     private fun log(

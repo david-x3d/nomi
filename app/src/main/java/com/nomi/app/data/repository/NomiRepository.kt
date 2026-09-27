@@ -32,6 +32,7 @@ import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
 import com.nomi.app.domain.usecase.canPersistForResearchReuse
 import com.nomi.app.domain.usecase.foodResearchExpiry
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -518,6 +519,38 @@ class NomiRepository(
             targetStartEpochMillis,
             targetZoneId,
         )
+    }
+
+    /**
+     * Copies the rows behind a History selection onto [targetLocalDate].
+     *
+     * The counterpart of [copyDay] for a partial pick, and the reason the selection is expanded to
+     * log ids before it gets here: the caller says which rows it wants, not which meal or day they
+     * happened to come from.
+     */
+    suspend fun copyLogsToDate(
+        logIds: List<Long>,
+        targetLocalDate: String,
+        targetStartEpochMillis: Long,
+        targetZoneId: String,
+    ): List<Long> {
+        require(logIds.isNotEmpty()) { "Select at least one food" }
+        validateLocalDate(targetLocalDate)
+        ZoneId.of(targetZoneId)
+        return logDao.copyLogsToDate(
+            logIds = logIds,
+            targetLocalDate = targetLocalDate,
+            targetStartEpochMillis = targetStartEpochMillis,
+            targetZoneId = targetZoneId,
+        )
+    }
+
+    /** Every date with at least one entry up to [endLocalDate], newest first. */
+    fun loggedDates(endLocalDate: String): Flow<List<LocalDate>> {
+        validateLocalDate(endLocalDate)
+        return logDao.observeLoggedDates(endLocalDate).map { dates ->
+            dates.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
+        }
     }
 
     suspend fun saveMeal(meal: SavedMealEntity, items: List<SavedMealItemEntity>): Long {
