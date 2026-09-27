@@ -17,6 +17,54 @@ internal val onboardingTranslations: Map<String, NomiTranslation> = mapOf(
     "About 2 minutes · You stay in control" to NomiTranslation(
         de = "Etwa 2 Minuten · Du behältst die Kontrolle", es = "Unos 2 minutos · Tú mantienes el control", fr = "Environ 2 minutes · Tu gardes le contrôle", it = "Circa 2 minuti · Mantieni il controllo", nl = "Ongeveer 2 minuten · Jij houdt de controle", pt = "Cerca de 2 minutos · Tu manténs o controlo", sq = "Rreth 2 minuta · Ti e ke kontrollin", sv = "Cirka 2 minuter · Du behåller kontrollen", tr = "Yaklaşık 2 dakika · Kontrol sende",
     ),
+    "Write a meal the way you'd say it." to NomiTranslation(
+        de = "Schreib eine Mahlzeit so, wie du sie sagen würdest.", es = "Escribe una comida como la dirías.", fr = "Écris un repas comme tu le dirais.", it = "Scrivi un pasto come lo diresti.", nl = "Schrijf een maaltijd zoals je hem zou zeggen.", pt = "Escreve uma refeição como falarias dela.", sq = "Shkruaj një vakt të ngrënies siç do ta thoshe.", sv = "Skriv en måltid som du skulle säga det.", tr = "Bir yemeği nasıl söylerdinse öyle yaz.",
+    ),
+    "80 g of blueberries with 200 g of Greek yoghurt" to NomiTranslation(
+        de = "80 g Blaubeeren mit 200 g griechischem Joghurt", es = "80 g de arándanos con 200 g de yogur griego", fr = "80 g de myrtilles avec 200 g de yaourt grec", it = "80 g di mirtilli con 200 g di yogurt greco", nl = "80 g bosbessen met 200 g Griekse yoghurt", pt = "80 g de mirtilos com 200 g de iogurte grego", sq = "80 g borvokë me 200 g jogurt greek", sv = "80 g blåbär med 200 g grekisk yoghurt", tr = "200 g Yunan yoğurduyla 80 g yaban mersini",
+    ),
+    "Nomi reads that as separate foods." to NomiTranslation(
+        de = "Nomi liest das als einzelne Lebensmittel.", es = "Nomi lo interpreta como alimentos separados.", fr = "Nomi y lit des aliments distincts.", it = "Nomi lo legge come alimenti separati.", nl = "Nomi leest dat als aparte voedingsmiddelen.", pt = "A Nomi lê isso como alimentos separados.", sq = "Nomi e lexon si si ushqrime të ndara.", sv = "Nomi läser det som separata livsmedel.", tr = "Nomi bunu ayrı yiyecekler olarak okur.",
+    ),
+    "Blueberries" to NomiTranslation(
+        de = "Blaubeeren", es = "Arándanos", fr = "Myrtilles", it = "Mirtilli", nl = "Bosbessen", pt = "Mirtilos", sq = "Borvokë", sv = "Blåbär", tr = "Yaban mersini",
+    ),
+    "Greek yoghurt, 2 % fat" to NomiTranslation(
+        de = "Griechischer Joghurt, 2 % Fett", es = "Yogur griego, 2 % de grasa", fr = "Yaourt grec, 2 % de matières grasses", it = "Yogurt greco, 2 % di grassi", nl = "Griekse yoghurt, 2 % vet", pt = "Iogurte grego, 2 % de gordura", sq = "Jogurt greek, 2 % yndyrë", sv = "Grekisk yoghurt, 2 % fett", tr = "Yunan yoğurdu, %2 yağ",
+    ),
+    "Every number shows where it came from." to NomiTranslation(
+        de = "Jede Zahl zeigt, woher sie kommt.", es = "Cada número muestra de dónde viene.", fr = "Chaque chiffre montre d'où il vient.", it = "Ogni numero mostra da dove viene.", nl = "Elk getal laat zien waar het vandaan komt.", pt = "Cada número mostra de onde veio.", sq = "Çdo numër tregon se prej nga vjen.", sv = "Varje siffra visar varifrån den kommer.", tr = "Her sayı nereden geldiğini gösterir.",
+    ),
+    "Total" to NomiTranslation(
+        de = "Gesamt", es = "Total", fr = "Total", it = "Totale", nl = "Totaal", pt = "Total", sq = "Totali", sv = "Totalt", tr = "Toplam",
+    ),
+    "2 cited sources · high confidence" to NomiTranslation(
+        de = "2 zitierte Quellen · hohe Sicherheit", es = "2 fuentes citadas · alta confianza", fr = "2 sources citées · confiance élevée", it = "2 fonti citate · alta attendibilità", nl = "2 geciteerde bronnen · hoge zekerheid", pt = "2 fontes citadas · alta confiança", sq = "2 burime të cituara · besim i lartë", sv = "2 källor · hög säkerhet", tr = "2 kaynak · yüksek güven",
+    ),
+    "Example" to NomiTranslation(
+        de = "Beispiel", es = "Ejemplo", fr = "Exemple", it = "Esempio", nl = "Voorbeeld", pt = "Exemplo", sq = "Shembull", sv = "Exempel", tr = "Örnek",
+    ),
+    "{0} kcal" to NomiTranslation(
+        de = "{0} kcal", es = "{0} kcal", fr = "{0} kcal", it = "{0} kcal", nl = "{0} kcal", pt = "{0} kcal", sq = "{0} kcal", sv = "{0} kcal", tr = "{0} kcal",
+    ),
+    "{0} g" to NomiTranslation(
+        de = "{0} g", es = "{0} g", fr = "{0} g", it = "{0} g", nl = "{0} g", pt = "{0} g", sq = "{0} g", sv = "{0} g", tr = "{0} g",
+    ),
+    "Example: a meal written in plain language, split into foods, with its calories and sources" to NomiTranslation(
+        de = "Beispiel: eine Mahlzeit in Alltagssprache notiert, in Lebensmittel aufgeteilt, mit Kalorien und Quellen", es = "Ejemplo: una comida escrita en lenguaje natural, dividida en alimentos, con sus calorías y fuentes", fr = "Exemple : un repas écrit en langage courant, décomposé en aliments, avec ses calories et ses sources", it = "Esempio: un pasto scritto in linguaggio semplice, suddiviso in alimenti, con calorie e fonti", nl = "Voorbeeld: een maaltijd in gewone taal genoteerd, opgesplitst in voedingsmiddelen, met calorieën en bronnen", pt = "Exemplo: uma refeição escrita em linguagem simples, separada em alimentos, com as suas calorias e fontes", sq = "Shembull: një vakt i shkruar në gjuhë të thjeshtë, i ndarë në ushqrime, me kaloritë dhe burimet e tij", sv = "Exempel: en måltid nedskriven i vardaglig språk, delad i livsmedel, med sina kalorier och källor", tr = "Örnek: sade bir dille yazılmış, yiyeceklere ayrılmış bir öğün, kalori ve kaynaklarıyla",
+    ),
+    "Or take a photo of your plate." to NomiTranslation(
+        de = "Oder fotografiere deinen Teller.", es = "O haz una foto de tu plato.", fr = "Ou prends une photo de ton assiette.", it = "Oppure scatta una foto del piatto.", nl = "Of maak een foto van je bord.", pt = "Ou tira uma fotografia do teu prato.", sq = "Ose fotografo tavolinën tënde.", sv = "Eller fotografera din tallrik.", tr = "Ya da tabaktan fotoğraf çek.",
+    ),
+    "Or scan a barcode." to NomiTranslation(
+        de = "Oder scanne einen Barcode.", es = "O escanea un código de barras.", fr = "Ou scanne un code-barres.", it = "Oppure scansiona un codice a barre.", nl = "Of scan een barcode.", pt = "Ou digitaliza um código de barras.", sq = "Ose skano barkod.", sv = "Eller skanna en streckkod.", tr = "Ya da barkod okut.",
+    ),
+    "Or read a nutrition label." to NomiTranslation(
+        de = "Oder lies ein Nährwertetikett.", es = "O lee una etiqueta nutricional.", fr = "Ou lis une étiquette nutritionnelle.", it = "Oppure leggi un'etichetta nutrizionale.", nl = "Of lees een voedingswaardelabel.", pt = "Ou lê um rótulo nutricional.", sq = "Ose lexo një etiketë ushqimore.", sv = "Eller läs en näringsvärdesetikett.", tr = "Ya da besin değeri etiketini oku.",
+    ),
+    "Nutrition label" to NomiTranslation(
+        de = "Nährwertetikett", es = "Etiqueta nutricional", fr = "Étiquette nutritionnelle", it = "Etichetta nutrizionale", nl = "Voedingswaardelabel", pt = "Rótulo nutricional", sq = "Etiketë ushqimore", sv = "Näringsvärdesetikett", tr = "Besin değeri etiketi",
+    ),
     "When were you born?" to NomiTranslation(
         de = "Wann bist du geboren?", es = "¿Cuándo naciste?", fr = "Quand es-tu né(e) ?", it = "Quando sei nato/a?", nl = "Wanneer ben je geboren?", pt = "Quando nasceste?", sq = "Kur ke lindur?", sv = "När föddes du?", tr = "Ne zaman doğdun?",
     ),

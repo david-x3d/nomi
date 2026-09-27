@@ -1,5 +1,23 @@
 # Changelog
 
+## Nomi v2.3.0 — 2026-09-27
+
+### Animated welcome
+
+- The welcome screen now demonstrates what Nomi does instead of describing it: a meal is written in plain language, taken apart into separate foods with real weights, totalled, and shown with the sources behind the numbers.
+- All quantities in the demo are actual gram weights, and the figures are typical values for the foods as described. The card carries an "Example" label so the demo cannot be read as a measurement the user took.
+- The three other ways in are named in turn — photo, barcode, nutrition label — while the food rows and total stay exactly where they are. The claim being made is that four different ways of describing a meal arrive at the same precise answer.
+- The sequence plays once, in about 3.6 seconds. Tapping the card lands it on its finished state immediately, and when the system animation scale is zero it never plays at all.
+- Nomi now reads the system animation scale. It previously ignored that setting everywhere, which matters most for the one sequence a user did not ask for.
+- The welcome screen's fox logo takes a neutral tone from the colour scheme rather than a hard-coded cream that only looked right in light mode.
+- New copy in all ten languages.
+
+### Verification
+
+- All 519 unit tests passed across 64 classes, with no failures, errors or skips.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- **The release APK is not published yet.** The signing key on the build machine is not the one that signed v2.2.1, so the built APK would not install over an existing Nomi. Publishing it would force every user to uninstall first and lose their food log, which is the one outcome the signing setup exists to prevent. The release waits on the original `debug.keystore`.
+
 ## Nomi v2.2.1 — 2026-09-26
 
 - Count-based quantities such as “1 Oreo”, “3 eggs” and “half a pizza” no longer require grams.

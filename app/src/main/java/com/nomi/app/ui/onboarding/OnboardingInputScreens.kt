@@ -124,14 +124,18 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
     ) {
         Surface(
             modifier = Modifier
-                .size(248.dp)
+                .size(124.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                 }
                 .semantics { heading() },
             shape = MaterialTheme.shapes.extraLarge,
-            color = androidx.compose.ui.graphics.Color(0xFFFFF8E8),
+            // Was a hard-coded cream, which read as a light-mode leftover the moment the app ran
+            // in dark or pitch black. Now it is a neutral tone from the scheme, so it follows the
+            // user's theme without tinting the fox - secondaryContainer put a mint cast behind an
+            // orange logo, which fought it.
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             Image(
                 painter = painterResource(R.drawable.nomi_logo),
@@ -142,13 +146,13 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
                     .graphicsLayer(scaleX = 1.55f, scaleY = 1.55f),
             )
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = nomiString("Nutrition that starts with you"),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             text = nomiString(
                 "Answer a few questions and we'll create a daily energy and macro plan you can adjust at any time.",
@@ -156,7 +160,9 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(44.dp))
+        Spacer(Modifier.height(22.dp))
+        NomiWelcomeStoryboard()
+        Spacer(Modifier.height(22.dp))
         Button(
             onClick = onContinue,
             shape = NomiShapes.Action,
