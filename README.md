@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v2.2.1](https://img.shields.io/badge/release-v2.2.1-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.2.1)
+[![Release v2.5.0](https://img.shields.io/badge/release-v2.5.0-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.5.0)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
@@ -55,7 +55,8 @@
 - ⚖️ Preserve explicit quantities and scale nutrition deterministically.
 - ✏️ Correct a logged amount with phrases such as “I ate 60 g less” without repeating online research.
 - ⭐ Reuse recent foods, favorites, and saved meals.
-- 📊 Track calories, macros, micronutrients, weight, goals, and progress.
+- 🕘 Reuse any past day: copy it whole, or pick the individual foods you want again to eat today or keep as a saved meal.
+- 📊 Track calories, macros, micronutrients, weight, goals, logging streak, and progress.
 - 🌍 Use the app in ten languages with metric and US customary quantities.
 - 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
 - 📤 Export a JSON diary of each day's foods, calories, protein and carbs, or a restoreable backup without API keys.
