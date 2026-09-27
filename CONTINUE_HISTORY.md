@@ -795,3 +795,63 @@ Note the hardened signing config works: the release APK is genuinely signed rath
 unsigned, which is the whole point of §7.3.
 
 Still outstanding: §7.6 (commit, push, tag, GitHub Release) and §7.7 (post-upload verification).
+
+---
+
+## 14. v2.4.0 — RELEASED
+
+https://github.com/david-x3d/nomi/releases/tag/v2.4.0
+
+```bash
+git push origin main          # f4be7fa..6b936c9
+git tag -a v2.4.0 -m "Nomi v2.4.0" && git push origin v2.4.0
+gh release create v2.4.0 Nomi-v2.4.0-release.apk --title "Nomi v2.4.0" --notes-file … --latest
+```
+
+One commit, `6b936c9`, carrying both the audit fixes and the History work.
+
+### Post-upload verification (§7.7) — all passed
+
+| Check | Result |
+|---|---|
+| Asset on the release | `Nomi-v2.4.0-release.apk`, 47,206,969 bytes |
+| Release flags | `draft: false`, `prerelease: false`, marked **Latest** |
+| Downloaded back with `gh release download` | **byte-for-byte identical** (`cmp` clean) |
+| SHA-256, local vs downloaded | `102df3b2f864c8c870b06b56a5d22d60684d23b3d6d7d976a3370035539d987d` — same |
+| Certificate on the **downloaded** copy | `9344cd48…67ee8bf` — matches published v2.3.0 |
+| Signature scheme | v2 (v1/v3/v3.1/v4 off) |
+| `dumpsys package` after install | `versionCode=118`, `versionName=2.4.0` |
+| The published APK installs | `Success` on `emulator-5554` |
+
+### The update checker verified against the live API
+
+The one part of the dialog that cannot be screenshotted is its summary, because it comes from
+GitHub. So the real endpoint was checked directly:
+
+```
+GET https://api.github.com/repos/david-x3d/nomi/releases/latest
+  tag_name  = "v2.4.0"          html_url = "https://github.com/…/tag/v2.4.0"
+  draft     = false             prerelease = false        body = present
+```
+
+Every field `@SerialName` in `GitHubRelease` is present in the live response, `html_url` is
+`https://`, and the comparison of installed `2.4.0` against latest `2.4.0` yields **UpToDate**, so
+no dialog — which is the correct behaviour for a user already on this build. Running the real
+release body through `UpdateCheck.summarize`'s rules yields 221 characters of clean text with the
+ellipsis truncation working, so the dialog's scroll area has realistic content to show.
+
+Note `run-as` does **not** work on the release build (`package not debuggable`), which is correct
+and is why the profile could only be seeded on the debug build in §12.
+
+### Everything in §7 is now closed
+
+1. Test suite green — **616 tests, 72 classes, 0 failures**
+2. Update-dialog screenshot — **captured, both themes, committed**
+3. Signing hardened — **a missing key fails the build**
+4. Version bumped — **118 / 2.4.0**
+5. `lintVitalRelease` + `assembleRelease` + `apksigner` — **all passed**
+6. Committed, pushed, tagged, released — **done**
+7. Post-upload verification — **done**
+
+There is no outstanding release work. The only things deliberately left undone are the ones §3.8
+and §4 list as out of scope, plus the two limitations named in §6.1 and §10.8.
