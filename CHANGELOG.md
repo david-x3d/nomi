@@ -16,7 +16,10 @@
 
 - All 519 unit tests passed across 64 classes, with no failures, errors or skips.
 - Release compilation, lint-vital analysis, signing and APK assembly passed.
-- **The release APK is not published yet.** The signing key on the build machine is not the one that signed v2.2.1, so the built APK would not install over an existing Nomi. Publishing it would force every user to uninstall first and lose their food log, which is the one outcome the signing setup exists to prevent. The release waits on the original `debug.keystore`.
+- The APK signature matches the previous stable release (v2.2.1): certificate SHA-256 `9344cd48425664bf8b010ac6cdaff835fb4e9524591ddf7a00e98184867ee8bf`, verified against the published v2.2.1 artifact. This installs over an existing Nomi without losing the food log.
+- Signed with APK Signature Scheme v2, and packaged for `arm64-v8a`, `armeabi-v7a` and `x86_64`.
+
+SHA-256: `0B5D15438A87BE657A63637C8D5DDE4C229B54D0A392D2C1B10E930D02540A34`
 
 ## Nomi v2.2.1 — 2026-09-26
 
