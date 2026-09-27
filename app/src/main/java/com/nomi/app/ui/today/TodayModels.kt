@@ -263,6 +263,10 @@ data class TodayUiState(
     val burnedCaloriesAreEstimated: Boolean
         get() = activeCaloriesKcal == null && estimatedStepCaloriesKcal != null
 
+    /** Source of the displayed total; do not pair it with a competing walking estimate. */
+    val burnedCaloriesSourceLabel: String?
+        get() = if (activeCaloriesKcal != null) "Health Connect" else null
+
     val burnedFraction: Float
         get() {
             val burned = effectiveBurnedCaloriesKcal ?: return 0f

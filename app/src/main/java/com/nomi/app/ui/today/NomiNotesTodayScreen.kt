@@ -2608,19 +2608,14 @@ private fun CalorieGoalCard(state: TodayUiState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (!state.burnedCaloriesAreEstimated) {
-                    state.estimatedStepCaloriesKcal?.let { estimate ->
-                        Text(
-                            text = listOfNotNull(
-                                "${estimatedStepCaloriesText(estimate, locale)} " +
-                                    nomiString("from steps"),
-                                state.steps?.let {
-                                    nomiFormat("{0} steps", it.formatted(locale))
-                                },
-                            ).joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = listOfNotNull(
+                            state.burnedCaloriesSourceLabel,
+                            state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
+                        ).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

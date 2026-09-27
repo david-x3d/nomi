@@ -122,19 +122,16 @@ private fun CalorieRow(state: TodayUiState) {
  * was eaten.
  *
  * Health Connect's complete activity remains the primary figure when available. Nomi's walking
- * estimate is shown alongside the steps and becomes the fallback only when Health Connect has no
+ * estimate becomes the fallback only when Health Connect has no
  * active-calorie record; the two are never added together.
  */
 @Composable
 private fun BurnedRow(state: TodayUiState) {
     val locale = nomiLocale()
     val burnedKcal = requireNotNull(state.effectiveBurnedCaloriesKcal)
-    val stepEstimate = state.estimatedStepCaloriesKcal
     val supporting = listOfNotNull(
         state.steps?.let { nomiFormat("{0} steps", it.formatted(locale)) },
-        stepEstimate?.takeIf { !state.burnedCaloriesAreEstimated }?.let {
-            "${estimatedStepCaloriesText(it, locale)} ${nomiString("from steps")}"
-        },
+        state.burnedCaloriesSourceLabel,
     ).joinToString(" · ")
     Column(
         modifier = Modifier.semantics(mergeDescendants = true) {},
@@ -145,7 +142,10 @@ private fun BurnedRow(state: TodayUiState) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Bottom,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier.weight(1f).padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 Text(
                     text = nomiString(
                         if (state.burnedCaloriesAreEstimated) "Estimated from steps" else "Burned",

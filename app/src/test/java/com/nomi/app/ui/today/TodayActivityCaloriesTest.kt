@@ -8,6 +8,25 @@ import org.junit.Test
 
 class TodayActivityCaloriesTest {
     @Test
+    fun `reported 191 kcal is labeled Health Connect despite a 40 kcal walking estimate`() {
+        val state = TodayUiState(
+            activeCaloriesKcal = 191.0,
+            estimatedStepCaloriesKcal = 40.0,
+            steps = 2_060,
+            calorieTarget = 1_500.0,
+        )
+
+        assertEquals(191.0, state.effectiveBurnedCaloriesKcal!!, 0.0)
+        assertEquals("Health Connect", state.burnedCaloriesSourceLabel)
+        assertEquals(191f / 1500f, state.burnedFraction, 0.00001f)
+        assertFalse(state.burnedCaloriesAreEstimated)
+        val fallback = state.copy(activeCaloriesKcal = null)
+        assertEquals(40.0, fallback.effectiveBurnedCaloriesKcal!!, 0.0)
+        assertEquals(null, fallback.burnedCaloriesSourceLabel)
+        assertTrue(fallback.burnedCaloriesAreEstimated)
+    }
+
+    @Test
     fun `Health Connect total remains primary and step estimate is not added`() {
         val state = TodayUiState(
             activeCaloriesKcal = 420.0,
