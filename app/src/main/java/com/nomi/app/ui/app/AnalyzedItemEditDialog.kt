@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
+import com.nomi.app.ai.validation.ServingNutritionNormalizer
+import com.nomi.app.domain.DecimalInput
 import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
@@ -33,7 +35,7 @@ fun AnalyzedItemEditDialog(
     var protein by remember(item) { mutableStateOf(item.proteinGrams.toString()) }
     var carbs by remember(item) { mutableStateOf(item.carbohydrateGrams.toString()) }
     var fat by remember(item) { mutableStateOf(item.fatGrams.toString()) }
-    val parsed = listOf(quantity, calories, protein, carbs, fat).map { it.replace(',', '.').toDoubleOrNull() }
+    val parsed = listOf(quantity, calories, protein, carbs, fat).map { DecimalInput.parseOrNull(it) }
     val valid = unit.isNotBlank() && parsed.all { it != null && it >= 0.0 } && (parsed.firstOrNull() ?: 0.0) > 0.0
 
     NomiDialog(
@@ -43,17 +45,25 @@ fun AnalyzedItemEditDialog(
         subtitle = nomiString("Values are saved as an immutable snapshot for this log entry."),
         confirmLabel = nomiString("Apply"),
         onConfirm = {
+            // Goes through the normalizer so a researched item keeps a serving basis that still
+            // describes these numbers. Writing them straight onto the item left the old basis
+            // attached, which made validateBeforeSave reject the whole meal on save.
             onSave(
-                item.copy(
-                    quantity = parsed[0]!!,
-                    unit = unit.trim(),
+                ServingNutritionNormalizer.applyUserNutrientCorrection(
+                    item = item,
                     calories = parsed[1]!!,
                     proteinGrams = parsed[2]!!,
                     carbohydrateGrams = parsed[3]!!,
                     fatGrams = parsed[4]!!,
-                    isEstimate = true,
-                    assumptions = item.assumptions + "Adjusted before saving",
-                ),
+                ).let { corrected ->
+                    // The amount and unit fields are the portion, and a nutrient correction does
+                    // not restate them; keep whatever the preview already showed.
+                    if (parsed[0]!! == item.quantity && unit.trim() == item.unit) {
+                        corrected
+                    } else {
+                        corrected.copy(quantity = parsed[0]!!, unit = unit.trim())
+                    }
+                },
             )
             onDismiss()
         },

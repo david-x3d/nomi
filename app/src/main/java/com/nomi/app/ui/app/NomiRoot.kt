@@ -1,7 +1,10 @@
 package com.nomi.app.ui.app
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -43,6 +46,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +72,7 @@ import androidx.navigation.navArgument
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.data.backup.BackupInspection
 import com.nomi.app.data.preferences.AppPreferences
+import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.enabledMicronutrients
@@ -81,7 +86,11 @@ import com.nomi.app.ui.capture.MenuScanScreen
 import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.R
+import com.nomi.app.ui.update.UpdateAvailableDialog
+import com.nomi.app.update.UpdateAvailability
 import com.nomi.app.ui.feedback.rememberNomiHaptics
+import com.nomi.app.ui.history.HistoryScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.localization.NomiLanguage
@@ -279,6 +288,7 @@ private fun NomiMain(
                     onPreviousDay = viewModel::previousDay,
                     onNextDay = viewModel::nextDay,
                     onToday = viewModel::selectToday,
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onFoodClick = { navController.navigate(Routes.food(it)) },
                     onDeleteFood = viewModel::deleteFoodLogForUndo,
                     onDeleteFoodImmediately = viewModel::deleteFoodLog,
@@ -564,17 +574,32 @@ private fun NomiMain(
                 )
             }
 
+            composable(Routes.HISTORY) {
+                val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+                HistoryScreen(
+                    state = historyState,
+                    today = viewModel.currentDate,
+                    onQueryChanged = viewModel::setHistoryQuery,
+                    onDateSelected = viewModel::setHistoryDate,
+                    onFoodClick = { id -> navController.navigate(Routes.food(id)) },
+                    onCopyMeal = { day, mealCategory -> viewModel.copyMealToToday(day.date, mealCategory) },
+                    onCopyDay = { day -> viewModel.copyDayToToday(day.date) },
+                    onSaveMeal = { day, name -> viewModel.saveHistoryDayAsMeal(day, name) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             composable(
                 route = Routes.FOOD,
                 arguments = listOf(navArgument("id") { type = NavType.LongType }),
             ) { entry ->
-                val todayState by viewModel.todayState.collectAsStateWithLifecycle()
-                val historyState by viewModel.historyState.collectAsStateWithLifecycle()
                 val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-                val id = entry.arguments?.getLong("id")
-                val food = (todayState.entries + historyState.visibleDays.flatMap { it.entries })
-                    .flatMap { entry -> listOf(entry) + entry.groupItems }
-                    .firstOrNull { it.id == id }
+                // Resolved straight from the database by id. The previous lookup scanned the
+                // selected day's entries plus a 30-day history window, so opening a food older
+                // than 30 days - which the Today day-pager lets a user reach - showed
+                // "This entry is no longer available."
+                val food by viewModel.foodDetail(entry.arguments?.getLong("id") ?: 0L)
+                    .collectAsStateWithLifecycle(initialValue = null)
                 NomiFoodDetailScreen(
                     entry = food,
                     enabledMicronutrients = preferences.micronutrients.enabledMicronutrients(),
@@ -653,6 +678,29 @@ private fun NomiMain(
         )
     }
 
+    // The update check starts after the first frame has been produced, so the dialog can never be
+    // part of what the user waits for at launch. The ViewModel makes the check itself
+    // idempotent, so a recomposition or a rotation does not repeat the request.
+    val updateAvailability by viewModel.update.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        viewModel.checkForUpdate()
+    }
+    // In a debug build the dialog can be forced on by a build-time resource, so it can be
+    // screenshotted without publishing a release first. `forcedUpdateAvailability` returns null
+    // in a release build, so the real check below is the only thing a shipped APK can show.
+    (rememberForcedUpdateAvailability() ?: updateAvailability as? UpdateAvailability.Available)
+        ?.let { available ->
+        UpdateAvailableDialog(
+            availability = available,
+            onViewUpdate = {
+                viewModel.dismissUpdate()
+                context.openReleasePage(available.releaseUrl)
+            },
+            onDismiss = viewModel::dismissUpdate,
+        )
+    }
+
     loggedAmountEditState?.let { state ->
         LoggedAmountEditDialog(
             state = state,
@@ -728,7 +776,9 @@ private fun NomiMain(
 
 
     if (showWeightDialog) {
+        val preferences by viewModel.preferences.collectAsStateWithLifecycle()
         WeightEntryDialog(
+            metric = preferences.weightUnit == WeightUnitPreference.KILOGRAMS,
             onDismiss = { showWeightDialog = false },
             onSave = viewModel::addWeight,
         )
@@ -766,6 +816,21 @@ private fun NomiMain(
             BackupSummaryLine(nomiString("Weights"), summary.weightEntryCount)
             BackupSummaryLine(nomiString("Plans"), summary.nutritionPlanCount)
         }
+    }
+}
+
+/**
+ * Opens the exact release page in the user's browser.
+ *
+ * The repository homepage is deliberately never substituted: a user who tapped "View update"
+ * wants the release, not a page they then have to navigate. `runCatching` because a device with
+ * no browser at all should do nothing rather than crash.
+ */
+private fun Context.openReleasePage(url: String) {
+    runCatching {
+        startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 
@@ -822,6 +887,7 @@ private fun MainNavigationSuite(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
+    onOpenHistory: () -> Unit,
     onFoodClick: (Long) -> Unit,
     onDeleteFood: (Long) -> Unit,
     onDeleteFoodImmediately: (Long) -> Unit,
@@ -964,6 +1030,7 @@ private fun MainNavigationSuite(
                     onPreviousDay = onPreviousDay,
                     onNextDay = onNextDay,
                     onToday = onToday,
+                    onOpenHistory = onOpenHistory,
                     onFoodClick = onFoodClick,
                     onDeleteFood = onDeleteFood,
                     onDeleteFoodImmediately = onDeleteFoodImmediately,
@@ -992,8 +1059,10 @@ private fun MainNavigationSuite(
             }
                     MainDestination.PROGRESS -> {
                 val progressState by viewModel.progressState.collectAsStateWithLifecycle()
+                val preferences by viewModel.preferences.collectAsStateWithLifecycle()
                 ProgressScreen(
                     state = progressState,
+                    metric = preferences.weightUnit == WeightUnitPreference.KILOGRAMS,
                     onRangeChanged = { haptics.toggled(); onProgressRange(it) },
                     onAddWeight = { haptics.selected(); onAddWeight() },
                 )
@@ -1031,6 +1100,32 @@ private fun MainNavigationSuite(
     }
 }
 
+/**
+ * The update dialog a **debug** build has been told to force, or `null` in a release.
+ *
+ * The switch is a build-time resource rather than a flag, an intent extra or a preference, so
+ * there is nothing in a shipped APK to flip: `nomi_debug_force_update_dialog` is a constant
+ * `false` in `src/main/res/values`, and only the `debug` source set overrides it. That is why
+ * this lives in the composition rather than in [com.nomi.app.ui.app.AppViewModel] - the ViewModel
+ * deliberately holds no `Context`, and giving it one for a debug affordance would be a bad trade.
+ */
+@Composable
+private fun rememberForcedUpdateAvailability(): UpdateAvailability.Available? {
+    val context = LocalContext.current
+    return remember(context) {
+        if (!context.resources.getBoolean(R.bool.nomi_debug_force_update_dialog)) return@remember null
+        val version = context.getString(R.string.nomi_debug_forced_update_version)
+            .takeIf(String::isNotBlank) ?: return@remember null
+        UpdateAvailability.Available(
+            version = version,
+            releaseUrl = "https://github.com/david-x3d/nomi/releases/latest",
+            summary = "This text stands in for the release notes, which is the one part of the " +
+                "dialog that cannot be faked - it comes from whatever GitHub returns. The dialog " +
+                "itself, this summary's scroll area, and the two buttons are all real.",
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun LoadingPage() = Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1062,6 +1157,7 @@ private object Routes {
     const val LABEL = "label"
     const val BARCODE = "barcode"
     const val LIBRARY = "library"
+    const val HISTORY = "history"
     const val FOOD = "food/{id}"
     const val PROFILE = "profile"
     const val PLAN = "plan"

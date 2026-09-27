@@ -14,6 +14,8 @@ import com.nomi.app.data.local.entity.SavedMealItemEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
 import com.nomi.app.data.preferences.AppPreferences
+import com.nomi.app.data.preferences.MicronutrientPreferences
+import com.nomi.app.data.preferences.MicronutrientSetting
 import com.nomi.app.data.preferences.ProviderSelection
 
 internal fun AppPreferences.toBackup(): BackupPreferencesV1 = BackupPreferencesV1(
@@ -29,7 +31,31 @@ internal fun AppPreferences.toBackup(): BackupPreferencesV1 = BackupPreferencesV
     reminders = reminders,
     onboardingCompleted = onboardingCompleted,
     adjustTargetFromActivity = adjustTargetFromActivity,
+    micronutrients = BackupMicronutrientsV1(
+        fiberGrams = micronutrients.fiber.dailyTarget,
+        fiberEnabled = micronutrients.fiber.enabled,
+        sugarGrams = micronutrients.sugar.dailyTarget,
+        sugarEnabled = micronutrients.sugar.enabled,
+        saturatedFatGrams = micronutrients.saturatedFat.dailyTarget,
+        saturatedFatEnabled = micronutrients.saturatedFat.enabled,
+        sodiumMilligrams = micronutrients.sodium.dailyTarget,
+        sodiumEnabled = micronutrients.sodium.enabled,
+    ),
+    calorieEstimateBias = calorieEstimateBias,
+    goalsCardStyle = goalsCardStyle,
+    smartFallbackProvider = smartFallbackProvider.toBackup(),
 )
+
+internal fun BackupMicronutrientsV1.toPreferences(): MicronutrientPreferences =
+    MicronutrientPreferences(
+        fiber = MicronutrientSetting(enabled = fiberEnabled, dailyTarget = fiberGrams),
+        sugar = MicronutrientSetting(enabled = sugarEnabled, dailyTarget = sugarGrams),
+        saturatedFat = MicronutrientSetting(
+            enabled = saturatedFatEnabled,
+            dailyTarget = saturatedFatGrams,
+        ),
+        sodium = MicronutrientSetting(enabled = sodiumEnabled, dailyTarget = sodiumMilligrams),
+    )
 
 private fun ProviderSelection.toBackup(): BackupProviderSelectionV1 =
     BackupProviderSelectionV1(providerId = providerId, model = model, endpoint = endpoint)

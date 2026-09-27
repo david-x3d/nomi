@@ -1,6 +1,7 @@
 package com.nomi.app.domain.usecase
 
 import com.nomi.app.ai.model.PortionEditInstruction
+import com.nomi.app.domain.DecimalInput
 import com.nomi.app.domain.PortionChangeValidator
 import java.util.Locale
 
@@ -32,7 +33,7 @@ object PortionEditParser {
         if (!currentQuantity.isFinite() || currentQuantity <= 0.0 || currentUnit.isBlank()) return null
         val core = stripFillerWords(normalize(correction))
         val match = RELATIVE_AMOUNT.matchEntire(core) ?: return null
-        val deltaQuantity = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        val deltaQuantity = DecimalInput.parseOrNull(match.groupValues[1]) ?: return null
         val deltaUnit = CANONICAL_UNITS[match.groupValues[2]] ?: return null
         val direction = match.groupValues[3]
         val deltaFactor = PortionChangeValidator.calculateMultiplier(
@@ -55,7 +56,12 @@ object PortionEditParser {
     fun parseOrNull(correction: String): PortionEditInstruction? {
         val normalized = normalize(correction)
         if (normalized.isBlank()) return null
-        val core = stripFillerWords(normalized)
+        // "instead of" / "statt" is dropped here, before the filler-word pass, because "instead"
+        // and "of" are themselves filler words: by the time the strip ran there would be no way
+        // left to tell the stated amount from the amount it replaces.
+        val stated = REPLACEMENT_CLAUSE.split(normalized).first().trim()
+        if (stated.isBlank()) return null
+        val core = stripFillerWords(stated)
         if (core.isBlank()) return null
 
         return parseWordFactor(core)
@@ -63,6 +69,9 @@ object PortionEditParser {
             ?: parseMultiplier(core)
             ?: parseFractionOfCount(core)
             ?: parseFraction(core)
+            // Last of the multiplicative readings, and before the unit-bearing one: "0,5" is a
+            // share of what is logged, whereas "0,5 g" is an amount.
+            ?: parseBareDecimal(core)
             ?: parseExplicitAmount(core)
     }
 
@@ -70,10 +79,24 @@ object PortionEditParser {
     private fun parseWordFactor(core: String): PortionEditInstruction? =
         WORD_FACTORS[core]?.let(PortionEditInstruction::scale)
 
+    /**
+     * A bare decimal is a share of what is already logged, the way "half" is: "0,5" and "0.5"
+     * both mean half. A number carrying a unit is a different statement and belongs to
+     * [parseExplicitAmount], so this only ever sees the number on its own.
+     */
+    private fun parseBareDecimal(core: String): PortionEditInstruction? {
+        if (!BARE_DECIMAL.matches(core)) return null
+        val factor = DecimalInput.parseOrNull(core) ?: return null
+        if (factor <= 0.0 || factor > PortionEditInstruction.MAX_SCALE_FACTOR) return null
+        return PortionEditInstruction.scale(factor)
+    }
+
+    private val BARE_DECIMAL = Regex("^\\d+(?:[.,]\\d+)?$")
+
     /** "50%", "55% of the package", "75% of it". */
     private fun parsePercentage(core: String): PortionEditInstruction? {
         val match = PERCENTAGE.matchEntire(core) ?: return null
-        val percent = match.groupValues[1].toDoubleOrNull() ?: return null
+        val percent = DecimalInput.parseOrNull(match.groupValues[1]) ?: return null
         if (!percent.isFinite() || percent <= 0.0) return null
         // Percentages describe a share of what is already logged, so anything above 100 is a
         // different statement than the user thinks they are making. Let the model handle it.
@@ -85,8 +108,7 @@ object PortionEditParser {
     private fun parseMultiplier(core: String): PortionEditInstruction? {
         val match = MULTIPLIER.matchEntire(core) ?: return null
         val factor = match.groupValues.drop(1).firstOrNull(String::isNotEmpty)
-            ?.replace(',', '.')
-            ?.toDoubleOrNull()
+            ?.let(DecimalInput::parseOrNull)
             ?: return null
         if (!factor.isFinite() || factor <= 0.0 || factor > PortionEditInstruction.MAX_SCALE_FACTOR) {
             return null
@@ -102,8 +124,8 @@ object PortionEditParser {
      */
     private fun parseFractionOfCount(core: String): PortionEditInstruction? {
         val match = FRACTION_OF_COUNT.matchEntire(core) ?: return null
-        val eaten = match.groupValues[1].toDoubleOrNull() ?: return null
-        val total = match.groupValues[2].toDoubleOrNull() ?: return null
+        val eaten = DecimalInput.parseOrNull(match.groupValues[1]) ?: return null
+        val total = DecimalInput.parseOrNull(match.groupValues[2]) ?: return null
         if (!eaten.isFinite() || !total.isFinite() || total <= 0.0 || eaten <= 0.0) return null
         if (eaten > total) return null
         return PortionEditInstruction.scale(eaten / total)
@@ -127,9 +149,9 @@ object PortionEditParser {
      * value is replacing, which is context, not a second amount.
      */
     private fun parseExplicitAmount(core: String): PortionEditInstruction? {
-        val withoutReplaced = core.replace(REPLACED_AMOUNT, "").trim()
-        val match = EXPLICIT_AMOUNT.matchEntire(withoutReplaced) ?: return null
-        val quantity = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: return null
+        // The "instead of <old amount>" clause was already removed by [parseOrNull].
+        val match = EXPLICIT_AMOUNT.matchEntire(core) ?: return null
+        val quantity = DecimalInput.parseOrNull(match.groupValues[1]) ?: return null
         if (!quantity.isFinite() || quantity <= 0.0) return null
         val unit = CANONICAL_UNITS[match.groupValues[2]] ?: return null
         return PortionEditInstruction.setQuantity(quantity, unit)
@@ -149,6 +171,9 @@ object PortionEditParser {
         .replace('ö', 'o')
         .replace('ü', 'u')
         .replace("ß", "ss")
+        .replace('×', 'x')
+        .replace('✕', 'x')
+        .replace('⋅', '.')
         .replace(Regex("[^a-z0-9%/.,\\s]"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
@@ -209,13 +234,18 @@ object PortionEditParser {
 
     private val PERCENTAGE = Regex("^(\\d{1,3}(?:[.,]\\d+)?)\\s*%(?:\\s*(?:package|packung|pack))?$")
     private val MULTIPLIER = Regex("^(?:(\\d+(?:[.,]\\d+)?)\\s*x|x\\s*(\\d+(?:[.,]\\d+)?)|(\\d+(?:[.,]\\d+)?)\\s*times)$")
-    private val FRACTION_OF_COUNT = Regex("^(\\d+(?:\\.\\d+)?)\\s*(?:/|out)?\\s*(?:of)?\\s*(\\d+(?:\\.\\d+)?)\\s*(?:pieces?|piece|slices?|stucke?|stuck|items?)$")
+    private val FRACTION_OF_COUNT = Regex("^(\\d+(?:[.,]\\d+)?)\\s*(?:/|out)?\\s*(?:of|von)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:pieces?|piece|slices?|stucken?|stuck|items?)$")
     private val FRACTION = Regex("^(\\d+)\\s*/\\s*(\\d+)$")
     private val EXPLICIT_AMOUNT = Regex("^(\\d+(?:[.,]\\d+)?)\\s*([a-z]+)$")
     private val RELATIVE_AMOUNT = Regex(
         "^(\\d+(?:[.,]\\d+)?)\\s*([a-z]+)\\s*(less|weniger|more|mehr)$",
     )
-    private val REPLACED_AMOUNT = Regex("\\s*\\d+(?:[.,]\\d+)?\\s*[a-z]*\\s*$")
+    /**
+     * "instead of 400 g" / "statt 400 g" names what the new amount replaces; it is context, not a
+     * second amount. Splitting on the clause word keeps the amount the user is actually stating,
+     * which a trailing-number regex could not: it matched the stated amount as well.
+     */
+    private val REPLACEMENT_CLAUSE = Regex("\\s+(?:instead|statt|anstatt)\\s+.*$")
 
     private val CANONICAL_UNITS: Map<String, String> = buildMap {
         listOf("g", "gram", "grams", "gramm").forEach { put(it, "g") }

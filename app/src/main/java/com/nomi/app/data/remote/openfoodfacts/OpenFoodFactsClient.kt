@@ -3,6 +3,9 @@ package com.nomi.app.data.remote.openfoodfacts
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -15,6 +18,23 @@ class OpenFoodFactsClient(
     private val httpClient: HttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true; explicitNulls = false })
+        }
+        // Open Food Facts asks every client to identify itself, and throttles or refuses the
+        // generic default agent. Not doing so showed up as products quietly "not found".
+        install(UserAgent) {
+            agent = "Nomi/$CLIENT_VERSION (Android; https://github.com/david-x3d/nomi)"
+        }
+        // Without a timeout a stalled lookup left the barcode flow spinning indefinitely.
+        install(HttpTimeout) {
+            requestTimeoutMillis = 8_000
+            socketTimeoutMillis = 8_000
+            connectTimeoutMillis = 8_000
+        }
+        // 5xx and 429 are worth one more go; a 404 is a legitimate "no such product" and retrying
+        // it only makes the user wait longer for the same answer.
+        install(HttpRequestRetry) {
+            retryOnServerErrors(maxRetries = 2)
+            exponentialDelay()
         }
         expectSuccess = true
     },
@@ -34,6 +54,10 @@ class OpenFoodFactsClient(
     }
 
     override fun close() = httpClient.close()
+
+    private companion object {
+        const val CLIENT_VERSION = "2.4.0"
+    }
 }
 
 data class BarcodeProduct(

@@ -3,6 +3,7 @@ package com.nomi.app.ui.components
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.nomi.app.ui.theme.animationsAreDisabled
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -103,10 +105,14 @@ internal fun researchSourceIconSlots(sourceUrls: List<String>, maxIcons: Int = 3
 
 @Composable
 private fun FaviconFallback(contentDescription: String?) {
+    // A shimmer that never stops is the second endless animation in the app. When the system
+    // animation scale is zero the band is centred on itself, so the placeholder is drawn once and
+    // does not move - the same call shape, with no motion to observe.
+    val animate = !animationsAreDisabled()
     val transition = rememberInfiniteTransition(label = "source shimmer")
     val shimmer = transition.animateFloat(
-        initialValue = -1f,
-        targetValue = 2f,
+        initialValue = if (animate) -1f else 0.5f,
+        targetValue = if (animate) 2f else 0.5f,
         animationSpec = infiniteRepeatable(animation = tween(durationMillis = 1_450)),
         label = "source shimmer position",
     )

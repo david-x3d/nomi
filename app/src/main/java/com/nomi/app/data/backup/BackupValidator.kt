@@ -29,7 +29,21 @@ data class BackupSummary(
 
 /** Strict preflight validation. No storage mutation may occur before this returns successfully. */
 object BackupValidator {
-    const val MAX_BACKUP_BYTES: Int = 16 * 1024 * 1024
+    /**
+     * Ceiling on the *decoded* backup size, and the bound on how much a hostile file may make
+     * Nomi buffer while reading it.
+     *
+     * This used to be 16 MiB, which a normal multi-year diary exceeds: roughly 1.7 kB per
+     * researched row, so a five-year user logging five foods a day hit the wall and could not
+     * produce a backup at all. The failure mode was the worst possible shape - the recovery copy
+     * became unavailable precisely when it was needed. 256 MiB of decoded JSON is far beyond any
+     * real diary, and the writer is now streamed and compressed so the memory cost is unrelated
+     * to this number.
+     */
+    const val MAX_BACKUP_BYTES: Int = 256 * 1024 * 1024
+
+    /** Ceiling on the compressed bytes actually written to storage. */
+    const val MAX_BACKUP_FILE_BYTES: Int = 64 * 1024 * 1024
     private const val MAX_TOTAL_ROWS = 300_000
     private const val MAX_CATALOG_ROWS = 75_000
     private const val MAX_LOG_ROWS = 200_000
@@ -490,7 +504,12 @@ object BackupValidator {
     ) {
         timestamp(created, "$path.createdAtEpochMillis", issues)
         timestamp(updated, "$path.updatedAtEpochMillis", issues)
-        if (updated < created) add(issues, "$path.updatedAtEpochMillis", "precedes creation")
+        // A backwards wall-clock correction (NTP, a manual change, a device restored from a
+        // backup taken at the wrong time) can leave updated_at behind created_at. This used to
+        // be a hard validation error, which meant one clock correction made every later export
+        // fail AND made an already-taken backup refuse to import - the user's only recovery copy
+        // destroyed by a device setting. It is a cosmetic ordering quirk, not a data problem, so
+        // it is normalised on read instead of rejected.
     }
 
     private fun validateText(

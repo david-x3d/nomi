@@ -62,9 +62,6 @@ internal val onboardingTranslations: Map<String, NomiTranslation> = mapOf(
     "Or read a nutrition label." to NomiTranslation(
         de = "Oder lies ein Nährwertetikett.", es = "O lee una etiqueta nutricional.", fr = "Ou lis une étiquette nutritionnelle.", it = "Oppure leggi un'etichetta nutrizionale.", nl = "Of lees een voedingswaardelabel.", pt = "Ou lê um rótulo nutricional.", sq = "Ose lexo një etiketë ushqimore.", sv = "Eller läs en näringsvärdesetikett.", tr = "Ya da besin değeri etiketini oku.",
     ),
-    "Nutrition label" to NomiTranslation(
-        de = "Nährwertetikett", es = "Etiqueta nutricional", fr = "Étiquette nutritionnelle", it = "Etichetta nutrizionale", nl = "Voedingswaardelabel", pt = "Rótulo nutricional", sq = "Etiketë ushqimore", sv = "Näringsvärdesetikett", tr = "Besin değeri etiketi",
-    ),
     "When were you born?" to NomiTranslation(
         de = "Wann bist du geboren?", es = "¿Cuándo naciste?", fr = "Quand es-tu né(e) ?", it = "Quando sei nato/a?", nl = "Wanneer ben je geboren?", pt = "Quando nasceste?", sq = "Kur ke lindur?", sv = "När föddes du?", tr = "Ne zaman doğdun?",
     ),
@@ -353,12 +350,6 @@ internal val onboardingTranslations: Map<String, NomiTranslation> = mapOf(
     "Chosen pace" to NomiTranslation(
         de = "Gewähltes Tempo", es = "Ritmo elegido", fr = "Rythme choisi", it = "Ritmo scelto", nl = "Gekozen tempo", pt = "Ritmo escolhido", sq = "Ritmi i zgjedhur", sv = "Vald takt", tr = "Seçilen hız",
     ),
-    "Female equation" to NomiTranslation(
-        de = "Gleichung für Frauen", es = "Ecuación para mujeres", fr = "Équation féminine", it = "Equazione femminile", nl = "Formule voor vrouwen", pt = "Equação feminina", sq = "Ekuacioni për femra", sv = "Formel för kvinnor", tr = "Kadın denklemi",
-    ),
-    "Male equation" to NomiTranslation(
-        de = "Gleichung für Männer", es = "Ecuación para hombres", fr = "Équation masculine", it = "Equazione maschile", nl = "Formule voor mannen", pt = "Equação masculina", sq = "Ekuacioni për meshkuj", sv = "Formel för män", tr = "Erkek denklemi",
-    ),
     "Manual · {0} kcal/day" to NomiTranslation(
         de = "Manuell · {0} kcal/Tag", es = "Manual · {0} kcal/día", fr = "Manuel · {0} kcal/jour", it = "Manuale · {0} kcal/giorno", nl = "Handmatig · {0} kcal/dag", pt = "Manual · {0} kcal/dia", sq = "Manual · {0} kcal/ditë", sv = "Manuellt · {0} kcal/dag", tr = "Elle · {0} kcal/gün",
     ),
@@ -367,9 +358,6 @@ internal val onboardingTranslations: Map<String, NomiTranslation> = mapOf(
     ),
     "You chose a manual calorie target, so the resting-energy and activity equations were skipped." to NomiTranslation(
         de = "Du hast ein manuelles Kalorienziel gewählt. Daher wurden die Gleichungen für Ruheenergie und Aktivität übersprungen.", es = "Elegiste un objetivo manual de calorías, por lo que se omitieron las ecuaciones de energía en reposo y actividad.", fr = "Tu as choisi un objectif calorique manuel ; les équations d’énergie au repos et d’activité ont donc été ignorées.", it = "Hai scelto un obiettivo calorico manuale, quindi le equazioni di energia a riposo e attività sono state ignorate.", nl = "Je koos een handmatig caloriedoel, dus de formules voor rustenergie en activiteit zijn overgeslagen.", pt = "Escolheste uma meta manual de calorias, por isso as equações de energia em repouso e atividade foram ignoradas.", sq = "Zgjodhe një objektiv manual kalorish, prandaj ekuacionet e energjisë në pushim dhe aktivitetit u anashkaluan.", sv = "Du valde ett manuellt kalorimål, så formlerna för viloenergi och aktivitet hoppades över.", tr = "Kalori hedefini elle seçtiğin için dinlenme enerjisi ve aktivite denklemleri atlandı.",
-    ),
-    "Manual energy target" to NomiTranslation(
-        de = "Manuelles Energieziel", es = "Objetivo manual de energía", fr = "Objectif énergétique manuel", it = "Obiettivo energetico manuale", nl = "Handmatig energiedoel", pt = "Meta manual de energia", sq = "Objektivi manual i energjisë", sv = "Manuellt energimål", tr = "Elle enerji hedefi",
     ),
     "1 · Resting energy" to NomiTranslation(
         de = "1 · Ruheenergie", es = "1 · Energía en reposo", fr = "1 · Énergie au repos", it = "1 · Energia a riposo", nl = "1 · Rustenergie", pt = "1 · Energia em repouso", sq = "1 · Energjia në pushim", sv = "1 · Viloenergi", tr = "1 · Dinlenme enerjisi",

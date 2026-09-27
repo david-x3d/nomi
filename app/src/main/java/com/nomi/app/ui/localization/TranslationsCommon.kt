@@ -87,6 +87,13 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         nl = "Gewicht in kg", pt = "Peso em kg", sq = "Pesha në kg", sv = "Vikt i kg",
         tr = "Kilo (kg)",
     ),
+    // The Imperial half of the weight field. Without it the label fell back to English for the
+    // nine other languages, which is exactly what the catalogue coverage test exists to prevent.
+    "Weight in lb" to NomiTranslation(
+        de = "Gewicht in lb", es = "Peso en lb", fr = "Poids en lb", it = "Peso in lb",
+        nl = "Gewicht in lb", pt = "Peso em lb", sq = "Pesha në lb", sv = "Vikt i lb",
+        tr = "Pound (lb)",
+    ),
     "Note (optional)" to NomiTranslation(
         de = "Notiz (optional)", es = "Nota (opcional)", fr = "Note (facultatif)",
         it = "Nota (facoltativa)", nl = "Notitie (optioneel)", pt = "Nota (opcional)",

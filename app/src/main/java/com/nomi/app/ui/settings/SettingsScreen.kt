@@ -55,6 +55,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.heading
@@ -581,7 +582,8 @@ private fun ReminderTimeDialog(
     val state = rememberTimePickerState(
         initialHour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 8,
         initialMinute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0,
-        is24Hour = true,
+        // Follows the device's 12/24-hour setting, which a US or UK user has set deliberately.
+        is24Hour = android.text.format.DateFormat.is24HourFormat(LocalContext.current),
     )
     NomiDialog(
         onDismissRequest = onDismiss,

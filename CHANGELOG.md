@@ -1,5 +1,49 @@
 # Changelog
 
+## Nomi v2.4.0 — 2026-09-27
+
+### History
+
+- The History screen is reachable. It was fully built but nothing could open it; it is now one tap from the Today day-pager row, alongside the arrows that move between days.
+- Each day lists its own totals against the day's target, and the foods under it. Tapping a food opens the same detail screen as everywhere else.
+- Search covers the whole visible window by food and brand.
+- "Copy" is offered per meal rather than per day: a day with breakfast and dinner gets two chips, one for each, because copying a whole day and calling it a meal would have had to guess which meal you meant.
+- The copied food lands on today as one meal, so it can be undone or deleted as a meal.
+- "Copy" and "Copy day" are not offered for today itself, since copying today onto today would only duplicate the plate.
+- "Save meal" asks for a name, pre-filled with the date. Saving keeps the exact portions that were eaten, so editing the original entry later cannot rewrite a meal you already kept.
+
+### Update check
+
+- Nomi checks GitHub for a newer release once, after the first frame is drawn, so it can never delay startup. The check is a few kilobytes of plain text, unauthenticated, with a short timeout, and any failure is treated as "no update".
+- Versions are compared numerically, so 2.10.0 correctly sorts above 2.9.9 — a string comparison would not. Drafts are never offered, and a pre-release is only offered to a pre-release build.
+- The dialog is Nomi's own, and the release notes are stripped of markup and shortened to something readable.
+- "View update" always opens that exact release, never the repository homepage.
+
+### Fixes
+
+- Correcting a researched food's calories or macros no longer makes the whole meal unsaveable. The correction is now re-derived against the per-100 basis instead of being written over it, so a corrected entry still passes the check that guards portion maths. An impossible correction is still refused.
+- Metric and Imperial units are now honoured. The weight setting was displayed and stored but read by nothing, so an Imperial user's real 180 lb was saved as 180 kg — and that number fed the calorie target and the step estimate. Storage stays metric; only the screen and the field convert.
+- "Weight in lb" is now translated. It was used but never added to the catalogue, so the label was English in all nine other languages.
+- Numbers typed with a decimal comma are accepted everywhere, including the manual food form, where a comma previously left Save permanently disabled with no explanation.
+- "200 g instead of 400 g" now corrects the amount. The word "instead" was being stripped along with the number it introduced, so the stated amount was deleted instead of replaced.
+- A single backwards clock correction no longer makes every future backup fail to export, and no longer makes an existing backup refuse to import.
+- Backups are larger than before (up to 256 MiB) and are written as gzip, which roughly halves them. Old uncompressed backups still import, and are detected automatically.
+- Preferences that were previously dropped from a backup — micronutrients, calorie estimate bias, goals card style, smart fallback provider — now round-trip.
+- Deleting one food from a meal now deletes the whole meal, whichever screen you delete from. It previously removed a single product, which left the day's total permanently wrong and turned the rest into orphans.
+- A food older than 30 days can be opened again from its history entry. It previously reported "This entry is no longer available."
+- Favouriting the same food twice no longer fails with a message about saving it first, and a favourite can now be un-favourited.
+- The midnight widget refresh receiver is no longer exported.
+- Open Food Facts requests identify themselves, time out, and retry only on server errors — never on a barcode that genuinely does not exist.
+- Nomi now follows the system 24-hour setting.
+
+### Verification
+
+- All 616 unit tests passed across 72 classes, with no failures, errors or skips.
+- Release compilation, lint-vital analysis, signing and APK assembly passed.
+- The APK signature matches the previous stable release (v2.3.0): certificate SHA-256 `9344cd48425664bf8b010ac6cdaff835fb4e9524591ddf7a00e98184867ee8bf`, verified against the published v2.3.0 artifact. This installs over an existing Nomi without losing the food log.
+- A release build can no longer be produced unsigned: a missing signing key now fails the build instead of silently shipping an APK that cannot install over the previous one.
+- The update dialog was captured on-device in both light and dark themes, and the debug override used to force it is a build-time resource that is `false` in a release APK.
+
 ## Nomi v2.3.0 — 2026-09-27
 
 ### Animated welcome

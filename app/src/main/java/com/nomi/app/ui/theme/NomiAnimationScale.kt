@@ -2,6 +2,7 @@ package com.nomi.app.ui.theme
 
 import android.provider.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
@@ -34,3 +35,23 @@ internal fun rememberNomiAnimationScale(): Float {
 /** True when the user has asked the system not to animate, by any route. */
 @Composable
 internal fun animationsAreDisabled(): Boolean = rememberNomiAnimationScale() <= 0f
+
+/**
+ * The current answer, for the places that cannot compose - chiefly `transitionSpec` and
+ * `sizeAnimationSpec` lambdas, which are ordinary function types and so are not composable
+ * contexts.
+ *
+ * Written once per configuration by [provideAnimationScale] and read by the motion specs. It is
+ * not recomposition state and nothing schedules work from it: it only chooses between a tween and
+ * a snap.
+ */
+@Volatile
+internal var animationsDisabled: Boolean = false
+
+/** Publishes the system's animation scale for the non-composable motion specs. */
+@Composable
+internal fun provideAnimationScale(content: @Composable () -> Unit) {
+    val disabled = rememberNomiAnimationScale() <= 0f
+    SideEffect { animationsDisabled = disabled }
+    content()
+}

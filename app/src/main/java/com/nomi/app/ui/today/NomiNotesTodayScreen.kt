@@ -194,6 +194,7 @@ import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
 import com.nomi.app.ui.theme.nomiLayoutMotionSpec
+import com.nomi.app.ui.theme.animationsAreDisabled
 import com.nomi.app.ui.theme.nomiPageMotionSpec
 import com.nomi.app.ui.theme.nomiProgressMotionSpec
 import java.time.LocalDate
@@ -218,6 +219,7 @@ fun NomiNotesTodayScreen(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
+    onOpenHistory: () -> Unit = {},
     onFoodClick: (Long) -> Unit,
     onDeleteFood: (Long) -> Unit = {},
     onDeleteFoodImmediately: (Long) -> Unit = {},
@@ -368,6 +370,7 @@ fun NomiNotesTodayScreen(
                 onPreviousDay = { haptics.selected(); onPreviousDay() },
                 onNextDay = { haptics.selected(); onNextDay() },
                 onToday = { haptics.selected(); onToday() },
+                onOpenHistory = { haptics.selected(); onOpenHistory() },
             )
         },
         bottomBar = {
@@ -675,6 +678,7 @@ private fun NotesHeader(
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
+    onOpenHistory: () -> Unit,
 ) {
     val locale = nomiLocale()
     val datePattern = nomiString("EEEE, MMMM d")
@@ -683,6 +687,7 @@ private fun NotesHeader(
     val todayPress = rememberNomiPressFeedback(pressedScale = 0.97f)
     val previousPress = rememberNomiPressFeedback(pressedScale = 0.90f)
     val nextPress = rememberNomiPressFeedback(pressedScale = 0.90f)
+    val historyPress = rememberNomiPressFeedback(pressedScale = 0.90f)
     val foxHalo by animateColorAsState(
         targetValue = when (foxMood) {
             NomiFoxMood.RESTING -> MaterialTheme.colorScheme.secondaryContainer
@@ -844,6 +849,21 @@ private fun NotesHeader(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = nomiString("Next day"),
+                        )
+                    }
+                    // History is a destination with its own screen, not a fourth bottom-bar tab,
+                    // so it hangs off the day pager: paging back through days is the gesture that
+                    // makes someone want to see a whole month at once.
+                    IconButton(
+                        onClick = onOpenHistory,
+                        interactionSource = historyPress.interactionSource,
+                        modifier = Modifier
+                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .nomiPress(historyPress),
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            contentDescription = nomiString("History"),
                         )
                     }
                 }
@@ -2225,7 +2245,12 @@ private fun NotesFloatingActionRow(
 @Composable
 private fun TypingDots() {
     val dots = remember { List(3) { Animatable(0f) } }
-    LaunchedEffect(Unit) {
+    // An endless loop is the one animation that cannot be justified as motion the user asked for,
+    // so it stops entirely when the system animation scale is zero. The dots then simply rest at
+    // their resting value, which still communicates "waiting" without moving.
+    val animate = !animationsAreDisabled()
+    LaunchedEffect(animate) {
+        if (!animate) return@LaunchedEffect
         dots.forEachIndexed { index, dot ->
             launch {
                 delay(index * 120L)

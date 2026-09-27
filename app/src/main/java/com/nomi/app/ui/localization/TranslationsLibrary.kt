@@ -51,10 +51,23 @@ internal val libraryTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Auswählen", es = "Seleccionar", fr = "Sélectionner", it = "Seleziona",
         nl = "Selecteren", pt = "Selecionar", sq = "Zgjidh", sv = "Välj", tr = "Seç",
     ),
-    "Copy meal" to NomiTranslation(
-        de = "Mahlzeit kopieren", es = "Copiar comida", fr = "Copier le repas",
-        it = "Copia il pasto", nl = "Maaltijd kopiëren", pt = "Copiar refeição",
-        sq = "Kopjo vaktin", sv = "Kopiera måltid", tr = "Öğünü kopyala",
+    // The old day-wide "Copy meal" key is gone: copying works per meal category, so the chip is
+    // now "Copy {0}" and names the meal it will move.
+    "Copy {0}" to NomiTranslation(
+        de = "{0} kopieren", es = "Copiar {0}", fr = "Copier {0}",
+        it = "Copia {0}", nl = "{0} kopiëren", pt = "Copiar {0}",
+        sq = "Kopjo {0}", sv = "Kopiera {0}", tr = "{0} öğünü kopyala",
+    ),
+    "Save day as a meal" to NomiTranslation(
+        de = "Tag als Mahlzeit speichern", es = "Guardar el día como comida",
+        fr = "Enregistrer la journée comme repas", it = "Salva la giornata come pasto",
+        nl = "Dag als maaltijd opslaan", pt = "Guardar o dia como refeição",
+        sq = "Ruaj ditën si vakt", sv = "Spara dagen som måltid", tr = "Günü öğün olarak kaydet",
+    ),
+    "Meal name" to NomiTranslation(
+        de = "Name der Mahlzeit", es = "Nombre de la comida", fr = "Nom du repas",
+        it = "Nome del pasto", nl = "Naam van de maaltijd", pt = "Nome da refeição",
+        sq = "Emri i vaktit", sv = "Måltidets namn", tr = "Öğün adı",
     ),
     "Copy day" to NomiTranslation(
         de = "Tag kopieren", es = "Copiar día", fr = "Copier la journée",

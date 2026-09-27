@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 117
-        versionName = "2.3.0"
+        versionCode = 118
+        versionName = "2.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -69,8 +69,18 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.findByName("localRelease")
-                ?.takeIf { it.storeFile?.exists() == true }
+            // Deliberately not `findByName(...)?.takeIf { storeFile.exists() }`. That form
+            // silently falls back to an UNSIGNED release when the keystore is absent, and an
+            // unsigned APK cannot install over the published one - so the build would succeed
+            // and the release would fail on someone else's device. require() fails here instead,
+            // at configuration time, naming the file it wanted.
+            signingConfig = signingConfigs.getByName("localRelease").also {
+                require(it.storeFile?.exists() == true) {
+                    "Release signing key is missing: ${it.storeFile?.absolutePath}. " +
+                        "Refusing to produce an unsigned release. Restore the keystore rather " +
+                        "than changing the signing configuration."
+                }
+            }
         }
     }
 

@@ -72,6 +72,13 @@ import com.nomi.app.data.repository.mapping.toPersistedDraft
 import com.nomi.app.data.security.SecretUnavailableException
 import com.nomi.app.di.AppContainer
 import com.nomi.app.domain.Micronutrient
+import com.nomi.app.update.GitHubReleaseSource
+import com.nomi.app.update.ReleaseVersion
+import com.nomi.app.update.UpdateAvailability
+import com.nomi.app.update.UpdateCheck
+import com.nomi.app.update.UpdateReleaseSource
+import com.nomi.app.update.installedVersion
+import com.nomi.app.domain.DecimalInput
 import com.nomi.app.domain.StepCalorieEstimate
 import com.nomi.app.domain.StepCalorieEstimator
 import com.nomi.app.domain.model.NutritionPlan
@@ -156,7 +163,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -201,6 +211,15 @@ class AppViewModel(
     private val zoneId: ZoneId = ZoneId.systemDefault()
     private val today: LocalDate get() = LocalDate.now(zoneId)
 
+    /**
+     * The current date in the user's own zone.
+     *
+     * [today] is deliberately private because most screens are driven by [todayState] instead. The
+     * History screen is the exception: it needs to know which visible day *is* today so it can
+     * offer "copy to today" only where that would mean something.
+     */
+    val currentDate: LocalDate get() = today
+
     val preferences: StateFlow<AppPreferences> = repository.preferences
         .stateIn(
             viewModelScope,
@@ -238,6 +257,51 @@ class AppViewModel(
 
     private val mutableLauncherShortcut = MutableStateFlow<LauncherShortcut?>(null)
     val launcherShortcut = mutableLauncherShortcut.asStateFlow()
+
+    /**
+     * A newer published release, if one was found on this cold start.
+     *
+     * Checked once per process, after the first frame, on a background dispatcher: startup never
+     * waits on the network, and a failure is simply no value. [dismissUpdate] clears it so a
+     * configuration change or a recomposition cannot bring the dialog back.
+     */
+    private val mutableUpdate = MutableStateFlow<UpdateAvailability>(UpdateAvailability.UpToDate)
+    val update: StateFlow<UpdateAvailability> = mutableUpdate.asStateFlow()
+    private var updateCheckStarted = false
+
+    fun dismissUpdate() {
+        mutableUpdate.value = UpdateAvailability.UpToDate
+    }
+
+    /** Idempotent: only the first call in a process performs a check. */
+    fun checkForUpdate(
+        source: UpdateReleaseSource = GitHubReleaseSource(),
+        installed: ReleaseVersion? = installedVersion,
+    ) {
+        if (updateCheckStarted) return
+        updateCheckStarted = true
+        viewModelScope.launch {
+            val availability = runCatching {
+                val current = installed ?: return@runCatching UpdateAvailability.UpToDate
+                val release = source.latest() ?: return@runCatching UpdateAvailability.UpToDate
+                when (
+                    val decision = UpdateCheck.decide(
+                        installed = current,
+                        latest = release.version,
+                        latestIsDraft = release.isDraft,
+                        latestIsPreRelease = release.isPreRelease,
+                    )
+                ) {
+                    is UpdateAvailability.UpToDate -> UpdateAvailability.UpToDate
+                    is UpdateAvailability.Available -> decision.copy(
+                        releaseUrl = release.releaseUrl,
+                        summary = UpdateCheck.summarize(release.body),
+                    )
+                }
+            }.getOrDefault(UpdateAvailability.UpToDate)
+            mutableUpdate.value = availability
+        }
+    }
 
     private var pendingLauncherShortcut: LauncherShortcut? = null
 
@@ -1546,34 +1610,86 @@ class AppViewModel(
             }
         }
     }
+    /**
+     * Resolves one logged entry for the detail screen straight from the database.
+     *
+     * Every logged food is its own immutable row, so an id is enough: a grouped meal's siblings
+     * are found by the shared entry group. This replaces a scan of the selected day plus a
+     * 30-day history window, which could not resolve anything older.
+     */
+    fun foodDetail(id: Long): Flow<TodayFoodEntry?> = flow {
+        if (id <= 0L) return@flow
+        val log = repository.foodLog(id) ?: return@flow
+        val siblings = log.entryGroupId
+            ?.let { repository.logsByEntryGroup(it) }
+            .orEmpty()
+            .ifEmpty { listOf(log) }
+        emit(siblings.toGroupedTodayEntries().firstOrNull { it.id == id } ?: log.toTodayEntry())
+    }.flowOn(Dispatchers.IO)
+
     fun favoriteFoodLog(id: Long) {
         viewModelScope.launch {
             runCatching {
                 val log = requireNotNull(repository.foodLog(id))
                 val foodId = requireNotNull(log.foodId) { "This entry has no reusable food" }
                 val now = System.currentTimeMillis()
+                // Re-favouriting has to update the existing row, not collide with it: food_id is
+                // UNIQUE, and inserting a second row for the same food failed and reported the
+                // unrelated "save this food again" message, leaving the old portion in place.
+                val existing = repository.favorites.first().firstOrNull { it.food.id == foodId }
                 repository.favorite(
                     FavoriteFoodEntity(
+                        id = existing?.favorite?.id ?: 0,
                         foodId = foodId,
                         typicalAmount = log.amount,
                         typicalUnit = log.unit,
                         typicalGrams = log.grams,
-                        createdAtEpochMillis = now,
+                        createdAtEpochMillis = existing?.favorite?.createdAtEpochMillis ?: now,
                         lastUsedAtEpochMillis = now,
                     ),
                 )
             }.onFailure {
-                mutableEvents.emit(AppEvent.Message(inUserLanguage("Save this food again before favoriting it")))
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save that favorite.")))
             }
         }
     }
 
+    /** Removes a food from favourites, which the favourite action previously had no way to do. */
+    fun unfavoriteFoodLog(id: Long) {
+        viewModelScope.launch {
+            runCatching {
+                val log = requireNotNull(repository.foodLog(id))
+                val foodId = requireNotNull(log.foodId) { "This entry has no reusable food" }
+                repository.unfavorite(foodId)
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't remove that favorite.")))
+            }
+        }
+    }
+
+    /**
+     * Deletes a logged entry and everything that was logged with it.
+     *
+     * Every product of a meal is its own row sharing an entry group, so the group is what the
+     * user thinks of as one thing. Deleting a single row out of it used to be possible from the
+     * detail screen: the remaining products kept the group id, the meal total on Today became
+     * permanently wrong, and the survivors were then deletable only as orphans. Deleting by group
+     * makes the detail screen and the Today row agree, with no schema change.
+     */
     fun deleteFoodLog(id: Long) {
         viewModelScope.launch {
-            runCatching { repository.deleteLog(id) }
-                .onFailure {
-                    mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't delete that food.")))
+            runCatching {
+                val log = repository.foodLog(id) ?: return@runCatching
+                val groupId = log.entryGroupId
+                val group = if (groupId.isNullOrBlank()) {
+                    listOf(log)
+                } else {
+                    repository.logsByEntryGroup(groupId).ifEmpty { listOf(log) }
                 }
+                group.forEach { repository.deleteLog(it) }
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't delete that food.")))
+            }
         }
     }
 
@@ -1772,6 +1888,8 @@ class AppViewModel(
                         createdAtEpochMillis = System.currentTimeMillis(),
                     ),
                 )
+            }.onSuccess {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi saved that meal.")))
             }.onFailure {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't save that meal")))
             }
@@ -1795,10 +1913,50 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching {
                 repository.copyDay(source.toString(), today.toString(), System.currentTimeMillis(), zoneId.id)
+            }.onSuccess {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi copied that day to today.")))
             }.onFailure {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't copy that day.")))
             }
         }
+    }
+
+    /**
+     * Copies a single meal - not a whole day - onto today.
+     *
+     * [NomiRepository.copyMeal] works per meal category, so the caller has to say which one; a
+     * day-wide "copy meal" would have had to guess, and guessing wrong would silently move the
+     * wrong food onto today's plate.
+     */
+    fun copyMealToToday(source: LocalDate, mealCategory: MealCategory) {
+        viewModelScope.launch {
+            runCatching {
+                repository.copyMeal(
+                    sourceLocalDate = source.toString(),
+                    sourceMealCategory = mealCategory.name,
+                    targetLocalDate = today.toString(),
+                    targetStartEpochMillis = System.currentTimeMillis(),
+                    targetZoneId = zoneId.id,
+                )
+            }.onSuccess {
+                // MealCategory.displayName is the English label, which would leak into every other
+                // language, so the catalogue wording is looked up here instead.
+                mutableEvents.emit(
+                    AppEvent.Message(
+                        inUserLanguage("Nomi copied that {0} to today.", localizedMealName(mealCategory)),
+                    ),
+                )
+            }.onFailure {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't copy that meal.")))
+            }
+        }
+    }
+
+    private fun localizedMealName(mealCategory: MealCategory): String = when (mealCategory) {
+        MealCategory.BREAKFAST -> inUserLanguage("Breakfast")
+        MealCategory.LUNCH -> inUserLanguage("Lunch")
+        MealCategory.DINNER -> inUserLanguage("Dinner")
+        MealCategory.SNACKS -> inUserLanguage("Snacks")
     }
 
     fun addWeight(kilograms: Double, note: String?) {
@@ -3252,17 +3410,32 @@ class AppViewModel(
         )
     }
 
-    private fun ManualFoodDraft.toLog(): FoodLogEntity = AnalyzedFoodItem(
-        name = name.trim(),
-        quantity = requireNotNull(amount.toDoubleOrNull()),
-        unit = unit.trim(),
-        calories = requireNotNull(calories.toDoubleOrNull()),
-        proteinGrams = requireNotNull(protein.toDoubleOrNull()),
-        carbohydrateGrams = requireNotNull(carbohydrates.toDoubleOrNull()),
-        fatGrams = requireNotNull(fat.toDoubleOrNull()),
-        isEstimate = false,
-        sourceName = "Manual entry",
-    ).toLog(mealCategory, "manual")
+    private companion object {
+        /**
+         * Stored verbatim so it is stable across releases and languages, and resolved for display
+         * at the read boundary rather than baked in at write time. See [nomiString].
+         */
+        const val MANUAL_SOURCE_NAME = "Manual entry"
+        const val LIBRARY_SOURCE_NAME = "Nomi food library"
+    }
+
+    private fun ManualFoodDraft.toLog(): FoodLogEntity {
+        // DecimalInput so a comma decimal - which is what nine of the ten supported keyboards
+        // produce - is the same number as a point decimal. isValid already gated this shape.
+        fun field(raw: String, label: String): Double = DecimalInput.parseOrNull(raw)
+            ?: throw IllegalArgumentException("$label must be a number")
+        return AnalyzedFoodItem(
+            name = name.trim(),
+            quantity = field(amount, "Amount"),
+            unit = unit.trim(),
+            calories = field(calories, "Calories"),
+            proteinGrams = field(protein, "Protein"),
+            carbohydrateGrams = field(carbohydrates, "Carbohydrates"),
+            fatGrams = field(fat, "Fat"),
+            isEstimate = false,
+            sourceName = MANUAL_SOURCE_NAME,
+        ).toLog(mealCategory, "manual")
+    }
 
     private fun FoodEntity.toLog(): FoodLogEntity = AnalyzedFoodItem(
         name = canonicalName,
@@ -3278,7 +3451,7 @@ class AppViewModel(
         sugarGrams = nutritionPer100g.sugarGrams,
         saturatedFatGrams = nutritionPer100g.saturatedFatGrams,
         sodiumMilligrams = nutritionPer100g.sodiumMilligrams,
-        sourceName ="Nomi food library",
+        sourceName = LIBRARY_SOURCE_NAME,
         isEstimate = isEstimated,
     ).toLog(defaultMealCategory(), "recent").copy(foodId = id)
 

@@ -114,9 +114,15 @@
                 android:resource="@xml/widget_large_info" />
         </receiver>
 
+        <!--
+            Not exported: the refresh alarm and the widget providers reach this receiver with an
+            explicit component, which does not require export. It was exported with a custom
+            action and no permission, so any app on the device could force a database read plus a
+            RemoteViews update for every placed widget, repeatedly.
+        -->
         <receiver
             android:name=".widget.WidgetRefreshReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.nomi.app.action.WIDGET_REFRESH" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

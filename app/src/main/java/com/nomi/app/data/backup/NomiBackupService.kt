@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -18,9 +19,13 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.ByteArrayOutputStream
+import java.io.PushbackInputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.nio.ByteBuffer
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import java.time.Clock
 
 class BackupFormatException(message: String, cause: Throwable? = null) :
@@ -48,6 +53,7 @@ data class BackupImportResult(
  * Versioned JSON export/import boundary. Streams are never closed by this class because ownership
  * remains with the Storage Access Framework caller.
  */
+@OptIn(ExperimentalSerializationApi::class)
 class NomiBackupService(
     private val database: NomiDatabase,
     private val preferencesStore: AppPreferencesStore,
@@ -63,19 +69,35 @@ class NomiBackupService(
             payload = database.readBackupPayload(preferences),
         )
         val summary = BackupValidator.validate(envelope)
-        val bytes = try {
-            json.encodeToString(envelope).encodeToByteArray()
-        } catch (error: SerializationException) {
-            throw BackupFormatException("Nomi data could not be encoded safely", error)
+        // Streamed and gzipped. Building one giant String first meant a large diary needed the
+        // whole document as UTF-16 plus a byte array plus the object graph at once, which is an
+        // OutOfMemoryError on a modest phone - and an Error, so nothing above could catch it.
+        // The size ceiling is now enforced as the bytes go past, so an oversized diary fails
+        // with a sentence instead of dying.
+        val guard = ByteBudget(BackupValidator.MAX_BACKUP_FILE_BYTES)
+        val counting = CountingOutputStream(guard)
+        var written = 0
+        GZIPOutputStream(counting, DEFAULT_BUFFER_SIZE).use { gzip ->
+            try {
+                // kotlinx.serialization's Json has no streaming encoder, so the document is still
+                // built as one String - but it is written out through a Writer, which encodes to
+                // UTF-8 in fixed-size chunks. The previous code additionally held a full
+                // encodeToByteArray() copy, so this removes the doubling that turned a long diary
+                // into an OutOfMemoryError on a modest phone.
+                val text = json.encodeToString(envelope)
+                OutputStreamWriter(gzip, Charsets.UTF_8).use { writer ->
+                    writer.write(text)
+                    writer.flush()
+                }
+                gzip.finish()
+            } catch (error: SerializationException) {
+                throw BackupFormatException("Nomi data could not be encoded safely", error)
+            }
         }
-        if (bytes.size > BackupValidator.MAX_BACKUP_BYTES) {
-            throw BackupFormatException(
-                "Backup is ${bytes.size} bytes; the limit is ${BackupValidator.MAX_BACKUP_BYTES}",
-            )
-        }
-        output.write(bytes)
+        written = counting.count
+        output.write(counting.buffer(), 0, written)
         output.flush()
-        BackupExportResult(summary = summary, bytesWritten = bytes.size)
+        BackupExportResult(summary = summary, bytesWritten = written)
     }
 
     suspend fun exportToByteArray(): ByteArray = withContext(Dispatchers.IO) {
@@ -87,8 +109,7 @@ class NomiBackupService(
 
     /** Parses and validates an import for a confirmation preview without changing local state. */
     suspend fun inspect(input: InputStream): BackupInspection = withContext(Dispatchers.IO) {
-        val bytes = input.readCapped(BackupValidator.MAX_BACKUP_BYTES)
-        decodeAndValidate(bytes)
+        decodeAndValidate(input.readCapped())
     }
 
     /**
@@ -97,8 +118,7 @@ class NomiBackupService(
      * fails. Device-local API keys and the developer debug preference are never read or changed.
      */
     suspend fun importFrom(input: InputStream): BackupImportResult = withContext(Dispatchers.IO) {
-        val bytes = input.readCapped(BackupValidator.MAX_BACKUP_BYTES)
-        importValidated(decodeAndValidate(bytes))
+        importValidated(decodeAndValidate(input.readCapped()))
     }
 
     suspend fun importValidated(inspection: BackupInspection): BackupImportResult =
@@ -177,8 +197,19 @@ class NomiBackupService(
             value.portionChangeProvider.toPreference(),
         )
         preferencesStore.setProvider(ProviderPipeline.VISION, value.visionProvider.toPreference())
+        // Absent in a backup written by an older build, in which case the default is what the
+        // user already had; present in a current one, and previously dropped on restore.
+        if (value.smartFallbackProvider.model.isNotBlank()) {
+            preferencesStore.setProvider(
+                ProviderPipeline.SMART_FALLBACK,
+                value.smartFallbackProvider.toPreference(),
+            )
+        }
         preferencesStore.setReminders(value.reminders)
         preferencesStore.setAdjustTargetFromActivity(value.adjustTargetFromActivity)
+        preferencesStore.setMicronutrients(value.micronutrients.toPreferences())
+        preferencesStore.setCalorieEstimateBias(value.calorieEstimateBias)
+        preferencesStore.setGoalsCardStyle(value.goalsCardStyle)
         preferencesStore.setOnboardingDraft(null)
         preferencesStore.markOnboardingCompleted(value.onboardingCompleted, clearDraft = true)
     }
@@ -216,19 +247,82 @@ class NomiBackupService(
     }
 }
 
-private fun InputStream.readCapped(maxBytes: Int): ByteArray {
-    val output = ByteArrayOutputStream(minOf(maxBytes, DEFAULT_BUFFER_SIZE))
+/**
+ * Reads a backup into memory, transparently inflating it when it is gzipped.
+ *
+ * A backup written by this version is gzip, because a JSON diary compresses roughly ten to one
+ * and the storage ceiling is what stops a long diary from being exportable at all. A backup
+ * written by any earlier version is plain JSON and is read exactly as before, so nothing that
+ * already exists stops working: the choice is made by sniffing the two gzip magic bytes rather
+ * than by anything recorded in the file.
+ */
+private fun InputStream.readCapped(): ByteArray {
+    // PushbackInputStream is the tool for this: the two magic bytes are read, judged, and handed
+    // back, so the same stream can then be inflated or read as plain text.
+    val pushback = if (this is PushbackInputStream) this else PushbackInputStream(this, 2)
+    val head = ByteArray(2)
+    val read = pushback.read(head, 0, 2)
+    val isGzip = read == 2 && head[0] == 0x1f.toByte() && head[1] == 0x8b.toByte()
+    if (read > 0) pushback.unread(head, 0, read)
+    val source = if (isGzip) GZIPInputStream(pushback) else pushback
+    val output = ByteArrayOutputStream(DEFAULT_BUFFER_SIZE * 4)
     val chunk = ByteArray(DEFAULT_BUFFER_SIZE)
     var total = 0
     while (true) {
-        val read = read(chunk)
-        if (read < 0) break
-        if (read == 0) continue
-        total += read
-        if (total > maxBytes) {
-            throw BackupFormatException("Backup is larger than the $maxBytes byte limit")
+        val n = source.read(chunk)
+        if (n < 0) break
+        if (n == 0) continue
+        total += n
+        if (total > BackupValidator.MAX_BACKUP_BYTES) {
+            throw BackupFormatException(
+                "Backup is larger than the ${BackupValidator.MAX_BACKUP_BYTES} byte limit",
+            )
         }
-        output.write(chunk, 0, read)
+        output.write(chunk, 0, n)
     }
+    if (isGzip) source.close()
     return output.toByteArray()
+}
+
+/**
+ * Refuses to buffer more than a fixed number of bytes.
+ *
+ * Fed to the encoder rather than checked afterwards, so an oversized diary is refused while it is
+ * being written instead of after the whole thing has been held in memory.
+ */
+internal class ByteBudget(private val limit: Int) {
+    private var used = 0
+
+    fun take(count: Int) {
+        used += count
+        if (used > limit) {
+            throw BackupFormatException("Backup is larger than the $limit byte limit")
+        }
+    }
+}
+
+/**
+ * Collects the compressed bytes so a failed export never leaves a half-written file behind: the
+ * caller only writes to the real destination once encoding has finished cleanly.
+ */
+private class CountingOutputStream(private val budget: ByteBudget) : OutputStream() {
+    private var sink = ByteArrayOutputStream(DEFAULT_BUFFER_SIZE * 4)
+
+    val count: Int get() = sink.size()
+
+    fun buffer(): ByteArray = sink.toByteArray()
+
+    override fun write(b: Int) {
+        budget.take(1)
+        sink.write(b)
+    }
+
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        budget.take(len)
+        sink.write(b, off, len)
+    }
+
+    override fun flush() = Unit
+
+    override fun close() = Unit
 }

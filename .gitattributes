@@ -1,0 +1,30 @@
+# Normalise line endings so a checkout on any platform cannot produce a
+# repository-wide phantom diff, and so the POSIX Gradle wrapper always runs.
+* text=auto eol=lf
+
+# The wrapper is a shell script: CRLF makes every line fail with
+# "'\r': command not found", and it must stay executable.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+*.sh text eol=lf
+
+# Room schema exports are rewritten by KSP and reviewed in migration diffs;
+# keep their line endings stable so a schema change is never buried in noise.
+app/schemas/** text eol=lf -diff
+
+# Binaries must never be touched by line-ending conversion.
+*.apk binary
+*.aab binary
+*.aar binary
+*.jks binary
+*.keystore binary
+*.jar binary
+*.zip binary
+*.gz binary
+*.so binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.tflite binary
+*.pdf binary

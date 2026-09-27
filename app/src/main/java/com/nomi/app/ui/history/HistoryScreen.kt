@@ -7,6 +7,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Search
@@ -42,6 +46,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.NomiDatePickerDialog
+import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
@@ -58,15 +63,21 @@ import kotlin.math.roundToInt
 @Composable
 fun HistoryScreen(
     state: HistoryUiState,
+    today: LocalDate,
     onQueryChanged: (String) -> Unit,
     onDateSelected: (LocalDate) -> Unit,
     onFoodClick: (Long) -> Unit,
-    onCopyMeal: (HistoryDay) -> Unit,
+    onCopyMeal: (HistoryDay, MealCategory) -> Unit,
     onCopyDay: (HistoryDay) -> Unit,
     modifier: Modifier = Modifier,
-    onSaveMeal: (HistoryDay) -> Unit,
+    onSaveMeal: (HistoryDay, String) -> Unit,
+    onBack: () -> Unit = {},
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    // The name is asked for, never invented: saveHistoryDayAsMeal refuses a blank name, so a
+    // silent default would look like a broken chip. The field is pre-filled with a date-derived
+    // suggestion the user can accept with one tap or retype.
+    var pendingSave by remember { mutableStateOf<HistoryDay?>(null) }
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and Settings, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -78,6 +89,16 @@ fun HistoryScreen(
             LargeFlexibleTopAppBar(
                 scrollBehavior = scrollBehavior,
                 title = { Text(nomiString("History")) },
+                navigationIcon = {
+                    // History is pushed on top of Today, so the bar carries the same way back the
+                    // other full-screen destinations do.
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = nomiString("Back"),
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(
@@ -135,19 +156,18 @@ fun HistoryScreen(
                     item(key = "summary-${day.date}") {
                         DayHeader(
                             day = day,
-                            onCopyMeal = { onCopyMeal(day) },
+                            // Copying today onto today would only duplicate the plate, so the
+                            // copy actions are hidden on the current day rather than offered and
+                            // silently producing a double entry.
+                            showCopyActions = !day.isSameDayAs(today),
+                            onCopyMeal = { mealCategory -> onCopyMeal(day, mealCategory) },
                             onCopyDay = { onCopyDay(day) },
-                            onSaveMeal = { onSaveMeal(day) },
+                            onSaveMeal = { pendingSave = day },
                             modifier = Modifier.animateItem(),
                         )
                     }
                     items(day.entries, key = { "${day.date}-${it.id}" }) { entry ->
-                        val categoryLabel = when (entry.mealCategory) {
-                            MealCategory.BREAKFAST -> nomiString("Breakfast")
-                            MealCategory.LUNCH -> nomiString("Lunch")
-                            MealCategory.DINNER -> nomiString("Dinner")
-                            MealCategory.SNACKS -> nomiString("Snacks")
-                        }
+                        val categoryLabel = localizedMealName(entry.mealCategory)
                         ListItem(
                             headlineContent = {
                                 Text(entry.name, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -188,12 +208,63 @@ fun HistoryScreen(
             showModeToggle = false,
         )
     }
+
+    pendingSave?.let { day ->
+        SaveMealNameDialog(
+            day = day,
+            onDismiss = { pendingSave = null },
+            onConfirm = { name ->
+                pendingSave = null
+                onSaveMeal(day, name)
+            },
+        )
+    }
 }
 
+/**
+ * Asks for the name the day will be filed under in the food library.
+ *
+ * The whole day is saved as one meal, so the name is the only thing the user gets to choose about
+ * it; the day itself is already fixed by the day header that was tapped.
+ */
+@Composable
+private fun SaveMealNameDialog(
+    day: HistoryDay,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    val locale = nomiLocale()
+    // Hoisted out of the remember block: remember's calculation lambda is not a composable
+    // context, so nomiString cannot be called inside it.
+    val defaultName = defaultSavedMealName(day.date, locale, nomiString("Meal"))
+    var name by remember(day.date) { mutableStateOf(defaultName) }
+    NomiDialog(
+        onDismissRequest = onDismiss,
+        title = nomiString("Save day as a meal"),
+        subtitle = day.date.format(
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale),
+        ),
+        icon = Icons.Default.BookmarkAdd,
+        confirmLabel = nomiString("Save"),
+        confirmEnabled = name.isNotBlank(),
+        onConfirm = { if (name.isNotBlank()) onConfirm(name.trim()) },
+        dismissLabel = nomiString("Cancel"),
+    ) {
+        NomiTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = nomiString("Meal name"),
+            singleLine = true,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DayHeader(
     day: HistoryDay,
-    onCopyMeal: () -> Unit,
+    showCopyActions: Boolean,
+    onCopyMeal: (MealCategory) -> Unit,
     onCopyDay: () -> Unit,
     onSaveMeal: () -> Unit,
     modifier: Modifier = Modifier,
@@ -228,22 +299,43 @@ private fun DayHeader(
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AssistChip(
-                onClick = onCopyMeal,
-                label = { Text(nomiString("Copy meal")) },
-                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-            )
-            AssistChip(
-                onClick = onCopyDay,
-                label = { Text(nomiString("Copy day")) },
-                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
-            )
+        // A day can hold four meals, so a single Row of chips would run off the edge on a long
+        // translation. FlowRow wraps instead of clipping.
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // One chip per meal actually eaten that day. The repository copies a single meal
+            // category at a time, so naming the meal in the chip is what makes the action
+            // unambiguous - a single day-wide "copy meal" would have to guess.
+            if (showCopyActions) {
+                day.mealCategories.forEach { mealCategory ->
+                    AssistChip(
+                        onClick = { onCopyMeal(mealCategory) },
+                        label = { Text(nomiFormat("Copy {0}", localizedMealName(mealCategory))) },
+                        leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                    )
+                }
+                AssistChip(
+                    onClick = onCopyDay,
+                    label = { Text(nomiString("Copy day")) },
+                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                )
+            }
             AssistChip(
                 onClick = onSaveMeal,
                 label = { Text(nomiString("Save meal")) },
-                leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Default.BookmarkAdd, contentDescription = null) },
             )
         }
     }
+}
+
+@Composable
+private fun localizedMealName(mealCategory: MealCategory): String = when (mealCategory) {
+    MealCategory.BREAKFAST -> nomiString("Breakfast")
+    MealCategory.LUNCH -> nomiString("Lunch")
+    MealCategory.DINNER -> nomiString("Dinner")
+    MealCategory.SNACKS -> nomiString("Snacks")
 }

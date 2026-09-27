@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Release values. The debug source set overrides both of these, which is the only way the
+    update dialog can be forced on demand.
+
+    A resource override rather than a flag in code: the release build has `false` and an empty
+    string, so there is no runtime switch and no backdoor in a shipped APK to flip.
+-->
+<resources>
+    <bool name="nomi_debug_force_update_dialog">false</bool>
+    <string name="nomi_debug_forced_update_version" translatable="false"></string>
+</resources>

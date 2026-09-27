@@ -155,6 +155,165 @@ object ServingNutritionNormalizer {
         }
     }
 
+    /**
+     * Applies a user's correction to one item's nutrient values, keeping it saveable.
+     *
+     * The user is correcting what the food *contains*, not how much was eaten, so the logged
+     * amount and the source serving stay put and the per-100 basis is re-derived from the
+     * corrected logged value. That is what keeps [validateBeforeSave] satisfied: the recorded
+     * basis and the item's numbers describe the same reading again, instead of the two being
+     * left to disagree.
+     *
+     * This deliberately re-derives rather than waives. The corrected per-100 values still have
+     * to be physically possible, so a correction to an impossible number is refused exactly as
+     * an impossible research result is.
+     */
+    fun applyUserNutrientCorrection(
+        item: AnalyzedFoodItem,
+        calories: Double,
+        proteinGrams: Double,
+        carbohydrateGrams: Double,
+        fatGrams: Double,
+    ): AnalyzedFoodItem {
+        val validation = item.servingValidation?.takeIf { item.requiresServingValidation }
+        if (validation == null) {
+            // No recorded basis to preserve, so the correction is the whole truth for this
+            // entry. It still has to be a food.
+            requireFiniteNonNegative(calories, "calories")
+            requireFiniteNonNegative(proteinGrams, "protein")
+            requireFiniteNonNegative(carbohydrateGrams, "carbohydrates")
+            requireFiniteNonNegative(fatGrams, "fat")
+            requireComponentWithinParent(
+                component = item.sugarGrams,
+                parent = carbohydrateGrams,
+                componentName = "sugar",
+                parentName = "carbohydrates",
+            )
+            requireComponentWithinParent(
+                component = item.saturatedFatGrams,
+                parent = fatGrams,
+                componentName = "saturated fat",
+                parentName = "fat",
+            )
+            requirePhysicallyPossiblePer100(
+                validation = per100ForLogged(
+                    loggedBaseAmount = 100.0,
+                    calories = calories,
+                    proteinGrams = proteinGrams,
+                    carbohydrateGrams = carbohydrateGrams,
+                    fatGrams = fatGrams,
+                    fiberGrams = item.fiberGrams,
+                    sugarGrams = item.sugarGrams,
+                    saturatedFatGrams = item.saturatedFatGrams,
+                    sodiumMilligrams = item.sodiumMilligrams,
+                ),
+                dimension = Dimension.Mass,
+            )
+            return correctedItem(item, calories, proteinGrams, carbohydrateGrams, fatGrams, null)
+        }
+
+        val loggedFactor = validation.loggedBaseAmount / 100.0
+        requireFiniteNonNegative(calories, "calories")
+        requireFiniteNonNegative(proteinGrams, "protein")
+        requireFiniteNonNegative(carbohydrateGrams, "carbohydrates")
+        requireFiniteNonNegative(fatGrams, "fat")
+
+        // Sugar and saturated fat are components of their parents and are not edited here, so a
+        // correction that drops a parent below its own component is still a contradiction.
+        requireComponentWithinParent(
+            component = validation.sugarGramsPer100,
+            parent = carbohydrateGrams / loggedFactor,
+            componentName = "sugar",
+            parentName = "carbohydrates",
+        )
+        requireComponentWithinParent(
+            component = validation.saturatedFatGramsPer100,
+            parent = fatGrams / loggedFactor,
+            componentName = "saturated fat",
+            parentName = "fat",
+        )
+
+        val correctedValidation = validation.copy(
+            caloriesPer100 = calories / loggedFactor,
+            proteinGramsPer100 = proteinGrams / loggedFactor,
+            carbohydrateGramsPer100 = carbohydrateGrams / loggedFactor,
+            fatGramsPer100 = fatGrams / loggedFactor,
+        )
+        requirePhysicallyPossiblePer100(
+            correctedValidation,
+            dimensionFromStorageName(validation.dimension),
+        )
+        return correctedItem(
+            item, calories, proteinGrams, carbohydrateGrams, fatGrams, correctedValidation,
+        ).also { validateBeforeSave(FoodAnalysis(items = listOf(it))) }
+    }
+
+    private fun correctedItem(
+        item: AnalyzedFoodItem,
+        calories: Double,
+        proteinGrams: Double,
+        carbohydrateGrams: Double,
+        fatGrams: Double,
+        validation: ServingSizeValidation?,
+    ): AnalyzedFoodItem = item.copy(
+        calories = calories,
+        proteinGrams = proteinGrams,
+        carbohydrateGrams = carbohydrateGrams,
+        fatGrams = fatGrams,
+        servingValidation = validation,
+        requiresServingValidation = validation != null,
+        // A value the cited source did not report is no longer a source reading.
+        isEstimate = true,
+        verificationStatus = com.nomi.app.ai.model.NutritionVerificationStatus.ESTIMATED,
+        assumptions = (
+            item.assumptions + "Nutrition corrected by hand before saving."
+            ).takeLast(12),
+    )
+
+    private fun per100ForLogged(
+        loggedBaseAmount: Double,
+        calories: Double,
+        proteinGrams: Double,
+        carbohydrateGrams: Double,
+        fatGrams: Double,
+        fiberGrams: Double?,
+        sugarGrams: Double?,
+        saturatedFatGrams: Double?,
+        sodiumMilligrams: Double?,
+    ) = ServingSizeValidation(
+        dimension = Dimension.Mass.storageName,
+        sourceQuantity = loggedBaseAmount,
+        sourceUnit = "g",
+        sourceBaseAmount = loggedBaseAmount,
+        loggedQuantity = loggedBaseAmount,
+        loggedUnit = "g",
+        loggedBaseAmount = loggedBaseAmount,
+        scaleFactor = 1.0,
+        caloriesPer100 = calories,
+        proteinGramsPer100 = proteinGrams,
+        carbohydrateGramsPer100 = carbohydrateGrams,
+        fatGramsPer100 = fatGrams,
+        fiberGramsPer100 = fiberGrams,
+        sugarGramsPer100 = sugarGrams,
+        saturatedFatGramsPer100 = saturatedFatGrams,
+        sodiumMilligramsPer100 = sodiumMilligrams,
+    )
+
+    private fun requireFiniteNonNegative(value: Double, label: String) {
+        if (!value.isFinite() || value < 0.0) {
+            throw AiValidationException("$label must be a finite value of zero or more")
+        }
+    }
+
+    /** Reads back the dimension a recorded validation was written against. */
+    private fun dimensionFromStorageName(storageName: String): Dimension = when {
+        storageName == Dimension.Mass.storageName -> Dimension.Mass
+        storageName == Dimension.Volume.storageName -> Dimension.Volume
+        storageName == Dimension.Piece.storageName -> Dimension.Piece
+        storageName.startsWith("custom:") -> Dimension.Custom(storageName.removePrefix("custom:"))
+        else -> Dimension.Mass
+    }
+
     /** Re-checks the exact source and logged bases immediately before database persistence. */
     fun validateBeforeSave(analysis: FoodAnalysis): FoodAnalysis {
         AiResponseValidator.validate(analysis)

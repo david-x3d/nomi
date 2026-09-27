@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
+import com.nomi.app.domain.UnitFormatter
 import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
@@ -61,12 +62,17 @@ import kotlin.math.roundToInt
 
 @Composable
 fun WeightEntryDialog(
+    metric: Boolean,
     onDismiss: () -> Unit,
     onSave: (Double, String?) -> Unit,
 ) {
     var weight by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    val parsed = weight.replace(',', '.').toDoubleOrNull()
+    val locale = nomiLocale()
+    // Parsed through the shared unit formatter, so the number a person types in pounds is stored
+    // as kilograms. It used to be a bare parse of a field labelled "kg", which meant a real
+    // 180 lb weigh-in was persisted as 180 kg and then fed the calorie calculator.
+    val parsed = UnitFormatter.parseWeightToKilograms(weight, metric)
     NomiDialog(
         onDismissRequest = onDismiss,
         title = nomiString("Log weight"),
@@ -74,14 +80,14 @@ fun WeightEntryDialog(
         subtitle = nomiString("Your trend matters more than any single weigh-in."),
         confirmLabel = nomiString("Save"),
         onConfirm = { parsed?.let { onSave(it, note); onDismiss() } },
-        confirmEnabled = parsed != null && parsed in 20.0..500.0,
+        confirmEnabled = parsed != null && UnitFormatter.isPlausibleWeightKilograms(parsed),
         dismissLabel = nomiString("Cancel"),
     ) {
         NomiTextField(
             value = weight,
             onValueChange = { weight = it.filter { character -> character.isDigit() || character in ".," } },
-            label = nomiString("Weight in kg"),
-            suffix = "kg",
+            label = if (metric) nomiString("Weight in kg") else nomiString("Weight in lb"),
+            suffix = UnitFormatter.weightUnit(metric),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         )
         NomiTextField(

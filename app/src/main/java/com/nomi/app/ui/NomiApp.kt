@@ -20,6 +20,7 @@ import com.nomi.app.ui.app.NomiRoot
 import com.nomi.app.ui.localization.LocalNomiLanguage
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.theme.NomiTheme
+import com.nomi.app.ui.theme.provideAnimationScale
 
 @Composable
 fun NomiApp(
@@ -51,6 +52,7 @@ fun NomiApp(
         darkTheme = dark,
         dynamicColor = preferences.dynamicColorEnabled,
     ) {
+      provideAnimationScale {
         CompositionLocalProvider(
             // No stored choice means a fresh install, which starts in the device's language if
             // Nomi speaks it and in English otherwise.
@@ -60,6 +62,7 @@ fun NomiApp(
         ) {
             NomiRoot(container = container, viewModel = viewModel)
         }
+      }
     }
 }
 

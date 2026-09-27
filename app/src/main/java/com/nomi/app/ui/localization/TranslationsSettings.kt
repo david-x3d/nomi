@@ -529,3 +529,57 @@ internal val settingsTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Reservalternativ", tr = "Yedek",
     ),
 )
+
+/**
+ * The in-app update check. Kept apart so the whole feature's copy is one readable block.
+ *
+ * Written in the same `"key" to NomiTranslation(` form as every other area: the coverage test
+ * reads catalogue keys by that shape, and a second spelling here is invisible to a reader but not
+ * to the test.
+ */
+internal val updateTranslations: Map<String, NomiTranslation> = mapOf(
+    "Nomi update available" to NomiTranslation(
+        de = "Nomi-Update verfügbar",
+        es = "Actualización de Nomi disponible",
+        fr = "Mise à jour de Nomi disponible",
+        it = "Aggiornamento di Nomi disponibile",
+        nl = "Nomi-update beschikbaar",
+        pt = "Atualização do Nomi disponível",
+        sq = "Përditësimi i Nomi është i disponueshëm",
+        sv = "Nomi-uppdatering tillgänglig",
+        tr = "Nomi güncellemesi kullanılabilir",
+    ),
+    "Nomi {0} is available." to NomiTranslation(
+        de = "Nomi {0} ist verfügbar.",
+        es = "Nomi {0} ya está disponible.",
+        fr = "Nomi {0} est disponible.",
+        it = "Nomi {0} è disponibile.",
+        nl = "Nomi {0} is beschikbaar.",
+        pt = "O Nomi {0} já está disponível.",
+        sq = "Nomi {0} është i disponueshëm.",
+        sv = "Nomi {0} är tillgänglig.",
+        tr = "Nomi {0} kullanılabilir.",
+    ),
+    "View update" to NomiTranslation(
+        de = "Update ansehen",
+        es = "Ver la actualización",
+        fr = "Voir la mise à jour",
+        it = "Vedi l'aggiornamento",
+        nl = "Update bekijken",
+        pt = "Ver a atualização",
+        sq = "Shiko përditësimin",
+        sv = "Visa uppdateringen",
+        tr = "Güncellemeyi görüntüle",
+    ),
+    "Later" to NomiTranslation(
+        de = "Später",
+        es = "Más tarde",
+        fr = "Plus tard",
+        it = "Più tardi",
+        nl = "Later",
+        pt = "Mais tarde",
+        sq = "Më vonë",
+        sv = "Senare",
+        tr = "Daha sonra",
+    ),
+)

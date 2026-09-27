@@ -383,6 +383,10 @@ class NomiRepository(
     suspend fun deleteLog(log: FoodLogEntity): Boolean = logDao.deleteLog(log) == 1
     suspend fun foodLog(id: Long): FoodLogEntity? = logDao.log(id)
 
+    /** Every product sharing a meal group, so a detail view can show the whole meal. */
+    suspend fun logsByEntryGroup(entryGroupId: String): List<FoodLogEntity> =
+        logDao.logsByEntryGroupId(entryGroupId)
+
     /**
      * Corrects how much of an already logged food was actually eaten.
      *
@@ -527,33 +531,15 @@ class NomiRepository(
         require(request.logIds.isNotEmpty()) { "Select at least one log" }
         val logs = request.logIds.distinct().map { id ->
             checkNotNull(logDao.log(id)) { "Food log $id does not exist" }
-        }.sortedWith(compareBy<FoodLogEntity> { it.loggedAtEpochMillis }.thenBy { it.id })
-        val meal = SavedMealEntity(
-            name = request.name.trim(),
-            normalizedName = normalize(request.normalizedName.ifBlank { request.name }),
-            notes = request.notes,
-            defaultMealCategory = request.defaultMealCategory ?: logs.first().mealCategory,
-            createdAtEpochMillis = request.createdAtEpochMillis,
-            updatedAtEpochMillis = request.createdAtEpochMillis,
-        )
-        val items = logs.mapIndexed { index, log ->
-            SavedMealItemEntity(
-                savedMealId = 0,
-                foodId = log.foodId,
-                foodServingId = log.foodServingId,
-                sortOrder = index,
-                displayNameSnapshot = log.displayNameSnapshot,
-                brandSnapshot = log.brandSnapshot,
-                amount = log.amount,
-                unit = log.unit,
-                grams = log.grams,
-                resolvedVolumeMl = log.resolvedVolumeMl,
-                resolutionSource = log.resolutionSource,
-                nutritionSnapshot = log.nutritionSnapshot,
-                sourceSnapshot = log.sourceSnapshot,
-                isEstimated = log.isEstimated,
-            )
         }
+        val (meal, items) = savedMealFromLogs(
+            name = request.name,
+            normalizedName = request.normalizedName,
+            notes = request.notes,
+            defaultMealCategory = request.defaultMealCategory,
+            createdAtEpochMillis = request.createdAtEpochMillis,
+            logs = logs,
+        )
         mealDao.saveMeal(meal, items)
     }
 
@@ -732,8 +718,9 @@ class NomiRepository(
         LocalDate.parse(localDate)
     }
 
-    private fun normalize(value: String): String =
-        value.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
+    // One definition for the search key of every name-shaped column, so the library search, the
+    // alias table and saved meals cannot drift apart and split one name across two rows.
+    private fun normalize(value: String): String = normalizeMealName(value)
 
     private fun validatedLimit(limit: Int): Int {
         require(limit in 1..500) { "Limit must be between 1 and 500" }

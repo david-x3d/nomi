@@ -7,12 +7,13 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.nomi.app.data.repository.copiedDayLogs
+import com.nomi.app.data.repository.copiedMealLogs
 import com.nomi.app.data.local.entity.FoodLogEntity
 import com.nomi.app.data.local.model.DailyNutritionTotals
 import com.nomi.app.data.local.model.FoodLogWithCatalogReference
 import com.nomi.app.data.local.model.MealNutritionTotals
 import kotlinx.coroutines.flow.Flow
-import java.util.UUID
 
 @Dao
 interface FoodLogDao {
@@ -206,21 +207,14 @@ interface FoodLogDao {
     ): List<Long> {
         val source = mealLogs(sourceLocalDate, sourceMealCategory)
         if (source.isEmpty()) return emptyList()
-        val groupId = UUID.randomUUID().toString()
         return insertLogs(
-            source.mapIndexed { index, log ->
-                log.copy(
-                    id = 0,
-                    entryGroupId = groupId,
-                    mealCategory = targetMealCategory,
-                    localDate = targetLocalDate,
-                    loggedAtEpochMillis = targetStartEpochMillis + index,
-                    zoneId = targetZoneId,
-                    inputMethod = "copied_meal",
-                    createdAtEpochMillis = targetStartEpochMillis,
-                    updatedAtEpochMillis = targetStartEpochMillis,
-                )
-            },
+            copiedMealLogs(
+                source = source,
+                targetLocalDate = targetLocalDate,
+                targetMealCategory = targetMealCategory,
+                targetStartEpochMillis = targetStartEpochMillis,
+                targetZoneId = targetZoneId,
+            ),
         )
     }
 
@@ -233,24 +227,13 @@ interface FoodLogDao {
     ): List<Long> {
         val source = dayLogs(sourceLocalDate)
         if (source.isEmpty()) return emptyList()
-        val copiedGroupIds = mutableMapOf<String, String>()
         return insertLogs(
-            source.mapIndexed { index, log ->
-                val sourceGroup = log.entryGroupId ?: "single:${log.id}"
-                val targetGroup = copiedGroupIds.getOrPut(sourceGroup) {
-                    UUID.randomUUID().toString()
-                }
-                log.copy(
-                    id = 0,
-                    entryGroupId = targetGroup,
-                    localDate = targetLocalDate,
-                    loggedAtEpochMillis = targetStartEpochMillis + index,
-                    zoneId = targetZoneId,
-                    inputMethod = "copied_day",
-                    createdAtEpochMillis = targetStartEpochMillis,
-                    updatedAtEpochMillis = targetStartEpochMillis,
-                )
-            },
+            copiedDayLogs(
+                source = source,
+                targetLocalDate = targetLocalDate,
+                targetStartEpochMillis = targetStartEpochMillis,
+                targetZoneId = targetZoneId,
+            ),
         )
     }
 }

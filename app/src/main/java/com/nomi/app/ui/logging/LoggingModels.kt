@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.PortionAdjustment
 import com.nomi.app.ai.model.PortionContext
+import com.nomi.app.domain.DecimalInput
 import com.nomi.app.ui.today.MealCategory
 
 sealed interface FoodLoggingUiState {
@@ -73,11 +74,11 @@ data class ManualFoodDraft(
     val mealCategory: MealCategory = MealCategory.SNACKS,
 ) {
     val isValid: Boolean
-        get() = name.isNotBlank() && amount.toDoubleOrNull()?.let { it > 0 } == true &&
-            calories.toDoubleOrNull()?.let { it >= 0 } == true &&
-            protein.toDoubleOrNull()?.let { it >= 0 } == true &&
-            carbohydrates.toDoubleOrNull()?.let { it >= 0 } == true &&
-            fat.toDoubleOrNull()?.let { it >= 0 } == true
+        get() = name.isNotBlank() && DecimalInput.parseOrNull(amount)?.let { it > 0 } == true &&
+            DecimalInput.parseOrNull(calories) != null &&
+            DecimalInput.parseOrNull(protein) != null &&
+            DecimalInput.parseOrNull(carbohydrates) != null &&
+            DecimalInput.parseOrNull(fat) != null
 }
 
 data class PortionEditUiState(

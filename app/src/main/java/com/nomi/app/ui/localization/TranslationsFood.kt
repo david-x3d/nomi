@@ -627,10 +627,6 @@ internal val foodTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Kontrollera portionerna innan du sparar.",
         tr = "Kaydetmeden önce porsiyonları kontrol et.",
     ),
-    "Total" to NomiTranslation(
-        de = "Gesamt", es = "Total", fr = "Total", it = "Totale", nl = "Totaal",
-        pt = "Total", sq = "Totali", sv = "Totalt", tr = "Toplam",
-    ),
     "Add to today" to NomiTranslation(
         de = "Zu Heute hinzufügen", es = "Añadir a hoy", fr = "Ajouter à aujourd’hui",
         it = "Aggiungi a oggi", nl = "Aan vandaag toevoegen", pt = "Adicionar a hoje",

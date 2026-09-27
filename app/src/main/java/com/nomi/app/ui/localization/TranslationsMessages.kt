@@ -86,6 +86,18 @@ internal val messageTranslations: Map<String, NomiTranslation> = mapOf(
     "Nomi couldn't copy that day." to NomiTranslation(
         de = "Nomi konnte diesen Tag nicht kopieren.", es = "Nomi no pudo copiar ese día.", fr = "Nomi n’a pas pu copier cette journée.", it = "Nomi non è riuscito a copiare quel giorno.", nl = "Nomi kon die dag niet kopiëren.", pt = "A Nomi não conseguiu copiar esse dia.", sq = "Nomi nuk mundi ta kopjonte atë ditë.", sv = "Nomi kunde inte kopiera dagen.", tr = "Nomi bu günü kopyalayamadı.",
     ),
+    "Nomi copied that day to today." to NomiTranslation(
+        de = "Nomi hat diesen Tag auf heute kopiert.", es = "Nomi copió ese día a hoy.", fr = "Nomi a copié cette journée sur aujourd’hui.", it = "Nomi ha copiato quel giorno su oggi.", nl = "Nomi heeft die dag naar vandaag gekopieerd.", pt = "A Nomi copiou esse dia para hoje.", sq = "Nomi e kopjoi atë ditë te sot.", sv = "Nomi kopierade den dagen till i dag.", tr = "Nomi o günü bugüne kopyaladı.",
+    ),
+    "Nomi couldn't copy that meal." to NomiTranslation(
+        de = "Nomi konnte diese Mahlzeit nicht kopieren.", es = "Nomi no pudo copiar esa comida.", fr = "Nomi n’a pas pu copier ce repas.", it = "Nomi non è riuscito a copiare quel pasto.", nl = "Nomi kon die maaltijd niet kopiëren.", pt = "A Nomi não conseguiu copiar essa refeição.", sq = "Nomi nuk mundi ta kopjonte atë vakt.", sv = "Nomi kunde inte kopiera måltiden.", tr = "Nomi bu öğünü kopyalayamadı.",
+    ),
+    "Nomi copied that {0} to today." to NomiTranslation(
+        de = "Nomi hat {0} auf heute kopiert.", es = "Nomi copió {0} a hoy.", fr = "Nomi a copié {0} sur aujourd’hui.", it = "Nomi ha copiato {0} su oggi.", nl = "Nomi heeft {0} naar vandaag gekopieerd.", pt = "A Nomi copiou {0} para hoje.", sq = "Nomi e kopjoi {0} te sot.", sv = "Nomi kopierade {0} till i dag.", tr = "Nomi {0} öğünü bugüne kopyaladı.",
+    ),
+    "Nomi saved that meal." to NomiTranslation(
+        de = "Nomi hat diese Mahlzeit gespeichert.", es = "Nomi guardó esa comida.", fr = "Nomi a enregistré ce repas.", it = "Nomi ha salvato quel pasto.", nl = "Nomi heeft die maaltijd opgeslagen.", pt = "A Nomi guardou essa refeição.", sq = "Nomi e ruajti atë vakt.", sv = "Nomi sparade måltiden.", tr = "Nomi bu öğünü kaydetti.",
+    ),
     "Enter a valid weight." to NomiTranslation(
         de = "Gib ein gültiges Gewicht ein.", es = "Introduce un peso válido.", fr = "Saisis un poids valide.", it = "Inserisci un peso valido.", nl = "Voer een geldig gewicht in.", pt = "Introduz um peso válido.", sq = "Vendos një peshë të vlefshme.", sv = "Ange en giltig vikt.", tr = "Geçerli bir kilo gir.",
     ),

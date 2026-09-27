@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Debug-only overrides. These exist in the `debug` source set, so they are compiled into debug
+    APKs and NOT into release APKs - the release values in src/main/res/values win there and stay
+    `false`.
+
+    This is the only way the update dialog can be forced on demand for a screenshot, and it is
+    unreachable in a shipped build: there is no code path, no preference and no intent extra that
+    reaches it, because the release resource is a constant `false` the R8/AGP resource merger has
+    already resolved.
+-->
+<resources>
+    <bool name="nomi_debug_force_update_dialog">true</bool>
+    <string name="nomi_debug_forced_update_version" translatable="false">99.0.0</string>
+</resources>

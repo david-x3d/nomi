@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.nomi.app.domain.UnitFormatter
 import com.nomi.app.ui.components.NomiCard
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
@@ -76,6 +77,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ProgressScreen(
     state: ProgressUiState,
+    metric: Boolean,
     onRangeChanged: (ProgressRange) -> Unit,
     onAddWeight: () -> Unit,
     modifier: Modifier = Modifier,
@@ -145,6 +147,7 @@ fun ProgressScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         WeightSection(
                             state = animatedState,
+                            metric = metric,
                             onAddWeight = onAddWeight,
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
@@ -181,6 +184,7 @@ private fun ProgressRange.label(): String = when (this) {
 @Composable
 private fun WeightSection(
     state: ProgressUiState,
+    metric: Boolean,
     onAddWeight: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -210,7 +214,7 @@ private fun WeightSection(
                     label = "Current weight",
                 ) { kilograms ->
                     Text(
-                        text = kilograms?.let { "${formatWeight(it, locale)} kg" } ?: "—",
+                        text = kilograms?.let { UnitFormatter.formatWeight(it, metric, locale) } ?: "—",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -229,6 +233,7 @@ private fun WeightSection(
             WeightChart(
                 points = state.weights,
                 targetKg = state.targetWeightKg,
+                metric = metric,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(2f),
@@ -240,14 +245,14 @@ private fun WeightSection(
                 state.startingWeightKg?.let {
                     WeightMilestone(
                         label = nomiString("Starting"),
-                        value = "${formatWeight(it, locale)} kg",
+                        value = UnitFormatter.formatWeight(it, metric, locale),
                         modifier = Modifier.weight(1f),
                     )
                 }
                 state.weights.lastOrNull()?.let {
                     WeightMilestone(
                         label = nomiString("Current"),
-                        value = "${formatWeight(it.kilograms, locale)} kg",
+                        value = UnitFormatter.formatWeight(it.kilograms, metric, locale),
                         modifier = Modifier.weight(1f),
                         emphasized = true,
                     )
@@ -255,7 +260,7 @@ private fun WeightSection(
                 state.targetWeightKg?.let {
                     WeightMilestone(
                         label = nomiString("Goal"),
-                        value = "${formatWeight(it, locale)} kg",
+                        value = UnitFormatter.formatWeight(it, metric, locale),
                         modifier = Modifier.weight(1f),
                         alignment = TextAlign.End,
                     )
@@ -309,6 +314,7 @@ private fun WeightMilestone(
 @Composable
 private fun WeightChart(
     points: List<WeightPoint>,
+    metric: Boolean,
     targetKg: Double?,
     modifier: Modifier = Modifier,
 ) {
@@ -325,8 +331,8 @@ private fun WeightChart(
     val max = (points.maxOf { it.kilograms }.let { if (targetKg != null) maxOf(it, targetKg) else it } + 1).toFloat()
     val summary = nomiFormat(
         "Weight trend from {0} to {1} kilograms across {2} measurements",
-        formatWeight(points.first().kilograms, locale),
-        formatWeight(points.last().kilograms, locale),
+        UnitFormatter.formatNumber(UnitFormatter.weightValue(points.first().kilograms, metric, locale), metric, locale) + " " + UnitFormatter.weightUnit(metric),
+        UnitFormatter.formatNumber(UnitFormatter.weightValue(points.last().kilograms, metric, locale), metric, locale) + " " + UnitFormatter.weightUnit(metric),
         points.size,
     )
     Canvas(modifier = modifier.semantics { contentDescription = summary }) {

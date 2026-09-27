@@ -41,7 +41,7 @@ internal class NomiTranslation(
  */
 internal object NomiTranslations {
 
-    val catalogue: Map<String, NomiTranslation> = buildMap(680) {
+    val catalogue: Map<String, NomiTranslation> = buildMap(700) {
         putAll(commonTranslations)
         putAll(onboardingTranslations)
         putAll(messageTranslations)
@@ -51,6 +51,7 @@ internal object NomiTranslations {
         putAll(libraryTranslations)
         putAll(profileTranslations)
         putAll(settingsTranslations)
+        putAll(updateTranslations)
     }
 
     fun translate(english: String, language: NomiLanguage): String {

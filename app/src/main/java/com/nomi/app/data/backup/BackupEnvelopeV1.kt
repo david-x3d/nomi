@@ -1,5 +1,7 @@
 package com.nomi.app.data.backup
 
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.HeightUnitPreference
 import com.nomi.app.data.preferences.ReminderPreferences
 import com.nomi.app.data.preferences.ThemePreference
@@ -63,6 +65,31 @@ data class BackupPreferencesV1(
     val reminders: ReminderPreferences,
     val onboardingCompleted: Boolean,
     val adjustTargetFromActivity: Boolean,
+    /**
+     * These four were written to the database but never carried in a backup, so restoring silently
+     * reset a user's tuned micronutrient targets, calorie bias and goals-card style to defaults.
+     * Every one is defaulted, which is what keeps a backup written by an older build readable.
+     */
+    val micronutrients: BackupMicronutrientsV1 = BackupMicronutrientsV1(),
+    val calorieEstimateBias: CalorieEstimateBias = CalorieEstimateBias.NONE,
+    val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
+    val smartFallbackProvider: BackupProviderSelectionV1 = BackupProviderSelectionV1(
+        providerId = "openrouter",
+        model = "",
+    ),
+)
+
+/** The four tracked nutrients and their targets, without the enabled set. */
+@Serializable
+data class BackupMicronutrientsV1(
+    val fiberGrams: Double = 30.0,
+    val fiberEnabled: Boolean = false,
+    val sugarGrams: Double = 25.0,
+    val sugarEnabled: Boolean = false,
+    val saturatedFatGrams: Double = 20.0,
+    val saturatedFatEnabled: Boolean = false,
+    val sodiumMilligrams: Double = 2_000.0,
+    val sodiumEnabled: Boolean = false,
 )
 
 @Serializable
