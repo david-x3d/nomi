@@ -63,6 +63,8 @@ class NomiShareReader(private val activity: Activity) : ShareReader {
             { tag -> onTag(NfcTagHandle(tag)) },
             NfcAdapter.FLAG_READER_NFC_A or
                 NfcAdapter.FLAG_READER_NFC_B or
+                // Talk directly to HCE without probing for an NDEF tag first.
+                NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK or
                 // Nomi is being held against another phone, so the sound and vibration of a tag
                 // being found would be noise on top of its own feedback.
                 NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,

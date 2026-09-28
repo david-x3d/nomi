@@ -12,7 +12,7 @@
     <aid-group
         android:description="@string/nfc_share_card_description"
         android:category="other">
-        <!-- "NOMI": how a reader tells a Nomi phone apart from a bank card. -->
-        <aid-filter android:name="4E4F4D49" />
+        <!-- Proprietary six-byte AID; must match ShareApdu.AID. -->
+        <aid-filter android:name="F04E4F4D4901" />
     </aid-group>
 </host-apdu-service>

@@ -17,6 +17,31 @@ import org.junit.Test
 class ShareApduTest {
 
     @Test
+    fun `registered AID is routable by Android and matches the reader`() {
+        val file = java.io.File("src/main/res/xml/nfc_share_apdu_service.xml")
+        val document = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder().parse(file)
+        val filter = document.getElementsByTagName("aid-filter").item(0)
+        val aid = filter.attributes.getNamedItem("android:name").nodeValue
+        assertTrue("Android requires 5 to 16 bytes", aid.length in 10..32 && aid.length % 2 == 0)
+        assertEquals(ShareApdu.AID.joinToString("") { "%02X".format(it) }, aid)
+        assertEquals(0xF0, ShareApdu.AID[0].toInt() and 0xF0)
+    }
+
+    @Test
+    fun `select accepts optional Le and rejects truncated AIDs`() {
+        val responder = ShareTagResponder(byteArrayOf(1))
+        val select = ShareApdu.selectAid()
+        assertEquals(ShareApdu.STATUS_OK, ShareApdu.statusOf(responder.respond(select.dropLast(1).toByteArray())))
+        assertEquals(ShareApdu.STATUS_BAD_REQUEST, ShareApdu.statusOf(responder.respond(select.dropLast(2).toByteArray())))
+        val badLength = select.copyOf().also { it[4] = 0x7F }
+        assertEquals(ShareApdu.STATUS_BAD_REQUEST, ShareApdu.statusOf(responder.respond(badLength)))
+        val badParameter = select.copyOf().also { it[3] = 1 }
+        assertEquals(ShareApdu.STATUS_BAD_REQUEST, ShareApdu.statusOf(responder.respond(badParameter)))
+    }
+
+
+    @Test
     fun `a shared day survives a whole tap`() = runTest {
         val payload = NomiSharePayload.encode(
             NomiSharePayload.envelope(

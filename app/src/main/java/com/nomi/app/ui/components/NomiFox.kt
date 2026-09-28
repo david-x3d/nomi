@@ -2,7 +2,6 @@ package com.nomi.app.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -124,8 +123,7 @@ private val NomiFoxMood.loop: FoxLoop
  * Each mood is its own drawn loop, and all of them share the same silhouette to the pixel, so
  * changing mood is a cross-fade in place rather than a cut: the eyes drift open, the mouth
  * softens, and the head never moves. The drawings carry the movement now, so nothing is
- * animated on top of them - only the slight postural difference between dozing and paying
- * attention, which the stills cannot express.
+ * animated on top of them, keeping the logo centred inside its circular header background.
  *
  * The loops stop as soon as the fox leaves the screen, because the effect that drives them
  * leaves composition with it.
@@ -137,25 +135,16 @@ fun NomiFox(
     size: Dp = 44.dp,
 ) {
     val description = nomiString("Nomi fox logo")
-    // Resting leans away from the page; curiosity straightens up and lifts a little.
-    val lean by animateFloatAsState(
-        targetValue = if (mood == NomiFoxMood.RESTING) -3f else 0f,
-        animationSpec = tween(durationMillis = 520),
-        label = "fox lean",
-    )
-    val lift by animateFloatAsState(
-        targetValue = if (mood == NomiFoxMood.CURIOUS) -2.5f else 0f,
-        animationSpec = tween(durationMillis = 520),
-        label = "fox lift",
-    )
 
     Box(
         modifier = modifier
             .size(size)
             .semantics { contentDescription = description }
             .graphicsLayer {
-                rotationZ = lean
-                translationY = lift * density
+                // All frames have visible bounds (70, 74)-(250, 236) on a 320px
+                // canvas: the artwork is five pixels above its canvas centre.
+                // Centre the visible fox, and keep every mood in the same position.
+                translationY = size.toPx() * (5f / 320f)
             },
     ) {
         Crossfade(

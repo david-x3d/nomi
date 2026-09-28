@@ -20,8 +20,8 @@ import java.util.zip.CRC32
  */
 object ShareApdu {
 
-    /** "NOMI", which is how a reader recognises a Nomi phone rather than a bank card. */
-    val AID: ByteArray = byteArrayOf(0x4E, 0x4F, 0x4D, 0x49)
+    /** Proprietary six-byte AID. Android rejects identifiers shorter than five bytes. */
+    val AID: ByteArray = byteArrayOf(0xF0.toByte(), 0x4E, 0x4F, 0x4D, 0x49, 0x01)
 
     /** Proprietary class byte: this is a Nomi conversation and nothing else on the card. */
     val CLA: Byte = 0x80.toByte()
@@ -150,14 +150,16 @@ class ShareTagResponder(private val payload: ByteArray) {
      * short to hold an AID is not a select at all, and falls through to the bad request answer.
      */
     private fun isSelect(apdu: ByteArray): Boolean =
-        apdu[0] == 0x00.toByte() && apdu[1] == 0xA4.toByte() && apdu.size >= 5 + ShareApdu.AID.size
+        apdu[0] == 0x00.toByte() && apdu[1] == 0xA4.toByte() && apdu.size >= 5
 
     /** Accepts Nomi and turns away everything else, which is what a card reader expects. */
     private fun select(apdu: ByteArray): ByteArray {
-        val aidLength = ((apdu[3].toInt() and 0xFF) shl 8) or (apdu[4].toInt() and 0xFF)
-        val start = 5
-        val end = (start + aidLength).coerceAtMost(apdu.size - 1)
-        val isNomi = end > start && apdu.copyOfRange(start, end).contentEquals(ShareApdu.AID)
+        val aidLength = apdu[4].toInt() and 0xFF
+        val end = 5 + aidLength
+        if (apdu[2] != 0x04.toByte() || apdu[3] != 0x00.toByte() ||
+            (apdu.size != end && apdu.size != end + 1)
+        ) return ShareApdu.statusOnly(ShareApdu.STATUS_BAD_REQUEST)
+        val isNomi = apdu.copyOfRange(5, end).contentEquals(ShareApdu.AID)
         return ShareApdu.statusOnly(
             if (isNomi) ShareApdu.STATUS_OK else ShareApdu.STATUS_WRONG_AID,
         )
