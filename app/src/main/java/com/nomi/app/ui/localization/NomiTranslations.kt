@@ -50,6 +50,7 @@ internal object NomiTranslations {
         putAll(captureTranslations)
         putAll(libraryTranslations)
         putAll(profileTranslations)
+        putAll(shareTranslations)
         putAll(settingsTranslations)
         putAll(updateTranslations)
     }

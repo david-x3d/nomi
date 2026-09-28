@@ -190,6 +190,8 @@ import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.profile.localizedName
+import com.nomi.app.ui.share.LocalNomiShareCoordinator
+import com.nomi.app.ui.share.ShareMenuSection
 import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
@@ -594,6 +596,7 @@ fun NomiNotesTodayScreen(
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
+                                day = state.date,
                                 onOpenDetails = {
                                     haptics.selected()
                                     onFoodClick(entry.id)
@@ -916,6 +919,8 @@ private data class PendingDeletedFood(
 @Composable
 private fun SwipeToDeleteFoodRow(
     entry: TodayFoodEntry,
+    /** The day being shown, which is the date a shared file is labelled with. */
+    day: LocalDate,
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
     onDelete: () -> Unit,
@@ -1011,6 +1016,7 @@ private fun SwipeToDeleteFoodRow(
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             NotesFoodRow(
                 entry = entry,
+                day = day,
                 onOpenDetails = onOpenDetails,
                 onEditText = onEditText,
                 onDuplicate = onDuplicate,
@@ -1110,6 +1116,8 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
 @Composable
 private fun NotesFoodRow(
     entry: TodayFoodEntry,
+    /** The day being shown, which is the date a shared file is labelled with. */
+    day: LocalDate,
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
     onDuplicate: () -> Unit,
@@ -1119,6 +1127,13 @@ private fun NotesFoodRow(
 ) {
     val haptics = rememberNomiHaptics()
     var showQuickActions by remember(entry.id) { mutableStateOf(false) }
+    // How far the share flow has got is one thing for the whole page, because it is about the
+    // phone's Bluetooth and not about this row. So a menu that closes has to put it back to its
+    // first step, or the next row held down would open showing this row's foods to send.
+    val shareCoordinator = LocalNomiShareCoordinator.current
+    LaunchedEffect(showQuickActions) {
+        if (!showQuickActions) shareCoordinator.collapse()
+    }
     val finalDescription = entry.rowDescription()
     val originalDescription = entry.revealText?.trim()
         ?.takeIf { it.isNotBlank() && it != finalDescription }
@@ -1298,6 +1313,15 @@ private fun NotesFoodRow(
             tonalElevation = 6.dp,
             shadowElevation = 14.dp,
         ) {
+            // Sharing lives at the top of this menu because it is the only entry here that asks
+            // what the user wants before doing anything, and the rest of the menu is a set of one
+            // tap actions. The section renders as a single Share row until it is opened.
+            ShareMenuSection(
+                entry = entry,
+                day = day,
+                onFinished = { showQuickActions = false },
+            )
+            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(nomiString("Duplicate")) },
                 leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },

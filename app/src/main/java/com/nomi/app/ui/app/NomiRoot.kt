@@ -45,6 +45,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
@@ -58,6 +59,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -94,7 +97,16 @@ import com.nomi.app.ui.history.HistoryScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.fillTemplate
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.data.share.ShareReceiveFailure
+import com.nomi.app.integration.nfc.NomiShareReader
+import com.nomi.app.ui.share.LocalNomiShareCoordinator
+import com.nomi.app.ui.share.NomiShareCoordinator
+import com.nomi.app.ui.share.NomiShareEvent
+import com.nomi.app.ui.share.ShareReceivedDialog
+import com.nomi.app.ui.share.ShareReceivingDialog
+import com.nomi.app.ui.share.ShareSendingDialog
 import com.nomi.app.ui.logging.FoodLoggingScreen
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.PortionEditSheet
@@ -125,26 +137,62 @@ fun NomiRoot(
     modifier: Modifier = Modifier,
 ) {
     val startState by viewModel.startState.collectAsStateWithLifecycle()
-    when (startState) {
-        AppStartState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            LoadingIndicator()
-        }
-
-        AppStartState.Onboarding -> OnboardingRoute(
-            onComplete = viewModel::completeOnboarding,
-            onDraftChanged = viewModel::persistOnboardingDraft,
-            onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
-            modifier = modifier,
+    // One share coordinator for the whole interface, above the start state, because a tap is one
+    // continuous action rather than something a screen owns: the user can start receiving from one
+    // row's menu and scroll the day out from under it, and the phone has to stay in the same role
+    // while they do. The reader needs an activity and the diary is written by the ViewModel, so
+    // both are handed in rather than reached for.
+    val context = LocalContext.current
+    val shareScope = rememberCoroutineScope()
+    val shareCoordinator = remember(viewModel) {
+        NomiShareCoordinator(
+            reader = context.findActivity()?.let { NomiShareReader(it) },
+            scope = shareScope,
+            onAddToDiary = { viewModel.importSharedDay(it) },
         )
-
-        AppStartState.Main -> NomiMain(container, viewModel, modifier)
     }
+    CompositionLocalProvider(LocalNomiShareCoordinator provides shareCoordinator) {
+        when (startState) {
+            AppStartState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+
+            AppStartState.Onboarding -> OnboardingRoute(
+                onComplete = viewModel::completeOnboarding,
+                onDraftChanged = viewModel::persistOnboardingDraft,
+                onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
+                modifier = modifier,
+            )
+
+            AppStartState.Main -> NomiMain(
+                container = container,
+                viewModel = viewModel,
+                shareCoordinator = shareCoordinator,
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+/**
+ * The activity behind a context.
+ *
+ * NFC reading has to be started from an activity, and the one in scope during composition is
+ * usually a wrapper rather than the activity itself, so the chain is unwrapped. Null when there is
+ * no activity, which leaves sharing unavailable rather than crashing on a screen nobody is looking
+ * at - there is no tap to be read from in that state anyway.
+ */
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 @Composable
 private fun NomiMain(
     container: AppContainer,
     viewModel: AppViewModel,
+    shareCoordinator: NomiShareCoordinator,
     modifier: Modifier,
 ) {
     val context = LocalContext.current
@@ -232,6 +280,69 @@ private fun NomiMain(
     val healthPermissionLauncher = rememberLauncherForActivityResult(
         PermissionController.createRequestPermissionResultContract(),
     ) { viewModel.healthConnectPermissionsChanged() }
+
+    // A finished share is reported as a message rather than left on screen, because the tap
+    // screens have already been dismissed by the time the outcome is known. The wording is
+    // resolved here, where the user's language is available, and the coordinator only names what
+    // happened.
+    val shareNoNfcMessage = nomiString("This phone has no NFC")
+    val shareNfcOffMessage = nomiString("Turn NFC on to share")
+    val shareNothingSelectedMessage = nomiString("Tick at least one food to share")
+    val shareNoTagMessage = nomiString("Nomi couldn't find a phone to read")
+    val shareTransferFailedMessage = nomiString("The share was interrupted, try holding them closer")
+    val shareCorruptedMessage = nomiString("That share arrived damaged, try again")
+    val shareIncompatibleMessage = nomiString("That phone isn't a Nomi this version can read")
+    val shareNotAShareMessage = nomiString("That wasn't a shared day")
+    val shareOfferedMessage = nomiString("Held for the other phone to read")
+    val shareAddedTemplate = nomiString("Added {0} shared foods to your day")
+
+    fun shareMessageText(event: NomiShareEvent): String = when (event) {
+        NomiShareEvent.Offered -> shareOfferedMessage
+        is NomiShareEvent.Added -> fillTemplate(shareAddedTemplate, arrayOf<Any?>(event.foodCount))
+        NomiShareEvent.NoNfcHardware -> shareNoNfcMessage
+        NomiShareEvent.NfcTurnedOff -> shareNfcOffMessage
+        NomiShareEvent.NothingSelected -> shareNothingSelectedMessage
+        // The four ways a tap fails each get their own sentence. One "sharing failed" would send
+        // the user off to guess, and the fixes are nothing alike: move the phones, hold still,
+        // update the app, or the other phone simply had nothing to offer.
+        is NomiShareEvent.Failed -> when (event.failure) {
+            ShareReceiveFailure.NoTagFound -> shareNoTagMessage
+            ShareReceiveFailure.TransferFailed -> shareTransferFailedMessage
+            ShareReceiveFailure.Corrupted -> shareCorruptedMessage
+            ShareReceiveFailure.Incompatible -> shareIncompatibleMessage
+            ShareReceiveFailure.NotAShare -> shareNotAShareMessage
+        }
+    }
+
+    LaunchedEffect(shareCoordinator) {
+        shareCoordinator.events.collectLatest { event -> showMessage(shareMessageText(event)) }
+    }
+
+    // The three tap screens are dialogs rather than destinations because none of them is a place
+    // the user can be: they are the phone waiting to be touched, and a tap that walks away from
+    // them has to be able to come back to the day rather than to a blank screen.
+    val offerState = shareCoordinator.offered
+    if (offerState != null) {
+        ShareSendingDialog(
+            foodCount = offerState.foodCount,
+            kcal = offerState.kcal,
+            onCancel = shareCoordinator::collapse,
+        )
+    }
+    if (shareCoordinator.isReceiving) {
+        ShareReceivingDialog(
+            receivedBytes = shareCoordinator.receivedBytes,
+            expectedBytes = shareCoordinator.expectedBytes,
+            onCancel = shareCoordinator::collapse,
+        )
+    }
+    shareCoordinator.received?.let { envelope ->
+        ShareReceivedDialog(
+            envelope = envelope,
+            onAdd = shareCoordinator::addReceivedToDiary,
+            onDiscard = shareCoordinator::discardReceived,
+        )
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.onMainVisible()

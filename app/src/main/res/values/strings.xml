@@ -17,6 +17,13 @@
     <string name="widget_title_small">Calories</string>
     <string name="widget_title_large">Calories &amp; macros</string>
 
+    <!--
+        Names the card Nomi answers as when two phones are held together. Android shows this in
+        the system's card reader and in the NFC settings screen, so it has to be a string resource
+        rather than something in the translation catalogue.
+    -->
+    <string name="nfc_share_card_description">Nomi day sharing</string>
+
     <!-- Placeholder texts baked into the layouts until the first data update. -->
     <string name="widget_preview_value" translatable="false">1,240</string>
     <string name="widget_preview_hero" translatable="false">1,240</string>

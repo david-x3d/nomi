@@ -37,6 +37,8 @@ import com.nomi.app.data.local.entity.NutritionValues
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
 import com.nomi.app.data.local.entity.citedUrlList
+import com.nomi.app.data.share.NomiShareImporter
+import com.nomi.app.data.share.ShareEnvelopeV1
 import com.nomi.app.data.local.entity.toCitedUrlColumn
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
 import com.nomi.app.data.local.model.SavedMealWithItems
@@ -159,6 +161,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -1738,6 +1741,48 @@ class AppViewModel(
             }.onFailure {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't delete that food.")))
             }
+        }
+    }
+
+    /**
+     * Logs a day that arrived from another phone by holding the two together.
+     *
+     * The rows keep the date the day was eaten on rather than being dated today, because the point
+     * of receiving somebody else's Monday is knowing it was their Monday. They are marked as
+     * shared and estimated, so nothing later in the app treats them as this user's own numbers or
+     * as anything the research verified.
+     */
+    fun importSharedDay(envelope: ShareEnvelopeV1) {
+        viewModelScope.launch {
+            val eatenOn = runCatching { LocalDate.parse(envelope.day.date) }
+                .getOrElse { LocalDate.now() }
+            val logs = NomiShareImporter.logsFor(
+                envelope = envelope,
+                date = eatenOn,
+                zone = zoneId,
+                now = System.currentTimeMillis(),
+            )
+            if (logs.isEmpty()) {
+                mutableEvents.emit(AppEvent.Message(inUserLanguage("That shared day had no food in it.")))
+                return@launch
+            }
+            runCatching { repository.addLogs(logs) }
+                .onSuccess {
+                    mutableEvents.emit(
+                        AppEvent.Message(
+                            inUserLanguage(
+                                "Added {0} shared foods to {1}.",
+                                logs.size,
+                                eatenOn.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
+                            ),
+                        ),
+                    )
+                }
+                .onFailure {
+                    mutableEvents.emit(
+                        AppEvent.Message(inUserLanguage("Nomi couldn't add that shared day.")),
+                    )
+                }
         }
     }
 

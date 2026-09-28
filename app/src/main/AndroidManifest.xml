@@ -4,12 +4,21 @@
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />
+    <!--
+        Sharing a day to another phone is done by holding the two together, so a phone with no NFC
+        should still install: the Share entry in a food's menu reports that there is no radio
+        rather than the app being unavailable.
+    -->
+    <uses-feature
+        android:name="android.hardware.nfc"
+        android:required="false" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />
@@ -73,6 +82,25 @@
                 <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
             </intent-filter>
         </activity-alias>
+
+        <!--
+            A tap share has the sending phone answer as a contactless card, which is the only
+            Android role that can push data to another phone: there is no file transfer API and
+            Android Beam is gone. The service is bound only by the platform, which is why the
+            permission is BIND_NFC_SERVICE, and it requires the device to be unlocked so a locked
+            phone cannot hand a stranger its day.
+        -->
+        <service
+            android:name=".integration.nfc.NomiShareTagService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/nfc_share_apdu_service" />
+        </service>
 
         <receiver
             android:name=".integration.notifications.ReminderAlarmReceiver"

@@ -4,7 +4,7 @@
 
 ### A fast Nutrition journal for Android
 
-[![Release v2.5.2](https://img.shields.io/badge/release-v2.5.2-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.5.2)
+[![Release v2.6.0](https://img.shields.io/badge/release-v2.6.0-6750A4?style=for-the-badge)](https://github.com/david-x3d/nomi/releases/tag/v2.6.0)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
 [![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
@@ -60,6 +60,7 @@
 - 🌍 Use the app in ten languages with metric and US customary quantities.
 - 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
 - 📤 Export a JSON diary of each day's foods, calories, protein and carbs, or a restoreable backup without API keys.
+- 📲 Share a day with another Nomi by holding the two phones together. Long-press a food, tick the foods to send, then tap the phones back to back. No pairing, no account, no server.
 
 ## 🌍 Languages
 
@@ -110,6 +111,7 @@ Nomi is a native Jetpack Compose app built with Material 3 Expressive. It suppor
 - The configured provider's own privacy policy and pricing apply to those requests.
 - Exported backups do not contain API keys or diagnostic events.
 - Exported diaries list foods and daily calorie, protein and carbohydrate totals. They do not contain API keys.
+- Sharing a day hands it to the other phone over NFC and nowhere else. Nothing is uploaded, and no relay, account, or internet connection is involved. What you send is what you ticked, and the receiving phone shows you the day before writing anything into its diary.
 
 ## 🧰 Requirements
 
@@ -118,6 +120,7 @@ Nomi is a native Jetpack Compose app built with Material 3 Expressive. It suppor
 | Install | Android 8.0 (API 26) or newer |
 | Build | JDK 17 and Android SDK 37 |
 | AI features | Your own supported provider API key(s) |
+| Tap to share | NFC on both phones, and the receiving phone unlocked with Nomi open |
 
 ## 🏗️ Build from source
 

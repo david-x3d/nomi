@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Registers Nomi as a card that another Nomi phone can read a shared day from.
+
+    "requireDeviceUnlock" is the important line. Without it the card answers even while the phone
+    is locked, which would mean a locked phone on a table could hand its day to anyone who tapped
+    it. With it, the sending phone has to be in the user's hands, awake, and open.
+-->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/nfc_share_card_description"
+    android:requireDeviceUnlock="true">
+    <aid-group
+        android:description="@string/nfc_share_card_description"
+        android:category="other">
+        <!-- "NOMI": how a reader tells a Nomi phone apart from a bank card. -->
+        <aid-filter android:name="4E4F4D49" />
+    </aid-group>
+</host-apdu-service>

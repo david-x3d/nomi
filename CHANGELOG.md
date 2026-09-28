@@ -1,5 +1,37 @@
 # Changelog
 
+## Nomi v2.6.0 — 2026-09-28
+
+### Sharing a day by tapping two phones together
+
+- **Share** is new in a food's long-press menu, and so is **Receive a shared day**. Long-press a food, tick the foods you want to send, then tap **Tap to share** and hold the other phone to the back of this one. There is nothing to pair, no account, and no server: the two phones talk directly over NFC while they are touching.
+- A food logged as one combined meal is a box per food, so you can send the rice and leave the fish. Everything is ticked to begin with, and the day's total updates as you untick, so the number shown is the number that is sent.
+- **Include totals** adds the running total for exactly the foods you ticked, not for the whole day.
+- The receiving phone shows the day that arrived — which day it was eaten on, which foods, and what they add up to — before anything is written. **Add to my diary** keeps it, **Discard** drops it. Nothing is logged until you say so.
+- An arriving day keeps the date it was eaten on. Somebody's Monday stays their Monday rather than being rewritten into your today, and each food becomes its own row so you can delete one of them.
+- Arriving foods are marked as shared and estimated. Nomi does not look them up in its own food catalogue, because a shared portion is the other person's number for their own plate and quietly matching it to a Nomi food would invent a link they never made.
+- A locked phone cannot hand over a day, so a phone left face up on a table will not offer its diary to the next person who taps it.
+- Four different things can go wrong with a tap, and each says which one: phones too far apart, a transfer interrupted by movement, a share that arrived damaged, and a phone that is not a Nomi this version understands. A damaged transfer is refused rather than logged.
+
+### Fixes
+
+- The Bluetooth share prototype this replaces has been removed, along with the `BLUETOOTH_CONNECT` permission. Nomi no longer asks to reach your paired devices at all.
+- A failed tap no longer leaves you staring at *Waiting for a phone* after the transfer has already failed, and a phone that was listening stops listening rather than going on to read whatever card comes near next.
+- A day offered for sharing is replaced rather than added to, so a reader that asks for the second day is handed the second day and not the first.
+
+### Requirements
+
+- Tap to share needs NFC on both phones. A phone without it still installs and says so rather than hiding the feature.
+- The phone that is *receiving* must be unlocked with Nomi open, because a locked phone cannot be read.
+
+### Verification
+
+- 721 unit tests across 79 classes, all passing.
+- The wire protocol is covered by tests that run the sending phone and the receiving phone against each other over a loopback, at every file size from one byte to forty thousand, including a tap that is abandoned halfway and a transfer that arrives with a byte flipped.
+- The tap itself has **not** been run between two physical phones yet. Android has no NFC in the emulator, so the radio is the one part of this release that has not been exercised on hardware.
+
+Your food log, settings, and calorie targets are unchanged.
+
 ## Nomi v2.5.2 — 2026-09-27
 
 - Always show Nomi’s calorie estimate from steps in the goals panel and activity pill. Health Connect active calories no longer override it.
