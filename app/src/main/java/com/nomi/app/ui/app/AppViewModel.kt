@@ -266,28 +266,26 @@ class AppViewModel(
     val launcherShortcut = mutableLauncherShortcut.asStateFlow()
 
     /**
-     * A newer published release, if one was found on this cold start.
+     * A newer published release, if one was found on the latest app start.
      *
-     * Checked once per process, after the first frame, on a background dispatcher: startup never
-     * waits on the network, and a failure is simply no value. [dismissUpdate] clears it so a
-     * configuration change or a recomposition cannot bring the dialog back.
+     * Checked on each activity start without waiting for the network. Failures stay silent.
+     * [dismissUpdate] clears the current prompt until the next start checks again.
      */
     private val mutableUpdate = MutableStateFlow<UpdateAvailability>(UpdateAvailability.UpToDate)
     val update: StateFlow<UpdateAvailability> = mutableUpdate.asStateFlow()
-    private var updateCheckStarted = false
+    private var updateCheckJob: kotlinx.coroutines.Job? = null
 
     fun dismissUpdate() {
         mutableUpdate.value = UpdateAvailability.UpToDate
     }
 
-    /** Idempotent: only the first call in a process performs a check. */
+    /** Rechecks on each start, coalescing requests while a check is running. */
     fun checkForUpdate(
         source: UpdateReleaseSource = GitHubReleaseSource(),
         installed: ReleaseVersion? = installedVersion,
     ) {
-        if (updateCheckStarted) return
-        updateCheckStarted = true
-        viewModelScope.launch {
+        if (updateCheckJob?.isActive == true) return
+        updateCheckJob = viewModelScope.launch {
             val availability = runCatching {
                 val current = installed ?: return@runCatching UpdateAvailability.UpToDate
                 val release = source.latest() ?: return@runCatching UpdateAvailability.UpToDate

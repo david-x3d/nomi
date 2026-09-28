@@ -596,6 +596,7 @@ fun NomiNotesTodayScreen(
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
+                                dayEntries = state.entries.filter { it.id !in pendingDeletedFoods },
                                 day = state.date,
                                 onOpenDetails = {
                                     haptics.selected()
@@ -919,6 +920,7 @@ private data class PendingDeletedFood(
 @Composable
 private fun SwipeToDeleteFoodRow(
     entry: TodayFoodEntry,
+    dayEntries: List<TodayFoodEntry>,
     /** The day being shown, which is the date a shared file is labelled with. */
     day: LocalDate,
     onOpenDetails: () -> Unit,
@@ -1016,6 +1018,7 @@ private fun SwipeToDeleteFoodRow(
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             NotesFoodRow(
                 entry = entry,
+                dayEntries = dayEntries,
                 day = day,
                 onOpenDetails = onOpenDetails,
                 onEditText = onEditText,
@@ -1116,6 +1119,7 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
 @Composable
 private fun NotesFoodRow(
     entry: TodayFoodEntry,
+    dayEntries: List<TodayFoodEntry>,
     /** The day being shown, which is the date a shared file is labelled with. */
     day: LocalDate,
     onOpenDetails: () -> Unit,
@@ -1316,6 +1320,7 @@ private fun NotesFoodRow(
             // tap actions. The section renders as a single Share row until it is opened.
             ShareMenuSection(
                 entry = entry,
+                dayEntries = dayEntries,
                 day = day,
                 onFinished = { closeQuickActions() },
             )

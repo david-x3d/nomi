@@ -9,6 +9,16 @@ package com.nomi.app.ui.localization
  * message rather than shown in the menu, so it is worded as an outcome.
  */
 internal val shareTranslations: Map<String, NomiTranslation> = mapOf(
+    "Share multiple" to NomiTranslation(
+        de = "Mehrere teilen", es = "Compartir varios", fr = "Partager plusieurs aliments",
+        it = "Condividi più alimenti", nl = "Meerdere delen", pt = "Partilhar vários",
+        sq = "Ndaj disa", sv = "Dela flera", tr = "Birden fazla paylaş",
+    ),
+    "Select all" to NomiTranslation(
+        de = "Alle auswählen", es = "Seleccionar todo", fr = "Tout sélectionner",
+        it = "Seleziona tutto", nl = "Alles selecteren", pt = "Selecionar tudo",
+        sq = "Zgjidh të gjitha", sv = "Välj alla", tr = "Tümünü seç",
+    ),
     "Share" to NomiTranslation(
         de = "Teilen", es = "Compartir", fr = "Partager", it = "Condividi",
         nl = "Delen", pt = "Partilhar", sq = "Ndaj", sv = "Dela", tr = "Paylaş",

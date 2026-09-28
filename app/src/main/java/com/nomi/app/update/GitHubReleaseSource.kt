@@ -2,7 +2,7 @@ package com.nomi.app.update
 
 import com.nomi.app.BuildConfig
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.UserAgent
@@ -44,7 +44,7 @@ data class ReleaseSummary(
  */
 class GitHubReleaseSource(
     private val repository: String = DEFAULT_REPOSITORY,
-    private val httpClient: HttpClient = defaultClient(),
+    private val httpClient: HttpClient = sharedClient,
 ) : UpdateReleaseSource {
 
     override suspend fun latest(): ReleaseSummary? = try {
@@ -55,7 +55,7 @@ class GitHubReleaseSource(
         if (response.status.value !in 200..299) {
             null
         } else {
-            response.body<GitHubRelease>().toSummary()
+            Json { ignoreUnknownKeys = true }.decodeFromString<GitHubRelease>(response.bodyAsText()).toSummary()
         }
     } catch (_: Exception) {
         // Offline, DNS failure, TLS problem, malformed body, unexpected status: all of these are
@@ -78,6 +78,8 @@ class GitHubReleaseSource(
 
     private companion object {
         const val API_BASE = "https://api.github.com"
+
+        val sharedClient by lazy { defaultClient() }
 
         fun defaultClient(): HttpClient = HttpClient(OkHttp) {
             expectSuccess = false

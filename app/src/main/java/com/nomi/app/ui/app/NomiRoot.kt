@@ -813,14 +813,7 @@ private fun NomiMain(
         )
     }
 
-    // The update check starts after the first frame has been produced, so the dialog can never be
-    // part of what the user waits for at launch. The ViewModel makes the check itself
-    // idempotent, so a recomposition or a rotation does not repeat the request.
     val updateAvailability by viewModel.update.collectAsStateWithLifecycle()
-    LaunchedEffect(Unit) {
-        withFrameNanos { }
-        viewModel.checkForUpdate()
-    }
     // In a debug build the dialog can be forced on by a build-time resource, so it can be
     // screenshotted without publishing a release first. `rememberForcedUpdateAvailability`
     // returns null in a release build, so the real check below is the only thing a shipped APK

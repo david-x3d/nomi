@@ -37,26 +37,20 @@ import com.nomi.app.ui.today.rowDescription
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-/**
- * The share flow inside a food row's long-press menu.
- *
- * Ticking happens here rather than on a screen of its own so that what is about to leave the
- * phone stays visible next to the row it came from. The menu is the only place in the app that
- * offers this, and it offers both directions, because with a tap there is no list to browse: one
- * phone offers and the other one takes, so a user needs to be able to get to either from the same
- * place they already know.
- *
- * The ticks are remembered per row, so reopening the menu shows the same choice, and they start
- * fully ticked: sharing a meal means all of it unless the user says otherwise.
- */
+/** Single-entry and day-wide food selection in the long-press menu. */
 @Composable
 fun ShareMenuSection(
     entry: TodayFoodEntry,
+    dayEntries: List<TodayFoodEntry>,
     day: LocalDate,
     onFinished: () -> Unit,
 ) {
     val coordinator = LocalNomiShareCoordinator.current
-    val foods = remember(entry.id) { entry.shareableFoods() }
+    var multiple by remember(entry.id) { mutableStateOf(false) }
+    val foods = remember(entry, dayEntries, multiple) {
+        if (multiple) dayEntries.flatMap { it.shareableFoods() }.distinctBy { it.id }
+        else entry.shareableFoods()
+    }
     var selectedIds by remember(entry.id) { mutableStateOf(foods.map { it.id }.toSet()) }
     var includeTotals by remember(entry.id) { mutableStateOf(true) }
 
@@ -65,7 +59,20 @@ fun ShareMenuSection(
             DropdownMenuItem(
                 text = { Text(nomiString("Share")) },
                 leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                onClick = coordinator::open,
+                onClick = {
+                    multiple = false
+                    selectedIds = entry.shareableFoods().map { it.id }.toSet()
+                    coordinator.open()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(nomiString("Share multiple")) },
+                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                onClick = {
+                    multiple = true
+                    selectedIds = entry.shareableFoods().map { it.id }.toSet()
+                    coordinator.open()
+                },
             )
             DropdownMenuItem(
                 text = { Text(nomiString("Receive a shared day")) },
@@ -78,6 +85,18 @@ fun ShareMenuSection(
         }
 
         NomiShareStage.PickingFoods -> {
+            ShareBackToFoods(nomiString("Back")) { coordinator.closeMenu() }
+            if (multiple) {
+                ShareCheckRow(
+                    label = nomiString("Select all"),
+                    detail = "${foods.count { it.id in selectedIds }} / ${foods.size}",
+                    checked = foods.isNotEmpty() && foods.all { it.id in selectedIds },
+                    onToggle = {
+                        selectedIds = if (foods.all { it.id in selectedIds }) emptySet()
+                        else foods.map { it.id }.toSet()
+                    },
+                )
+            }
             foods.forEach { food ->
                 ShareCheckRow(
                     label = food.rowDescription(),
@@ -103,7 +122,7 @@ fun ShareMenuSection(
                 leadingIcon = { Icon(Icons.Default.Nfc, contentDescription = null) },
                 // Nothing ticked means nothing to send, and a row that cannot be pressed answers
                 // the question sooner than a tap that comes back with an error.
-                enabled = selectedIds.isNotEmpty(),
+                enabled = foods.any { it.id in selectedIds },
                 onClick = {
                     coordinator.offer(
                         day = day,
