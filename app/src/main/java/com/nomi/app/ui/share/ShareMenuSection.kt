@@ -37,40 +37,28 @@ import com.nomi.app.ui.today.rowDescription
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
-/** Single-entry and day-wide food selection in the long-press menu. */
+/** Select foods from the displayed day through the bottom plus menu. */
 @Composable
 fun ShareMenuSection(
-    entry: TodayFoodEntry,
     dayEntries: List<TodayFoodEntry>,
     day: LocalDate,
     onFinished: () -> Unit,
 ) {
     val coordinator = LocalNomiShareCoordinator.current
-    var multiple by remember(entry.id) { mutableStateOf(false) }
-    val foods = remember(entry, dayEntries, multiple) {
-        if (multiple) dayEntries.flatMap { it.shareableFoods() }.distinctBy { it.id }
-        else entry.shareableFoods()
+    val foods = remember(dayEntries) {
+        dayEntries.flatMap { it.shareableFoods() }.distinctBy { it.id }
     }
-    var selectedIds by remember(entry.id) { mutableStateOf(foods.map { it.id }.toSet()) }
-    var includeTotals by remember(entry.id) { mutableStateOf(true) }
+    var selectedIds by remember(day) { mutableStateOf(emptySet<Long>()) }
+    var includeTotals by remember(day) { mutableStateOf(true) }
 
     when (coordinator.stage) {
         NomiShareStage.Collapsed -> {
             DropdownMenuItem(
                 text = { Text(nomiString("Share")) },
                 leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                enabled = foods.isNotEmpty(),
                 onClick = {
-                    multiple = false
-                    selectedIds = entry.shareableFoods().map { it.id }.toSet()
-                    coordinator.open()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(nomiString("Share multiple")) },
-                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
-                onClick = {
-                    multiple = true
-                    selectedIds = entry.shareableFoods().map { it.id }.toSet()
+                    selectedIds = emptySet()
                     coordinator.open()
                 },
             )
@@ -86,17 +74,15 @@ fun ShareMenuSection(
 
         NomiShareStage.PickingFoods -> {
             ShareBackToFoods(nomiString("Back")) { coordinator.closeMenu() }
-            if (multiple) {
-                ShareCheckRow(
-                    label = nomiString("Select all"),
-                    detail = "${foods.count { it.id in selectedIds }} / ${foods.size}",
-                    checked = foods.isNotEmpty() && foods.all { it.id in selectedIds },
-                    onToggle = {
-                        selectedIds = if (foods.all { it.id in selectedIds }) emptySet()
-                        else foods.map { it.id }.toSet()
-                    },
-                )
-            }
+            ShareCheckRow(
+                label = nomiString("Select all"),
+                detail = "${foods.count { it.id in selectedIds }} / ${foods.size}",
+                checked = foods.isNotEmpty() && foods.all { it.id in selectedIds },
+                onToggle = {
+                    selectedIds = if (foods.all { it.id in selectedIds }) emptySet()
+                    else foods.map { it.id }.toSet()
+                },
+            )
             foods.forEach { food ->
                 ShareCheckRow(
                     label = food.rowDescription(),

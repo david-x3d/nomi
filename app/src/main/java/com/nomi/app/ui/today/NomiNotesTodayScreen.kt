@@ -394,7 +394,7 @@ fun NomiNotesTodayScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     NotesFloatingActionRow(
-                        state = state,
+                        state = state.copy(entries = state.entries.filter { it.id !in pendingDeletedFoods }),
                         dictation = dictation,
                         onGoals = { haptics.selected(); showGoals = true },
                         onVoice = { haptics.selected(); dictation.start() },
@@ -596,8 +596,6 @@ fun NomiNotesTodayScreen(
                             )
                             pending == null -> SwipeToDeleteFoodRow(
                                 entry = entry,
-                                dayEntries = state.entries.filter { it.id !in pendingDeletedFoods },
-                                day = state.date,
                                 onOpenDetails = {
                                     haptics.selected()
                                     onFoodClick(entry.id)
@@ -920,9 +918,6 @@ private data class PendingDeletedFood(
 @Composable
 private fun SwipeToDeleteFoodRow(
     entry: TodayFoodEntry,
-    dayEntries: List<TodayFoodEntry>,
-    /** The day being shown, which is the date a shared file is labelled with. */
-    day: LocalDate,
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
     onDelete: () -> Unit,
@@ -1018,8 +1013,6 @@ private fun SwipeToDeleteFoodRow(
         Surface(color = MaterialTheme.colorScheme.surfaceContainerLowest) {
             NotesFoodRow(
                 entry = entry,
-                dayEntries = dayEntries,
-                day = day,
                 onOpenDetails = onOpenDetails,
                 onEditText = onEditText,
                 onDuplicate = onDuplicate,
@@ -1119,9 +1112,6 @@ private fun RestoringFoodRow(entry: TodayFoodEntry) {
 @Composable
 private fun NotesFoodRow(
     entry: TodayFoodEntry,
-    dayEntries: List<TodayFoodEntry>,
-    /** The day being shown, which is the date a shared file is labelled with. */
-    day: LocalDate,
     onOpenDetails: () -> Unit,
     onEditText: (Int) -> Unit,
     onDuplicate: () -> Unit,
@@ -1131,10 +1121,8 @@ private fun NotesFoodRow(
 ) {
     val haptics = rememberNomiHaptics()
     var showQuickActions by remember(entry.id) { mutableStateOf(false) }
-    val shareCoordinator = LocalNomiShareCoordinator.current
     fun closeQuickActions() {
         showQuickActions = false
-        shareCoordinator.closeMenu()
     }
     val finalDescription = entry.rowDescription()
     val originalDescription = entry.revealText?.trim()
@@ -1315,16 +1303,6 @@ private fun NotesFoodRow(
             tonalElevation = 6.dp,
             shadowElevation = 14.dp,
         ) {
-            // Sharing lives at the top of this menu because it is the only entry here that asks
-            // what the user wants before doing anything, and the rest of the menu is a set of one
-            // tap actions. The section renders as a single Share row until it is opened.
-            ShareMenuSection(
-                entry = entry,
-                dayEntries = dayEntries,
-                day = day,
-                onFinished = { closeQuickActions() },
-            )
-            HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(nomiString("Duplicate")) },
                 leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
@@ -2047,6 +2025,13 @@ private fun NotesFloatingActionRow(
     val locale = nomiLocale()
     var showCameraMenu by rememberSaveable { mutableStateOf(false) }
     var showLibraryMenu by rememberSaveable { mutableStateOf(false) }
+    val shareCoordinator = LocalNomiShareCoordinator.current
+    fun closeLibraryMenu() {
+        showLibraryMenu = false
+        shareCoordinator.closeMenu()
+    }
+    LaunchedEffect(state.date) { closeLibraryMenu() }
+
     val effectsSpec = nomiFadeMotionSpec<Float>()
     // Today's calories settle into their new value instead of snapping when an entry
     // is added, removed, or rescaled.
@@ -2174,7 +2159,7 @@ private fun NotesFloatingActionRow(
                             icon = Icons.Default.CameraAlt,
                             description = nomiString("Photo"),
                             onClick = {
-                                showLibraryMenu = false
+                                closeLibraryMenu()
                                 showCameraMenu = true
                             },
                         )
@@ -2230,35 +2215,43 @@ private fun NotesFloatingActionRow(
                         )
                         DropdownMenu(
                             expanded = showLibraryMenu,
-                            onDismissRequest = { showLibraryMenu = false },
+                            onDismissRequest = { closeLibraryMenu() },
                             offset = DpOffset(x = (-8).dp, y = (-8).dp),
                             shape = RoundedCornerShape(24.dp),
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                         ) {
-                            CompactActionMenuItem(
-                                icon = Icons.Default.History,
-                                label = nomiString("Recent"),
-                                onClick = {
-                                    showLibraryMenu = false
-                                    onLibraryMethod(AddFoodMethod.RECENT)
-                                },
+                            ShareMenuSection(
+                                dayEntries = state.entries,
+                                day = state.date,
+                                onFinished = { closeLibraryMenu() },
                             )
-                            CompactActionMenuItem(
-                                icon = Icons.Default.FavoriteBorder,
-                                label = nomiString("Favorites"),
-                                onClick = {
-                                    showLibraryMenu = false
-                                    onLibraryMethod(AddFoodMethod.FAVORITES)
-                                },
-                            )
-                            CompactActionMenuItem(
-                                icon = Icons.Default.RestaurantMenu,
-                                label = nomiString("Saved meals"),
-                                onClick = {
-                                    showLibraryMenu = false
-                                    onLibraryMethod(AddFoodMethod.SAVED_MEALS)
-                                },
-                            )
+                            if (shareCoordinator.stage == com.nomi.app.ui.share.NomiShareStage.Collapsed) {
+                                HorizontalDivider()
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.History,
+                                    label = nomiString("Recent"),
+                                    onClick = {
+                                        closeLibraryMenu()
+                                        onLibraryMethod(AddFoodMethod.RECENT)
+                                    },
+                                )
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.FavoriteBorder,
+                                    label = nomiString("Favorites"),
+                                    onClick = {
+                                        closeLibraryMenu()
+                                        onLibraryMethod(AddFoodMethod.FAVORITES)
+                                    },
+                                )
+                                CompactActionMenuItem(
+                                    icon = Icons.Default.RestaurantMenu,
+                                    label = nomiString("Saved meals"),
+                                    onClick = {
+                                        closeLibraryMenu()
+                                        onLibraryMethod(AddFoodMethod.SAVED_MEALS)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
