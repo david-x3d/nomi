@@ -20,16 +20,13 @@ class NomiShareTagService : HostApduService() {
     override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
         val request = commandApdu
             ?: return ShareApdu.statusOnly(ShareApdu.STATUS_BAD_REQUEST)
-        val payload = staged
-            ?: return ShareApdu.statusOnly(ShareApdu.STATUS_NO_PAYLOAD)
+        val payload = if ((System.nanoTime() / 1_000_000) < expiresAt) staged else null
         return ShareTagResponder(payload).respond(request)
     }
 
     override fun onDeactivated(reason: Int) {
-        // Android takes the card role away when the phones part company, when the session times
-        // out, or when another app wants it. Whatever the reason, the shared day has been read or
-        // abandoned, and either way it should not sit in memory waiting for the next tap.
-        clear()
+        // A probe, a different AID or momentary link loss is not a completed share.
+        // Keep the offer available for another tap until cancellation, backgrounding or expiry.
     }
 
     internal companion object {
@@ -44,7 +41,11 @@ class NomiShareTagService : HostApduService() {
         @Volatile
         private var staged: ByteArray? = null
 
+        @Volatile
+        private var expiresAt: Long = 0
+
         fun stage(payload: ByteArray) {
+            expiresAt = (System.nanoTime() / 1_000_000) + 120_000
             staged = payload
         }
 
@@ -53,7 +54,7 @@ class NomiShareTagService : HostApduService() {
         }
 
         /** What the card has ready, for the sending screen to describe. Null when nothing is. */
-        fun hasStagedDay(): Boolean = staged != null
+        fun hasStagedDay(): Boolean = staged != null && (System.nanoTime() / 1_000_000) < expiresAt
     }
 }
 

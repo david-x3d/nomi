@@ -70,7 +70,10 @@ fun ShareMenuSection(
             DropdownMenuItem(
                 text = { Text(nomiString("Receive a shared day")) },
                 leadingIcon = { Icon(Icons.Default.Download, contentDescription = null) },
-                onClick = coordinator::startReceiving,
+                onClick = {
+                    coordinator.startReceiving()
+                    if (coordinator.isReceiving) onFinished()
+                },
             )
         }
 

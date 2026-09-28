@@ -1,6 +1,7 @@
 package com.nomi.app.data.share
 
 import java.util.zip.CRC32
+import kotlinx.coroutines.CancellationException
 
 /**
  * The bytes that cross between two Nomi phones held back to back.
@@ -117,13 +118,15 @@ object ShareApdu {
  * matters because a tap can be abandoned halfway through, and a tag that remembered "we were at
  * offset 600" would send the rest of the file to whoever tapped next.
  */
-class ShareTagResponder(private val payload: ByteArray) {
+class ShareTagResponder(private val payload: ByteArray?) {
 
     /** What the reader is told before it starts: the length, then the checksum of those bytes. */
-    fun metadata(): ByteArray =
-        ShareApdu.intBytes(payload.size) +
+    fun metadata(): ByteArray {
+        val payload = payload ?: return ShareApdu.statusOnly(ShareApdu.STATUS_NO_PAYLOAD)
+        return ShareApdu.intBytes(payload.size) +
             ShareApdu.intBytes(ShareApdu.checksumOf(payload)) +
             ShareApdu.statusOnly(ShareApdu.STATUS_OK)
+    }
 
     /**
      * Handles one request.
@@ -166,6 +169,7 @@ class ShareTagResponder(private val payload: ByteArray) {
     }
 
     private fun chunk(apdu: ByteArray): ByteArray {
+        val payload = payload ?: return ShareApdu.statusOnly(ShareApdu.STATUS_NO_PAYLOAD)
         // Four bytes of offset, as asked for by readChunk.
         if (apdu.size < 9) return ShareApdu.statusOnly(ShareApdu.STATUS_BAD_REQUEST)
         val offset = ShareApdu.readInt(apdu, 5)
@@ -207,6 +211,9 @@ suspend fun pullSharedDay(
     onProgress: (receivedBytes: Int, totalBytes: Int) -> Unit = { _, _ -> },
 ): Result<ByteArray> = runCatching {
     val selected = transceive(ShareApdu.selectAid())
+    if (ShareApdu.statusOf(selected) == ShareApdu.STATUS_NO_PAYLOAD) {
+        throw ShareReceiveException(ShareReceiveFailure.NoTagFound)
+    }
     if (ShareApdu.statusOf(selected) != ShareApdu.STATUS_OK) {
         throw ShareReceiveException(ShareReceiveFailure.Incompatible)
     }
@@ -244,7 +251,7 @@ suspend fun pullSharedDay(
         throw ShareReceiveException(ShareReceiveFailure.Corrupted)
     }
     received
-}
+}.onFailure { if (it is CancellationException) throw it }
 
 class ShareReceiveException(val failure: ShareReceiveFailure) :
     Exception("Shared day could not be received: $failure")

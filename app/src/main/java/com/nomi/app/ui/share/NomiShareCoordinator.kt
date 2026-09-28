@@ -16,6 +16,8 @@ import com.nomi.app.integration.nfc.NomiShareTag
 import com.nomi.app.integration.nfc.ShareReader
 import com.nomi.app.ui.today.TodayFoodEntry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -60,6 +62,8 @@ sealed interface NomiShareEvent {
     data object NoNfcHardware : NomiShareEvent
 
     data object NfcTurnedOff : NomiShareEvent
+
+    data object CannotEmulate : NomiShareEvent
 
     data class Failed(val failure: ShareReceiveFailure) : NomiShareEvent
 
@@ -109,6 +113,10 @@ class NomiShareCoordinator(
     var offered by mutableStateOf<OfferedDay?>(null)
         private set
 
+    private var session = 0L
+    private var reading = false
+    private var offerTimeout: Job? = null
+
     private val _events = MutableSharedFlow<NomiShareEvent>(extraBufferCapacity = 4)
     val events: SharedFlow<NomiShareEvent> = _events.asSharedFlow()
 
@@ -121,6 +129,10 @@ class NomiShareCoordinator(
     }
 
     /** Called when the row menu's Share entry is tapped. */
+    fun closeMenu() {
+        if (stage == NomiShareStage.PickingFoods) collapse()
+    }
+
     fun open() {
         stage = NomiShareStage.PickingFoods
     }
@@ -133,6 +145,10 @@ class NomiShareCoordinator(
      * and a staged day would be offered to whoever touched the phone next.
      */
     fun collapse() {
+        session++
+        reading = false
+        offerTimeout?.cancel()
+        offerTimeout = null
         stopListening()
         NomiShareTag.withdraw()
         received = null
@@ -166,12 +182,29 @@ class NomiShareCoordinator(
             emit(NomiShareEvent.NothingSelected)
             return
         }
+        if (!checkRadio()) return
+        if (reader?.canOffer() != true) {
+            emit(NomiShareEvent.CannotEmulate)
+            return
+        }
+        collapse()
+        try {
+            reader.prepareOffering()
+        } catch (_: RuntimeException) {
+            collapse()
+            emit(NomiShareEvent.Failed(ShareReceiveFailure.TransferFailed))
+            return
+        }
         NomiShareTag.offer(NomiSharePayload.encode(envelope))
         offered = OfferedDay(
             foodCount = envelope.day.foods.size,
             kcal = envelope.day.totals?.kcal ?: envelope.day.foods.sumOf { it.kcal },
         )
         stage = NomiShareStage.Sending
+        offerTimeout = scope.launch {
+            delay(120_000)
+            collapse()
+        }
     }
 
     /**
@@ -182,46 +215,59 @@ class NomiShareCoordinator(
      * anything. A phone with no radio at all is a different answer from a phone that is merely
      * off, and the user has to be able to tell which one they are holding.
      */
-    fun startReceiving() {
+    private fun checkRadio(): Boolean {
         if (reader == null || !reader.isAvailable()) {
             emit(NomiShareEvent.NoNfcHardware)
-            return
+            return false
         }
         if (!reader.isEnabled()) {
             emit(NomiShareEvent.NfcTurnedOff)
-            return
+            return false
         }
-        received = null
-        receivedBytes = 0
-        expectedBytes = 0
+        return true
+    }
+
+    fun startReceiving() {
+        if (!checkRadio()) return
+        collapse()
         stage = NomiShareStage.Receiving
-        reader.listen { tag ->
-            scope.launch {
-                val result = reader.read(tag, receiveProgress)
-                // The phone comes out of the reading role either way. A reader that is met with
-                // silence simply carries on listening, so a failed read has to take the role
-                // back or the next card that came near would be read too.
-                stopListening()
-                val payload = result.getOrNull()
-                val envelope = payload?.let(NomiSharePayload::decode)
-                if (envelope != null) {
-                    received = envelope
-                    stage = NomiShareStage.Received
-                } else {
-                    // And the screen comes back too, rather than leaving the user looking at
-                    // "waiting for a phone" after the tap has already failed.
-                    stage = NomiShareStage.Collapsed
-                    receivedBytes = 0
-                    expectedBytes = 0
-                    emit(
-                        NomiShareEvent.Failed(
-                            (result.exceptionOrNull() as? ShareReceiveException)?.failure
-                                ?: if (payload != null) ShareReceiveFailure.NotAShare
-                                else ShareReceiveFailure.TransferFailed,
-                        ),
-                    )
+        val activeSession = session
+        try {
+            reader!!.listen { tag ->
+                scope.launch {
+                    if (activeSession != session || !isReceiving || reading) return@launch
+                    reading = true
+                    try {
+                        val result = reader.read(tag) { done, total ->
+                            if (activeSession == session) receiveProgress(done, total)
+                        }
+                        if (activeSession != session) return@launch
+                        val payload = result.getOrNull()
+                        val envelope = payload?.let(NomiSharePayload::decode)
+                        if (envelope != null) {
+                            received = envelope
+                            stage = NomiShareStage.Received
+                            // Keep reader mode until the preview is dismissed. Disabling it with
+                            // the phones still touching gives the same tag back to Android.
+                        } else {
+                            receivedBytes = 0
+                            expectedBytes = 0
+                            emit(NomiShareEvent.Failed(
+                                (result.exceptionOrNull() as? ShareReceiveException)?.failure
+                                    ?: if (payload != null) ShareReceiveFailure.NotAShare
+                                    else ShareReceiveFailure.TransferFailed,
+                            ))
+                            // Remain in the explicit receive session so separating and tapping
+                            // again works without returning to Android's generic tag discovery.
+                        }
+                    } finally {
+                        if (activeSession == session) reading = false
+                    }
                 }
             }
+        } catch (_: RuntimeException) {
+            collapse()
+            emit(NomiShareEvent.Failed(ShareReceiveFailure.TransferFailed))
         }
     }
 

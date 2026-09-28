@@ -64,7 +64,7 @@ fun ShareSendingDialog(
                 Text(
                     // Said before the first attempt rather than after it fails, because the phone
                     // doing the reading has to be open: a locked one is deaf.
-                    text = nomiString("The other phone needs Nomi open and unlocked"),
+                    text = nomiString("On the other phone, open Nomi and choose Receive a shared day before touching the phones"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -173,7 +173,7 @@ fun ShareReceivedDialog(
                 }
             }
         },
-        confirmLabel = nomiString("Add to my diary"),
+        confirmLabel = nomiString("Add"),
         onConfirm = onAdd,
         dismissLabel = nomiString("Discard"),
         onDismissAction = onDiscard,

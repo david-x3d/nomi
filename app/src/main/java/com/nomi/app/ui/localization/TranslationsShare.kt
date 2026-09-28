@@ -55,6 +55,28 @@ internal val shareTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Håll den andra telefonen mot baksidan av den här för att skicka {0} livsmedel",
         tr = "{0} yiyeceği göndermek için diğer telefonu bunun arkasına dayayın",
     ),
+    "This phone can receive NFC shares but cannot send them" to NomiTranslation(
+        de = "Dieses Handy kann NFC-Freigaben empfangen, aber nicht senden",
+        es = "Este teléfono puede recibir por NFC, pero no enviar",
+        fr = "Ce téléphone peut recevoir par NFC, mais pas envoyer",
+        it = "Questo telefono può ricevere tramite NFC, ma non inviare",
+        nl = "Deze telefoon kan via NFC ontvangen, maar niet verzenden",
+        pt = "Este telefone pode receber por NFC, mas não enviar",
+        sq = "Ky telefon mund të marrë përmes NFC, por jo të dërgojë",
+        sv = "Den här telefonen kan ta emot via NFC men inte skicka",
+        tr = "Bu telefon NFC ile alabilir ancak gönderemez",
+    ),
+    "On the other phone, open Nomi and choose Receive a shared day before touching the phones" to NomiTranslation(
+        de = "Öffne auf dem anderen Handy Nomi und wähle zuerst „Einen geteilten Tag empfangen“. Halte die Handys erst danach zusammen.",
+        es = "En el otro teléfono, abre Nomi y elige Recibir un día compartido antes de acercarlos",
+        fr = "Sur l’autre téléphone, ouvre Nomi et choisis Recevoir une journée partagée avant de rapprocher les téléphones",
+        it = "Sull'altro telefono, apri Nomi e scegli Ricevi un giorno condiviso prima di avvicinarli",
+        nl = "Open Nomi op de andere telefoon en kies Een gedeelde dag ontvangen voordat je de telefoons tegen elkaar houdt",
+        pt = "No outro telefone, abre o Nomi e escolhe Receber um dia partilhado antes de aproximar os telefones",
+        sq = "Në telefonin tjetër, hap Nomi dhe zgjidh Merr një ditë të ndarë përpara se t'i afrosh telefonat",
+        sv = "Öppna Nomi på den andra telefonen och välj Ta emot en delad dag innan du för ihop telefonerna",
+        tr = "Telefonları yaklaştırmadan önce diğer telefonda Nomi'yi aç ve Paylaşılan bir günü al seçeneğini seç",
+    ),
     "The other phone needs Nomi open and unlocked" to NomiTranslation(
         de = "Das andere Telefon braucht geöffnetes und entsperrtes Nomi",
         es = "El otro teléfono necesita Nomi abierto y desbloqueado",
@@ -139,12 +161,6 @@ internal val shareTranslations: Map<String, NomiTranslation> = mapOf(
         fr = "{0} sur {1} aliments", it = "{0} su {1} alimenti",
         nl = "{0} over {1} voedingsmiddelen", pt = "{0} em {1} alimentos",
         sq = "{0} në {1} ushqime", sv = "{0} över {1} livsmedel", tr = "{1} yiyeçekte {0}",
-    ),
-    "Add to my diary" to NomiTranslation(
-        de = "Zu meinem Tagebuch hinzufügen", es = "Añadir a mi diario",
-        fr = "Ajouter à mon journal", it = "Aggiungi al mio diario", nl = "Aan mijn dagboek toevoegen",
-        pt = "Adicionar ao meu diário", sq = "Shto në ditarin tim", sv = "Lägg till i min dagbok",
-        tr = "Günlüğüme ekle",
     ),
 
     // Said once the tap is over. The four ways a tap fails each get their own sentence, because

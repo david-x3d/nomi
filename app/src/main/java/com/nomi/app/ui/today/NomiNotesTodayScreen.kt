@@ -1127,12 +1127,10 @@ private fun NotesFoodRow(
 ) {
     val haptics = rememberNomiHaptics()
     var showQuickActions by remember(entry.id) { mutableStateOf(false) }
-    // How far the share flow has got is one thing for the whole page, because it is about the
-    // phone's Bluetooth and not about this row. So a menu that closes has to put it back to its
-    // first step, or the next row held down would open showing this row's foods to send.
     val shareCoordinator = LocalNomiShareCoordinator.current
-    LaunchedEffect(showQuickActions) {
-        if (!showQuickActions) shareCoordinator.collapse()
+    fun closeQuickActions() {
+        showQuickActions = false
+        shareCoordinator.closeMenu()
     }
     val finalDescription = entry.rowDescription()
     val originalDescription = entry.revealText?.trim()
@@ -1302,7 +1300,7 @@ private fun NotesFoodRow(
         }
         DropdownMenu(
             expanded = showQuickActions,
-            onDismissRequest = { showQuickActions = false },
+            onDismissRequest = { closeQuickActions() },
             // A context menu belongs to the touched row, not to the page's left edge. Anchoring
             // its popup at the row's trailing centre lets it float beside the content while the
             // position provider still keeps it safely inside narrow screens.
@@ -1319,14 +1317,14 @@ private fun NotesFoodRow(
             ShareMenuSection(
                 entry = entry,
                 day = day,
-                onFinished = { showQuickActions = false },
+                onFinished = { closeQuickActions() },
             )
             HorizontalDivider()
             DropdownMenuItem(
                 text = { Text(nomiString("Duplicate")) },
                 leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
                 onClick = {
-                    showQuickActions = false
+                    closeQuickActions()
                     haptics.confirmed()
                     onDuplicate()
                 },
@@ -1335,7 +1333,7 @@ private fun NotesFoodRow(
                 text = { Text(nomiString("Change amount")) },
                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
                 onClick = {
-                    showQuickActions = false
+                    closeQuickActions()
                     haptics.selected()
                     onEditAmount()
                 },
@@ -1344,7 +1342,7 @@ private fun NotesFoodRow(
                 text = { Text(nomiString("Favorite")) },
                 leadingIcon = { Icon(Icons.Default.FavoriteBorder, contentDescription = null) },
                 onClick = {
-                    showQuickActions = false
+                    closeQuickActions()
                     haptics.confirmed()
                     onFavorite()
                 },
@@ -1353,7 +1351,7 @@ private fun NotesFoodRow(
                 text = { Text(nomiString("Delete")) },
                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                 onClick = {
-                    showQuickActions = false
+                    closeQuickActions()
                     onDelete()
                 },
             )

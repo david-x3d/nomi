@@ -10,12 +10,15 @@ import com.nomi.app.integration.nfc.ShareReader
 import com.nomi.app.integration.nfc.ShareTagHandle
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -40,6 +43,90 @@ import java.time.ZoneOffset
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NomiShareCoordinatorTest {
+
+    @Test
+    fun `closing the food menu keeps a newly started offer alive`() = runTest {
+        val reader = FakeReader()
+        val coordinator = coordinator(reader)
+        coordinator.open()
+        coordinator.offer(DAY, listOf(food(1, "Toast", 196.0)), setOf(1L), true)
+        coordinator.closeMenu()
+        assertEquals(NomiShareStage.Sending, coordinator.stage)
+        assertNotNull(coordinator.offered)
+        assertTrue(reader.offering)
+        assertTrue(com.nomi.app.integration.nfc.NomiShareTag.isOffering())
+        coordinator.collapse()
+        assertFalse(reader.offering)
+        assertFalse(com.nomi.app.integration.nfc.NomiShareTag.isOffering())
+    }
+
+    @Test
+    fun `closing the menu only cancels food selection`() = runTest {
+        val coordinator = coordinator(FakeReader())
+        coordinator.open()
+        coordinator.closeMenu()
+        assertEquals(NomiShareStage.Collapsed, coordinator.stage)
+        coordinator.startReceiving()
+        coordinator.closeMenu()
+        assertEquals(NomiShareStage.Receiving, coordinator.stage)
+    }
+
+    @Test
+    fun `failed contact can be retried without leaving reader mode`() = runTest {
+        val reader = FakeReader()
+        val coordinator = coordinator(reader)
+        coordinator.startReceiving()
+        reader.failWith(ShareReceiveFailure.NoTagFound)
+        assertTrue(reader.listening)
+        reader.deliver(payloadOf(breakfast()))
+        assertEquals(NomiShareStage.Received, coordinator.stage)
+        assertTrue(reader.listening)
+        coordinator.closeMenu()
+        assertEquals(NomiShareStage.Received, coordinator.stage)
+        coordinator.collapse()
+        assertFalse(reader.listening)
+    }
+
+    @Test
+    fun `offer expires and releases its radio role`() = runTest {
+        val reader = FakeReader()
+        val coordinator = coordinator(reader)
+        coordinator.offer(DAY, listOf(food(1, "Toast", 196.0)), setOf(1L), true)
+        advanceTimeBy(120_000)
+        runCurrent()
+        assertEquals(NomiShareStage.Collapsed, coordinator.stage)
+        assertFalse(reader.offering)
+    }
+
+    @Test
+    fun `sending checks whether NFC is enabled`() = runTest {
+        val reader = FakeReader(enabled = false)
+        val coordinator = coordinator(reader)
+        val events = collectEvents(coordinator)
+        coordinator.offer(DAY, listOf(food(1, "Toast", 196.0)), setOf(1L), true)
+        assertFalse(reader.offering)
+        assertEquals(listOf(NomiShareEvent.NfcTurnedOff), events())
+    }
+
+    @Test
+    fun `late and duplicate tag callbacks cannot replace a cancelled session`() = runTest {
+        val reader = FakeReader()
+        val gate = CompletableDeferred<Unit>()
+        reader.readGate = gate
+        val coordinator = coordinator(reader)
+        coordinator.startReceiving()
+        reader.deliver(payloadOf(breakfast()))
+        reader.deliver(payloadOf(breakfast()))
+        assertEquals(1, reader.reads)
+        coordinator.collapse()
+        coordinator.startReceiving()
+        gate.complete(Unit)
+        assertNull(coordinator.received)
+        assertEquals(NomiShareStage.Receiving, coordinator.stage)
+        reader.deliver(payloadOf(breakfast()))
+        assertEquals(NomiShareStage.Received, coordinator.stage)
+    }
+
 
     @Test
     fun `opening the menu asks the phone for nothing`() = runTest {
@@ -210,10 +297,8 @@ class NomiShareCoordinatorTest {
         advanceUntilIdle()
 
         assertNull(coordinator.received)
-        assertEquals(NomiShareStage.Collapsed, coordinator.stage)
-        // A reader that is met with silence keeps listening, so a failed read has to take the
-        // phone out of the role or the next card on the table would be read too.
-        assertFalse(reader.listening)
+        assertEquals(NomiShareStage.Receiving, coordinator.stage)
+        assertTrue(reader.listening)
         assertEquals(listOf(NomiShareEvent.Failed(ShareReceiveFailure.Corrupted)), events())
     }
 
@@ -391,6 +476,11 @@ class NomiShareCoordinatorTest {
      */
     private class FakeReader(private val enabled: Boolean = true) : ShareReader {
         var listening = false
+        var offering = false
+        var reads = 0
+        var readGate: CompletableDeferred<Unit>? = null
+
+        override fun prepareOffering() { offering = true }
         private var onTag: ((ShareTagHandle) -> Unit)? = null
 
         override fun isAvailable(): Boolean = true
@@ -403,6 +493,7 @@ class NomiShareCoordinatorTest {
         }
 
         override fun stop() {
+            offering = false
             listening = false
             onTag = null
         }
@@ -410,9 +501,13 @@ class NomiShareCoordinatorTest {
         override suspend fun read(
             tag: ShareTagHandle,
             onProgress: (Int, Int) -> Unit,
-        ): Result<ByteArray> = (tag as FakeCard).result.map { payload ->
-            onProgress(payload.size, payload.size)
-            payload
+        ): Result<ByteArray> {
+            reads++
+            readGate?.await()
+            return (tag as FakeCard).result.map { payload ->
+                onProgress(payload.size, payload.size)
+                payload
+            }
         }
 
         /** A card was touched and it turned out to be a Nomi offering this many bytes. */

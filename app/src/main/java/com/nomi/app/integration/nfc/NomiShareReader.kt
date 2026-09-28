@@ -1,6 +1,13 @@
 package com.nomi.app.integration.nfc
 
 import android.app.Activity
+import android.app.PendingIntent
+import android.content.ComponentName
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.nfc.cardemulation.CardEmulation
+import android.os.Build
+import android.os.Bundle
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
@@ -32,6 +39,10 @@ interface ShareReader {
     /** False on a phone with no radio at all, which is a different answer from one that is off. */
     fun isAvailable(): Boolean
 
+    fun canOffer(): Boolean = isAvailable()
+
+    fun prepareOffering() {}
+
     fun isEnabled(): Boolean
 
     /** Starts listening, handing every card that is touched to [onTag]. */
@@ -49,6 +60,35 @@ class NomiShareReader(private val activity: Activity) : ShareReader {
 
     override fun isAvailable(): Boolean = adapter != null
 
+    private var offering = false
+    private var discoveryChanged = false
+
+    override fun canOffer(): Boolean = activity.packageManager.hasSystemFeature(
+        PackageManager.FEATURE_NFC_HOST_CARD_EMULATION,
+    )
+
+    override fun prepareOffering() {
+        stop()
+        val nfc = adapter ?: return
+        offering = true
+        CardEmulation.getInstance(nfc).setPreferredService(
+            activity, ComponentName(activity, NomiShareTagService::class.java),
+        )
+        if (Build.VERSION.SDK_INT >= 35) {
+            nfc.setDiscoveryTechnology(
+                activity, NfcAdapter.FLAG_READER_DISABLE, NfcAdapter.FLAG_LISTEN_KEEP,
+            )
+            discoveryChanged = true
+        } else {
+            // Older Android cannot disable polling independently of HCE. Consume incidental
+            // tag discoveries here so another tag app cannot take over the sending screen.
+            val intent = Intent(activity, activity.javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val flags = PendingIntent.FLAG_UPDATE_CURRENT or
+                if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+            nfc.enableForegroundDispatch(activity, PendingIntent.getActivity(activity, 0, intent, flags), null, null)
+        }
+    }
+
     override fun isEnabled(): Boolean = adapter?.isEnabled == true
 
     /**
@@ -57,6 +97,7 @@ class NomiShareReader(private val activity: Activity) : ShareReader {
      * else, and would keep listening after the user walked away.
      */
     override fun listen(onTag: (ShareTagHandle) -> Unit) {
+        stop()
         val nfc = adapter ?: return
         nfc.enableReaderMode(
             activity,
@@ -68,12 +109,23 @@ class NomiShareReader(private val activity: Activity) : ShareReader {
                 // Nomi is being held against another phone, so the sound and vibration of a tag
                 // being found would be noise on top of its own feedback.
                 NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS,
-            null,
+            Bundle().apply { putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250) },
         )
     }
 
     override fun stop() {
-        runCatching { adapter?.disableReaderMode(activity) }
+        val nfc = adapter ?: return
+        runCatching { nfc.disableReaderMode(activity) }
+        if (offering) {
+            runCatching { CardEmulation.getInstance(nfc).unsetPreferredService(activity) }
+            if (Build.VERSION.SDK_INT >= 35 && discoveryChanged) {
+                runCatching { nfc.resetDiscoveryTechnology(activity) }
+            } else {
+                runCatching { nfc.disableForegroundDispatch(activity) }
+            }
+        }
+        offering = false
+        discoveryChanged = false
     }
 
     /**
@@ -90,6 +142,7 @@ class NomiShareReader(private val activity: Activity) : ShareReader {
             ?: return@withContext Result.failure(ShareReadException())
         try {
             isoDep.connect()
+            isoDep.timeout = 5000
             pullSharedDay(
                 transceive = { apdu -> isoDep.transceive(apdu) },
                 onProgress = onProgress,

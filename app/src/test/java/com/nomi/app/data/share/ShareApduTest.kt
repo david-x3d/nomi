@@ -17,6 +17,21 @@ import org.junit.Test
 class ShareApduTest {
 
     @Test
+    fun `an idle Nomi still identifies itself without reporting an incompatible version`() = runTest {
+        val card = ShareTagResponder(null)
+        assertEquals(ShareApdu.STATUS_OK, ShareApdu.statusOf(card.respond(ShareApdu.selectAid())))
+        assertEquals(ShareReceiveFailure.NoTagFound, pullSharedDay(card::respond).failureOrNull())
+    }
+
+    @Test
+    fun `older sender with cleared offer is not reported as incompatible`() = runTest {
+        assertEquals(ShareReceiveFailure.NoTagFound, pullSharedDay({
+            ShareApdu.statusOnly(ShareApdu.STATUS_NO_PAYLOAD)
+        }).failureOrNull())
+    }
+
+
+    @Test
     fun `registered AID is routable by Android and matches the reader`() {
         val file = java.io.File("src/main/res/xml/nfc_share_apdu_service.xml")
         val document = javax.xml.parsers.DocumentBuilderFactory.newInstance()

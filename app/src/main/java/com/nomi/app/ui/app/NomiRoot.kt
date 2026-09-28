@@ -151,6 +151,19 @@ fun NomiRoot(
             onAddToDiary = { viewModel.importSharedDay(it) },
         )
     }
+    val shareLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    androidx.compose.runtime.DisposableEffect(shareCoordinator, shareLifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE &&
+                (shareCoordinator.isSending || shareCoordinator.isReceiving)
+            ) shareCoordinator.collapse()
+        }
+        shareLifecycle.addObserver(observer)
+        onDispose {
+            shareLifecycle.removeObserver(observer)
+            shareCoordinator.collapse()
+        }
+    }
     CompositionLocalProvider(LocalNomiShareCoordinator provides shareCoordinator) {
         when (startState) {
             AppStartState.Loading -> Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -286,6 +299,7 @@ private fun NomiMain(
     // resolved here, where the user's language is available, and the coordinator only names what
     // happened.
     val shareNoNfcMessage = nomiString("This phone has no NFC")
+    val shareCannotEmulateMessage = nomiString("This phone can receive NFC shares but cannot send them")
     val shareNfcOffMessage = nomiString("Turn NFC on to share")
     val shareNothingSelectedMessage = nomiString("Tick at least one food to share")
     val shareNoTagMessage = nomiString("Nomi couldn't find a phone to read")
@@ -301,6 +315,7 @@ private fun NomiMain(
         is NomiShareEvent.Added -> fillTemplate(shareAddedTemplate, arrayOf<Any?>(event.foodCount))
         NomiShareEvent.NoNfcHardware -> shareNoNfcMessage
         NomiShareEvent.NfcTurnedOff -> shareNfcOffMessage
+        NomiShareEvent.CannotEmulate -> shareCannotEmulateMessage
         NomiShareEvent.NothingSelected -> shareNothingSelectedMessage
         // The four ways a tap fails each get their own sentence. One "sharing failed" would send
         // the user off to guess, and the fixes are nothing alike: move the phones, hold still,
