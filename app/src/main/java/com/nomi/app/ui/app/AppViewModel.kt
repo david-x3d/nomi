@@ -2110,6 +2110,24 @@ class AppViewModel(
         }
     }
 
+    private val libraryDeletions = com.nomi.app.ui.library.LibraryDeletionController(
+        scope = viewModelScope,
+        delete = { item ->
+            when (item.kind) {
+                LibraryItemKind.FAVORITE -> repository.unfavorite(item.id)
+                LibraryItemKind.SAVED_MEAL -> repository.deleteSavedMealById(item.id)
+                LibraryItemKind.RECENT -> Unit
+            }
+        },
+        onFailure = {
+            mutableEvents.emit(AppEvent.Message(inUserLanguage("Nomi couldn't delete that food.")))
+        },
+    )
+    val pendingLibraryDeletions = libraryDeletions.pending
+
+    fun deleteLibraryItem(item: LibraryItem) = libraryDeletions.request(item)
+    fun undoLibraryDeletion(item: LibraryItem) = libraryDeletions.undo(item)
+
     fun addLibraryItem(item: LibraryItem) {
         viewModelScope.launch {
             runCatching {

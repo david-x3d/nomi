@@ -692,11 +692,15 @@ private fun NomiMain(
 
             composable(Routes.LIBRARY) {
                 val libraryState by viewModel.libraryState.collectAsStateWithLifecycle()
+                val pendingDeletions by viewModel.pendingLibraryDeletions.collectAsStateWithLifecycle()
                 LibraryScreen(
                     state = libraryState,
                     initialKind = libraryKind,
                     onBack = { navController.popBackStack() },
                     onAdd = viewModel::addLibraryItem,
+                    pendingDeletions = pendingDeletions,
+                    onDelete = viewModel::deleteLibraryItem,
+                    onUndoDelete = viewModel::undoLibraryDeletion,
                 )
             }
 

@@ -3,6 +3,8 @@ package com.nomi.app.ui.library
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
@@ -28,16 +31,27 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.nomiPageContainerColor
 import kotlin.math.roundToInt
@@ -50,7 +64,9 @@ data class LibraryItem(
     val title: String,
     val subtitle: String,
     val calories: Double,
-)
+) {
+    val key: String get() = "$kind-$id"
+}
 
 data class LibraryUiState(
     val recent: List<LibraryItem> = emptyList(),
@@ -65,6 +81,9 @@ fun LibraryScreen(
     initialKind: LibraryItemKind,
     onBack: () -> Unit,
     onAdd: (LibraryItem) -> Unit,
+    pendingDeletions: Map<String, Boolean>,
+    onDelete: (LibraryItem) -> Unit,
+    onUndoDelete: (LibraryItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selected by rememberSaveable(initialKind) { mutableStateOf(initialKind) }
@@ -134,17 +153,13 @@ fun LibraryScreen(
                 }
             } else {
                 items(items, key = { "${it.kind}-${it.id}" }) { item ->
-                    ListItem(
-                        headlineContent = { Text(item.title) },
-                        supportingContent = { Text(item.subtitle) },
-                        leadingContent = { Icon(item.kind.icon, contentDescription = null) },
-                        trailingContent = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("${item.calories.roundToInt()} kcal")
-                                Icon(Icons.Default.Add, contentDescription = null)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().clickable { onAdd(item) }.animateItem(),
+                    LibraryRow(
+                        item = item,
+                        pending = pendingDeletions[item.key],
+                        onAdd = { onAdd(item) },
+                        onDelete = { onDelete(item) },
+                        onUndo = { onUndoDelete(item) },
+                        modifier = Modifier.animateItem(),
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 }
@@ -152,6 +167,96 @@ fun LibraryScreen(
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LibraryRow(
+    item: LibraryItem,
+    pending: Boolean?,
+    onAdd: () -> Unit,
+    onDelete: () -> Unit,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptics = rememberNomiHaptics()
+    val deleteLabel = nomiString("Delete")
+    if (pending != null) {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ) {
+            Row(
+                Modifier.heightIn(min = 72.dp).padding(horizontal = 20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null)
+                Text(item.title, Modifier.weight(1f), maxLines = 2)
+                TextButton(onClick = { haptics.confirmed(); onUndo() }, enabled = pending) {
+                    Text(nomiString("Undo"))
+                }
+            }
+        }
+        return
+    }
+    val content: @Composable () -> Unit = {
+        ListItem(
+            headlineContent = { Text(item.title) },
+            supportingContent = { Text(item.subtitle) },
+            leadingContent = { Icon(item.kind.icon, contentDescription = null) },
+            trailingContent = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("${item.calories.roundToInt()} kcal")
+                    Icon(Icons.Default.Add, contentDescription = null)
+                }
+            },
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onAdd).semantics {
+                if (item.kind != LibraryItemKind.RECENT) {
+                    customActions = listOf(CustomAccessibilityAction(deleteLabel) {
+                        haptics.removed()
+                        onDelete()
+                        true
+                    })
+                }
+            },
+        )
+    }
+    if (item.kind == LibraryItemKind.RECENT) {
+        Box(modifier) { content() }
+        return
+    }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.removed()
+                onDelete()
+                true
+            } else false
+        },
+        positionalThreshold = { it * 0.32f },
+    )
+    val armed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+    LaunchedEffect(armed) { if (armed) haptics.deleteArmed() }
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = true,
+        backgroundContent = {
+            Row(
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer)
+                    .padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            ) {
+                Text(deleteLabel, color = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Icons.Default.Delete, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        },
+    ) { content() }
 }
 
 @Composable

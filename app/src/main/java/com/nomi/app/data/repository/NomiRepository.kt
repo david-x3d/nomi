@@ -581,6 +581,8 @@ class NomiRepository(
         mealDao.replaceMeal(meal, items)
     }
 
+    suspend fun deleteSavedMealById(id: Long): Boolean = mealDao.deleteMealById(id) == 1
+
     suspend fun deleteSavedMeal(meal: SavedMealEntity): Boolean = mealDao.deleteMeal(meal) == 1
 
     /** Expands immutable saved-item snapshots and inserts all resulting logs atomically. */
