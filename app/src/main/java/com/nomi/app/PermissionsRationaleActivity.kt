@@ -19,6 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.nomi.app.ui.localization.LocalNomiLanguage
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.NomiTheme
 
 
@@ -36,9 +42,6 @@ class PermissionsRationaleActivity : ComponentActivity() {
 
 @Composable
 private fun HealthConnectRationale(onClose: () -> Unit) {
-    val german = LocalConfiguration.current.locales[0].language.equals("de", ignoreCase = true)
-    fun text(english: String, germanText: String): String = if (german) germanText else english
-
     Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
         Column(
             modifier = Modifier
@@ -48,55 +51,34 @@ private fun HealthConnectRationale(onClose: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text("Health Connect privacy", "Health-Connect-Datenschutz"),
+                nomiString("Health Connect privacy"),
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                text(
-                    "Nomi uses Health Connect only when you choose to connect it.",
-                    "Nomi verwendet Health Connect nur, wenn du die Verbindung selbst aktivierst.",
-                ),
+                nomiString("Nomi uses Health Connect only when you choose to connect it."),
             )
             Text(
-                text(
-                    "Nomi reads today's step count and active calories. With past-data access, it also imports your complete available weight history; otherwise Health Connect limits the import to its standard recent window.",
-                    "Nomi liest die heutige Schrittzahl und aktive Kalorien. Mit Zugriff auf vergangene Daten importiert Nomi außerdem deinen vollständig verfügbaren Gewichtsverlauf; andernfalls gilt das übliche aktuelle Zeitfenster von Health Connect.",
-                ),
+                nomiString("Nomi reads today's step count and active calories. With past-data access, it also imports your complete available weight history; otherwise Health Connect limits the import to its standard recent window."),
             )
             Text(
-                text(
-                    "Nomi estimates calories from steps locally using your latest weight and, when available, your height. This estimate is kept separate from Health Connect active calories.",
-                    "Nomi schätzt Schrittkalorien lokal anhand deines aktuellen Gewichts und, falls vorhanden, deiner Größe. Diese Schätzung bleibt von den aktiven Kalorien aus Health Connect getrennt.",
-                ),
+                nomiString("Nomi estimates calories from steps locally using your latest weight and, when available, your height. This estimate is kept separate from Health Connect active calories."),
             )
             Text(
-                text(
-                    "Nomi writes the weight measurements that you manually save in Nomi and retries pending measurements later. A failed Health Connect write never removes the weight from Nomi.",
-                    "Nomi schreibt die Gewichtsmessungen, die du manuell in Nomi speicherst, und versucht ausstehende Messungen später erneut. Ein fehlgeschlagener Health-Connect-Schreibvorgang entfernt das Gewicht niemals aus Nomi.",
-                ),
+                nomiString("Nomi writes the weight measurements that you manually save in Nomi and retries pending measurements later. A failed Health Connect write never removes the weight from Nomi."),
             )
             Text(
-                text(
-                    "Nomi also writes your complete food log as nutrition entries: the calories, protein, carbohydrates and fat of each logged portion, with its name and meal. Editing or deleting food in Nomi updates or removes the matching Health Connect entry.",
-                    "Nomi schreibt außerdem dein vollständiges Ernährungstagebuch als Ernährungseinträge: Kalorien, Eiweiß, Kohlenhydrate und Fett jeder erfassten Portion samt Name und Mahlzeit. Wenn du ein Lebensmittel in Nomi änderst oder löschst, wird der zugehörige Health-Connect-Eintrag aktualisiert oder entfernt.",
-                ),
+                nomiString("Nomi also writes your complete food log as nutrition entries: the calories, protein, carbohydrates and fat of each logged portion, with its name and meal. Editing or deleting food in Nomi updates or removes the matching Health Connect entry."),
             )
             Text(
-                text(
-                    "Your Health Connect data is stored in Nomi's local database. Nomi does not sell or upload this health data.",
-                    "Deine Health-Connect-Daten werden in der lokalen Nomi-Datenbank gespeichert. Nomi verkauft oder überträgt diese Gesundheitsdaten nicht.",
-                ),
+                nomiString("Your Health Connect data is stored in Nomi's local database. Nomi does not sell or upload this health data."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text(
-                    "You can revoke any permission at any time in Health Connect settings.",
-                    "Du kannst jede Berechtigung jederzeit in den Health-Connect-Einstellungen widerrufen.",
-                ),
+                nomiString("You can revoke any permission at any time in Health Connect settings."),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-                Text(text("Close", "Schließen"))
+                Text(nomiString("Close"))
             }
         }
     }

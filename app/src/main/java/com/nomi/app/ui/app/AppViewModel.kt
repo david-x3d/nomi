@@ -3459,6 +3459,7 @@ class AppViewModel(
         sourceServingQuantity = sourceSnapshot.servingQuantity,
         sourceServingUnit = sourceSnapshot.servingUnit,
         calorieExplanation = sourceSnapshot.calorieExplanation,
+        inputMethod = inputMethod,
         originalInput = originalInput,
         revealText = revealText,
     )

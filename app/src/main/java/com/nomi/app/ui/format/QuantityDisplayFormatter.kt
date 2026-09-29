@@ -1,5 +1,7 @@
 package com.nomi.app.ui.format
 
+import com.nomi.app.ui.localization.NomiLanguage
+import com.nomi.app.ui.localization.NomiTranslations
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.abs
@@ -250,21 +252,24 @@ object QuantityDisplayFormatter {
                 val unit = request.packageUnit.orEmpty()
                 "${formatNumber(quantity, locale, 2)} ${localizedUnit(unit, quantity, locale)}".trim()
             }
-        val german = locale.language.equals("de", ignoreCase = true)
-
+        // Worded through the catalogue so every language gets the sentence, not only German.
+        val language = NomiLanguage.matching(locale)
         return when {
-            german && source != null && entered != null ->
-                "Die Quelle listet derzeit eine Packungsgröße von $source. Deine Eingabe von $entered wurde beibehalten."
-            german && source != null ->
-                "Die Quelle listet derzeit eine Packungsgröße von $source. Deine eingegebene Menge wurde beibehalten."
-            german ->
-                "Die Quelle listet eine andere Packungsgröße. Deine eingegebene Menge wurde beibehalten."
-            source != null && entered != null ->
-                "The source currently lists a $source package. Your entered $entered package was kept."
-            source != null ->
-                "The source currently lists a $source package. Your entered amount was kept."
-            else ->
-                "The source lists a different package size. Your entered amount was kept."
+            source != null && entered != null -> NomiTranslations.format(
+                "The source currently lists a {0} package. Your entered {1} package was kept.",
+                language,
+                source,
+                entered,
+            )
+            source != null -> NomiTranslations.format(
+                "The source currently lists a {0} package. Your entered amount was kept.",
+                language,
+                source,
+            )
+            else -> NomiTranslations.translate(
+                "The source lists a different package size. Your entered amount was kept.",
+                language,
+            )
         }
     }
 

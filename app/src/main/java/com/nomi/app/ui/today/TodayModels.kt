@@ -151,6 +151,8 @@ data class TodayFoodEntry(
     val sourceServingUnit: String? = null,
     /** Short AI-generated explanation of the main calorie contributors for this entry. */
     val calorieExplanation: String? = null,
+    /** How the entry was made - "ai", "manual", "shared", "favorite" … - for the origin line. */
+    val inputMethod: String? = null,
     /** Individual logs that make up a combined meal shown as one row on the Today page. */
     val groupItems: List<TodayFoodEntry> = emptyList(),
     /** Exact sentence used to create the entry, persisted so it can be rewritten later. */

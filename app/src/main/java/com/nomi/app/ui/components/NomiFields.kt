@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.localization.nomiMessage
 
 /**
  * The shape every field Nomi asks you to type into is cut from.
@@ -145,7 +146,7 @@ fun NomiInlineError(message: String, modifier: Modifier = Modifier) {
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
-            Text(text = message, style = MaterialTheme.typography.bodyMedium)
+            Text(text = nomiMessage(message), style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

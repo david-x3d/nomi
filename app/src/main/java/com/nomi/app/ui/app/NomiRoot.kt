@@ -53,6 +53,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -128,6 +129,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.nomi.app.ui.localization.LocalNomiLanguage
+import com.nomi.app.ui.localization.NomiTranslations
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -235,8 +238,13 @@ private fun NomiMain(
     var pendingReminderIndex by remember { mutableStateOf<Int?>(null) }
     var menuAddingPage by remember { mutableStateOf(false) }
 
+    // Messages arrive already composed, often from outside any composition, so they are put
+    // into the chosen language here, at the one place every snackbar passes through.
+    val language by rememberUpdatedState(LocalNomiLanguage.current)
     fun showMessage(message: String) {
-        scope.launch { snackbarHostState.showSnackbar(message) }
+        scope.launch {
+            snackbarHostState.showSnackbar(NomiTranslations.localizeMessage(message, language))
+        }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -368,7 +376,9 @@ private fun NomiMain(
                     navController.popBackStack(Routes.HOME, inclusive = false)
                 }
                 AppEvent.OnboardingSaved -> Unit
-                is AppEvent.Message -> snackbarHostState.showSnackbar(event.text)
+                is AppEvent.Message -> snackbarHostState.showSnackbar(
+                    NomiTranslations.localizeMessage(event.text, language),
+                )
             }
         }
     }

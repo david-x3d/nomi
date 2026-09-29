@@ -20,6 +20,7 @@ import com.nomi.app.integration.voice.WhisperVoiceController
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import kotlinx.coroutines.delay
+import com.nomi.app.ui.localization.nomiMessage
 
 /**
  * Dictation that happens where the user already is, instead of on a page of its own.
@@ -129,7 +130,7 @@ fun rememberInlineDictation(
         isTranscribing = recognition.isTranscribing,
         downloadProgress = downloadProgress,
         level = level,
-        message = failure,
+        message = failure?.let { nomiMessage(it) },
         start = { start() },
         stop = { controller.stop() },
         cancel = { cancel() },

@@ -38,6 +38,7 @@ import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.localization.nomiFormat
 import java.net.URI
+import com.nomi.app.ui.localization.nomiMessage
 
 data class AiProviderEditorState(
     val purpose: String,
@@ -226,7 +227,7 @@ fun AiProviderEditorDialog(
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             ) {
                 Text(
-                    it,
+                    nomiMessage(it),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )

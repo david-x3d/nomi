@@ -70,6 +70,7 @@ import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.today.MealCategory
 import kotlin.math.roundToInt
+import com.nomi.app.ui.localization.nomiMessage
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -483,7 +484,7 @@ private fun ErrorContent(
     ) {
         Icon(Icons.Default.Restaurant, contentDescription = null)
         Spacer(Modifier.height(16.dp))
-        Text(state.message, style = MaterialTheme.typography.titleLarge)
+        Text(nomiMessage(state.message), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(20.dp))
         if (state.canRetry) {
             Button(onClick = onRetry) { Text(nomiString("Try again")) }

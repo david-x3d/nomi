@@ -70,6 +70,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Locale
+import com.nomi.app.ui.localization.nomiMessage
 
 @Composable
 fun ProfileSettingsScreen(
@@ -474,6 +475,6 @@ private fun Double.displayNumber(locale: Locale): String =
  */
 @Composable
 private fun localizeProfileError(message: String?): String? =
-    message?.let { nomiString(it) }
+    message?.let { nomiMessage(it) }
 
 private fun LocalDate.toUtcMilliseconds(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()

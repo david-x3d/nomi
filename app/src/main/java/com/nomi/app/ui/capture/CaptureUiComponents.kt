@@ -37,6 +37,7 @@ import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.localization.nomiMessage
 
 /**
  * Puts the keyboard away for as long as a viewfinder is on screen. A camera opened while a
@@ -121,7 +122,7 @@ internal fun CaptureMessageCard(
             Spacer(Modifier.width(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(text = title, style = MaterialTheme.typography.titleSmall)
-                Text(text = message, style = MaterialTheme.typography.bodyMedium)
+                Text(text = nomiMessage(message), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

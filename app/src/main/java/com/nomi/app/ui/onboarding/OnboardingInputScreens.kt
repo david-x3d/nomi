@@ -102,6 +102,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import com.nomi.app.ui.localization.nomiMessage
 
 @Composable
 internal fun WelcomeScreen(onContinue: () -> Unit) {
@@ -725,7 +726,7 @@ private fun QuestionPage(
         error?.let { message ->
             item {
                 NomiInlineError(
-                    message = nomiString(message),
+                    message = nomiMessage(message),
                     modifier = Modifier
                         .semantics { liveRegion = LiveRegionMode.Polite }
                         .testTag("onboarding_error"),

@@ -78,6 +78,7 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.nomi.app.ui.localization.nomiMessage
 
 @Composable
 internal fun PlanRevealScreen(
@@ -89,7 +90,7 @@ internal fun PlanRevealScreen(
     if (plan == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                text = state.validationMessage?.let { nomiString(it) }
+                text = state.validationMessage?.let { nomiMessage(it) }
                     ?: nomiString("Complete the previous steps to calculate your plan."),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
@@ -585,7 +586,7 @@ private fun PlanEditor(
             }
             state.planEditor.validationMessage?.let { message ->
                 Text(
-                    text = nomiString(message),
+                    text = nomiMessage(message),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },

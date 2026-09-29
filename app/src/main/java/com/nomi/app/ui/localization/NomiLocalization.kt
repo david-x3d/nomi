@@ -67,6 +67,16 @@ fun nomiString(english: String): String =
 fun nomiFormat(english: String, vararg arguments: Any?): String =
     fillTemplate(NomiTranslations.translate(english, LocalNomiLanguage.current), arguments)
 
+/**
+ * Translates a message that was composed elsewhere - an error from the ViewModel, a provider,
+ * the speech recogniser - including one that already has its values filled in. See
+ * [NomiTranslations.localizeMessage].
+ */
+@Composable
+@ReadOnlyComposable
+fun nomiMessage(message: String): String =
+    NomiTranslations.localizeMessage(message, LocalNomiLanguage.current)
+
 @Composable
 @ReadOnlyComposable
 fun nomiLocale(): Locale = LocalNomiLanguage.current.locale

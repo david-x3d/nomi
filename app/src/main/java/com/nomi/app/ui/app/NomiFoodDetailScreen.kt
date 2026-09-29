@@ -96,6 +96,7 @@ import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.localization.nomiMessage
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.today.MealCategory
@@ -417,6 +418,9 @@ private fun NutritionContent(
                 entry = entry,
                 enabledMicronutrients = enabledMicronutrients,
             )
+        }
+        item(key = "calorie-origin") {
+            CalorieOriginSection(entry = entry)
         }
         item(key = "explanation") {
             EstimateExplanationCard(entry = entry, onEditAmount = onEditAmount)
@@ -780,7 +784,7 @@ private fun ItemAndSourceCard(
     val leadingSiteHost = remember(leadingSiteUrl) {
         WebsiteFaviconUrl.normalizePublicHttpsHostname(leadingSiteUrl)
     }
-    val sourceLabel = entry.sourceName?.takeIf { it.isNotBlank() }
+    val sourceLabel = entry.sourceName?.takeIf { it.isNotBlank() }?.let { nomiMessage(it) }
         ?: if (entry.isEstimated) {
             nomiString("Nomi estimate")
         } else {
@@ -957,7 +961,7 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
     } else {
         entry.quantityDisplay(locale).withContext
     }
-    val sourceDetail = entry.sourceName?.takeIf { it.isNotBlank() }
+    val sourceDetail = entry.sourceName?.takeIf { it.isNotBlank() }?.let { nomiMessage(it) }
         ?: if (entry.isEstimated) {
             nomiString("the food description you entered")
         } else {
@@ -978,11 +982,6 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
             amountDetail,
         )
     }
-    val calorieExplanation = entry.calorieExplanation
-        ?.trim()
-        ?.takeIf(String::isNotBlank)
-        ?: fallbackCalorieExplanation(entry)
-
     // The section name sits above the card the way "References" does, so the card itself opens
     // on the confidence ring instead of repeating its own title.
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1013,46 +1012,12 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = nomiString("Why this calorie total"),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = calorieExplanation,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
                 if (entry.groupItems.isEmpty()) {
                     CorrectionPrompt(onClick = onEditAmount)
                 }
             }
         }
     }
-}
-
-/** Fallback for older, manual, barcode, and library entries that predate the AI explanation. */
-private fun fallbackCalorieExplanation(entry: TodayFoodEntry): String {
-    val contributors = listOf(
-        "fat" to entry.fatGrams.coerceAtLeast(0.0) * 9.0,
-        "carbohydrates" to entry.carbohydrateGrams.coerceAtLeast(0.0) * 4.0,
-        "protein" to entry.proteinGrams.coerceAtLeast(0.0) * 4.0,
-    )
-    val dominant = contributors.maxByOrNull { it.second }
-    if (dominant == null || dominant.second <= 0.0) {
-        return "The calorie total follows the logged portion and the available nutrition data."
-    }
-    val grams = when (dominant.first) {
-        "fat" -> entry.fatGrams
-        "carbohydrates" -> entry.carbohydrateGrams
-        else -> entry.proteinGrams
-    }
-    val kcalPerGram = if (dominant.first == "fat") 9 else 4
-    return "Most of the energy comes from ${dominant.first} (${formatNumber(grams, Locale.getDefault())} g, " +
-        "about ${dominant.second.roundToInt()} kcal). At $kcalPerGram kcal per gram, it is the " +
-        "main calorie driver for this portion."
 }
 
 /** The way out of a wrong estimate: the amount editor, one tap from the reasoning that produced it. */

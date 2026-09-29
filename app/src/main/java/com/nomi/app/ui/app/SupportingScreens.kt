@@ -59,6 +59,7 @@ import com.nomi.app.ui.today.formatted
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import kotlin.math.roundToInt
+import com.nomi.app.ui.localization.nomiMessage
 
 @Composable
 fun WeightEntryDialog(
@@ -357,7 +358,7 @@ fun HealthConnectScreen(
 
             health.message?.let { message ->
                 Text(
-                    message,
+                    nomiMessage(message),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

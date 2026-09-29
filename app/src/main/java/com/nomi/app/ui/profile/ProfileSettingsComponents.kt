@@ -45,6 +45,7 @@ import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.localization.nomiMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +101,7 @@ internal fun SettingsNoticeCard(
             Spacer(Modifier.width(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(message, style = MaterialTheme.typography.bodyMedium)
+                Text(nomiMessage(message), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
