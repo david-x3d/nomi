@@ -105,7 +105,8 @@ internal object NomiTranslations {
      * template that would also match by swallowing more into one slot.
      */
     private val messageTemplates: List<MessageTemplate> by lazy {
-        val placeholder = Regex("""\{(\d+)}""")
+        // Both braces escaped: Android's ICU engine rejects a bare "}", which the JVM accepts.
+        val placeholder = Regex("""\{(\d+)\}""")
         // A template that is mostly slots ("{0} kcal", "{0}: {1}") would claim unrelated
         // messages, so only sentences with real wording around their values take part.
         catalogue.keys
@@ -116,14 +117,25 @@ internal object NomiTranslations {
                 val pattern = buildString {
                     var last = 0
                     placeholder.findAll(key).forEach { found ->
-                        append(Regex.escape(key.substring(last, found.range.first)))
+                        append(literalPattern(key.substring(last, found.range.first)))
                         append("(.+?)")
                         slots += found.groupValues[1].toInt()
                         last = found.range.last + 1
                     }
-                    append(Regex.escape(key.substring(last)))
+                    append(literalPattern(key.substring(last)))
                 }
                 MessageTemplate(key, Regex(pattern, RegexOption.DOT_MATCHES_ALL), slots)
             }
+    }
+
+    /**
+     * Escapes every non-alphanumeric character on its own rather than using \Q…\E, so the pattern
+     * means the same thing on the JVM and on Android's ICU engine.
+     */
+    private fun literalPattern(text: String): String = buildString(text.length * 2) {
+        text.forEach { character ->
+            if (!character.isLetterOrDigit() && !character.isWhitespace()) append('\\')
+            append(character)
+        }
     }
 }
