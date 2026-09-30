@@ -966,9 +966,7 @@ private fun requireGroundedNutritionBasis(
         }
         return
     }
-    val normalizedEvidence = corpus.normalizedBasisEvidence()
-    val normalizedBasisText = basisText.normalizedBasisEvidence()
-    if (!normalizedEvidence.contains(normalizedBasisText)) {
+    if (!corpus.containsBasisQuote(basisText)) {
         throw NutritionResearchException(
             reason = NutritionFailureReason.INVALID_NUTRITION_BASIS,
             itemName = parsed.name,
@@ -1002,11 +1000,56 @@ private fun GeminiNutritionItem.basisTextAgreesWithDeclaredBasis(): Boolean {
     return when (nutritionBasis) {
         ResearchNutritionBasis.PER_100_G -> PER_100_G_BASIS.containsMatchIn(basisText)
         ResearchNutritionBasis.PER_100_ML -> PER_100_ML_BASIS.containsMatchIn(basisText)
-        ResearchNutritionBasis.SOURCE_SERVING ->
-            !PER_100_G_BASIS.containsMatchIn(basisText) &&
-                !PER_100_ML_BASIS.containsMatchIn(basisText)
+        ResearchNutritionBasis.SOURCE_SERVING -> {
+            val namesPer100 = PER_100_G_BASIS.containsMatchIn(basisText) ||
+                PER_100_ML_BASIS.containsMatchIn(basisText)
+            // Nutrition tables commonly head two columns at once - "pro 100 g | pro Portion
+            // (119 g)" - and a model quoting the whole heading has not mislabeled anything. It
+            // agrees with a serving basis when, once the per-100 part is set aside, the quote
+            // still names a serving and the declared serving is not itself 100 g or 100 ml.
+            // "per 100 g" on its own is still rejected: that is the mislabel this check exists for.
+            !namesPer100 || (
+                SERVING_BASIS.containsMatchIn(
+                    basisText.replace(PER_100_G_BASIS, " ").replace(PER_100_ML_BASIS, " "),
+                ) && !declaresHundredUnitServing()
+            )
+        }
     }
 }
+
+private fun GeminiNutritionItem.declaresHundredUnitServing(): Boolean {
+    val unit = sourceServingUnit?.trim()?.lowercase(Locale.ROOT) ?: return false
+    return sourceServingQuantity == 100.0 && unit in setOf("g", "gram", "grams", "ml")
+}
+
+/**
+ * Whether the model's basis quote appears in the source.
+ *
+ * The quote is required to be verbatim, and it still is - character for character - but web
+ * pages reach Nomi as extracted text: table cells joined by pipes, headings broken across lines,
+ * "Portion(119g)" printed without the spaces the model writes back. Comparing only letters and
+ * digits keeps every word and number of the quote bound to the page while no longer failing a
+ * correct quote over layout. Very short quotes must still match in the whitespace-normalized
+ * form, where a two-letter fragment cannot turn up by accident inside unrelated words.
+ */
+private fun String.containsBasisQuote(quote: String): Boolean {
+    val normalizedQuote = quote.normalizedBasisEvidence()
+    if (normalizedBasisEvidence().contains(normalizedQuote)) return true
+    val compactQuote = normalizedQuote.compactBasisEvidence()
+    if (compactQuote.length < MIN_COMPACT_BASIS_QUOTE) return false
+    return normalizedBasisEvidence().compactBasisEvidence().contains(compactQuote)
+}
+
+private fun String.compactBasisEvidence(): String = replace(Regex("[^\\p{L}\\p{N}.]"), "")
+
+private const val MIN_COMPACT_BASIS_QUOTE = 6
+
+/** Words and printed amounts that name one serving rather than a per-100 reference. */
+private val SERVING_BASIS = Regex(
+    "(?:portion|serving|stück|stueck|piece|pièce|porción|porcion|porzione|portie|porção|" +
+        "porcao|racion|ración|each|item|pro stk|per stk)" +
+        "|\\(\\s*\\d+(?:\\.\\d+)?\\s*(?:g|ml)\\s*\\)",
+)
 
 private fun String.normalizedBasisEvidence(): String = lowercase(Locale.ROOT)
     .replace('\u00a0', ' ')
