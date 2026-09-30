@@ -1,5 +1,13 @@
 # Changelog
 
+## Nomi v2.9.1 — 2026-10-01
+
+### Fixes
+
+- Restaurant meals such as a McDonald's Cheeseburger no longer fail with "the nutrition is given for a serving it cannot convert to your amount" when the source is fine. Nutrition pages that print "per 100 g" and "per serving" side by side, or whose table text reaches Nomi without the spaces the page shows, are now read correctly. A serving that is really only "per 100 g", or a quote that is not on the page, is still refused.
+
+Your food log, settings, and calorie targets are unchanged.
+
 ## Nomi v2.9.0 — 2026-10-01
 
 ### A friendlier start

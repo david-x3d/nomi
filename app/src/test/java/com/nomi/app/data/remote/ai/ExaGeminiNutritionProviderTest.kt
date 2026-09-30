@@ -662,6 +662,67 @@ class ExaGeminiNutritionProviderTest {
     }
 
     @Test
+    fun `a restaurant table heading both columns still grounds a per-serving reading`() = runBlocking {
+        // Restaurant pages print "pro 100 g" and "pro Portion" side by side, and extracted text
+        // turns the table into pipes. Quoting that heading used to reject a correct serving.
+        val result = restaurantProvider(
+            table = RESTAURANT_TABLE,
+            basisText = "pro 100 g | pro Portion (119 g)",
+        ).researchNutrition(cheeseburgerIntent()).items.single()
+
+        assertEquals(300.0, result.calories, 1e-9)
+        assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+    }
+
+    @Test
+    fun `a basis quote survives the page's own spacing and line breaks`() = runBlocking {
+        // The page prints "Portion(119g)" in a table cell; the model writes it back with spaces.
+        val result = restaurantProvider(
+            table = RESTAURANT_TABLE.replace("pro Portion (119 g)", "pro\nPortion(119g)"),
+            basisText = "pro Portion (119 g)",
+        ).researchNutrition(cheeseburgerIntent()).items.single()
+
+        assertEquals(300.0, result.calories, 1e-9)
+    }
+
+    @Test
+    fun `a serving quote that is only per 100 g is still rejected`() {
+        assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                restaurantProvider(table = RESTAURANT_TABLE, basisText = "pro 100 g")
+                    .researchNutrition(cheeseburgerIntent())
+            }
+        }
+    }
+
+    @Test
+    fun `a quote that is not on the page is still rejected`() {
+        assertThrows(AiValidationException::class.java) {
+            runBlocking {
+                restaurantProvider(table = RESTAURANT_TABLE, basisText = "pro Menü (350 g)")
+                    .researchNutrition(cheeseburgerIntent())
+            }
+        }
+    }
+
+    private fun cheeseburgerIntent() = ParsedFoodIntent(
+        originalText = "1 McDonald's Cheeseburger",
+        items = listOf(
+            ParsedFoodItem("Cheeseburger", brand = "McDonald's", quantity = 1.0, unit = "piece"),
+        ),
+    )
+
+    private fun restaurantProvider(table: String, basisText: String) = provider(
+        sources = listOf(
+            source("McDonald's Cheeseburger Nährwerte", "https://mcdonalds.test/cheeseburger", table),
+        ),
+        extraction = extraction(
+            restaurantItem("Cheeseburger", "McDonald's", 300.0, 15.5, 31.0, 12.5, "exa-1")
+                .copy(sourceBasisText = basisText),
+        ),
+    )
+
+    @Test
     fun `legitimate zero calories require explicit retrieved zero calorie evidence`() {
         val zeroCase = SuccessCase(
             text = "500 ml Coca-Cola Zero Sugar",
@@ -1026,6 +1087,17 @@ class ExaGeminiNutritionProviderTest {
         isEstimate = false,
         confidence = 0.98,
     )
+
+    private companion object {
+        const val RESTAURANT_TABLE =
+            "McDonald's Cheeseburger Nährwerte\n" +
+                "| Nährwert | pro 100 g | pro Portion (119 g) |\n" +
+                "| --- | --- | --- |\n" +
+                "| Energie | 252 kcal | 300 kcal |\n" +
+                "| Eiweiß | 13 g | 15.5 g |\n" +
+                "| Kohlenhydrate | 26 g | 31 g |\n" +
+                "| Fett | 10.5 g | 12.5 g |"
+    }
 
     private data class SuccessCase(
         val text: String,
