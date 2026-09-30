@@ -2,13 +2,20 @@
 #
 # The signing key never comes to GitHub. Whoever builds the release pushes the signed APK to a
 # branch named release-assets-<tag> (holding only Nomi-<tag>-release.apk) and then pushes the
-# tag. This job attaches that APK to a release titled from release-notes-<tag>.md and removes
-# the asset branch again, so the APK does not stay in the repository.
+# tag - or, where tags cannot be pushed, starts this workflow by hand with the tag name, and the
+# release creates the tag on the commit the workflow ran on. This job attaches that APK to a
+# release titled from release-notes-<tag>.md and removes the asset branch again, so the APK does
+# not stay in the repository.
 name: Publish release
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, e.g. v2.9.0. Created on the selected branch's latest commit."
+        required: true
 
 permissions:
   contents: write
@@ -16,12 +23,13 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Fetch the signed APK
         run: |
-          TAG="${GITHUB_REF_NAME}"
           git fetch --depth=1 origin "release-assets-${TAG}"
           git show "FETCH_HEAD:Nomi-${TAG}-release.apk" > "Nomi-${TAG}-release.apk"
           ls -l "Nomi-${TAG}-release.apk"
@@ -30,15 +38,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF_NAME}"
           NOTES="release-notes-${TAG}.md"
           # "Nomi v2.9.0 — <first section heading>", the way earlier releases were titled.
           HEADING="$(grep -m1 '^### ' "$NOTES" | sed 's/^### //')"
           TITLE="Nomi ${TAG}${HEADING:+ — $HEADING}"
+          # A pushed tag already exists; a manual run creates it on the commit this run checked out.
           gh release create "$TAG" "Nomi-${TAG}-release.apk" \
             --title "$TITLE" \
             --notes-file "$NOTES" \
-            --verify-tag
+            --target "$GITHUB_SHA"
 
       - name: Remove the asset branch
-        run: git push origin --delete "release-assets-${GITHUB_REF_NAME}"
+        run: git push origin --delete "release-assets-${TAG}"
