@@ -12,6 +12,8 @@ import com.nomi.app.ai.model.QuantitySemantic
 import com.nomi.app.ai.model.ResearchNutritionBasis
 import kotlinx.coroutines.runBlocking
 import com.nomi.app.ai.validation.AiValidationException
+import com.nomi.app.ai.validation.NutritionFailureReason
+import com.nomi.app.ai.validation.NutritionResearchException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
@@ -705,6 +707,172 @@ class ExaGeminiNutritionProviderTest {
         }
     }
 
+    @Test
+    fun `a restaurant portion with its printed weight logs one counted burger`() = runBlocking {
+        // The page's serving is "Portion (105 g)" and the user logged "1 Hamburger", a piece.
+        // Both sides carry the same printed weight, so they meet in grams instead of failing
+        // because a portion is not a piece.
+        val result = hamburgerProvider(
+            hamburgerItem().copy(loggedServingGramsEquivalent = 105.0),
+        ).researchNutrition(hamburgerIntent()).items.single()
+
+        assertEquals(250.0, result.calories, 1e-9)
+        assertEquals(12.6, result.proteinGrams, 1e-9)
+        assertEquals(105.0, result.resolvedWeightGrams!!, 1e-9)
+        assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+    }
+
+    @Test
+    fun `two burgers scale a weighed restaurant portion by their combined weight`() = runBlocking {
+        val result = hamburgerProvider(
+            hamburgerItem().copy(loggedServingGramsEquivalent = 210.0),
+        ).researchNutrition(hamburgerIntent(quantity = 2.0)).items.single()
+
+        assertEquals(500.0, result.calories, 1e-9)
+        assertEquals(210.0, result.resolvedWeightGrams!!, 1e-9)
+    }
+
+    @Test
+    fun `a portion's weight is read from its quoted heading when the model leaves it out`() =
+        runBlocking {
+            val result = hamburgerProvider(
+                hamburgerItem().copy(
+                    sourceServingGramsEquivalent = null,
+                    loggedServingGramsEquivalent = 105.0,
+                ),
+            ).researchNutrition(hamburgerIntent()).items.single()
+
+            assertEquals(250.0, result.calories, 1e-9)
+            assertEquals(105.0, result.sourceServingGramsEquivalent!!, 1e-9)
+        }
+
+    @Test
+    fun `a serving named after the food itself is one piece of it`() = runBlocking {
+        // "pro Hamburger" is a count of hamburgers, whatever word the unit field carries.
+        val result = hamburgerProvider(
+            hamburgerItem().copy(
+                sourceServingUnit = "Hamburger",
+                sourceServingGramsEquivalent = null,
+                sourceBasisText = "pro Portion (105 g)",
+            ),
+        ).researchNutrition(hamburgerIntent(quantity = 2.0)).items.single()
+
+        assertEquals(500.0, result.calories, 1e-9)
+        assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+    }
+
+    @Test
+    fun `a weight the page does not print is dropped when the serving already counts pieces`() =
+        runBlocking {
+            // A per-burger reading needs no weight. A weight the page never printed must not be
+            // shown, but it is no reason to throw away a reading the page fully supports.
+            val result = provider(
+                sources = listOf(
+                    source(
+                        "McDonald's Cheeseburger Nährwerte",
+                        "https://mcdonalds.test/cheeseburger",
+                        RESTAURANT_TABLE,
+                    ),
+                ),
+                extraction = extraction(
+                    restaurantItem("Cheeseburger", "McDonald's", 300.0, 15.5, 31.0, 12.5, "exa-1")
+                        .copy(
+                            sourceBasisText = "pro Portion (119 g)",
+                            loggedServingGramsEquivalent = 130.0,
+                        ),
+                ),
+            ).researchNutrition(cheeseburgerIntent()).items.single()
+
+            assertEquals(300.0, result.calories, 1e-9)
+            assertEquals(null, result.resolvedWeightGrams)
+            assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+        }
+
+    @Test
+    fun `a per-100 g reading still needs a printed weight for a counted burger`() {
+        val error = assertThrows(NutritionResearchException::class.java) {
+            runBlocking {
+                hamburgerProvider(
+                    hamburgerItem().copy(
+                        calories = 238.0,
+                        proteinGrams = 12.0,
+                        carbohydrateGrams = 29.0,
+                        fatGrams = 8.3,
+                        sourceServingQuantity = 100.0,
+                        sourceServingUnit = "g",
+                        sourceServingGramsEquivalent = 100.0,
+                        nutritionBasis = ResearchNutritionBasis.PER_100_G,
+                        sourceBasisText = "pro 100 g",
+                        // Not printed anywhere on the page.
+                        loggedServingGramsEquivalent = 110.0,
+                    ),
+                ).researchNutrition(hamburgerIntent())
+            }
+        }
+
+        assertEquals(NutritionFailureReason.MISSING_PORTION_WEIGHT, error.reason)
+    }
+
+    @Test
+    fun `a portion of several pieces is not taken for one piece`() {
+        // Six nuggets make one portion. Without a weight for the nine the user ate, a portion
+        // and a piece stay apart; reading them as equal would log 54 nuggets.
+        val table = "McDonald's Chicken McNuggets Nährwerte\n" +
+            "| Nährwert | pro 100 g | pro Portion (6 Stück) |\n" +
+            "| Energie | 266 kcal | 255 kcal |\n" +
+            "| Eiweiß | 15 g | 14.4 g |\n" +
+            "| Kohlenhydrate | 17 g | 16.3 g |\n" +
+            "| Fett | 15 g | 14.4 g |"
+        val error = assertThrows(NutritionResearchException::class.java) {
+            runBlocking {
+                provider(
+                    sources = listOf(
+                        source("McDonald's Chicken McNuggets", "https://mcdonalds.test/nuggets", table),
+                    ),
+                    extraction = extraction(
+                        restaurantItem("Chicken McNuggets", "McDonald's", 255.0, 14.4, 16.3, 14.4, "exa-1")
+                            .copy(sourceServingUnit = "Portion", sourceBasisText = "pro Portion (6 Stück)"),
+                    ),
+                ).researchNutrition(
+                    ParsedFoodIntent(
+                        originalText = "9 McDonald's Chicken McNuggets",
+                        items = listOf(
+                            ParsedFoodItem(
+                                "Chicken McNuggets",
+                                brand = "McDonald's",
+                                quantity = 9.0,
+                                unit = "piece",
+                            ),
+                        ),
+                    ),
+                )
+            }
+        }
+
+        assertEquals(NutritionFailureReason.MISSING_PORTION_WEIGHT, error.reason)
+    }
+
+    private fun hamburgerIntent(quantity: Double = 1.0) = ParsedFoodIntent(
+        originalText = "${quantity.toInt()} McDonald's Hamburger",
+        items = listOf(
+            ParsedFoodItem("Hamburger", brand = "McDonald's", quantity = quantity, unit = "piece"),
+        ),
+    )
+
+    private fun hamburgerItem() =
+        restaurantItem("Hamburger", "McDonald's", 250.0, 12.6, 30.5, 8.7, "exa-1").copy(
+            sourceServingUnit = "Portion",
+            sourceServingGramsEquivalent = 105.0,
+            sourceBasisText = "pro Portion (105 g)",
+        )
+
+    private fun hamburgerProvider(item: GeminiNutritionItem) = provider(
+        sources = listOf(
+            source("McDonald's Hamburger Nährwerte", "https://mcdonalds.test/hamburger", HAMBURGER_TABLE),
+        ),
+        extraction = extraction(item),
+    )
+
     private fun cheeseburgerIntent() = ParsedFoodIntent(
         originalText = "1 McDonald's Cheeseburger",
         items = listOf(
@@ -1097,6 +1265,15 @@ class ExaGeminiNutritionProviderTest {
                 "| Eiweiß | 13 g | 15.5 g |\n" +
                 "| Kohlenhydrate | 26 g | 31 g |\n" +
                 "| Fett | 10.5 g | 12.5 g |"
+
+        const val HAMBURGER_TABLE =
+            "McDonald's Hamburger Nährwerte\n" +
+                "| Nährwert | pro 100 g | pro Portion (105 g) |\n" +
+                "| --- | --- | --- |\n" +
+                "| Energie | 238 kcal | 250 kcal |\n" +
+                "| Eiweiß | 12 g | 12.6 g |\n" +
+                "| Kohlenhydrate | 29 g | 30.5 g |\n" +
+                "| Fett | 8.3 g | 8.7 g |"
     }
 
     private data class SuccessCase(

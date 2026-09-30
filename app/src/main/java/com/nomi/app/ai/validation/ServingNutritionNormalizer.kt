@@ -682,6 +682,15 @@ object ServingNutritionNormalizer {
             requireFinitePositive(loggedVolumeMl, "resolved volume")
             return ServingMeasures(source, Measure(Dimension.Volume, loggedVolumeMl, logged.originalUnit))
         }
+        // Neither side is a mass, but each carries its own total weight: a restaurant
+        // "Portion (105 g)" against the burger the user logged as a piece. A portion is still
+        // never read as a piece; the two only meet in grams, and only when both weights exist.
+        if (sourceGramsEquivalent != null && loggedGramsEquivalent != null) {
+            return ServingMeasures(
+                massEquivalent(sourceGramsEquivalent, source.originalUnit, "source serving grams"),
+                massEquivalent(loggedGramsEquivalent, logged.originalUnit, "logged serving grams"),
+            )
+        }
         requireCompatible(source, logged)
         return ServingMeasures(source, logged)
     }
