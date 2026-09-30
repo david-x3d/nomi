@@ -130,6 +130,7 @@ import com.nomi.app.ui.progress.ProgressRange
 import com.nomi.app.ui.progress.ProgressUiState
 import com.nomi.app.ui.progress.WeightPoint
 import com.nomi.app.ui.progress.loggingStreakDays
+import com.nomi.app.ui.progress.longestLoggingStreakDays
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.AiProviderSetting
 import com.nomi.app.ui.settings.HealthConnectUiState
@@ -468,6 +469,10 @@ class AppViewModel(
                 totalDays = totalDays,
                 rangeStart = start,
                 streakDays = loggingStreakDays(dates, today),
+                longestStreakDays = maxOf(
+                    longestLoggingStreakDays(dates, today),
+                    loggingStreakDays(dates, today),
+                ),
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())

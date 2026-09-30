@@ -271,6 +271,11 @@ private fun StreakCard(state: ProgressUiState, modifier: Modifier = Modifier) {
                 alignment = TextAlign.End,
             )
         }
+        ProgressStat(
+            label = nomiString("Longest streak"),
+            value = nomiFormat("{0} days", maxOf(state.longestStreakDays, milestone.streakDays)),
+            modifier = Modifier.fillMaxWidth(),
+        )
         MilestoneTrail(
             milestones = milestoneTrail(milestone.streakDays),
             streakDays = milestone.streakDays,

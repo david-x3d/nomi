@@ -854,6 +854,11 @@ internal val profileTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Serie", es = "Racha", fr = "Série", it = "Serie", nl = "Reeks",
         pt = "Sequência", sq = "Varg", sv = "Svit", tr = "Seri",
     ),
+    "Longest streak" to NomiTranslation(
+        de = "Längste Serie", es = "Racha más larga", fr = "Plus longue série",
+        it = "Serie più lunga", nl = "Langste reeks", pt = "Maior sequência",
+        sq = "Vargu më i gjatë", sv = "Längsta svit", tr = "En uzun seri",
+    ),
     "days in a row" to NomiTranslation(
         de = "Tage in Folge", es = "días seguidos", fr = "jours d’affilée",
         it = "giorni di fila", nl = "dagen op rij", pt = "dias seguidos",

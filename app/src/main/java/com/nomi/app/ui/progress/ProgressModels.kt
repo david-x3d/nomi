@@ -42,6 +42,8 @@ data class ProgressUiState(
      * and the 30-day cycle it currently sits in at the same time.
      */
     val streakDays: Int = 0,
+    /** The longest run of consecutive logged days ever, from the whole log like [streakDays]. */
+    val longestStreakDays: Int = 0,
 ) {
     /** The milestone view of [streakDays]; derived so no caller can hold a stale copy. */
     val milestone: StreakMilestone get() = streakMilestone(streakDays)

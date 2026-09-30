@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Longest streak** on the Progress page: the best run of consecutive logged days you have ever had, in all ten languages. A lapsed streak no longer makes your record disappear from view.
+
 ## Nomi v2.8.0 — 2026-09-29
 
 ### Where do the calories come from?
