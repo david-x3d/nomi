@@ -97,7 +97,7 @@ object NomiSharePayload {
     private fun ShareableFood.toV1(): ShareFoodV1 = ShareFoodV1(
         name = name,
         brand = brand?.takeIf { it.isNotBlank() },
-        amount = amount.whole(),
+        amount = amount.portion(),
         unit = unit,
         meal = meal,
         kcal = kcal.whole(),
@@ -116,6 +116,19 @@ object NomiSharePayload {
 
     private fun Double.whole(): Double =
         if (isFinite()) kotlin.math.round(this).toDouble() else 0.0
+
+    /**
+     * An amount keeps two decimals and never rounds down to nothing.
+     *
+     * Rounding it like calories sent half a pizza as 0 pieces, which the receiver rightly refuses
+     * as an entry, so the whole shared day failed to import; 1.5 slices also arrived as 2 slices
+     * next to the calories of 1.5.
+     */
+    private fun Double.portion(): Double {
+        if (!isFinite()) return 0.0
+        val rounded = kotlin.math.round(this * 100.0) / 100.0
+        return if (rounded <= 0.0 && this > 0.0) this else rounded
+    }
 
     private fun Double.gram(): Double =
         if (isFinite()) kotlin.math.round(this * 10.0) / 10.0 else 0.0

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Right after midnight, steps and activity calories showed "Not synced yet" and disappeared from Today even though the sync worked. A day with no steps yet now reads 0, and the new day is read as soon as the date changes.
+- "500 milliliters juice", "2 liters milk", "8 ounces steak", "1 lb chicken" and "12 floz cola" are understood as amounts. Before, spelled-out and US units were logged as that many pieces, or the entry failed.
+- "vier", "fünf" and "sechs" are understood as counts, like "four" to "six".
+- Correcting a food with "only 2" sets the count to 2 instead of doubling it. "halb" halves.
+- A shared day with half a portion in it imports again. Amounts are sent with two decimals instead of being rounded to whole numbers.
+- The home-screen widget keeps updating live after midnight.
+- The message after importing a shared day shows the date in the app's language.
 - Food logged after midnight in an app left open overnight now lands on the new day instead of yesterday. Progress, the streak and History follow the date change too.
 - **Longest streak** on the Progress page: the best run of consecutive logged days you have ever had, in all ten languages. A lapsed streak no longer makes your record disappear from view.
 

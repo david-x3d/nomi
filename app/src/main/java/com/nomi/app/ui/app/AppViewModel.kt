@@ -670,6 +670,9 @@ class AppViewModel(
         currentDay.value = now
         selectedDate.update { followDayRollover(it, previous, now) }
         historyDate.update { followDayRollover(it, previous, now) }
+        // Steps and active calories belong to one date, so yesterday's are hidden from now on;
+        // read the new day's straight away instead of waiting for the next time the app starts.
+        requestHealthConnectSync()
     }
     fun setHistoryQuery(value: String) { historyQuery.value = value }
     fun setHistoryDate(value: LocalDate) { historyDate.value = value.coerceAtMost(today) }
@@ -1807,7 +1810,7 @@ class AppViewModel(
                             inUserLanguage(
                                 "Added {0} shared foods to {1}.",
                                 logs.size,
-                                eatenOn.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
+                                eatenOn.format(DateTimeFormatter.ofPattern("d MMMM", currentLanguage().locale)),
                             ),
                         ),
                     )
@@ -2752,12 +2755,15 @@ class AppViewModel(
                         ),
                     )
                 }.onSuccess { activity ->
-                    if (grantedFeatures.readSteps) todaySteps = activity.steps
+                    // A successful read with no records is zero, not "not synced": right after
+                    // midnight there are no steps yet, and treating that as missing hid the
+                    // activity calories and showed "Not synced yet" after a sync that worked.
+                    if (grantedFeatures.readSteps) todaySteps = activity.steps ?: 0L
                     if (
                         grantedFeatures.readActiveCalories &&
                         activity.activeCaloriesReadSucceeded
                     ) {
-                        todayActiveCaloriesKcal = activity.activeCaloriesKcal
+                        todayActiveCaloriesKcal = activity.activeCaloriesKcal ?: 0.0
                     }
                     syncedActivityLocalDate = activityDateText
                 }.onFailure { error ->

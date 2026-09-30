@@ -10,7 +10,10 @@ import com.nomi.app.NomiApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -34,6 +37,13 @@ object NomiWidgetUpdater {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
+     * The date [install] observes. Moved forward by [updateAll], which the midnight alarm and the
+     * DATE_CHANGED broadcast both run, so the live observer follows the day instead of watching
+     * the totals of the date the process happened to start on.
+     */
+    private val observedDate = MutableStateFlow(todayLocalDate())
+
+    /**
      * Fire-and-forget refresh used by widget providers and the refresh receiver. [onDone] runs
      * once the update finished (or failed) so BroadcastReceiver.goAsync results are released.
      */
@@ -52,13 +62,15 @@ object NomiWidgetUpdater {
      * process runs. Called once from [com.nomi.app.NomiApplication.onCreate]; the database is
      * only touched once the coroutine actually runs, keeping app start lazy.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun install(context: Context, scope: CoroutineScope = this.scope) {
         val appContext = context.applicationContext
         scope.launch {
             val repository = (appContext as NomiApplication).container.repository
-            combine(repository.dayTotals(todayLocalDate()), repository.currentPlan) { totals, plan ->
-                totals to plan
-            }
+            combine(
+                observedDate.flatMapLatest { repository.dayTotals(it) },
+                repository.currentPlan,
+            ) { totals, plan -> totals to plan }
                 .distinctUntilChanged()
                 .collect {
                     runCatching { updateAll(appContext) }
@@ -68,6 +80,7 @@ object NomiWidgetUpdater {
 
     /** Refreshes every placed small and large widget from the current local data. */
     suspend fun updateAll(context: Context) {
+        observedDate.value = todayLocalDate()
         val appContext = context.applicationContext
         val manager = AppWidgetManager.getInstance(appContext) ?: return
         val snapshot = loadSnapshot(appContext)

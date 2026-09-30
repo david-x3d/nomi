@@ -18,7 +18,7 @@ object LocalFoodIntentParser {
     private val explicitAmountFood = Regex(
         """(?iu)^(\d+(?:[.,]\d+)?)\s*""" +
             """(mg|milligrams?|milligramm|kg|kilograms?|kilogramm|g|grams?|gramm|""" +
-            """ml|cl|l|liter|litre|""" +
+            """ml|milliliters?|millilitres?|cl|l|liters?|litres?|""" +
             """essl(?:\u00f6|oe|o)ffel|el|tbsp|tbs|tablespoons?|""" +
             """teel(?:\u00f6|oe|o)ffel|tl|tsp|teaspoons?|""" +
             """l(?:\u00f6|oe|o)ffel|spoons?)\s+""" +

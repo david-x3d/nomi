@@ -177,6 +177,33 @@ class NomiSharePayloadTest {
         assertFalse(root.containsKey("weightLogs"))
     }
 
+    @Test
+    fun `a fractional amount survives instead of rounding to zero`() {
+        // Half a pizza used to leave as 0 pieces, which the receiver refuses as an entry, so the
+        // whole shared day failed to import.
+        val amounts = listOf(0.5, 1.5, 0.25, 1.234).mapIndexed { index, amount ->
+            food(id = index + 10L, name = "Food $index").copy(amount = amount, unit = "piece")
+        }
+        val shared = NomiSharePayload.envelope(
+            day = DAY,
+            foods = amounts,
+            selectedIds = amounts.map(ShareableFood::id).toSet(),
+            includeTotals = false,
+            sharedAtEpochMillis = 1L,
+            appVersionName = "2.8.0",
+        )!!
+
+        assertEquals(listOf(0.5, 1.5, 0.25, 1.23), shared.day.foods.map(ShareFoodV1::amount))
+    }
+
+    @Test
+    fun `a tiny amount is never sent as zero`() {
+        val tiny = food(id = 5, name = "Salt").copy(amount = 0.001)
+        val shared = NomiSharePayload.envelope(DAY, listOf(tiny), setOf(5L), false, 1L, "2.8.0")!!
+
+        assertTrue(shared.day.foods.single().amount > 0.0)
+    }
+
     private fun envelope(
         selectedIds: Set<Long>,
         includeTotals: Boolean = false,
