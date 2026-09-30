@@ -2,20 +2,32 @@ package com.nomi.app.ui.localization
 
 /** Welcome, onboarding questions, calculator result and plan editor. */
 internal val onboardingTranslations: Map<String, NomiTranslation> = mapOf(
-    "Nutrition that starts with you" to NomiTranslation(
-        de = "Ernährung, die bei dir beginnt", es = "Nutrición que empieza contigo", fr = "Une nutrition qui commence avec toi", it = "Nutrizione che parte da te", nl = "Voeding die bij jou begint", pt = "Nutrição que começa contigo", sq = "Ushqyerje që nis nga ti", sv = "Kost som utgår från dig", tr = "Seninle başlayan beslenme",
+    "Say what you ate." to NomiTranslation(
+        de = "Sag, was du gegessen hast.", es = "Di lo que has comido.", fr = "Dis ce que tu as mangé.", it = "Di' cosa hai mangiato.", nl = "Zeg wat je hebt gegeten.", pt = "Diz o que comeste.", sq = "Thuaj çfarë hëngre.", sv = "Säg vad du har ätit.", tr = "Ne yediğini söyle.",
+    ),
+    "Nomi does the math." to NomiTranslation(
+        de = "Nomi rechnet.", es = "Nomi hace las cuentas.", fr = "Nomi fait les calculs.", it = "Ai conti pensa Nomi.", nl = "Nomi rekent het uit.", pt = "A Nomi faz as contas.", sq = "Nomi bën llogaritë.", sv = "Nomi räknar.", tr = "Hesabı Nomi yapar.",
+    ),
+    "Type it, photograph it or scan it. Every number shows where it came from." to NomiTranslation(
+        de = "Tippen, fotografieren oder scannen. Jede Zahl zeigt, woher sie kommt.", es = "Escríbelo, hazle una foto o escanéalo. Cada número muestra de dónde viene.", fr = "Écris-le, prends-le en photo ou scanne-le. Chaque chiffre montre d’où il vient.", it = "Scrivilo, fotografalo o scansionalo. Ogni numero mostra da dove viene.", nl = "Typ het, fotografeer het of scan het. Elk getal laat zien waar het vandaan komt.", pt = "Escreve, fotografa ou digitaliza. Cada número mostra de onde vem.", sq = "Shkruaje, fotografoje ose skanoje. Çdo numër tregon nga vjen.", sv = "Skriv, fotografera eller skanna. Varje siffra visar var den kommer ifrån.", tr = "Yaz, fotoğrafını çek ya da tara. Her sayı nereden geldiğini gösterir.",
+    ),
+    "Set up my plan" to NomiTranslation(
+        de = "Meinen Plan einrichten", es = "Configurar mi plan", fr = "Créer mon plan", it = "Imposta il mio piano", nl = "Mijn plan instellen", pt = "Configurar o meu plano", sq = "Krijo planin tim", sv = "Skapa min plan", tr = "Planımı oluştur",
+    ),
+    "A few questions · about 2 minutes" to NomiTranslation(
+        de = "Ein paar Fragen · etwa 2 Minuten", es = "Unas preguntas · unos 2 minutos", fr = "Quelques questions · environ 2 minutes", it = "Qualche domanda · circa 2 minuti", nl = "Een paar vragen · ongeveer 2 minuten", pt = "Algumas perguntas · cerca de 2 minutos", sq = "Disa pyetje · rreth 2 minuta", sv = "Några frågor · cirka 2 minuter", tr = "Birkaç soru · yaklaşık 2 dakika",
+    ),
+    "{0} from where you are now." to NomiTranslation(
+        de = "{0} von dort, wo du jetzt bist.", es = "{0} desde donde estás ahora.", fr = "{0} par rapport à aujourd’hui.", it = "{0} da dove sei ora.", nl = "{0} van waar je nu bent.", pt = "{0} de onde estás agora.", sq = "{0} nga ku je tani.", sv = "{0} från där du är nu.", tr = "Şu anki hâlinden {0} uzakta.",
+    ),
+    "That's about {0} kcal a day to stay where you are." to NomiTranslation(
+        de = "Das sind etwa {0} kcal am Tag, um dein Gewicht zu halten.", es = "Son unas {0} kcal al día para mantenerte como estás.", fr = "Cela fait environ {0} kcal par jour pour rester stable.", it = "Sono circa {0} kcal al giorno per restare dove sei.", nl = "Dat is ongeveer {0} kcal per dag om op gewicht te blijven.", pt = "São cerca de {0} kcal por dia para te manteres como estás.", sq = "Janë rreth {0} kcal në ditë për të mbetur ku je.", sv = "Det är ungefär {0} kcal om dagen för att ligga kvar där du är.", tr = "Olduğun yerde kalmak için günde yaklaşık {0} kcal.",
+    ),
+    "At this pace, you'd get there around {0}." to NomiTranslation(
+        de = "In diesem Tempo wärst du etwa im {0} da.", es = "A este ritmo, llegarías hacia {0}.", fr = "À ce rythme, tu y serais vers {0}.", it = "A questo ritmo, ci arriveresti verso {0}.", nl = "In dit tempo ben je er rond {0}.", pt = "A este ritmo, chegarias lá por volta de {0}.", sq = "Me këtë ritëm, do të arrije rreth {0}.", sv = "I den här takten är du där runt {0}.", tr = "Bu hızla {0} civarında oraya varırsın.",
     ),
     "Nomi, smiling fox logo" to NomiTranslation(
         de = "Nomi, lächelndes Fuchslogo", es = "Nomi, logotipo de zorro sonriente", fr = "Nomi, logo de renard souriant", it = "Nomi, logo della volpe sorridente", nl = "Nomi, glimlachend vossenlogo", pt = "Nomi, logótipo de raposa sorridente", sq = "Nomi, logoja e dhelprës së buzëqeshur", sv = "Nomi, leende rävlogotyp", tr = "Nomi, gülümseyen tilki logosu",
-    ),
-    "Answer a few questions and we'll create a daily energy and macro plan you can adjust at any time." to NomiTranslation(
-        de = "Beantworte ein paar Fragen und wir erstellen einen täglichen Energie- und Makroplan, den du jederzeit anpassen kannst.", es = "Responde unas preguntas y crearemos un plan diario de energía y macros que podrás ajustar cuando quieras.", fr = "Réponds à quelques questions et nous créerons un plan quotidien d’énergie et de macros modifiable à tout moment.", it = "Rispondi ad alcune domande e creeremo un piano giornaliero di energia e macro che potrai modificare in qualsiasi momento.", nl = "Beantwoord een paar vragen en we maken een dagelijks energie- en macroplan dat je altijd kunt aanpassen.", pt = "Responde a algumas perguntas e criaremos um plano diário de energia e macros que podes ajustar a qualquer momento.", sq = "Përgjigju disa pyetjeve dhe do të krijojmë një plan ditor energjie dhe makrosh që mund ta ndryshosh kur të duash.", sv = "Svara på några frågor så skapar vi en daglig energi- och makroplan som du kan justera när som helst.", tr = "Birkaç soruyu yanıtla; istediğin zaman ayarlayabileceğin günlük enerji ve makro planını oluşturalım.",
-    ),
-    "Get started" to NomiTranslation(
-        de = "Loslegen", es = "Empezar", fr = "Commencer", it = "Inizia", nl = "Aan de slag", pt = "Começar", sq = "Fillo", sv = "Kom igång", tr = "Başla",
-    ),
-    "About 2 minutes · You stay in control" to NomiTranslation(
-        de = "Etwa 2 Minuten · Du behältst die Kontrolle", es = "Unos 2 minutos · Tú mantienes el control", fr = "Environ 2 minutes · Tu gardes le contrôle", it = "Circa 2 minuti · Mantieni il controllo", nl = "Ongeveer 2 minuten · Jij houdt de controle", pt = "Cerca de 2 minutos · Tu manténs o controlo", sq = "Rreth 2 minuta · Ti e ke kontrollin", sv = "Cirka 2 minuter · Du behåller kontrollen", tr = "Yaklaşık 2 dakika · Kontrol sende",
     ),
     "Write a meal the way you'd say it." to NomiTranslation(
         de = "Schreib eine Mahlzeit so, wie du sie sagen würdest.", es = "Escribe una comida como la dirías.", fr = "Écris un repas comme tu le dirais.", it = "Scrivi un pasto come lo diresti.", nl = "Schrijf een maaltijd zoals je hem zou zeggen.", pt = "Escreve uma refeição como falarias dela.", sq = "Shkruaj një vakt të ngrënies siç do ta thoshe.", sv = "Skriv en måltid som du skulle säga det.", tr = "Bir yemeği nasıl söylerdinse öyle yaz.",

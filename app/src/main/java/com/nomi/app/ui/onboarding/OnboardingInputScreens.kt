@@ -1,6 +1,9 @@
 package com.nomi.app.ui.onboarding
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.foundation.Image
@@ -22,6 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -75,12 +80,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.R
 import com.nomi.app.data.preferences.settingFor
 import com.nomi.app.domain.Micronutrient
+import com.nomi.app.domain.UnitConverter
 import com.nomi.app.domain.model.ActivityLevel
 import com.nomi.app.domain.model.EnergySex
 import com.nomi.app.domain.model.GoalType
@@ -91,10 +98,12 @@ import com.nomi.app.ui.components.NomiPickerField
 import com.nomi.app.ui.components.NomiSelectionRow
 import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.NomiTheme
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Period
@@ -104,6 +113,13 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import com.nomi.app.ui.localization.nomiMessage
 
+/**
+ * The first screen, which has one job: say what Nomi is before asking anything.
+ *
+ * The headline is the product in two lines rather than a slogan about it. The fox arrives with a
+ * small tilt that settles, once, so the screen has a bit of life without anything looping or
+ * waiting for attention; with system animations off it simply appears in place.
+ */
 @Composable
 internal fun WelcomeScreen(onContinue: () -> Unit) {
     var entered by remember { mutableStateOf(false) }
@@ -111,6 +127,11 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
         targetValue = if (entered) 1f else 0.82f,
         animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
         label = "welcome_mark_scale",
+    )
+    val tilt by animateFloatAsState(
+        targetValue = if (entered) 0f else WelcomeFoxTiltDegrees,
+        animationSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+        label = "welcome_mark_tilt",
     )
     LaunchedEffect(Unit) { entered = true }
 
@@ -125,10 +146,11 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
     ) {
         Surface(
             modifier = Modifier
-                .size(124.dp)
+                .size(112.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
+                    rotationZ = tilt
                 }
                 .semantics { heading() },
             shape = MaterialTheme.shapes.extraLarge,
@@ -147,19 +169,27 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
                     .graphicsLayer(scaleX = 1.55f, scaleY = 1.55f),
             )
         }
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(22.dp))
         Text(
-            text = nomiString("Nutrition that starts with you"),
-            style = MaterialTheme.typography.headlineSmall,
+            text = nomiString("Say what you ate."),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = nomiString("Nomi does the math."),
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = nomiString(
-                "Answer a few questions and we'll create a daily energy and macro plan you can adjust at any time.",
-            ),
+            text = nomiString("Type it, photograph it or scan it. Every number shows where it came from."),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(22.dp))
         NomiWelcomeStoryboard()
@@ -172,16 +202,25 @@ internal fun WelcomeScreen(onContinue: () -> Unit) {
                 .height(64.dp)
                 .testTag("onboarding_get_started"),
         ) {
-            Text(nomiString("Get started"), style = MaterialTheme.typography.titleMedium)
+            Text(nomiString("Set up my plan"), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(14.dp))
         Text(
-            text = nomiString("About 2 minutes · You stay in control"),
+            text = nomiString("A few questions · about 2 minutes"),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
+
+/** Where the fox starts before it settles upright: enough to read as a nod, not a spin. */
+private const val WelcomeFoxTiltDegrees = -9f
 
 @Composable
 internal fun DateOfBirthScreen(
@@ -436,6 +475,14 @@ internal fun GoalScreen(state: OnboardingUiState, actions: OnboardingActions) {
 @Composable
 internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingActions) {
     val losing = state.draft.goalType == GoalType.LOSE
+    val locale = nomiLocale()
+    val distance = OnboardingInsights.distanceToTargetKg(
+        draft = state.draft,
+        targetKg = state.draft.targetWeightKg ?: state.rememberedTargetWeightKg,
+    )
+    val distanceNote = distance?.let {
+        nomiFormat("{0} from where you are now.", formatWeight(it, state.weightSystem, locale))
+    }
     QuestionPage(
         title = if (losing) {
             nomiString("What's your target weight?")
@@ -451,6 +498,7 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
         },
         error = state.validationMessage,
         onContinue = actions::goNext,
+        note = distanceNote,
     ) {
         if (state.weightSystem == MeasurementSystem.METRIC) {
             DecimalField(
@@ -493,6 +541,9 @@ internal fun TargetWeightScreen(state: OnboardingUiState, actions: OnboardingAct
 
 @Composable
 internal fun ActivityScreen(state: OnboardingUiState, actions: OnboardingActions) {
+    val today = remember { LocalDate.now() }
+    val locale = nomiLocale()
+    val maintenance = OnboardingInsights.maintenanceKcal(state.draft, today)
     QuestionPage(
         title = nomiString("How active is a normal week?"),
         supportingText = nomiString(
@@ -500,6 +551,12 @@ internal fun ActivityScreen(state: OnboardingUiState, actions: OnboardingActions
         ),
         error = state.validationMessage,
         onContinue = actions::goNext,
+        note = maintenance?.let {
+            nomiFormat(
+                "That's about {0} kcal a day to stay where you are.",
+                NumberFormat.getIntegerInstance(locale).format(it),
+            )
+        },
     ) {
         ActivityOption(
             level = ActivityLevel.SEDENTARY,
@@ -574,6 +631,9 @@ internal fun ProgressRateScreen(state: OnboardingUiState, actions: OnboardingAct
     }
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val today = remember { LocalDate.now() }
+    val locale = nomiLocale()
+    val arrival = OnboardingInsights.estimatedArrival(state.draft, today)
 
     QuestionPage(
         title = if (gaining) nomiString("Choose a gain rate") else nomiString("Choose a loss rate"),
@@ -582,6 +642,12 @@ internal fun ProgressRateScreen(state: OnboardingUiState, actions: OnboardingAct
         ),
         error = state.validationMessage,
         onContinue = actions::goNext,
+        note = arrival?.let {
+            nomiFormat(
+                "At this pace, you'd get there around {0}.",
+                it.format(DateTimeFormatter.ofPattern("MMMM yyyy", locale)),
+            )
+        },
     ) {
         options.forEach { option ->
             SelectionCard(
@@ -695,6 +761,7 @@ private fun QuestionPage(
     supportingText: String,
     error: String?,
     onContinue: () -> Unit,
+    note: String? = null,
     content: @Composable () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
@@ -723,6 +790,7 @@ private fun QuestionPage(
         }
         item { Spacer(Modifier.height(4.dp)) }
         item { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
+        item { NomiNote(text = note) }
         error?.let { message ->
             item {
                 NomiInlineError(
@@ -768,12 +836,17 @@ private fun SelectionCard(
     onClick: () -> Unit,
     testTag: String,
 ) {
+    val haptics = rememberNomiHaptics()
     NomiSelectionRow(
         title = title,
         description = description,
         icon = icon,
         selected = selected,
-        onClick = onClick,
+        onClick = {
+            // A light tick, so picking an answer feels like a choice and not a form field.
+            haptics.selected()
+            onClick()
+        },
         modifier = Modifier.testTag(testTag),
     )
 }
@@ -800,6 +873,83 @@ private fun MeasurementSystemPicker(
                 label = { Text(item.second) },
             )
         }
+    }
+}
+
+/**
+ * What an answer already means, said back by Nomi while the question is still on screen.
+ *
+ * It is a consequence the user can check rather than encouragement: "about 2,300 kcal a day to
+ * stay where you are" gives an activity answer an immediate payoff, where a cheer would only be
+ * noise. With nothing true to say yet it takes no space at all.
+ */
+@Composable
+private fun NomiNote(text: String?) {
+    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val sizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    AnimatedContent(
+        targetState = text,
+        // Keyed on whether there is anything to say, so the bubble fades in and out once while
+        // its words follow the answer live - retyping a target weight updates, not flickers.
+        contentKey = { it != null },
+        transitionSpec = {
+            (fadeIn(animationSpec = effectsSpec) togetherWith fadeOut(animationSpec = effectsSpec))
+                .using(SizeTransform(clip = false) { _, _ -> sizeSpec })
+        },
+        label = "onboarding_note",
+    ) { shown ->
+        if (shown != null) NomiNoteBubble(shown) else Spacer(Modifier.fillMaxWidth())
+    }
+}
+
+@Composable
+private fun NomiNoteBubble(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("onboarding_note"),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Surface(
+            modifier = Modifier.size(34.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
+            Image(
+                // The launcher icon's face: the logo carries the "Nomi" wordmark under it, which
+                // pushed the fox above the middle of a round avatar.
+                painter = painterResource(R.drawable.nomi_icon_foreground),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
+            )
+        }
+        Surface(
+            // The corner nearest the fox is tight, so the bubble reads as coming from it.
+            shape = RoundedCornerShape(topStart = 6.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
+        }
+    }
+}
+
+/** A weight difference in the unit the user is answering in, with at most one decimal. */
+private fun formatWeight(kilograms: Double, system: MeasurementSystem, locale: Locale): String {
+    val format = NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 }
+    return if (system == MeasurementSystem.METRIC) {
+        "${format.format(kilograms)} kg"
+    } else {
+        "${format.format(kilograms * UnitConverter.POUNDS_PER_KILOGRAM)} lb"
     }
 }
 

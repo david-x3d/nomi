@@ -79,6 +79,12 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.nomi.app.ui.localization.nomiMessage
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.nomi.app.R
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.graphicsLayer
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 
 @Composable
 internal fun PlanRevealScreen(
@@ -105,8 +111,12 @@ internal fun PlanRevealScreen(
     val calorieAnimation = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     val expandAnimation = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val fadeAnimation = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val haptics = rememberNomiHaptics()
     LaunchedEffect(plan.caloriesKcal) {
         animatedCalories.animateTo(plan.caloriesKcal.toFloat(), calorieAnimation)
+        // One tick as the count lands, so the number the whole flow was building toward
+        // arrives as a moment rather than just stopping.
+        haptics.confirmed()
     }
 
     LazyColumn(
@@ -160,15 +170,22 @@ internal fun PlanRevealScreen(
                         .padding(horizontal = 24.dp, vertical = 28.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    // The same fox that answered along the way hands over the result.
                     Surface(
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(56.dp),
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Outlined.Restaurant, contentDescription = null)
-                        }
+                        Image(
+                            // The launcher icon's face: the logo carries the "Nomi" wordmark under it, which
+                            // pushed the fox above the middle of a round avatar.
+                            painter = painterResource(R.drawable.nomi_icon_foreground),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
+                        )
                     }
                     Spacer(Modifier.height(14.dp))
                     Text(nomiString("Daily energy target"), style = MaterialTheme.typography.titleMedium)
