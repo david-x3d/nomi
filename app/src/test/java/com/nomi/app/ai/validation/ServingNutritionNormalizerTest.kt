@@ -568,6 +568,41 @@ class ServingNutritionNormalizerTest {
     }
 
     @Test
+    fun `a weighed portion and a weighed piece meet through their gram totals`() {
+        // A restaurant "Portion (105 g)" and the burger the user logged as a piece share no
+        // unit, but each carries its own total weight.
+        val normalized = normalize(
+            raw = sourceItem(1.0, "piece", 1.0, "Portion", calories = 250.0).copy(
+                sourceServingGramsEquivalent = 105.0,
+                gramsEquivalent = 105.0,
+            ),
+            requestedQuantity = 1.0,
+            requestedUnit = "piece",
+        )
+
+        assertEquals(250.0, normalized.calories, 1e-9)
+        assertEquals("mass_g", normalized.servingValidation!!.dimension)
+        ServingNutritionNormalizer.validateBeforeSave(FoodAnalysis(listOf(normalized)))
+
+        val two = ServingNutritionNormalizer.rescaleValidatedItemTo(normalized, 2.0, "piece")
+        assertEquals(500.0, two.calories, 1e-9)
+        assertEquals(210.0, two.gramsEquivalent!!, 1e-9)
+    }
+
+    @Test
+    fun `a portion and a piece without both weights stay apart`() {
+        listOf(
+            sourceItem(1.0, "piece", 1.0, "Portion").copy(sourceServingGramsEquivalent = 105.0),
+            sourceItem(1.0, "piece", 1.0, "Portion").copy(gramsEquivalent = 105.0),
+        ).forEach { raw ->
+            val error = assertThrows(NutritionResearchException::class.java) {
+                normalize(raw = raw, requestedQuantity = 1.0, requestedUnit = "piece")
+            }
+            assertEquals(NutritionFailureReason.MISSING_PORTION_WEIGHT, error.reason)
+        }
+    }
+
+    @Test
     fun `mass and volume mismatch requires an explicit source mass bridge`() {
         assertThrows(AiValidationException::class.java) {
             normalize(

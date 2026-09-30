@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
+import com.nomi.app.ai.model.QuantityUnits
 import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.AiResponseValidator
@@ -490,7 +491,11 @@ internal class ExaGeminiNutritionProvider(
         val parsed = intent.items[index]
         return try {
             val itemIntent = intent.copy(items = listOf(parsed))
-            val grounded = groundExtractedItem(parsed, extracted, documents)
+            val grounded = groundExtractedItem(
+                parsed,
+                extracted.withFoodNamedServingAsLoggedUnit(parsed).withServingWeightFromBasisQuote(),
+                documents,
+            )
             val reconciled = UserQuantityResolver.reconcileAnalysis(
                 itemIntent,
                 FoodAnalysis(items = listOf(grounded)),
@@ -614,6 +619,7 @@ internal fun geminiNutritionPrompt(
     appendLine("The user's quantity/unit are authoritative, including packs, slices, bottles, cans, cups and spoons. Prefer exact manufacturer data for ONE matching sourceUnit in sourceUnitWeightGrams/sourceUnitVolumeMl; Nomi multiplies it by the user's quantity. A pack is never a piece. resolvedVolumeMl is a total volume, never grams. Unknown weights stay null; use a matching SOURCE_SERVING basis or the existing clearly labelled estimation fallback, not a request for grams.")
     appendLine("For a logged piece/item/bar/serving with no gramsEquivalent, extract the exact total grams for the logged count into loggedServingGramsEquivalent when the evidence states a unit weight (for example, evidence that one bar weighs 18.2 g means two logged bars total 36.4 g). Keep the logged quantity and unit unchanged. Never derive weight from nutrition values or guess it.")
     appendLine("A counted logged unit cannot be scaled from a per-100 g/ml basis without that weight. When the logged unit is a count and no evidence states a unit weight, prefer a retrieved source whose own basis is per item/piece/serving and set nutritionBasis SOURCE_SERVING with that serving. For a request that names no brand, package or barcode, you may instead give a typical unit weight for the generic food in loggedServingGramsEquivalent; that reading is unverified, so set isEstimate=true and say so in assumptions. Never do this for a branded or packaged product.")
+    appendLine("When one printed serving is exactly one of the logged items - a restaurant portion that is one burger, sandwich or wrap, or a bar or pastry sold singly - that serving is the logged unit: set sourceServingQuantity 1 and sourceServingUnit to the logged unit verbatim (for example \"piece\"), keep the page's serving heading in sourceBasisText, and when the page prints the serving's weight, also set sourceServingGramsEquivalent to it and loggedServingGramsEquivalent to that weight times the logged count. Never do this when one serving holds several items, such as a 6-piece nugget portion.")
     appendLine("Do not estimate when reliable values exist. Never invent a source, URL, source ID, product, or value. sourceProductName must be the exact product title printed by the selected source.")
     appendLine("Return every schema property. Use null for unavailable nullable values and [] for unavailable list values.")
     if (focusedRetry) {
@@ -740,20 +746,29 @@ private fun groundExtractedItem(
         }
     }
     var evidenceFailure: NutritionResearchException? = null
-    val groundedPrimary = candidates.firstOrNull { candidate ->
-        try {
-            requireNutritionEvidence(extracted, parsed, candidate)
-            true
-        } catch (failure: NutritionResearchException) {
-            evidenceFailure = failure
-            false
-        }
+    fun groundedIn(reading: GeminiNutritionItem, candidate: ExaNutritionDocument): Boolean = try {
+        requireNutritionEvidence(reading, parsed, candidate)
+        true
+    } catch (failure: NutritionResearchException) {
+        evidenceFailure = failure
+        false
     }
-    if (groundedPrimary != null) {
-        val groundedSupporting = supporting
-            .takeIf { groundedPrimary.sourceId == primary.sourceId }
-            .orEmpty()
-        return extracted.toAnalyzedItem(parsed, groundedPrimary, groundedSupporting)
+    fun supportingFor(document: ExaNutritionDocument) =
+        supporting.takeIf { document.sourceId == primary.sourceId }.orEmpty()
+
+    candidates.firstOrNull { groundedIn(extracted, it) }?.let { groundedPrimary ->
+        return extracted.toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
+    }
+    // A unit weight or volume the page does not print cannot be kept, but it is no reason to
+    // discard nutrition the page does print: a per-burger reading needs no weight at all. The
+    // reading goes on without it, and if the arithmetic did need that bridge, the normalizer
+    // still refuses the item for exactly that reason.
+    candidates.firstNotNullOfOrNull { candidate ->
+        extracted.keepingBridgesPrintedIn(parsed, candidate)
+            .takeIf { it != extracted && groundedIn(it, candidate) }
+            ?.let { candidate to it }
+    }?.let { (groundedPrimary, reading) ->
+        return reading.toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
     }
 
     val allZero = extracted.calories == 0.0 && extracted.proteinGrams == 0.0 &&
@@ -884,18 +899,9 @@ private fun requireNutritionEvidence(
             detail = "The selected Exa source contains no recognizable nutrition evidence",
         )
     }
-    val values = NUTRITION_VALUE.findAll(corpus).mapNotNull { match ->
-        match.groupValues[1].replace(',', '.').toDoubleOrNull()?.let { value ->
-            EvidenceValue(value, match.groupValues[2].lowercase(Locale.ROOT))
-        }
-    }.toList()
+    val values = document.evidenceValues()
     item.loggedServingGramsEquivalent?.let { loggedGrams ->
-        val perLoggedPiece = parsed.quantity
-            ?.takeIf { it.isFinite() && it > 0.0 }
-            ?.let { loggedGrams / it }
-        if (!values.matches(loggedGrams, "g") &&
-            (perLoggedPiece == null || !values.matches(perLoggedPiece, "g"))
-        ) {
+        if (!values.supportsLoggedWeight(loggedGrams, parsed)) {
             throw NutritionResearchException(
                 reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
                 itemName = parsed.name,
@@ -913,9 +919,7 @@ private fun requireNutritionEvidence(
         }
     }
     item.resolvedVolumeMl?.let { volume ->
-        val perUnit = parsed.quantity?.takeIf { it > 0.0 }?.let { volume / it }
-        if (parsed.resolvedVolumeMl == null && !values.matches(volume, "ml") &&
-            (perUnit == null || !values.matches(perUnit, "ml"))) {
+        if (!values.supportsResolvedVolume(volume, parsed)) {
             throw NutritionResearchException(
                 reason = NutritionFailureReason.MISSING_PORTION_WEIGHT,
                 itemName = parsed.name,
@@ -944,6 +948,94 @@ private fun requireNutritionEvidence(
         )
     }
 }
+
+private fun ExaNutritionDocument.evidenceValues(): List<EvidenceValue> =
+    NUTRITION_VALUE.findAll(title + "\n" + content).mapNotNull { match ->
+        match.groupValues[1].replace(',', '.').toDoubleOrNull()?.let { value ->
+            EvidenceValue(value, match.groupValues[2].lowercase(Locale.ROOT))
+        }
+    }.toList()
+
+/** Whether the page prints the logged count's total weight, or what one of them weighs. */
+private fun List<EvidenceValue>.supportsLoggedWeight(grams: Double, parsed: ParsedFoodItem): Boolean {
+    val perLoggedPiece = parsed.quantity?.takeIf { it.isFinite() && it > 0.0 }?.let { grams / it }
+    return matches(grams, "g") || (perLoggedPiece != null && matches(perLoggedPiece, "g"))
+}
+
+private fun List<EvidenceValue>.supportsResolvedVolume(volume: Double, parsed: ParsedFoodItem): Boolean {
+    if (parsed.resolvedVolumeMl != null) return true
+    val perUnit = parsed.quantity?.takeIf { it > 0.0 }?.let { volume / it }
+    return matches(volume, "ml") || (perUnit != null && matches(perUnit, "ml"))
+}
+
+/** The same reading, keeping only the unit weights and volumes this document prints. */
+private fun GeminiNutritionItem.keepingBridgesPrintedIn(
+    parsed: ParsedFoodItem,
+    document: ExaNutritionDocument,
+): GeminiNutritionItem {
+    val values = document.evidenceValues()
+    return copy(
+        loggedServingGramsEquivalent = loggedServingGramsEquivalent
+            ?.takeIf { values.supportsLoggedWeight(it, parsed) },
+        sourceUnitWeightGrams = sourceUnitWeightGrams?.takeIf { values.matches(it, "g") },
+        sourceUnitVolumeMl = sourceUnitVolumeMl?.takeIf { values.matches(it, "ml") },
+        resolvedVolumeMl = resolvedVolumeMl?.takeIf { values.supportsResolvedVolume(it, parsed) },
+    )
+}
+
+/**
+ * A serving printed as the food itself - "pro Hamburger", "per burger", "1 Big Mac" - counts the
+ * same thing the user counted when they logged pieces of that food. Carried as free text, such a
+ * unit shared no dimension with "piece", and a reading that needed no weight failed for the lack
+ * of one. Serving words keep their meaning: a portion, pack or bar is never taken for a piece.
+ */
+private fun GeminiNutritionItem.withFoodNamedServingAsLoggedUnit(
+    parsed: ParsedFoodItem,
+): GeminiNutritionItem {
+    if (nutritionBasis != ResearchNutritionBasis.SOURCE_SERVING) return this
+    val loggedUnit = parsed.unit?.trim()
+        ?.takeIf { QuantityUnits.normalize(it) == "piece" } ?: return this
+    if (QuantityUnits.isCount(sourceServingUnit)) return this
+    val servingTokens = entityTokens(sourceServingUnit)
+    if (servingTokens.isEmpty() || servingTokens.any { it.length < MIN_FOOD_SERVING_TOKEN }) {
+        return this
+    }
+    val foodTokens = entityTokens(parsed.name) + entityTokens(sourceProductName.orEmpty())
+    val namesTheFood = servingTokens.all { serving ->
+        foodTokens.any { food -> food == serving || food.endsWith(serving) }
+    }
+    return if (namesTheFood) copy(sourceServingUnit = loggedUnit) else this
+}
+
+private const val MIN_FOOD_SERVING_TOKEN = 3
+
+/**
+ * Reads a counted serving's weight from the basis quote when the model left it out.
+ *
+ * "pro Portion (105 g)" states both the serving and what it weighs, and the quote itself is
+ * bound to the page before anything is accepted. Only a single printed gram amount is read,
+ * after the per-100 column is set aside, so a quote that also carries nutrient values in grams
+ * is left alone rather than guessed at. The quote weighs one serving, so it is only read for a
+ * declared serving of exactly one.
+ */
+private fun GeminiNutritionItem.withServingWeightFromBasisQuote(): GeminiNutritionItem {
+    if (nutritionBasis != ResearchNutritionBasis.SOURCE_SERVING) return this
+    if (sourceServingGramsEquivalent != null || sourceServingQuantity != 1.0) return this
+    if (!QuantityUnits.isCount(sourceServingUnit)) return this
+    val quote = sourceBasisText?.normalizedBasisEvidence()
+        ?.replace(PER_100_G_BASIS, " ")
+        ?.replace(PER_100_ML_BASIS, " ")
+        ?: return this
+    val grams = PRINTED_GRAMS.findAll(quote)
+        .mapNotNull { it.groupValues[1].toDoubleOrNull() }
+        .distinct()
+        .singleOrNull()
+        ?.takeIf { it.isFinite() && it > 0.0 }
+        ?: return this
+    return copy(sourceServingGramsEquivalent = grams)
+}
+
+private val PRINTED_GRAMS = Regex("(\\d+(?:\\.\\d+)?)\\s*g\\b")
 
 /**
  * Binds the model's serving-basis classification to exact retrieved page text. Nutrient values
