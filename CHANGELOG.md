@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Food logged after midnight in an app left open overnight now lands on the new day instead of yesterday. Progress, the streak and History follow the date change too.
 - **Longest streak** on the Progress page: the best run of consecutive logged days you have ever had, in all ten languages. A lapsed streak no longer makes your record disappear from view.
 
 ## Nomi v2.8.0 — 2026-09-29

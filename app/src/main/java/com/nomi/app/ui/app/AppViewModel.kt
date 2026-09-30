@@ -162,6 +162,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -227,6 +228,15 @@ class AppViewModel(
      * offer "copy to today" only where that would mean something.
      */
     val currentDate: LocalDate get() = today
+
+    /**
+     * The date every "up to today" query is anchored on.
+     *
+     * A flow built once from [today] would keep the date the view model was created on for as long
+     * as the process lives, and Android keeps Nomi's process around for days. This is moved forward
+     * by [refreshCurrentDay] at midnight and whenever the app comes back to the foreground.
+     */
+    private val currentDay = MutableStateFlow(today)
 
     val preferences: StateFlow<AppPreferences> = repository.preferences
         .stateIn(
@@ -436,18 +446,18 @@ class AppViewModel(
      * daily user is a few hundred short strings.
      */
     private val loggedDates: Flow<List<LocalDate>> =
-        repository.loggedDates(today.toString()).stateIn(
+        currentDay.flatMapLatest { repository.loggedDates(it.toString()) }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(5_000),
             emptyList(),
         )
 
-    val progressState: StateFlow<ProgressUiState> = progressRange.flatMapLatest { range ->
+    val progressState: StateFlow<ProgressUiState> = combine(progressRange, currentDay, ::Pair).flatMapLatest { (range, day) ->
         val totalDays = range.dayCount()
-        val start = today.minusDays((totalDays - 1).toLong())
+        val start = day.minusDays((totalDays - 1).toLong())
         combine(
-            repository.weights(start.toString(), today.toString()),
-            repository.nutritionHistory(start.toString(), today.toString()),
+            repository.weights(start.toString(), day.toString()),
+            repository.nutritionHistory(start.toString(), day.toString()),
             repository.profile,
             loggedDates,
         ) { weights, nutrition, profile, dates ->
@@ -468,10 +478,10 @@ class AppViewModel(
                 loggingDays = nutrition.size,
                 totalDays = totalDays,
                 rangeStart = start,
-                streakDays = loggingStreakDays(dates, today),
+                streakDays = loggingStreakDays(dates, day),
                 longestStreakDays = maxOf(
-                    longestLoggingStreakDays(dates, today),
-                    loggingStreakDays(dates, today),
+                    longestLoggingStreakDays(dates, day),
+                    loggingStreakDays(dates, day),
                 ),
             )
         }
@@ -579,6 +589,14 @@ class AppViewModel(
 
 
     init {
+        // Handles the day changing while the app is on screen. The wait runs on uptime, which
+        // stops in deep sleep, so MainActivity.onStart covers the app coming back the next morning.
+        viewModelScope.launch {
+            while (true) {
+                delay(delayUntilNextDay(ZonedDateTime.now(zoneId), zoneId))
+                refreshCurrentDay()
+            }
+        }
         // Provider keys are local and safe to inspect immediately. Health Connect reads, on the
         // other hand, must wait for MainActivity.onStart so they run while Nomi is foregrounded.
         refreshProviderStatus()
@@ -640,6 +658,19 @@ class AppViewModel(
         }
     }
     fun selectToday() { selectedDate.value = today }
+
+    /**
+     * Moves everything anchored on "today" to the real date if the day changed while Nomi was open
+     * or in the background. Screens the user paged back to on purpose are left alone.
+     */
+    fun refreshCurrentDay() {
+        val previous = currentDay.value
+        val now = today
+        if (previous == now) return
+        currentDay.value = now
+        selectedDate.update { followDayRollover(it, previous, now) }
+        historyDate.update { followDayRollover(it, previous, now) }
+    }
     fun setHistoryQuery(value: String) { historyQuery.value = value }
     fun setHistoryDate(value: LocalDate) { historyDate.value = value.coerceAtMost(today) }
     fun setProgressRange(value: ProgressRange) { progressRange.value = value }
