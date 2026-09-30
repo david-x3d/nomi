@@ -117,3 +117,23 @@ fun loggingStreakDays(loggedDates: Collection<LocalDate>, today: LocalDate): Int
     }
     return streak
 }
+
+/**
+ * The longest run of consecutive logged days the user has ever had, current one included.
+ *
+ * Like [loggingStreakDays] it reads the whole log, so it does not change with the range shown. It
+ * is the number to beat after a streak lapses: a broken streak of 3 reads as a fresh start, but
+ * "longest: 41 days" says what the user has already shown they can do. Dates after [today] are
+ * ignored, as they are for the current streak, so the longest run can never be smaller than it.
+ */
+fun longestLoggingStreakDays(loggedDates: Collection<LocalDate>, today: LocalDate): Int {
+    val days = loggedDates.asSequence().filter { !it.isAfter(today) }.distinct().sorted().toList()
+    if (days.isEmpty()) return 0
+    var longest = 1
+    var run = 1
+    for (i in 1 until days.size) {
+        run = if (days[i - 1].plusDays(1) == days[i]) run + 1 else 1
+        if (run > longest) longest = run
+    }
+    return longest
+}

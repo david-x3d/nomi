@@ -1,6 +1,7 @@
 package com.nomi.app.domain.usecase
 
 import com.nomi.app.ai.model.PortionEditInstruction
+import com.nomi.app.ai.model.QuantityUnits
 import com.nomi.app.domain.DecimalInput
 import com.nomi.app.domain.PortionChangeValidator
 import java.util.Locale
@@ -32,6 +33,7 @@ object PortionEditParser {
         parseOrNull(correction)?.let { return it }
         if (!currentQuantity.isFinite() || currentQuantity <= 0.0 || currentUnit.isBlank()) return null
         val core = stripFillerWords(normalize(correction))
+        parseBareCount(core, currentUnit)?.let { return it }
         val match = RELATIVE_AMOUNT.matchEntire(core) ?: return null
         val deltaQuantity = DecimalInput.parseOrNull(match.groupValues[1]) ?: return null
         val deltaUnit = CANONICAL_UNITS[match.groupValues[2]] ?: return null
@@ -80,15 +82,26 @@ object PortionEditParser {
         WORD_FACTORS[core]?.let(PortionEditInstruction::scale)
 
     /**
-     * A bare decimal is a share of what is already logged, the way "half" is: "0,5" and "0.5"
-     * both mean half. A number carrying a unit is a different statement and belongs to
+     * A bare decimal below one is a share of what is already logged, the way "half" is: "0,5"
+     * and "0.5" both mean half. A number carrying a unit is a different statement and belongs to
      * [parseExplicitAmount], so this only ever sees the number on its own.
+     *
+     * One and above is not read as a factor. "I only had 2" of three logged eggs means two eggs,
+     * and reading it as "twice" logged six; [parseBareCount] answers it when the logged unit is a
+     * count, and anything else goes to the model.
      */
     private fun parseBareDecimal(core: String): PortionEditInstruction? {
         if (!BARE_DECIMAL.matches(core)) return null
         val factor = DecimalInput.parseOrNull(core) ?: return null
-        if (factor <= 0.0 || factor > PortionEditInstruction.MAX_SCALE_FACTOR) return null
+        if (factor <= 0.0 || factor >= 1.0) return null
         return PortionEditInstruction.scale(factor)
+    }
+
+    /** "2" against a food logged in pieces, slices or servings is the new count in that unit. */
+    private fun parseBareCount(core: String, currentUnit: String): PortionEditInstruction? {
+        if (!BARE_DECIMAL.matches(core) || !QuantityUnits.isCount(currentUnit)) return null
+        val count = DecimalInput.parseOrNull(core)?.takeIf { it > 0.0 } ?: return null
+        return PortionEditInstruction.setQuantity(count, currentUnit)
     }
 
     private val BARE_DECIMAL = Regex("^\\d+(?:[.,]\\d+)?$")
@@ -192,6 +205,7 @@ object PortionEditParser {
     private val WORD_FACTORS: Map<String, Double> = mapOf(
         "half" to 0.5,
         "halve" to 0.5,
+        "halb" to 0.5,
         "hal" to 0.5,
         "halfte" to 0.5,
         "haelfte" to 0.5,

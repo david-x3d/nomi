@@ -231,3 +231,41 @@ class LoggingStreakDaysTest {
         assertEquals(2, loggingStreakDays(dates, today))
     }
 }
+
+/** The longest-streak stat: the best run ever, which a lapsed streak must not erase. */
+class LongestLoggingStreakDaysTest {
+
+    private val today = LocalDate.of(2026, 9, 27)
+
+    @Test
+    fun `an empty log has no streak`() {
+        assertEquals(0, longestLoggingStreakDays(emptyList(), today))
+    }
+
+    @Test
+    fun `an older run longer than the current one is the longest`() {
+        val old = (20L..25L).map { today.minusDays(it) } // 6 days
+        val current = listOf(today, today.minusDays(1)) // 2 days
+
+        assertEquals(6, longestLoggingStreakDays(old + current, today))
+    }
+
+    @Test
+    fun `the current run counts when it is the longest`() {
+        val dates = (0L..4L).map { today.minusDays(it) } + today.minusDays(10)
+
+        assertEquals(5, longestLoggingStreakDays(dates, today))
+    }
+
+    @Test
+    fun `duplicates and unsorted input do not change the result`() {
+        val dates = listOf(today.minusDays(2), today, today.minusDays(1), today, today.minusDays(9))
+
+        assertEquals(3, longestLoggingStreakDays(dates, today))
+    }
+
+    @Test
+    fun `dates after today are ignored`() {
+        assertEquals(1, longestLoggingStreakDays(listOf(today, today.plusDays(1)), today))
+    }
+}

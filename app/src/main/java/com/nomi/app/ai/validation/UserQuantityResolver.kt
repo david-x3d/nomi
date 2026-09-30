@@ -30,7 +30,10 @@ object UserQuantityResolver {
             "(?:essl(?:\\u00f6|oe|o)ffel|el|tbsp|tbs|tablespoons?)|" +
             "(?:teel(?:\\u00f6|oe|o)ffel|tl|tsp|teaspoons?)|" +
             "(?:l(?:ö|oe|o)ffel|spoons?)|" +
-            "ml|cl|l|liter|litre|(?:us\\s*)?fl\\.?\\s*oz|oz)"
+            // Spelled-out and US units sit beside their abbreviations: without them "500 milliliters
+            // juice" or "1 lb chicken" fell through to the count pattern and logged 500 pieces.
+            "ml|milliliters?|millilitres?|cl|l|liters?|litres?|" +
+            "(?:us\\s*)?fl\\.?\\s*oz|oz|ounces?|lbs?|pounds?)"
     private val decimal = "(\\d+(?:[.,]\\d+)?)"
 
     private val percentagePackagePattern = Regex(
@@ -52,7 +55,7 @@ object UserQuantityResolver {
         """(?iu)$decimal\s*[-–—]?\s*$amountUnit\b""",
     )
 
-    private val countNumber = "(?:\\d+(?:[.,]\\d+)?|one|two|three|four|five|six|a|an|ein(?:e[nrms]?)?|zwei|drei|half|halb(?:e[nrms]?)?|½)"
+    private val countNumber = "(?:\\d+(?:[.,]\\d+)?|one|two|three|four|five|six|a|an|ein(?:e[nrms]?)?|zwei|drei|vier|f(?:ü|ue)nf|sechs|half|halb(?:e[nrms]?)?|½)"
     private val countUnit = "(?:pieces?|items?|pcs?|servings?|portions?|portionen|packs?|packages?|packets?|packungen?|bars?|riegel|slices?|scheiben?|bottles?|flaschen?|cans?|dosen?|cups?|tassen?|st(?:ü|ue|u)cke?)"
     private val countPattern = Regex(
         """(?iu)(?<![\p{L}\p{N}.,/])($countNumber)\s+(?:(?:of\s+)?(?:a|an|eine)\s+)?(?:($countUnit)\b\s*(?:of\s+)?)?(?=[\p{L}])""",
@@ -74,9 +77,9 @@ object UserQuantityResolver {
     private fun countValue(raw: String): Double = when (raw.lowercase(Locale.ROOT)) {
         "two", "zwei" -> 2.0
         "three", "drei" -> 3.0
-        "four" -> 4.0
-        "five" -> 5.0
-        "six" -> 6.0
+        "four", "vier" -> 4.0
+        "five", "fünf", "fuenf" -> 5.0
+        "six", "sechs" -> 6.0
         "half", "½", "halb", "halbe", "halben", "halber", "halbes" -> 0.5
         else -> raw.replace(',', '.').toDoubleOrNull() ?: 1.0
     }
@@ -495,14 +498,15 @@ object UserQuantityResolver {
             "g", "gram", "grams", "gramm" -> CanonicalMeasure(quantity, "g")
             "kg", "kilogram", "kilograms", "kilogramm" ->
                 CanonicalMeasure(quantity * 1_000.0, "g")
-            "oz" -> CanonicalMeasure(quantity * 28.349523125, "g")
+            "oz", "ounce", "ounces" -> CanonicalMeasure(quantity * 28.349523125, "g")
+            "lb", "lbs", "pound", "pounds" -> CanonicalMeasure(quantity * 453.59237, "g")
             "tbsp", "tbs", "tablespoon", "tablespoons", "el", "essloffel", "essloeffel" ->
                 CanonicalMeasure(quantity * 15.0, "ml")
             "tsp", "teaspoon", "teaspoons", "tl", "teeloffel", "teeloeffel" ->
                 CanonicalMeasure(quantity * 5.0, "ml")
             "loffel", "loeffel", "spoon", "spoons" ->
                 CanonicalMeasure(quantity * 15.0, "ml")
-            "ml" -> CanonicalMeasure(quantity, "ml")
+            "ml", "milliliter", "milliliters", "millilitre", "millilitres" -> CanonicalMeasure(quantity, "ml")
             "cl" -> CanonicalMeasure(quantity * 10.0, "ml")
             "l", "liter", "liters", "litre", "litres" -> CanonicalMeasure(quantity * 1_000.0, "ml")
             "fl oz", "us fl oz" -> CanonicalMeasure(quantity * US_FLUID_OUNCE_ML, "ml")
@@ -535,6 +539,9 @@ object UserQuantityResolver {
         .replace(Regex("[._-]+"), " ")
         .replace(Regex("\\s+"), " ")
         .trim()
+        // "floz", "fl.oz" and "usfl oz" are all accepted by the unit pattern above, so they must
+        // land on the same spelling [canonicalMeasure] knows rather than failing the whole entry.
+        .replace(Regex("^(us ?)?fl ?oz$")) { if (it.groupValues[1].isEmpty()) "fl oz" else "us fl oz" }
 
     private fun String.menuIdentity(): String = trim()
         .lowercase(Locale.ROOT)

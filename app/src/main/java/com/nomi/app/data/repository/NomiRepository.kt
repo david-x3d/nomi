@@ -714,7 +714,7 @@ class NomiRepository(
 
     private fun validateLog(log: FoodLogEntity) {
         require(log.displayNameSnapshot.isNotBlank()) { "A food name is required" }
-        require(log.amount > 0.0) { "Logged amount must be positive" }
+        require(log.amount.isFinite() && log.amount > 0.0) { "Logged amount must be positive" }
         require(log.resolvedVolumeMl == null || (log.resolvedVolumeMl.isFinite() && log.resolvedVolumeMl > 0.0)) { "Resolved volume must be positive" }
         require(log.grams == null || log.grams > 0.0) { "Logged gram weight must be positive" }
         validateNutrition(log.nutritionSnapshot)
@@ -729,10 +729,12 @@ class NomiRepository(
     }
 
     private fun validateNutrition(values: NutritionValues) {
-        require(values.caloriesKcal >= 0.0) { "Calories cannot be negative" }
-        require(values.proteinGrams >= 0.0) { "Protein cannot be negative" }
-        require(values.carbohydrateGrams >= 0.0) { "Carbohydrates cannot be negative" }
-        require(values.fatGrams >= 0.0) { "Fat cannot be negative" }
+        // Finite as well as non-negative: `>= 0.0` alone lets Infinity through, and one infinite
+        // row turns every total it is summed into for good.
+        require(values.caloriesKcal.isFinite() && values.caloriesKcal >= 0.0) { "Calories cannot be negative" }
+        require(values.proteinGrams.isFinite() && values.proteinGrams >= 0.0) { "Protein cannot be negative" }
+        require(values.carbohydrateGrams.isFinite() && values.carbohydrateGrams >= 0.0) { "Carbohydrates cannot be negative" }
+        require(values.fatGrams.isFinite() && values.fatGrams >= 0.0) { "Fat cannot be negative" }
         require(values.fiberGrams == null || values.fiberGrams >= 0.0) { "Fiber cannot be negative" }
         require(values.sugarGrams == null || values.sugarGrams >= 0.0) { "Sugar cannot be negative" }
         require(values.saturatedFatGrams == null || values.saturatedFatGrams >= 0.0) {
