@@ -11,6 +11,7 @@ import com.nomi.app.ai.model.QuantityResolutionMetadata
 import com.nomi.app.ai.model.QuantitySemantic
 import com.nomi.app.ai.model.ResearchNutritionBasis
 import kotlinx.coroutines.runBlocking
+import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.NutritionFailureReason
 import com.nomi.app.ai.validation.NutritionResearchException
@@ -806,6 +807,7 @@ class ExaGeminiNutritionProviderTest {
                         // Not printed anywhere on the page.
                         loggedServingGramsEquivalent = 110.0,
                     ),
+                    table = HAMBURGER_TABLE.replace("pro Portion (105 g)", "pro Portion"),
                 ).researchNutrition(hamburgerIntent())
             }
         }
@@ -852,6 +854,120 @@ class ExaGeminiNutritionProviderTest {
         assertEquals(NutritionFailureReason.MISSING_PORTION_WEIGHT, error.reason)
     }
 
+    @Test
+    fun `cheeseburger portions scale without model supplied logged weights and remain saveable`() = runBlocking {
+        for (count in listOf(0.5, 1.0, 2.0)) {
+            val intent = cheeseburgerIntent().let {
+                it.copy(originalText = "$count McDonald's Cheeseburger", items = listOf(it.items.single().copy(quantity = count)))
+            }
+            val result = provider(
+                sources = listOf(source("McDonald's Cheeseburger", "https://mcdonalds.test/cheeseburger", RESTAURANT_TABLE)),
+                extraction = extraction(
+                    restaurantItem("Cheeseburger", "McDonald's", 300.0, 15.5, 31.0, 12.5, "exa-1")
+                        .copy(sourceServingUnit = "Portion", sourceBasisText = "pro Portion (119 g)"),
+                ),
+            ).researchNutrition(intent)
+            assertEquals(300.0 * count, result.items.single().calories, 1e-9)
+            ServingNutritionNormalizer.validateBeforeSave(result)
+            val edited = ServingNutritionNormalizer.rescaleValidatedItemTo(
+                result.items.single(), 3.0, "piece",
+            )
+            assertEquals(900.0, edited.calories, 1e-9)
+        }
+    }
+
+    @Test
+    fun `one red bull resolves a printed can size with either nutrition basis`() = runBlocking {
+        for (count in listOf(0.5, 1.0, 2.0)) {
+            for (sourceUnit in listOf("ml", "can", "Portion")) {
+                val per100 = sourceUnit == "ml"
+                val reading = restaurantItem("Red Bull", "Red Bull", if (per100) 46.0 else 115.0,
+                    0.0, if (per100) 11.0 else 27.5, 0.0, "exa-1").copy(
+                    nutritionBasis = if (per100) ResearchNutritionBasis.PER_100_ML else ResearchNutritionBasis.SOURCE_SERVING,
+                    sourceServingQuantity = if (per100) 100.0 else 1.0,
+                    sourceServingUnit = sourceUnit,
+                    sourceBasisText = if (per100) "per 100 ml" else "per can (250 ml)",
+                )
+                val result = provider(
+                    sources = listOf(source("Red Bull nutrition", "https://redbull.test/energy",
+                        "Red Bull nutrition per 100 ml: 46 kcal, protein 0 g, carbohydrates 11 g, fat 0 g. " +
+                            "Per can (250 ml): 115 kcal, protein 0 g, carbohydrates 27.5 g, fat 0 g.")),
+                    extraction = extraction(reading),
+                ).researchNutrition(ParsedFoodIntent("$count red bull", items = listOf(
+                    ParsedFoodItem("Red Bull", brand = "Red Bull", quantity = count, unit = "piece"),
+                )))
+                val item = result.items.single()
+                assertEquals(115.0 * count, item.calories, 1e-9)
+                assertEquals(250.0 * count, item.resolvedVolumeMl!!, 1e-9)
+                assertEquals(null, item.resolvedWeightGrams)
+                ServingNutritionNormalizer.validateBeforeSave(result)
+            }
+        }
+    }
+
+    @Test
+    fun `ambiguous can sizes and unlabelled volumes do not resolve a counted drink`() {
+        for (sizes in listOf("Can (250 ml), can (355 ml)", "Volume 250 ml")) {
+            assertThrows(NutritionResearchException::class.java) {
+                runBlocking {
+                    provider(
+                        sources = listOf(source("Red Bull nutrition", "https://redbull.test/energy",
+                            "Red Bull nutrition per 100 ml: 46 kcal, protein 0 g, carbohydrates 11 g, fat 0 g. $sizes")),
+                        extraction = extraction(restaurantItem("Red Bull", "Red Bull", 46.0, 0.0, 11.0, 0.0, "exa-1").copy(
+                            nutritionBasis = ResearchNutritionBasis.PER_100_ML,
+                            sourceServingQuantity = 100.0, sourceServingUnit = "ml", sourceBasisText = "per 100 ml",
+                        )),
+                    ).researchNutrition(ParsedFoodIntent("one red bull", items = listOf(
+                        ParsedFoodItem("Red Bull", brand = "Red Bull", quantity = 1.0, unit = "piece"),
+                    )))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a German can size before the container resolves two counted drinks`() = runBlocking {
+        val result = provider(
+            sources = listOf(source("Red Bull Nährwerte", "https://redbull.test/energy",
+                "Red Bull 250 ml Dose. Nährwerte pro 100 ml: 46 kcal, Eiweiß 0 g, Kohlenhydrate 11 g, Fett 0 g.")),
+            extraction = extraction(restaurantItem("Red Bull", "Red Bull", 46.0, 0.0, 11.0, 0.0, "exa-1").copy(
+                nutritionBasis = ResearchNutritionBasis.PER_100_ML,
+                sourceServingQuantity = 100.0, sourceServingUnit = "ml", sourceBasisText = "pro 100 ml",
+            )),
+        ).researchNutrition(ParsedFoodIntent("2 Red Bull", items = listOf(
+            ParsedFoodItem("Red Bull", brand = "Red Bull", quantity = 2.0, unit = "piece"),
+        )))
+        assertEquals(230.0, result.items.single().calories, 1e-9)
+        assertEquals(500.0, result.items.single().resolvedVolumeMl!!, 1e-9)
+    }
+
+    @Test
+    fun `a multi burger serving is not treated as one burger`() {
+        val basis = "pro Portion (2 Cheeseburger)"
+        assertThrows(NutritionResearchException::class.java) {
+            runBlocking {
+                provider(
+                    sources = listOf(source("McDonald's Cheeseburger", "https://mcdonalds.test/cheeseburger",
+                        RESTAURANT_TABLE.replace("pro Portion (119 g)", basis))),
+                    extraction = extraction(restaurantItem("Cheeseburger", "McDonald's", 300.0, 15.5, 31.0, 12.5, "exa-1")
+                        .copy(sourceServingUnit = "Portion", sourceBasisText = basis)),
+                ).researchNutrition(cheeseburgerIntent())
+            }
+        }
+    }
+
+    @Test
+    fun `a counted burger uses the printed portion weight for per hundred gram nutrition`() = runBlocking<Unit> {
+        val result = hamburgerProvider(hamburgerItem().copy(
+            calories = 238.0, proteinGrams = 12.0, carbohydrateGrams = 29.0, fatGrams = 8.3,
+            sourceServingQuantity = 100.0, sourceServingUnit = "g", sourceServingGramsEquivalent = 100.0,
+            nutritionBasis = ResearchNutritionBasis.PER_100_G, sourceBasisText = "pro 100 g",
+        )).researchNutrition(hamburgerIntent(quantity = 2.0))
+        assertEquals(499.8, result.items.single().calories, 1e-9)
+        assertEquals(210.0, result.items.single().resolvedWeightGrams!!, 1e-9)
+        ServingNutritionNormalizer.validateBeforeSave(result)
+    }
+
     private fun hamburgerIntent(quantity: Double = 1.0) = ParsedFoodIntent(
         originalText = "${quantity.toInt()} McDonald's Hamburger",
         items = listOf(
@@ -866,9 +982,9 @@ class ExaGeminiNutritionProviderTest {
             sourceBasisText = "pro Portion (105 g)",
         )
 
-    private fun hamburgerProvider(item: GeminiNutritionItem) = provider(
+    private fun hamburgerProvider(item: GeminiNutritionItem, table: String = HAMBURGER_TABLE) = provider(
         sources = listOf(
-            source("McDonald's Hamburger Nährwerte", "https://mcdonalds.test/hamburger", HAMBURGER_TABLE),
+            source("McDonald's Hamburger Nährwerte", "https://mcdonalds.test/hamburger", table),
         ),
         extraction = extraction(item),
     )

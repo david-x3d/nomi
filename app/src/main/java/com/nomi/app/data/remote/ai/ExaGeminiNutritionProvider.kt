@@ -763,7 +763,8 @@ private fun groundExtractedItem(
         supporting.takeIf { document.sourceId == primary.sourceId }.orEmpty()
 
     candidates.firstOrNull { groundedIn(extracted, it) }?.let { groundedPrimary ->
-        return extracted.toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
+        return extracted.withSingleProductServing(parsed, groundedPrimary)
+            .toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
     }
     // A unit weight or volume the page does not print cannot be kept, but it is no reason to
     // discard nutrition the page does print: a per-burger reading needs no weight at all. The
@@ -774,7 +775,8 @@ private fun groundExtractedItem(
             .takeIf { it != extracted && groundedIn(it, candidate) }
             ?.let { candidate to it }
     }?.let { (groundedPrimary, reading) ->
-        return reading.toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
+        return reading.withSingleProductServing(parsed, groundedPrimary)
+            .toAnalyzedItem(parsed, groundedPrimary, supportingFor(groundedPrimary))
     }
 
     val allZero = extracted.calories == 0.0 && extracted.proteinGrams == 0.0 &&
@@ -1012,6 +1014,82 @@ private fun GeminiNutritionItem.withFoodNamedServingAsLoggedUnit(
     }
     return if (namesTheFood) copy(sourceServingUnit = loggedUnit) else this
 }
+
+/**
+ * Resolves a source's individual product after its identity, basis and nutrients are grounded.
+ * A burger portion counts one burger; an explicitly sized can or bottle supplies volume for
+ * one drink. Arbitrary servings and multi-item products must still provide their own bridge.
+ */
+private fun GeminiNutritionItem.withSingleProductServing(
+    parsed: ParsedFoodItem,
+    document: ExaNutritionDocument,
+): GeminiNutritionItem {
+    val loggedUnit = parsed.unit ?: return this
+    val unit = QuantityUnits.normalize(loggedUnit)
+    if (unit !in setOf("piece", "can", "bottle")) return this
+    val identity = (parsed.name + " " + sourceProductName.orEmpty()).normalizedBasisEvidence()
+    val basis = sourceBasisText.orEmpty().normalizedBasisEvidence()
+    if (MULTI_ITEM_PRODUCT.containsMatchIn(identity + " " + basis)) return this
+
+    val corpus = (document.title + "\n" + document.content).normalizedBasisEvidence()
+    if (unit == "piece" && SINGLE_PRODUCT_FOOD.containsMatchIn(identity)) {
+        if (nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
+            sourceServingQuantity == 1.0 && QuantityUnits.normalize(sourceServingUnit) == "serving"
+        ) {
+            return copy(sourceServingUnit = loggedUnit)
+        }
+        if (nutritionBasis == ResearchNutritionBasis.PER_100_G && loggedServingGramsEquivalent == null) {
+            val weight = SINGLE_PORTION_GRAMS.findAll(corpus)
+                .mapNotNull { it.groupValues[1].toDoubleOrNull() }
+                .filter { it > 0.0 }.distinct().singleOrNull()
+            if (weight != null && parsed.quantity != null) {
+                return copy(loggedServingGramsEquivalent = weight * parsed.quantity)
+            }
+        }
+    }
+
+    // Bind volume to a named container, never to an arbitrary ml number elsewhere in the table.
+    // Several sizes on the same page remain ambiguous unless the quoted serving selects one.
+    fun sizes(text: String): List<Pair<String, Double>> = (
+        CONTAINER_VOLUME.findAll(text).map { it.groupValues[1] to it.groupValues[2] } +
+            VOLUME_CONTAINER.findAll(text).map { it.groupValues[2] to it.groupValues[1] }
+        ).mapNotNull { (container, amount) ->
+            amount.toDoubleOrNull()?.takeIf { it > 0.0 }?.let { QuantityUnits.normalize(container) to it }
+        }.filter { unit == "piece" || it.first == unit }.distinct().toList()
+    val selected = sizes(basis).singleOrNull() ?: sizes(corpus).singleOrNull() ?: return this
+    val count = parsed.quantity ?: return this
+    val volume = selected.second * count
+    if (nutritionBasis == ResearchNutritionBasis.PER_100_ML ||
+        (nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING &&
+            QuantityUnits.normalize(sourceServingUnit) == "ml")
+    ) {
+        return copy(resolvedVolumeMl = parsed.resolvedVolumeMl ?: resolvedVolumeMl ?: volume)
+    }
+    if (nutritionBasis == ResearchNutritionBasis.SOURCE_SERVING && sourceServingQuantity == 1.0 &&
+        QuantityUnits.normalize(sourceServingUnit) in setOf(selected.first, "serving") &&
+        (sizes(basis).singleOrNull() == selected ||
+            QuantityUnits.normalize(sourceServingUnit) == selected.first)
+    ) {
+        return copy(sourceServingUnit = loggedUnit, resolvedVolumeMl = parsed.resolvedVolumeMl ?: resolvedVolumeMl ?: volume)
+    }
+    return this
+}
+
+private val SINGLE_PORTION_GRAMS = Regex(
+    "\\b(?:pro|per|je)\\s+(?:portion|serving)\\s*\\(\\s*(\\d+(?:\\.\\d+)?)\\s*g\\s*\\)",
+)
+private val SINGLE_PRODUCT_FOOD = Regex("\\b(?:[\\p{L}]*burger|sandwich|wrap|croissant)\\b")
+private val MULTI_ITEM_PRODUCT = Regex(
+    "\\b(?:pack|multipack|packung|menu|menü|meal|box|bundle|nuggets)\\b|" +
+        "\\b(?:[2-9]|[1-9]\\d+)\\s*[-x×]?\\s*(?:piece|stück|stueck|pack|can|dose|bottle|flasche|[\\p{L}]*burger|sandwich|wrap|croissant)",
+)
+private val CONTAINER_VOLUME = Regex(
+    "\\b(can|dose|bottle|flasche)\\s*(?:contains|enthält|of|à|:)?\\s*\\(?\\s*(\\d+(?:\\.\\d+)?)\\s*ml\\b",
+)
+
+private val VOLUME_CONTAINER = Regex(
+    "\\b(\\d+(?:\\.\\d+)?)\\s*ml\\s*[-–]?\\s*(can|dose|bottle|flasche)\\b",
+)
 
 private const val MIN_FOOD_SERVING_TOKEN = 3
 

@@ -34,10 +34,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
-import com.nomi.app.data.preferences.DEFAULT_DIRECT_GEMINI_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
-import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
 import com.nomi.app.ui.components.NomiFieldShape
 import com.nomi.app.ui.components.NomiInlineError
@@ -400,6 +398,8 @@ private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
 
+private const val SUGGESTED_GEMINI_MODEL = "gemini-3.8-flash"
+
 private fun AiProviderKind.suggestedModel(purpose: String): String = when (this) {
     AiProviderKind.PERPLEXITY -> if (purpose == "Fallback") "sonar-pro" else "sonar"
     AiProviderKind.OPEN_ROUTER -> if (purpose == "Food research") {
@@ -408,16 +408,16 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
         DEFAULT_OPENROUTER_MODEL
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
-    AiProviderKind.EXA_GEMINI -> DEFAULT_GEMINI_NUTRITION_MODEL
-    AiProviderKind.GEMINI -> DEFAULT_DIRECT_GEMINI_MODEL
+    AiProviderKind.EXA_GEMINI -> SUGGESTED_GEMINI_MODEL
+    AiProviderKind.GEMINI -> SUGGESTED_GEMINI_MODEL
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> ""
 }
 
 /**
  * Models offered as one-tap answers under the field, so an empty field is never a dead end.
  *
- * Only names Nomi already relies on elsewhere are listed. Research and Fallback have to search
- * the web, which is why OpenAI is offered its search model there and not the general one alone.
+ * Research and Fallback need web search, so OpenAI includes its search model there. Gemini
+ * offers the same model for every task; selecting a suggestion is an explicit user choice.
  */
 private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
     val searches = purpose == "Food research" || purpose == "Fallback"
@@ -427,8 +427,8 @@ private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
         AiProviderKind.PERPLEXITY -> listOf("sonar", "sonar-pro")
         AiProviderKind.OPEN_AI ->
             if (searches) listOf("gpt-4o-search-preview", "gpt-5.2") else listOf("gpt-5.2")
-        AiProviderKind.EXA_GEMINI -> listOf(DEFAULT_GEMINI_NUTRITION_MODEL)
-        AiProviderKind.GEMINI -> listOf(DEFAULT_DIRECT_GEMINI_MODEL, DEFAULT_GEMINI_NUTRITION_MODEL)
+        AiProviderKind.EXA_GEMINI -> listOf(SUGGESTED_GEMINI_MODEL)
+        AiProviderKind.GEMINI -> listOf(SUGGESTED_GEMINI_MODEL)
         AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> emptyList()
     }
 }
