@@ -16,6 +16,8 @@ import com.nomi.app.ai.validation.NutritionResearchException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
 import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
+import com.nomi.app.data.preferences.CalorieEstimateBias
+import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -274,6 +276,7 @@ internal class ExaGeminiNutritionProvider(
     private val localeCountryProvider: () -> String? = { Locale.getDefault().country },
     private val searchProgressSink: suspend (List<String>) -> Unit = {},
     private val debugSink: suspend (ExaGeminiDebugTrace) -> Unit = {},
+    private val calorieBiasProvider: () -> CalorieEstimateBias = { CalorieEstimateBias.NONE },
 ) : NutritionResearchProvider {
 
     override suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis {
@@ -498,7 +501,10 @@ internal class ExaGeminiNutritionProvider(
             )
             val reconciled = UserQuantityResolver.reconcileAnalysis(
                 itemIntent,
-                FoodAnalysis(items = listOf(grounded)),
+                // Biased on the source-serving values, before the normalizer scales them, exactly
+                // as the OpenAI-compatible path does; an estimate from this provider used to
+                // ignore the setting altogether.
+                FoodAnalysis(items = listOf(CalorieBiasAdjuster.apply(grounded, calorieBiasProvider()))),
             )
             val normalized = ServingNutritionNormalizer.normalize(itemIntent, reconciled)
             val validated = SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))

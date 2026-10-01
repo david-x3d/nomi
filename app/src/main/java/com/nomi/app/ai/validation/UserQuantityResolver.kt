@@ -36,9 +36,16 @@ object UserQuantityResolver {
             "(?:us\\s*)?fl\\.?\\s*oz|oz|ounces?|lbs?|pounds?)"
     private val decimal = "(\\d+(?:[.,]\\d+)?)"
 
+    /**
+     * "55% of a 320 g package", "50 % von 200 g", "50% einer 200 g Packung".
+     *
+     * A linking word is required. Without one, the fat percentage in "Milch 1,5% 250 ml" was read
+     * as a share of the amount that follows it and logged 3.75 ml of milk.
+     */
     private val percentagePackagePattern = Regex(
-        """(?iu)$decimal\s*(?:%|prozent)\s*(?:(?:of|von)\s+)?""" +
-            """(?:(?:a|an|the|einer|einem|einen|eine|der|dem|den)\s+)?""" +
+        """(?iu)$decimal\s*(?:%|prozent)\s*""" +
+            """(?:(?:of|von)\s+(?:(?:a|an|the|einer|einem|einen|eine|der|dem|den)\s+)?|""" +
+            """(?:a|an|the|einer|einem|einen|eine|der|dem|den)\s+)""" +
             """$decimal\s*[-–—]?\s*$amountUnit\b""",
     )
 

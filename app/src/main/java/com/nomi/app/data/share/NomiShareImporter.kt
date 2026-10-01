@@ -35,10 +35,13 @@ object NomiShareImporter {
         val loggedAt = now + index
         FoodLogEntity(
             mealCategory = food.meal.toMealCategoryName(),
-            displayNameSnapshot = food.name,
-            brandSnapshot = food.brand,
+            // The bytes come from another device, so they are bounded the way Nomi's own entries
+            // are: an unbounded name or a blank unit is stored happily and then makes every later
+            // backup of this diary fail validation.
+            displayNameSnapshot = food.name.trim().take(MAX_SHARED_NAME_CHARS),
+            brandSnapshot = food.brand?.trim()?.take(MAX_SHARED_BRAND_CHARS)?.takeIf(String::isNotBlank),
             amount = food.amount,
-            unit = food.unit,
+            unit = food.unit.trim().take(MAX_SHARED_UNIT_CHARS).ifBlank { FALLBACK_SHARED_UNIT },
             // Grams are not part of a shared day, and guessing them from a unit would put a
             // number in the diary that nobody weighed.
             grams = null,
@@ -61,6 +64,11 @@ object NomiShareImporter {
             updatedAtEpochMillis = loggedAt,
         )
     }
+
+    private const val MAX_SHARED_NAME_CHARS = 300
+    private const val MAX_SHARED_BRAND_CHARS = 200
+    private const val MAX_SHARED_UNIT_CHARS = 64
+    private const val FALLBACK_SHARED_UNIT = "serving"
 
     /** One instant for the whole day, so the rows keep the order they were shared in. */
     fun now(): Long = Instant.now().toEpochMilli()

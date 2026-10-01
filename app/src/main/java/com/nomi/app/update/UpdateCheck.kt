@@ -25,7 +25,32 @@ data class ReleaseVersion(
         // A pre-release is older than the bare version it leads up to: 2.4.0-beta.1 < 2.4.0.
         if (isPreRelease && !other.isPreRelease) return -1
         if (!isPreRelease && other.isPreRelease) return 1
-        return preRelease.compareTo(other.preRelease)
+        return comparePreRelease(preRelease, other.preRelease)
+    }
+
+    /**
+     * Semver precedence for the part after the dash: identifiers are compared one at a time,
+     * numbers as numbers, a number below a word, and a shorter list below a longer one it
+     * prefixes. Comparing the whole suffix as text put `beta.10` below `beta.2`, so a beta.10
+     * tester was offered beta.2 as an update - the same mistake this class exists to prevent.
+     */
+    private fun comparePreRelease(first: String, second: String): Int {
+        val a = first.split('.')
+        val b = second.split('.')
+        for (index in 0 until minOf(a.size, b.size)) {
+            val left = a[index]
+            val right = b[index]
+            val leftNumber = left.takeIf { it.isNotEmpty() && it.all(Char::isDigit) }?.toBigIntegerOrNull()
+            val rightNumber = right.takeIf { it.isNotEmpty() && it.all(Char::isDigit) }?.toBigIntegerOrNull()
+            val result = when {
+                leftNumber != null && rightNumber != null -> leftNumber.compareTo(rightNumber)
+                leftNumber != null -> -1
+                rightNumber != null -> 1
+                else -> left.compareTo(right)
+            }
+            if (result != 0) return result
+        }
+        return a.size.compareTo(b.size)
     }
 
     override fun toString(): String =

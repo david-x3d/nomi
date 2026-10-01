@@ -4,12 +4,14 @@ import com.nomi.app.BuildConfig
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -47,13 +49,22 @@ class OpenFoodFactsClient(
 
     suspend fun findByBarcode(barcode: String): BarcodeProduct? {
         require(barcode.matches(Regex("[0-9]{8,14}"))) { "Invalid barcode" }
-        val response = httpClient.get("https://world.openfoodfacts.org/api/v2/product/$barcode.json") {
-            parameter(
-                "fields",
-                "code,status,product_name,brands,image_front_small_url,serving_size," +
-                    "product_quantity_unit,nutriments",
-            )
-        }.body<OpenFoodFactsResponse>()
+        val response = try {
+            httpClient.get("https://world.openfoodfacts.org/api/v2/product/$barcode.json") {
+                parameter(
+                    "fields",
+                    "code,status,product_name,brands,image_front_small_url,serving_size," +
+                        "product_quantity_unit,nutriments",
+                )
+            }.body<OpenFoodFactsResponse>()
+        } catch (notFound: ClientRequestException) {
+            // Open Food Facts answers an unknown barcode with HTTP 404. With expectSuccess that
+            // is an exception, and letting it escape skipped the web-research fallback and showed
+            // the user an AI-provider "model not found" message for a product that is simply
+            // not in the database.
+            if (notFound.response.status != HttpStatusCode.NotFound) throw notFound
+            return null
+        }
         if (response.status != 1 || response.product == null) return null
         return response.product.toDomain(response.code ?: barcode)
     }

@@ -195,20 +195,28 @@ object ServingNutritionNormalizer {
                 componentName = "saturated fat",
                 parentName = "fat",
             )
-            requirePhysicallyPossiblePer100(
-                validation = per100ForLogged(
-                    loggedBaseAmount = 100.0,
-                    calories = calories,
-                    proteinGrams = proteinGrams,
-                    carbohydrateGrams = carbohydrateGrams,
-                    fatGrams = fatGrams,
-                    fiberGrams = item.fiberGrams,
-                    sugarGrams = item.sugarGrams,
-                    saturatedFatGrams = item.saturatedFatGrams,
-                    sodiumMilligrams = item.sodiumMilligrams,
-                ),
-                dimension = Dimension.Mass,
-            )
+            // The per-100 ceiling needs the portion's weight. The totals of a 300 g plate are
+            // not per-100 values, and reading them as such refused any real meal above 100 g of
+            // macros; a portion with no known weight makes no per-100 claim to check at all.
+            val grams = item.gramsEquivalent
+                ?: item.quantity.takeIf { normalizeUnit(item.unit) == "g" }
+            if (grams != null && grams.isFinite() && grams > 0.0) {
+                val per100 = 100.0 / grams
+                requirePhysicallyPossiblePer100(
+                    validation = per100ForLogged(
+                        loggedBaseAmount = 100.0,
+                        calories = calories * per100,
+                        proteinGrams = proteinGrams * per100,
+                        carbohydrateGrams = carbohydrateGrams * per100,
+                        fatGrams = fatGrams * per100,
+                        fiberGrams = item.fiberGrams?.times(per100),
+                        sugarGrams = item.sugarGrams?.times(per100),
+                        saturatedFatGrams = item.saturatedFatGrams?.times(per100),
+                        sodiumMilligrams = item.sodiumMilligrams?.times(per100),
+                    ),
+                    dimension = Dimension.Mass,
+                )
+            }
             return correctedItem(item, calories, proteinGrams, carbohydrateGrams, fatGrams, null)
         }
 
@@ -245,6 +253,47 @@ object ServingNutritionNormalizer {
         )
         return correctedItem(
             item, calories, proteinGrams, carbohydrateGrams, fatGrams, correctedValidation,
+        ).also { validateBeforeSave(FoodAnalysis(items = listOf(it))) }
+    }
+
+    /**
+     * Applies a hand-typed amount or unit to one preview item, keeping it saveable.
+     *
+     * The dialog treats its fields as one snapshot the user vouches for, so the nutrition is not
+     * rescaled here. What has to go is the recorded serving basis: it describes the amount the
+     * research was scaled to, and leaving it attached made [validateBeforeSave] refuse the whole
+     * meal with "logged amount changed". The known weight follows the amount only while the unit
+     * is unchanged; a new unit has no weight unless it is grams itself.
+     */
+    fun applyUserAmountOverride(
+        item: AnalyzedFoodItem,
+        quantity: Double,
+        unit: String,
+    ): AnalyzedFoodItem {
+        val newUnit = unit.trim()
+        if (!quantity.isFinite() || quantity <= 0.0) {
+            throw AiValidationException("amount must be finite and greater than zero")
+        }
+        if (newUnit.isEmpty()) throw AiValidationException("Serving unit is missing")
+        if (quantity == item.quantity && newUnit == item.unit) return item
+        val sameUnit = normalizeUnit(newUnit) == normalizeUnit(item.unit)
+        val factor = quantity / item.quantity
+        return item.copy(
+            quantity = quantity,
+            unit = newUnit,
+            gramsEquivalent = when {
+                sameUnit -> item.gramsEquivalent?.times(factor)
+                normalizeUnit(newUnit) == "g" -> quantity
+                else -> null
+            },
+            resolvedVolumeMl = item.resolvedVolumeMl?.times(factor)?.takeIf { sameUnit },
+            quantityResolution = null,
+            servingValidation = null,
+            requiresServingValidation = false,
+            // The cited source reported these numbers for a different amount.
+            isEstimate = true,
+            verificationStatus = com.nomi.app.ai.model.NutritionVerificationStatus.ESTIMATED,
+            assumptions = (item.assumptions + "Amount changed by hand before saving.").takeLast(12),
         ).also { validateBeforeSave(FoodAnalysis(items = listOf(it))) }
     }
 
@@ -572,8 +621,16 @@ object ServingNutritionNormalizer {
             Dimension.Volume -> MAX_PLAUSIBLE_DENSITY
             else -> return
         }
-        val macroGrams = validation.proteinGramsPer100 + validation.carbohydrateGramsPer100 +
-            validation.fatGramsPer100 + (validation.fiberGramsPer100 ?: 0.0)
+        // Fibre is checked on its own rather than added to the total. US-style tables already
+        // count it inside carbohydrate, so adding it again put chia seeds at 124 g per 100 g and
+        // refused almonds, flaxseed, bran and cocoa powder as impossible. Protein, carbohydrate
+        // and fat fitting into the serving holds under both labelling conventions.
+        val fiberGrams = validation.fiberGramsPer100 ?: 0.0
+        val macroGrams = maxOf(
+            validation.proteinGramsPer100 + validation.carbohydrateGramsPer100 +
+                validation.fatGramsPer100,
+            fiberGrams,
+        )
         if (macroGrams > MAX_MACRO_GRAMS_PER_100 * densityAllowance) {
             throw AiValidationException(
                 "The researched nutrition is not possible per 100 ${dimension.per100Label}: " +

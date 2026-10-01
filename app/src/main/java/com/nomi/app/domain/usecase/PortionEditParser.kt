@@ -248,7 +248,15 @@ object PortionEditParser {
 
     private val PERCENTAGE = Regex("^(\\d{1,3}(?:[.,]\\d+)?)\\s*%(?:\\s*(?:package|packung|pack))?$")
     private val MULTIPLIER = Regex("^(?:(\\d+(?:[.,]\\d+)?)\\s*x|x\\s*(\\d+(?:[.,]\\d+)?)|(\\d+(?:[.,]\\d+)?)\\s*times)$")
-    private val FRACTION_OF_COUNT = Regex("^(\\d+(?:[.,]\\d+)?)\\s*(?:/|out)?\\s*(?:of|von)?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:pieces?|piece|slices?|stucken?|stuck|items?)$")
+    /**
+     * The two numbers must be visibly separate: a slash, or the space that "of" / "von" leaves
+     * behind once the filler words are gone. With the separator optional, "12 pieces" backtracked
+     * into "1 of 2 pieces" and halved a food the user had just said they ate twelve of.
+     */
+    private val FRACTION_OF_COUNT = Regex(
+        "^(\\d+(?:[.,]\\d+)?)(?:\\s*/\\s*|\\s+(?:out\\s+)?(?:(?:of|von)\\s+)?)" +
+            "(\\d+(?:[.,]\\d+)?)\\s*(?:pieces?|piece|slices?|stucken?|stuck|items?)$",
+    )
     private val FRACTION = Regex("^(\\d+)\\s*/\\s*(\\d+)$")
     private val EXPLICIT_AMOUNT = Regex("^(\\d+(?:[.,]\\d+)?)\\s*([a-z]+)$")
     private val RELATIVE_AMOUNT = Regex(

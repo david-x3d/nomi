@@ -2,7 +2,9 @@ package com.nomi.app.domain.calculator
 
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.data.preferences.CalorieEstimateBias
+import java.util.Locale
 
 /**
  * Chooses where inside an estimate's plausible range the logged number lands.
@@ -47,7 +49,7 @@ object CalorieBiasAdjuster {
         if (bias == CalorieEstimateBias.NONE) return item
         // Only an estimate has a range to move within.
         if (!item.isEstimate) return item
-        val scale = scaleFor(item.uncertaintyPercent, bias)
+        val scale = scaleFor(item.uncertaintyPercent, bias).coerceAtMost(physicalCeiling(item))
         if (scale == 1.0) return item
         return item.copy(
             calories = item.calories * scale,
@@ -60,6 +62,51 @@ object CalorieBiasAdjuster {
             sodiumMilligrams = item.sodiumMilligrams?.times(scale),
         )
     }
+
+    /**
+     * The largest factor that still leaves a food that can exist.
+     *
+     * The source serving weighs what it weighs, so its macros cannot be pushed past that weight
+     * and its energy cannot be pushed past pure fat. Without this ceiling, "estimate high" turned
+     * 100 g of oil into 110 g of fat per 100 g, the plausibility check refused it, and the user
+     * could not log oil, butter or sugar at all while the setting was on.
+     *
+     * Never below 1.0: a value that is already impossible is the validator's to refuse, and a
+     * downward bias has no ceiling to hit.
+     */
+    private fun physicalCeiling(item: AnalyzedFoodItem): Double {
+        val capacityGrams = sourceCapacityGrams(item) ?: return Double.MAX_VALUE
+        val macroGrams = item.proteinGrams + item.carbohydrateGrams + item.fatGrams
+        val macroCeiling = if (macroGrams > 0.0) capacityGrams / macroGrams else Double.MAX_VALUE
+        val energyCeiling = if (item.calories > 0.0) {
+            capacityGrams * MAX_KCAL_PER_GRAM / item.calories
+        } else {
+            Double.MAX_VALUE
+        }
+        return minOf(macroCeiling, energyCeiling).coerceAtLeast(1.0)
+    }
+
+    /** Grams the source serving can hold; a volume is allowed the density of a heavy syrup. */
+    private fun sourceCapacityGrams(item: AnalyzedFoodItem): Double? {
+        when (item.nutritionBasis) {
+            ResearchNutritionBasis.PER_100_G -> return 100.0
+            ResearchNutritionBasis.PER_100_ML -> return 100.0 * MAX_GRAMS_PER_MILLILITER
+            ResearchNutritionBasis.SOURCE_SERVING, null -> Unit
+        }
+        item.sourceServingGramsEquivalent?.takeIf { it.isFinite() && it > 0.0 }?.let { return it }
+        val quantity = item.sourceServingQuantity?.takeIf { it.isFinite() && it > 0.0 } ?: return null
+        return when (item.sourceServingUnit?.trim()?.lowercase(Locale.ROOT)) {
+            "g" -> quantity
+            "kg" -> quantity * 1_000.0
+            "ml" -> quantity * MAX_GRAMS_PER_MILLILITER
+            "l" -> quantity * 1_000.0 * MAX_GRAMS_PER_MILLILITER
+            else -> null
+        }
+    }
+
+    /** Pure fat is 8.84 kcal per gram. */
+    private const val MAX_KCAL_PER_GRAM = 9.0
+    private const val MAX_GRAMS_PER_MILLILITER = 1.5
 
     /**
      * The factor every nutrient is multiplied by. Macros move with the calories rather than
