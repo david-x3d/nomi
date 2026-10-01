@@ -177,16 +177,10 @@ internal val libraryTranslations: Map<String, NomiTranslation> = mapOf(
         sv = "Inga livsmedel matchar ”{0}”.",
         tr = "“{0}” ile eşleşen besin yok.",
     ),
-    "{0} / {1} kcal · P {2} · C {3} · F {4}" to NomiTranslation(
-        de = "{0} / {1} kcal · E {2} · K {3} · F {4}",
-        es = "{0} / {1} kcal · P {2} · H {3} · G {4}",
-        fr = "{0} / {1} kcal · P {2} · G {3} · L {4}",
-        it = "{0} / {1} kcal · P {2} · C {3} · G {4}",
-        nl = "{0} / {1} kcal · E {2} · K {3} · V {4}",
-        pt = "{0} / {1} kcal · P {2} · H {3} · G {4}",
-        sq = "{0} / {1} kcal · P {2} · K {3} · Y {4}",
-        sv = "{0} / {1} kcal · P {2} · K {3} · F {4}",
-        tr = "{0} / {1} kcal · P {2} · K {3} · Y {4}",
+    "Nothing found" to NomiTranslation(
+        de = "Nichts gefunden", es = "No se encontró nada", fr = "Aucun résultat",
+        it = "Nessun risultato", nl = "Niets gevonden", pt = "Nada encontrado",
+        sq = "Nuk u gjet asgjë", sv = "Inget hittades", tr = "Hiçbir şey bulunamadı",
     ),
 
     // Food library
