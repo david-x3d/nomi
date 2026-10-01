@@ -1,7 +1,8 @@
 # Publishes a release from an APK that was already built and signed elsewhere.
 #
 # The signing key never comes to GitHub. Whoever builds the release pushes the signed APK to a
-# branch named release-assets-<tag> (holding only Nomi-<tag>-release.apk) and then pushes the
+# branch named release-assets-<tag> (holding only Nomi-<tag>-release.apk, or that file split
+# into Nomi-<tag>-release.apk.part-NN plus Nomi-<tag>-release.apk.sha256) and then pushes the
 # tag - or, where tags cannot be pushed, starts this workflow by hand with the tag name, and the
 # release creates the tag on the commit the workflow ran on. This job attaches that APK to a
 # release titled from release-notes-<tag>.md and removes the asset branch again, so the APK does
@@ -31,8 +32,20 @@ jobs:
       - name: Fetch the signed APK
         run: |
           git fetch --depth=1 origin "release-assets-${TAG}"
-          git show "FETCH_HEAD:Nomi-${TAG}-release.apk" > "Nomi-${TAG}-release.apk"
-          ls -l "Nomi-${TAG}-release.apk"
+          APK="Nomi-${TAG}-release.apk"
+          if git cat-file -e "FETCH_HEAD:${APK}" 2>/dev/null; then
+            git show "FETCH_HEAD:${APK}" > "$APK"
+          else
+            # A slow or lossy uplink cannot push the whole APK in one piece, so the branch may
+            # hold it as numbered parts instead, pushed one small commit at a time, next to
+            # the checksum the joined file has to match.
+            : > "$APK"
+            for part in $(git ls-tree --name-only FETCH_HEAD | grep -F "${APK}.part-" | sort); do
+              git show "FETCH_HEAD:${part}" >> "$APK"
+            done
+            git show "FETCH_HEAD:${APK}.sha256" | sha256sum --check --strict -
+          fi
+          ls -l "$APK"
 
       - name: Create the release
         env:
