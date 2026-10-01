@@ -3,85 +3,41 @@ package com.nomi.app.ui.app
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nomi.app.BuildConfig
 import com.nomi.app.ai.model.AiProcessingStage
-import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
-import com.nomi.app.ai.model.AiRuntimeCredential
-import com.nomi.app.ui.logging.toPhotoParsedItem
-import com.nomi.app.ui.logging.toPhotoMealDescription
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.MenuDish
-import com.nomi.app.ai.model.NutritionLabelReading
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
-import com.nomi.app.ai.model.PortionAdjustment
-import com.nomi.app.ai.parsing.FoodNameCorrection
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
-import com.nomi.app.ai.provider.NutritionResearchProvider
-import com.nomi.app.ai.validation.AiValidationException
-import com.nomi.app.ai.validation.FoodDisplayName
-import com.nomi.app.ai.validation.NutritionFailureReason
-import com.nomi.app.ai.validation.NutritionResearchException
 import com.nomi.app.ai.validation.ServingNutritionNormalizer
-import com.nomi.app.ai.validation.SourceIntegrityVerifier
 import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodEntity
 import com.nomi.app.data.local.entity.FoodLogEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
-import com.nomi.app.data.local.entity.NutritionSourceSnapshot
-import com.nomi.app.data.local.entity.NutritionValues
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
-import com.nomi.app.data.local.entity.citedUrlList
-import com.nomi.app.data.share.NomiShareImporter
-import com.nomi.app.data.share.ShareEnvelopeV1
-import com.nomi.app.data.local.entity.toCitedUrlColumn
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
 import com.nomi.app.data.local.model.SavedMealWithItems
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
-import com.nomi.app.data.preferences.HealthNutritionSyncState
 import com.nomi.app.data.preferences.HeightUnitPreference
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
-import com.nomi.app.data.preferences.ProviderSelection
-import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.data.preferences.WeightUnitPreference
-import com.nomi.app.data.preferences.enabledMicronutrients
-import com.nomi.app.data.preferences.resolvedTarget
-import com.nomi.app.data.preferences.settingFor
-import com.nomi.app.data.preferences.withSupportedModel
-import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
-import com.nomi.app.data.remote.ai.EXA_API_ENDPOINT
-import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
-import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
-import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
-import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
-import com.nomi.app.data.remote.ai.NutritionScalingDebugTrace
-import com.nomi.app.data.remote.ai.ProviderTemporarilyUnavailableException
-import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
-import com.nomi.app.data.repository.HEALTH_CONNECT_WEIGHT_SOURCE
 import com.nomi.app.data.repository.SaveLoggedMealRequest
 import com.nomi.app.data.repository.duplicatedLogs
 import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
 import com.nomi.app.data.repository.mapping.toEntity
 import com.nomi.app.data.repository.mapping.toPersistedDraft
-import com.nomi.app.data.security.SecretUnavailableException
+import com.nomi.app.data.share.NomiShareImporter
+import com.nomi.app.data.share.ShareEnvelopeV1
 import com.nomi.app.di.AppContainer
-import com.nomi.app.domain.Micronutrient
-import com.nomi.app.update.GitHubReleaseSource
-import com.nomi.app.update.ReleaseVersion
-import com.nomi.app.update.UpdateAvailability
-import com.nomi.app.update.UpdateCheck
-import com.nomi.app.update.UpdateReleaseSource
-import com.nomi.app.update.installedVersion
-import com.nomi.app.domain.DecimalInput
 import com.nomi.app.domain.StepCalorieEstimate
 import com.nomi.app.domain.StepCalorieEstimator
 import com.nomi.app.domain.model.NutritionPlan
@@ -89,23 +45,9 @@ import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
 import com.nomi.app.domain.usecase.FoodEditRouter
 import com.nomi.app.domain.usecase.NutritionRoute
-import com.nomi.app.domain.usecase.PortionEditApplier
 import com.nomi.app.domain.usecase.PortionEditParser
 import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
-import com.nomi.app.domain.usecase.acceptsVerifiedUpgradeFrom
-import com.nomi.app.domain.usecase.isTrustedForNutritionReuse
 import com.nomi.app.domain.usecase.toPortionContext
-import com.nomi.app.integration.health.HealthConnectPermissionStatus
-import com.nomi.app.integration.health.HealthFeatures
-import com.nomi.app.integration.health.HealthNutritionDeleteRange
-import com.nomi.app.integration.health.NomiHealthFeatures
-import com.nomi.app.integration.health.importableHealthWeights
-import com.nomi.app.integration.health.nutritionSyncDatesForFullHistory
-import com.nomi.app.integration.health.nutritionSyncStartTimes
-import com.nomi.app.integration.health.planNutritionSync
-import com.nomi.app.integration.health.resolveHealthConnectPermissionStatus
-import com.nomi.app.integration.health.toHealthNutritionEntry
-import com.nomi.app.integration.health.weightClientRecordId
 import com.nomi.app.ui.capture.BarcodeAmountSupport
 import com.nomi.app.ui.capture.BarcodeAmountUiState
 import com.nomi.app.ui.capture.MenuScanUiState
@@ -122,9 +64,10 @@ import com.nomi.app.ui.library.LibraryUiState
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.NomiTranslations
 import com.nomi.app.ui.logging.FoodLoggingUiState
-import com.nomi.app.ui.logging.groupedMealTitle
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.logging.PortionEditUiState
+import com.nomi.app.ui.logging.toPhotoMealDescription
+import com.nomi.app.ui.logging.toPhotoParsedItem
 import com.nomi.app.ui.profile.ProfileEdit
 import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
@@ -134,34 +77,24 @@ import com.nomi.app.ui.progress.loggingStreakDays
 import com.nomi.app.ui.progress.longestLoggingStreakDays
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.AiProviderSetting
-import com.nomi.app.ui.settings.HealthConnectUiState
-import com.nomi.app.ui.settings.NutritionTargetSetting
 import com.nomi.app.ui.settings.SettingsUiState
 import com.nomi.app.ui.settings.ThemeMode
 import com.nomi.app.ui.settings.UnitSystem
 import com.nomi.app.ui.today.AddFoodMethod
 import com.nomi.app.ui.today.LoggedAmountEditError
 import com.nomi.app.ui.today.LoggedAmountEditUiState
-import com.nomi.app.ui.today.MacroProgress
 import com.nomi.app.ui.today.MealCategory
-import com.nomi.app.ui.today.MicronutrientProgress
 import com.nomi.app.ui.today.TodayFoodEntry
 import com.nomi.app.ui.today.TodayUiState
 import com.nomi.app.ui.today.reeditableText
-import io.ktor.client.call.NoTransformationFoundException
-import io.ktor.client.network.sockets.ConnectTimeoutException
-import io.ktor.client.plugins.HttpRequestTimeoutException
-import io.ktor.client.plugins.ResponseException
-import io.ktor.http.HttpStatusCode
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.URI
-import java.net.UnknownHostException
-import java.security.MessageDigest
+import com.nomi.app.update.GitHubReleaseSource
+import com.nomi.app.update.ReleaseVersion
+import com.nomi.app.update.UpdateAvailability
+import com.nomi.app.update.UpdateCheck
+import com.nomi.app.update.UpdateReleaseSource
+import com.nomi.app.update.installedVersion
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -169,14 +102,11 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -184,20 +114,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.yield
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.encodeToString
 
 sealed interface AppStartState {
     data object Loading : AppStartState
@@ -226,6 +152,11 @@ class AppViewModel(
     private val zoneId: ZoneId get() = ZoneId.systemDefault()
     private val today: LocalDate get() = LocalDate.now(zoneId)
 
+    /** New rows land on the day being viewed, which is not always today. */
+    private val logDestination: LogDestination get() = LogDestination(selectedDate.value, zoneId)
+
+    private fun defaultMealCategory(): MealCategory = defaultMealCategory(zoneId)
+
     /**
      * The current date in the user's own zone.
      *
@@ -250,6 +181,11 @@ class AppViewModel(
             SharingStarted.Eagerly,
             AppPreferences(),
         )
+
+    private val debug = AiDebugRecorder(container, preferences, viewModelScope)
+    private val providers =
+        AiProviderAccess(container, preferences, debug, viewModelScope, ::showResearchSources)
+    private val foodCatalog = LocalFoodCatalog(repository) { recentFoodsSnapshot }
 
     val startState: StateFlow<AppStartState> = repository.profile
         .map { profile ->
@@ -290,7 +226,7 @@ class AppViewModel(
      */
     private val mutableUpdate = MutableStateFlow<UpdateAvailability>(UpdateAvailability.UpToDate)
     val update: StateFlow<UpdateAvailability> = mutableUpdate.asStateFlow()
-    private var updateCheckJob: kotlinx.coroutines.Job? = null
+    private var updateCheckJob: Job? = null
 
     fun dismissUpdate() {
         mutableUpdate.value = UpdateAvailability.UpToDate
@@ -337,7 +273,8 @@ class AppViewModel(
 
     // Declared before the flows that read it: a property initialiser running earlier would see
     // null and take the whole view model down at construction.
-    private val healthConnectUiState = MutableStateFlow(HealthConnectUiState())
+    private val healthSync = HealthConnectSyncController(repository, { container.healthConnect }, viewModelScope)
+    private val healthConnectUiState = healthSync.state
 
     /** Recalculates immediately when steps, the profile, or the latest logged weight changes. */
     private val stepCalorieEstimate: Flow<StepCalorieEstimate?> = combine(
@@ -367,7 +304,11 @@ class AppViewModel(
         repository.preferences,
         recentlySavedInputs,
     ) { logs, plan, date, prefs, freshInputs ->
-        mapToday(date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle, freshInputs)
+        mapToday(
+            date, logs, plan, prefs.micronutrients, prefs.goalsCardStyle, freshInputs,
+            language = currentLanguage(),
+            fallbackZone = zoneId,
+        )
     }
 
     /**
@@ -413,7 +354,7 @@ class AppViewModel(
         historyQuery,
         historyDate,
         repository.currentPlan,
-    ) { logs, query, date, plan -> mapHistory(logs, query, date, plan) }
+    ) { logs, query, date, plan -> mapHistory(logs, query, date, plan, currentLanguage(), zoneId) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 
     /**
@@ -493,32 +434,14 @@ class AppViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
-    private data class ProviderKeyPresence(
-        val primary: Boolean,
-        val search: Boolean,
-    ) {
-        val complete: Boolean get() = primary && search
-    }
-
-    private data class WeightExportSummary(
-        val sentCount: Int,
-        val failedCount: Int,
-    )
-
-    private val keyPresence = MutableStateFlow<Map<ProviderPipeline, ProviderKeyPresence>>(emptyMap())
-    private val healthSyncMutex = Mutex()
-    private var healthSyncJob: Job? = null
-    private var pendingFullHealthSync = false
-    private var pendingNutritionHealthSync = false
-    private var pendingUserInitiatedHealthSync = false
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
         repository.currentPlan,
-        keyPresence,
+        providers.keyPresence,
         healthConnectUiState,
         stepCalorieEstimate,
     ) { prefs, plan, keys, health, stepEstimate ->
-        mapSettings(prefs, plan, keys, health, stepEstimate)
+        mapSettings(prefs, plan, keys, health, stepEstimate, currentLanguage())
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -605,8 +528,8 @@ class AppViewModel(
         }
         // Provider keys are local and safe to inspect immediately. Health Connect reads, on the
         // other hand, must wait for MainActivity.onStart so they run while Nomi is foregrounded.
-        refreshProviderStatus()
-        observeFoodLogForHealthConnect()
+        providers.refreshKeyPresence()
+        healthSync.observeFoodLog()
         viewModelScope.launch {
             runCatching { container.reminderScheduler.reconcileFrom(repository.appPreferencesStore) }
         }
@@ -678,7 +601,7 @@ class AppViewModel(
         historyDate.update { followDayRollover(it, previous, now) }
         // Steps and active calories belong to one date, so yesterday's are hidden from now on;
         // read the new day's straight away instead of waiting for the next time the app starts.
-        requestHealthConnectSync()
+        healthSync.request()
     }
     fun setHistoryQuery(value: String) { historyQuery.value = value }
     fun setHistoryDate(value: LocalDate) { historyDate.value = value.coerceAtMost(today) }
@@ -800,9 +723,7 @@ class AppViewModel(
         mutableMenuScanState.value = before.copy(isProcessing = true, errorMessage = null)
         viewModelScope.launch {
             runCatching {
-                withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
-                    providerFor(config, key).scanMenu(bytes, mediaType)
-                }
+                providers.withProvider(ProviderPipeline.VISION) { it.scanMenu(bytes, mediaType) }
             }.onSuccess { result ->
                 if (requestId != menuScanRequestId) return@onSuccess
                 val current = mutableMenuScanState.value
@@ -932,7 +853,7 @@ class AppViewModel(
                     if (portionEditIndex != index) return@onSuccess
                     when (decision) {
                         is FoodEditRouter.Decision.Scale -> {
-                            recordRoute(
+                            debug.recordRoute(
                                 route = NutritionRoute.PORTION_SCALE,
                                 decision = decision.decidedBy,
                                 detail = decision.classification?.reason?.takeIf(String::isNotBlank)
@@ -967,11 +888,18 @@ class AppViewModel(
         }
     }
 
+    /**
+     * Turns a sentence into foods and amounts: on the phone when it is plain enough, through the
+     * interpretation model otherwise, and with spellings repaired against the user's own log.
+     */
+    private suspend fun interpret(text: String): ParsedFoodIntent = foodCatalog.withKnownSpellings(
+        LocalFoodIntentParser.parseOrNull(text)
+            ?: providers.withProvider(ProviderPipeline.FOOD_INTERPRETATION) { it.parseFood(text) },
+    )
+
     /** Binds the routing rules to this app's configured cheap classifier. */
     private fun editRouter() = FoodEditRouter { context, correction ->
-        withConfiguredProvider(ProviderPipeline.PORTION_CHANGE) { config, key ->
-            providerFor(config, key).classifyEdit(context, correction)
-        }
+        providers.withProvider(ProviderPipeline.PORTION_CHANGE) { it.classifyEdit(context, correction) }
     }
 
     /**
@@ -999,12 +927,7 @@ class AppViewModel(
                     append(", ").append(item.quantity.cleanNumber()).append(' ').append(item.unit)
                     append(". Correction: ").append(correction)
                 }
-                val parsed = (
-                    LocalFoodIntentParser.parseOrNull(request)
-                        ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
-                            providerFor(config, key).parseFood(request)
-                        }
-                    ).withKnownSpellings()
+                val parsed = interpret(request)
                 // Known context survives the edit unless the correction replaced it.
                 val intent = parsed.copy(
                     originalText = request,
@@ -1016,10 +939,10 @@ class AppViewModel(
                         )
                     },
                 )
-                researchNutrition(intent)
+                providers.researchNutrition(intent)
             }.onSuccess { analysis ->
                 if (portionEditIndex != index) return@onSuccess
-                recordRoute(
+                debug.recordRoute(
                     route = NutritionRoute.CONTENT_RERESEARCH,
                     decision = NutritionRoute.Decision.CLASSIFIER,
                     detail = edit.researchReason ?: "The edit changed the food itself",
@@ -1056,64 +979,6 @@ class AppViewModel(
         (mutableLoggingState.value as? FoodLoggingUiState.Preview)?.analysis?.items?.getOrNull(index)
 
     /**
-     * Keeps the diagnostic trail in the existing debug log, where it is already gated behind the
-     * developer switch. Failures here are swallowed on purpose: a bookkeeping problem must never
-     * be the reason a user's correction does not apply.
-     */
-    private fun recordRoute(
-        route: NutritionRoute,
-        decision: NutritionRoute.Decision,
-        detail: String,
-        confidence: Double? = null,
-    ) {
-        if (!preferences.value.aiDebugEnabled) return
-        viewModelScope.launch {
-            runCatching {
-                val selection = preferences.value.selectionFor(
-                    if (route == NutritionRoute.CONTENT_RERESEARCH) {
-                        ProviderPipeline.FOOD_RESEARCH
-                    } else {
-                        ProviderPipeline.PORTION_CHANGE
-                    },
-                )
-                repository.recordAiDebugEvent(
-                    AiDebugEventEntity(
-                        pipeline = route.name,
-                        providerId = if (decision == NutritionRoute.Decision.LOCAL) {
-                            "nomi-local"
-                        } else {
-                            selection.providerId
-                        },
-                        model = if (decision == NutritionRoute.Decision.LOCAL) {
-                            "PortionEditParser"
-                        } else {
-                            selection.model
-                        },
-                        durationMillis = 0,
-                        cacheHit = decision == NutritionRoute.Decision.LOCAL,
-                        sourceSummary = decision.name,
-                        validationStatus = "ROUTED",
-                        safeMessage = confidence
-                            ?.let { "$detail (confidence ${(it * 100).roundToInt()}%)" }
-                            ?: detail,
-                        createdAtEpochMillis = System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-    }
-
-    /** Presents a deterministic result in the shape the preview sheet already renders. */
-    private fun PortionEditApplier.Result.toPortionAdjustment(): PortionAdjustment = PortionAdjustment(
-        newQuantity = item.quantity,
-        newUnit = item.unit,
-        multiplier = factor,
-        newGrams = item.gramsEquivalent,
-        interpretation = description,
-        requiresConfirmation = false,
-    )
-
-    /**
      * Saves the result that was already computed deterministically when the change was read.
      *
      * Nothing is recalculated here: the preview the user approved and the row that gets stored
@@ -1135,7 +1000,7 @@ class AppViewModel(
         lastLoggingText = text
         val cacheKey = foodAnalysisCacheKey(text)
         recentFoodAnalysisCache.get(cacheKey)?.takeIf { menuDishes == null }?.let { analysis ->
-            recordCachedNutritionTrace("5-minute exact-input cache", analysis)
+            debug.recordCachedNutritionTrace("5-minute exact-input cache", analysis)
             saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
             return
         }
@@ -1151,15 +1016,9 @@ class AppViewModel(
         )
         val job = viewModelScope.launch {
             val intent = runCatching {
-                (
-                    LocalFoodIntentParser.parseOrNull(text)
-                        ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
-                            providerFor(config, key).parseFood(text)
-                        }
-                    ).withKnownSpellings().let { parsed ->
-                        menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) }
-                            ?: parsed
-                    }
+                interpret(text).let { parsed ->
+                    menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) } ?: parsed
+                }
             }.getOrElse { error ->
                 if (error is CancellationException) throw error
                 if (requestId == analysisRequestId) {
@@ -1175,21 +1034,21 @@ class AppViewModel(
             if (menuDishes == null) {
                 repository.cachedFoodResearch(cacheKey)?.let { cached ->
                     if (requestId == analysisRequestId) {
-                        recordRoute(
+                        debug.recordRoute(
                             route = NutritionRoute.NEW_RESEARCH,
                             decision = NutritionRoute.Decision.LOCAL,
                             detail = "Validated 21-day food research cache hit",
                         )
-                        recordCachedNutritionTrace("21-day validated research cache", cached)
+                        debug.recordCachedNutritionTrace("21-day validated research cache", cached)
                         saveTextAnalysisAutomatically(cached, current.mealCategory, text)
                     }
                     return@launch
                 }
             }
 
-            cachedNutritionAnalysis(intent)?.let { cached ->
+            foodCatalog.cachedAnalysis(intent)?.let { cached ->
                 if (requestId == analysisRequestId) {
-                    recordCachedNutritionTrace("per-100-g local food cache", cached)
+                    debug.recordCachedNutritionTrace("per-100-g local food cache", cached)
                     saveTextAnalysisAutomatically(cached, current.mealCategory, text)
                 }
                 return@launch
@@ -1201,7 +1060,7 @@ class AppViewModel(
                 AiProcessingStage.FINDING_NUTRITION,
                 originalText = text,
             )
-            runCatching { researchNutrition(intent) }
+            runCatching { providers.researchNutrition(intent) }
                 .onSuccess { analysis ->
                     if (requestId != analysisRequestId) return@onSuccess
                     recentFoodAnalysisCache.put(cacheKey, analysis)
@@ -1213,9 +1072,9 @@ class AppViewModel(
                     // without another Exa/Gemini request; estimates and size-only portions are
                     // intentionally skipped by cacheAnalyzedFood's provenance/weight checks.
                     analysis.items.forEach { item ->
-                        runCatching { cacheAnalyzedFood(item) }
+                        runCatching { foodCatalog.cache(item) }
                     }
-                    recordRoute(
+                    debug.recordRoute(
                         route = NutritionRoute.NEW_RESEARCH,
                         decision = NutritionRoute.Decision.DIRECT,
                         detail = "New food entry researched before preview",
@@ -1231,7 +1090,7 @@ class AppViewModel(
                     if (error is CancellationException) throw error
                     if (requestId != analysisRequestId) return@onFailure
                     mutableLoggingState.value = FoodLoggingUiState.Error(
-                        researchFailureMessage(error),
+                        researchFailureMessage(error, currentLanguage()),
                         canRetry = true,
                         originalText = text,
                     )
@@ -1270,8 +1129,8 @@ class AppViewModel(
                     // total stays compact without throwing away the per-product nutrition.
                     val validated = ServingNutritionNormalizer.validateBeforeSave(analysis)
                     val logs = validated.items.map { item ->
-                        val foodId = if (grouped) null else cacheAnalyzedFood(item)
-                        item.toLog(category, "ai", consultedUrls, originalText).copy(
+                        val foodId = if (grouped) null else foodCatalog.cache(item)
+                        item.toLog(category, "ai", logDestination, consultedUrls, originalText).copy(
                             foodId = foodId,
                             entryGroupId = revealGroupId,
                         )
@@ -1333,11 +1192,11 @@ class AppViewModel(
         viewModelScope.launch {
             mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.FINDING_NUTRITION)
             runCatching {
-                val reading = withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
-                    providerFor(config, key).readNutritionLabel(bytes, mediaType)
+                val reading = providers.withProvider(ProviderPipeline.VISION) {
+                    it.readNutritionLabel(bytes, mediaType)
                 }
-                val sourceItem = reading.toAnalyzedItem()
-                cacheAnalyzedFood(sourceItem)
+                val sourceItem = reading.toAnalyzedItem(currentLanguage())
+                foodCatalog.cache(sourceItem)
                 BarcodeAmountUiState(
                     sourceItem = sourceItem,
                     amount = BarcodeAmountSupport.initialSuggestion(
@@ -1368,43 +1227,6 @@ class AppViewModel(
     }
 
     /**
-     * A printed table is a source serving like any other, so it enters the pipeline the same
-     * way an Open Food Facts product does. It is never an estimate: these numbers were read,
-     * not guessed.
-     */
-    private fun NutritionLabelReading.toAnalyzedItem(): AnalyzedFoodItem {
-        val unit = basisUnit.trim().ifBlank { "g" }
-        val grams = basisQuantity.takeIf { unit.equals("g", ignoreCase = true) }
-        return AnalyzedFoodItem(
-            name = FoodDisplayName.clean(
-                productName?.takeIf(String::isNotBlank) ?: inUserLanguage("Photographed label"),
-            ),
-            brand = brand?.takeIf(String::isNotBlank)?.take(200),
-            quantity = basisQuantity,
-            unit = unit,
-            gramsEquivalent = grams,
-            calories = calories,
-            proteinGrams = proteinGrams,
-            carbohydrateGrams = carbohydrateGrams,
-            fatGrams = fatGrams,
-            fiberGrams = fiberGrams,
-            sugarGrams = sugarGrams,
-            saturatedFatGrams = saturatedFatGrams,
-            sodiumMilligrams = sodiumMilligrams,
-            sourceName = inUserLanguage("Nutrition label photo"),
-            sourceProductName = productName?.takeIf(String::isNotBlank),
-            sourceServingQuantity = basisQuantity,
-            sourceServingUnit = unit,
-            sourceServingGramsEquivalent = grams,
-            sourcePackageQuantity = packageQuantity,
-            sourcePackageUnit = packageUnit?.takeIf(String::isNotBlank),
-            confidence = confidence,
-            assumptions = notes,
-            isEstimate = false,
-        )
-    }
-
-    /**
      * Recognizes a photo and stops there, handing the description back for review.
      *
      * Research is the expensive half in both money and seconds, so it does not start until the
@@ -1419,14 +1241,12 @@ class AppViewModel(
             val category = defaultMealCategory()
             runCatching {
                 mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.UNDERSTANDING_MEAL)
-                withConfiguredProvider(ProviderPipeline.VISION) { config, key ->
-                    providerFor(config, key).identifyFood(bytes, mediaType)
-                }
+                providers.withProvider(ProviderPipeline.VISION) { it.identifyFood(bytes, mediaType) }
             }.onSuccess { vision ->
                 if (requestId != analysisRequestId) return@onSuccess
                 val recognized = vision.items.map { it.toPhotoParsedItem() }
                 val description = recognized.toPhotoMealDescription()
-                recordRoute(
+                debug.recordRoute(
                     route = NutritionRoute.PHOTO_DESCRIPTION,
                     decision = NutritionRoute.Decision.DIRECT,
                     detail = "Photo described by the vision model; no nutrition looked up yet",
@@ -1489,12 +1309,7 @@ class AppViewModel(
         val job = viewModelScope.launch {
             runCatching {
                 val items = if (review.isEdited || review.recognizedItems.isEmpty()) {
-                    (
-                        LocalFoodIntentParser.parseOrNull(description)
-                            ?: withConfiguredProvider(ProviderPipeline.FOOD_INTERPRETATION) { config, key ->
-                                providerFor(config, key).parseFood(description)
-                            }
-                        ).withKnownSpellings().items
+                    interpret(description).items
                 } else {
                     review.recognizedItems
                 }
@@ -1509,16 +1324,16 @@ class AppViewModel(
                 mutableLoggingState.value = FoodLoggingUiState.Processing(
                     AiProcessingStage.FINDING_NUTRITION,
                     originalText = description,
-                    sourceUrls = listOfNotNull(currentResearchProviderWebsite()),
+                    sourceUrls = listOfNotNull(preferences.value.foodResearchProvider.website()),
                 )
-                researchNutrition(intent).let { analysis ->
+                providers.researchNutrition(intent).let { analysis ->
                     // Keep the visual portion caveat even when nutrition came from an exact table.
                     analysis.copy(items = analysis.items.mapIndexed { index, item ->
                         item.copy(assumptions = (item.assumptions +
                             intent.items.getOrNull(index)?.assumptions.orEmpty()).distinct())
                     })
                 }.also {
-                    recordRoute(
+                    debug.recordRoute(
                         route = NutritionRoute.NEW_RESEARCH,
                         decision = NutritionRoute.Decision.DIRECT,
                         detail = "Reviewed photo description researched on the web",
@@ -1573,7 +1388,7 @@ class AppViewModel(
                             val label = product?.name?.takeIf { it.isNotBlank() }
                                 ?: "Product with barcode $barcode"
                             val basisUnit = product?.nutritionBasisUnit ?: "g"
-                            researchNutrition(
+                            providers.researchNutrition(
                                 ParsedFoodIntent(
                                     originalText = "Barcode lookup",
                                     items = listOf(
@@ -1589,7 +1404,7 @@ class AppViewModel(
                             ).items.single()
                         }
                 }
-                cacheAnalyzedFood(analyzedItem, barcode)
+                foodCatalog.cache(analyzedItem, barcode)
                 val sourceItem = analyzedItem.asBarcodeSourceServing()
                 val suggestion = BarcodeAmountSupport.initialSuggestion(servingLabel, sourceItem.unit)
                 BarcodeAmountUiState(
@@ -1679,15 +1494,15 @@ class AppViewModel(
                         is FoodLoggingUiState.Preview -> {
                             val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
                             val logs = validated.items.map { item ->
-                                item.toLog(current.mealCategory, "ai", consultedResearchUrls)
-                                    .copy(foodId = cacheAnalyzedFood(item))
+                                item.toLog(current.mealCategory, "ai", logDestination, consultedResearchUrls)
+                                    .copy(foodId = foodCatalog.cache(item))
                             }
                             repository.addLogs(logs)
                         }
                         is FoodLoggingUiState.Manual -> {
                             require(current.draft.isValid)
-                            val log = current.draft.toLog()
-                            repository.addLog(log.copy(foodId = cacheLogFood(log)))
+                            val log = current.draft.toLog(logDestination)
+                            repository.addLog(log.copy(foodId = foodCatalog.cache(log)))
                         }
                         else -> error("Unsupported logging state")
                     }
@@ -1724,7 +1539,10 @@ class AppViewModel(
             ?.let { repository.logsByEntryGroup(it) }
             .orEmpty()
             .ifEmpty { listOf(log) }
-        emit(siblings.toGroupedTodayEntries().firstOrNull { it.id == id } ?: log.toTodayEntry())
+        emit(
+            siblings.toGroupedTodayEntries(currentLanguage(), zoneId).firstOrNull { it.id == id }
+                ?: log.toTodayEntry(zoneId),
+        )
     }.flowOn(Dispatchers.IO)
 
     fun favoriteFoodLog(id: Long) {
@@ -1889,7 +1707,7 @@ class AppViewModel(
                 when (decision) {
                     is FoodEditRouter.Decision.Scale -> {
                         val result = decision.result
-                        recordRoute(
+                        debug.recordRoute(
                             route = NutritionRoute.PORTION_SCALE,
                             decision = decision.decidedBy,
                             detail = result.description,
@@ -2141,37 +1959,14 @@ class AppViewModel(
                 return@launch
             }
 
-            val canWriteWeight = runCatching {
-                container.healthConnect.hasPermissions(HealthFeatures(writeWeight = true))
-            }.getOrDefault(false)
-            if (!canWriteWeight) return@launch
-
-            healthSyncMutex.withLock {
-                runCatching {
-                    container.healthConnect.writeWeight(
-                        kilograms = kilograms,
-                        time = Instant.ofEpochMilli(now),
-                        clientRecordId = weightClientRecordId(localId, now),
-                        clientRecordVersion = now,
-                        zoneId = zoneId,
-                    )
-                }.onSuccess { healthConnectId ->
-                    runCatching {
-                        repository.markWeightHealthConnectSynced(
-                            id = localId,
-                            externalId = healthConnectId,
-                            updatedAtEpochMillis = System.currentTimeMillis(),
-                        )
-                    }.onFailure {
-                        mutableEvents.emit(
-                            AppEvent.Message("Weight was saved in Nomi and Health Connect, but sync status couldn't be updated."),
-                        )
-                    }
-                }.onFailure {
-                    mutableEvents.emit(
-                        AppEvent.Message("Weight was saved in Nomi, but Health Connect sync failed."),
-                    )
-                }
+            when (healthSync.mirrorNewWeight(localId, kilograms, now)) {
+                WeightMirrorResult.SYNCED_BUT_UNMARKED -> mutableEvents.emit(
+                    AppEvent.Message("Weight was saved in Nomi and Health Connect, but sync status couldn't be updated."),
+                )
+                WeightMirrorResult.FAILED -> mutableEvents.emit(
+                    AppEvent.Message("Weight was saved in Nomi, but Health Connect sync failed."),
+                )
+                WeightMirrorResult.NOT_PERMITTED, WeightMirrorResult.SYNCED -> Unit
             }
         }
     }
@@ -2199,9 +1994,9 @@ class AppViewModel(
             runCatching {
                 when (item.kind) {
                     LibraryItemKind.RECENT -> recentFoodsSnapshot.first { it.id == item.id }
-                        .let { repository.addLog(it.toLog()) }
+                        .let { repository.addLog(it.toLog(logDestination)) }
                     LibraryItemKind.FAVORITE -> favoriteSnapshot.first { it.food.id == item.id }
-                        .let { repository.addLog(it.toLog()) }
+                        .let { repository.addLog(it.toLog(logDestination)) }
                     LibraryItemKind.SAVED_MEAL -> repository.addSavedMealToLog(
                         AddSavedMealToLogRequest(
                             savedMealId = item.id,
@@ -2426,35 +2221,13 @@ class AppViewModel(
         onResult: (success: Boolean, message: String) -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching {
-                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val draft = state.toProviderSelection(pipeline)
-                val config = draft.toRuntimeConfig()
-                val selection = draft.copy(endpoint = config.endpoint)
-                state.apiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
-                    try {
-                        container.secretStore.put(secretId(selection), chars)
-                    } finally {
-                        chars.fill('\u0000')
-                    }
+            runCatching { providers.save(pipelineAt(index), state) }
+                .onSuccess {
+                    recentFoodAnalysisCache.clear()
+                    refreshProviderAndHealthStatus()
+                    onResult(true, "Provider saved")
                 }
-                if (config.kind == AiProviderKind.EXA_GEMINI) {
-                    state.searchApiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
-                        try {
-                            container.secretStore.put(exaSecretId(), chars)
-                        } finally {
-                            chars.fill('\u0000')
-                        }
-                    }
-                }
-                repository.appPreferencesStore.setProvider(pipeline, selection)
-            }.onSuccess {
-                recentFoodAnalysisCache.clear()
-                refreshProviderAndHealthStatus()
-                onResult(true, "Provider saved")
-            }.onFailure { error ->
-                onResult(false, error.safeProviderSettingsMessage())
-            }
+                .onFailure { error -> onResult(false, error.safeProviderSettingsMessage()) }
         }
     }
 
@@ -2464,522 +2237,41 @@ class AppViewModel(
         onResult: (success: Boolean, message: String) -> Unit,
     ) {
         viewModelScope.launch {
-            runCatching {
-                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val selection = state.toProviderSelection(pipeline)
-                val primaryRemoved = container.secretStore.delete(secretId(selection))
-                val searchRemoved = if (selection.providerId.equals("exa-gemini", true)) {
-                    container.secretStore.delete(exaSecretId())
-                } else false
-                primaryRemoved || searchRemoved
-            }.onSuccess { removed ->
-                recentFoodAnalysisCache.clear()
-                refreshProviderAndHealthStatus()
-                onResult(
-                    true,
-                    if (removed) "Stored API key removed" else "No stored API key was found",
-                )
-            }.onFailure { error ->
-                onResult(false, error.safeProviderSettingsMessage())
-            }
+            runCatching { providers.removeStoredKeys(pipelineAt(index), state) }
+                .onSuccess { removed ->
+                    recentFoodAnalysisCache.clear()
+                    refreshProviderAndHealthStatus()
+                    onResult(
+                        true,
+                        if (removed) "Stored API key removed" else "No stored API key was found",
+                    )
+                }
+                .onFailure { error -> onResult(false, error.safeProviderSettingsMessage()) }
         }
     }
 
     fun testProvider(index: Int, state: AiProviderEditorState, onResult: (String) -> Unit) {
         viewModelScope.launch {
             val result = runCatching {
-                val pipeline = ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
-                val draft = state.toProviderSelection(pipeline)
-                val config = draft.toRuntimeConfig()
-                val selection = draft.copy(endpoint = config.endpoint)
-                suspend fun testWith(
-                    targetConfig: AiProviderConfig,
-                    credential: AiRuntimeCredential,
-                ) {
-                    if (pipeline.requiresWebResearch()) {
-                        providerFor(targetConfig, credential).researchNutrition(
-                            providerConnectionTestIntent(),
-                        )
-                    } else {
-                        val content = container.openAiClient.completeJson(
-                            config = targetConfig,
-                            credential = credential,
-                            systemPrompt = "Return one JSON object and nothing else.",
-                            userPrompt = "Reply with {\"ok\":true} to confirm this connection.",
-                        )
-                        require(content.isNotBlank()) { "The provider returned an empty response." }
-                    }
-                }
-                suspend fun <T> withDraftOrStoredCredential(
-                    input: String,
-                    storedId: String,
-                    missingMessage: String,
-                    block: suspend (AiRuntimeCredential) -> T,
-                ): T {
-                    val entered = input.normalizedApiKeyCharsOrNull()
-                    if (entered != null) {
-                        return try {
-                            block(AiRuntimeCredential.from(entered.concatToString()))
-                        } finally {
-                            entered.fill('\u0000')
-                        }
-                    }
-                    return container.secretStore.useSecret(storedId) { chars ->
-                        block(AiRuntimeCredential.from(chars.concatToString()))
-                    } ?: error(missingMessage)
-                }
-
-                if (config.kind == AiProviderKind.EXA_GEMINI) {
-                    withDraftOrStoredCredential(
-                        input = state.apiKeyInput,
-                        storedId = secretId(selection),
-                        missingMessage = "Enter a Google Gemini API key before testing this provider.",
-                    ) { geminiCredential ->
-                        withDraftOrStoredCredential(
-                            input = state.searchApiKeyInput,
-                            storedId = exaSecretId(),
-                            missingMessage = "Enter an Exa API key before testing this provider.",
-                        ) { exaCredential ->
-                            exaGeminiProvider(config, geminiCredential, exaCredential)
-                                .researchNutrition(providerConnectionTestIntent())
-                        }
-                    }
-                    return@runCatching "Connection successful"
-                }
-
-                val enteredKey = state.apiKeyInput.normalizedApiKeyCharsOrNull()
-                if (enteredKey != null) {
-                    try {
-                        testWith(config, AiRuntimeCredential.from(enteredKey.concatToString()))
-                    } finally {
-                        enteredKey.fill('\u0000')
-                    }
-                } else if (pipeline == ProviderPipeline.SMART_FALLBACK) {
-                    withSmartFallbackCredential(
-                        prefs = loadedPreferences(),
-                        selection = selection,
-                        block = ::testWith,
-                    )
-                } else {
-                    container.secretStore.useSecret(secretId(selection)) { chars ->
-                        testWith(config, AiRuntimeCredential.from(chars.concatToString()))
-                    } ?: error("Enter an API key before testing this provider.")
-                }
+                providers.testConnection(pipelineAt(index), state)
                 "Connection successful"
             }.getOrElse(Throwable::safeProviderConnectionMessage)
             onResult(result)
         }
     }
 
+    /** The settings list is indexed in pipeline order; anything out of range edits research. */
+    private fun pipelineAt(index: Int): ProviderPipeline =
+        ProviderPipeline.entries.getOrElse(index) { ProviderPipeline.FOOD_RESEARCH }
+
     fun refreshProviderAndHealthStatus() {
-        refreshProviderStatus()
-        requestHealthConnectSync()
+        providers.refreshKeyPresence()
+        healthSync.request()
     }
 
-    private fun refreshProviderStatus() {
-        viewModelScope.launch {
-            val prefs = loadedPreferences()
-            keyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
-                val selection = prefs.selectionFor(pipeline)
-                val primary = runCatching {
-                    container.secretStore.contains(secretId(selection))
-                }.getOrDefault(false)
-                val search = if (selection.providerId.equals("exa-gemini", true)) {
-                    runCatching { container.secretStore.contains(exaSecretId()) }.getOrDefault(false)
-                } else true
-                ProviderKeyPresence(primary = primary, search = search)
-            }
-        }
-    }
+    fun syncHealthConnect() = healthSync.request(userInitiated = true)
 
-    fun syncHealthConnect() {
-        requestHealthConnectSync(userInitiated = true)
-    }
-
-    fun healthConnectPermissionsChanged() {
-        requestHealthConnectSync()
-    }
-
-    /**
-     * Coalesces onStart, permission callbacks, food changes and repeated button taps.
-     *
-     * A request made while a sync is running becomes one follow-up pass rather than being dropped
-     * or queued repeatedly. Yielding once also folds the usual onStart + permission-result pair
-     * into the same pass before any Health Connect I/O starts.
-     */
-    private fun requestHealthConnectSync(
-        userInitiated: Boolean = false,
-        nutritionOnly: Boolean = false,
-    ) {
-        if (nutritionOnly) {
-            pendingNutritionHealthSync = true
-        } else {
-            pendingFullHealthSync = true
-            pendingUserInitiatedHealthSync = pendingUserInitiatedHealthSync || userInitiated
-        }
-        if (healthSyncJob?.isActive == true) return
-
-        healthSyncJob = viewModelScope.launch {
-            yield()
-            try {
-                while (pendingFullHealthSync || pendingNutritionHealthSync) {
-                    val runFullSync = pendingFullHealthSync
-                    val runUserInitiated = pendingUserInitiatedHealthSync
-                    pendingFullHealthSync = false
-                    pendingUserInitiatedHealthSync = false
-                    if (runFullSync) pendingNutritionHealthSync = false
-
-                    healthSyncMutex.withLock {
-                        if (runFullSync) {
-                            refreshHealthConnectAndSyncLocked(runUserInitiated)
-                        } else {
-                            pendingNutritionHealthSync = false
-                            syncNutritionLogToHealthConnect()
-                        }
-                    }
-                }
-            } finally {
-                healthSyncJob = null
-            }
-        }
-    }
-
-    private suspend fun refreshHealthConnectAndSyncLocked(userInitiated: Boolean) {
-        try {
-            val healthConnect = container.healthConnect
-            val availability = healthConnect.availability
-            val requestedPermissions = healthConnect.permissionsFor(NomiHealthFeatures)
-            val grantedPermissions = runCatching { healthConnect.grantedPermissions() }
-                .getOrElse { error ->
-                    if (error is CancellationException) throw error
-                    healthConnectUiState.value = healthConnectUiState.value.copy(
-                        isSyncing = false,
-                        message = "Health Connect permissions couldn't be checked. Try again.",
-                    )
-                    return
-                }
-            val status = resolveHealthConnectPermissionStatus(
-                availability = availability,
-                requiredPermissions = requestedPermissions,
-                grantedPermissions = grantedPermissions,
-            )
-            if (
-                status == HealthConnectPermissionStatus.UNAVAILABLE ||
-                status == HealthConnectPermissionStatus.UPDATE_REQUIRED
-            ) {
-                healthConnectUiState.value = HealthConnectUiState(
-                    status = status,
-                    message = when (status) {
-                        HealthConnectPermissionStatus.UPDATE_REQUIRED ->
-                            "Update Health Connect to enable syncing."
-                        else -> null
-                    },
-                )
-                return
-            }
-
-            val grantedFeatures = healthConnect.featuresForGrantedPermissions(grantedPermissions)
-            val hasUsablePermission = grantedFeatures.readWeight || grantedFeatures.writeWeight ||
-                grantedFeatures.readSteps || grantedFeatures.readActiveCalories ||
-                grantedFeatures.writeNutrition
-            if (!hasUsablePermission) {
-                healthConnectUiState.value = HealthConnectUiState(status = status)
-                return
-            }
-
-            val previous = healthConnectUiState.value
-            healthConnectUiState.value = previous.copy(
-                status = status,
-                isSyncing = true,
-                message = if (userInitiated) "Syncing Health Connect..." else previous.message,
-            )
-
-            val now = Instant.now()
-            val activityDate = now.atZone(zoneId).toLocalDate()
-            val activityDateText = activityDate.toString()
-            val syncEpochMillis = now.toEpochMilli()
-            val failures = mutableListOf<String>()
-            var attemptedOperationCount = 0
-            var importedWeightCount = 0
-            var sentWeightCount = 0
-            var sharedNutritionEntryCount = previous.sharedNutritionEntryCount
-            val canRetainPreviousActivity = previous.activityLocalDate == activityDateText
-            var todaySteps = if (grantedFeatures.readSteps && canRetainPreviousActivity) {
-                previous.todaySteps
-            } else {
-                null
-            }
-            var todayActiveCaloriesKcal = if (
-                grantedFeatures.readActiveCalories && canRetainPreviousActivity
-            ) {
-                previous.todayActiveCaloriesKcal
-            } else {
-                null
-            }
-            var syncedActivityLocalDate = activityDateText.takeIf {
-                canRetainPreviousActivity &&
-                    (grantedFeatures.readSteps || grantedFeatures.readActiveCalories)
-            }
-
-            if (grantedFeatures.readWeight) {
-                attemptedOperationCount += 1
-                runCatching {
-                    val weights = healthConnect.readWeights(
-                        // Without extended-history access Health Connect safely filters this to
-                        // the caller's grant-era boundary; with it, the complete history returns.
-                        start = Instant.EPOCH,
-                        end = now,
-                    )
-                    val entries = importableHealthWeights(
-                        weights = weights,
-                        ownPackageName = healthConnect.applicationPackageName,
-                    ).map { weight ->
-                        val measuredDate = weight.zoneOffset
-                            ?.let { offset -> weight.time.atOffset(offset).toLocalDate() }
-                            ?: weight.time.atZone(zoneId).toLocalDate()
-                        WeightEntryEntity(
-                            weightKg = weight.kilograms,
-                            localDate = measuredDate.toString(),
-                            measuredAtEpochMillis = weight.time.toEpochMilli(),
-                            zoneId = weight.zoneOffset?.id ?: zoneId.id,
-                            source = HEALTH_CONNECT_WEIGHT_SOURCE,
-                            externalId = weight.id,
-                            createdAtEpochMillis = syncEpochMillis,
-                            updatedAtEpochMillis = syncEpochMillis,
-                        )
-                    }
-                    repository.importHealthConnectWeights(entries)
-                }.onSuccess { imported ->
-                    importedWeightCount = imported
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    failures += "weight import"
-                }
-            }
-
-            if (grantedFeatures.writeWeight) {
-                attemptedOperationCount += 1
-                runCatching { pushPendingWeightsToHealthConnect() }
-                    .onSuccess { result ->
-                        sentWeightCount = result.sentCount
-                        if (result.failedCount > 0) failures += "weight export"
-                    }
-                    .onFailure { error ->
-                        if (error is CancellationException) throw error
-                        failures += "weight export"
-                    }
-            }
-
-            if (grantedFeatures.readSteps || grantedFeatures.readActiveCalories) {
-                attemptedOperationCount += 1
-                runCatching {
-                    healthConnect.readActivity(
-                        start = activityDate.atStartOfDay(zoneId).toInstant(),
-                        end = now,
-                        features = HealthFeatures(
-                            readSteps = grantedFeatures.readSteps,
-                            readActiveCalories = grantedFeatures.readActiveCalories,
-                        ),
-                    )
-                }.onSuccess { activity ->
-                    // A successful read with no records is zero, not "not synced": right after
-                    // midnight there are no steps yet, and treating that as missing hid the
-                    // activity calories and showed "Not synced yet" after a sync that worked.
-                    if (grantedFeatures.readSteps) todaySteps = activity.steps ?: 0L
-                    if (
-                        grantedFeatures.readActiveCalories &&
-                        activity.activeCaloriesReadSucceeded
-                    ) {
-                        todayActiveCaloriesKcal = activity.activeCaloriesKcal ?: 0.0
-                    }
-                    syncedActivityLocalDate = activityDateText
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                    failures += "activity"
-                }
-            }
-
-            if (grantedFeatures.writeNutrition) {
-                attemptedOperationCount += 1
-                runCatching { pushNutritionToHealthConnect(forceRewrite = userInitiated) }
-                    .onSuccess { sharedNutritionEntryCount = it }
-                    .onFailure { error ->
-                        if (error is CancellationException) throw error
-                        failures += "nutrition"
-                    }
-            }
-
-            healthConnectUiState.value = HealthConnectUiState(
-                status = status,
-                isSyncing = false,
-                todaySteps = todaySteps,
-                todayActiveCaloriesKcal = todayActiveCaloriesKcal,
-                activityLocalDate = syncedActivityLocalDate,
-                sharedNutritionEntryCount = sharedNutritionEntryCount,
-                lastSyncEpochMillis = if (attemptedOperationCount > 0 && failures.isEmpty()) {
-                    syncEpochMillis
-                } else {
-                    previous.lastSyncEpochMillis
-                },
-                importedWeightCount = importedWeightCount,
-                message = when {
-                    failures.isNotEmpty() -> "Some Health Connect data couldn't be synced. Try again."
-                    importedWeightCount == 1 -> "Health Connect synced. Imported 1 new weight."
-                    importedWeightCount > 1 -> "Health Connect synced. Imported $importedWeightCount new weights."
-                    sentWeightCount == 1 -> "Health Connect synced. Sent 1 pending weight."
-                    sentWeightCount > 1 -> "Health Connect synced. Sent $sentWeightCount pending weights."
-                    status == HealthConnectPermissionStatus.PARTIAL ->
-                        "Allowed Health Connect categories are up to date. Grant missing permissions for full sync."
-                    else -> "Health Connect is up to date."
-                },
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            healthConnectUiState.value = healthConnectUiState.value.copy(
-                isSyncing = false,
-                message = "Health Connect couldn't be synced. Try again.",
-            )
-        }
-    }
-
-    /** Retries every local/onboarding weight that has never reached Health Connect. */
-    private suspend fun pushPendingWeightsToHealthConnect(): WeightExportSummary {
-        val healthConnect = container.healthConnect
-        var sent = 0
-        var failed = 0
-        repository.pendingHealthConnectWeightSync().forEach { weight ->
-            try {
-                val externalId = healthConnect.writeWeight(
-                    kilograms = weight.weightKg,
-                    time = Instant.ofEpochMilli(weight.measuredAtEpochMillis),
-                    clientRecordId = weightClientRecordId(weight.id, weight.createdAtEpochMillis),
-                    clientRecordVersion = weight.updatedAtEpochMillis.coerceAtLeast(0L),
-                    zoneId = runCatching { ZoneId.of(weight.zoneId) }.getOrDefault(zoneId),
-                )
-                check(
-                    repository.markWeightHealthConnectSynced(
-                        id = weight.id,
-                        externalId = externalId,
-                        updatedAtEpochMillis = System.currentTimeMillis(),
-                    ),
-                ) { "A synced weight could not be marked locally" }
-                sent += 1
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // Keep this row pending but do not let one bad legacy measurement block the rest.
-                failed += 1
-            }
-        }
-        return WeightExportSummary(sentCount = sent, failedCount = failed)
-    }
-
-    /**
-     * Mirrors the complete food history into Health Connect and reports how many entries it holds.
-     *
-     * Ordinary automatic syncs still write only changes. Local deletes use owned-data time ranges
-     * that are safe to retry even when a record was already removed in Health Connect. Legacy
-     * ledger rows without a stored timestamp fall back to a checkpointed one-time rebuild.
-     */
-    private suspend fun pushNutritionToHealthConnect(forceRewrite: Boolean = false): Int {
-        val endDate = today
-        val entries = repository.logsInRange(HEALTH_CONNECT_HISTORY_START_LOCAL_DATE, endDate.toString())
-            .map { log -> log.toHealthNutritionEntry(zoneId) }
-        val stored = loadedPreferences().healthNutritionSync
-        val plan = planNutritionSync(
-            entries = entries,
-            windowDates = nutritionSyncDatesForFullHistory(entries, stored.syncedVersions),
-            synced = stored.syncedVersions,
-            forceRewrite = forceRewrite,
-        )
-        val syncedStartTimes = nutritionSyncStartTimes(entries)
-        val storedStartsByLogId = stored.syncedStartEpochMillis.values
-            .asSequence()
-            .flatMap { day -> day.asSequence() }
-            .associate { (logId, start) -> logId to start }
-        val deletedStarts = plan.deleteClientRecordIds.mapNotNull { clientRecordId ->
-            val logId = clientRecordId.substringAfterLast('-').takeIf(String::isNotBlank)
-            logId?.let(storedStartsByLogId::get)
-        }
-        val requiresFullRewrite = stored.needsFullRewrite ||
-            deletedStarts.size != plan.deleteClientRecordIds.size
-        val synced = HealthNutritionSyncState(
-            syncedVersions = plan.syncedVersions,
-            syncedStartEpochMillis = syncedStartTimes,
-        )
-        if (
-            plan.isEmpty &&
-            synced == stored &&
-            !requiresFullRewrite
-        ) {
-            return stored.entryCount
-        }
-
-        val healthConnect = container.healthConnect
-        if (requiresFullRewrite) {
-            repository.appPreferencesStore.setHealthNutritionSync(
-                stored.copy(needsFullRewrite = true),
-            )
-            healthConnect.replaceNutrition(entries)
-        } else {
-            val deleteRanges = deletedStarts.distinct().map { startEpochMillis ->
-                val start = Instant.ofEpochMilli(startEpochMillis)
-                HealthNutritionDeleteRange(start = start, end = start.plusSeconds(1))
-            }
-            healthConnect.deleteNutrition(deleteRanges)
-            val overlapRewrites = entries.filter { entry ->
-                deleteRanges.any { range ->
-                    entry.startTime < range.end && entry.endTime > range.start
-                }
-            }
-            healthConnect.writeNutrition(
-                (plan.write + overlapRewrites).distinctBy { entry -> entry.logId },
-            )
-        }
-        repository.appPreferencesStore.setHealthNutritionSync(synced)
-        return synced.entryCount
-    }
-
-    /**
-     * Keeps Health Connect in step with edits made after a sync.
-     *
-     * Every logging path ends in a food_logs write, so watching the complete history totals
-     * catches new entries, corrections, deletions, restored undos and copied days alike without
-     * each of them having to remember to push. The debounce lets a multi-item meal land as one
-     * batch instead of one write per item.
-     */
-    @OptIn(FlowPreview::class)
-    private fun observeFoodLogForHealthConnect() {
-        viewModelScope.launch {
-            repository.nutritionHistory(
-                HEALTH_CONNECT_HISTORY_START_LOCAL_DATE,
-                HEALTH_CONNECT_HISTORY_END_LOCAL_DATE,
-            )
-                .drop(1)
-                .debounce(NUTRITION_SYNC_DEBOUNCE_MILLIS)
-                .collect {
-                    requestHealthConnectSync(nutritionOnly = true)
-                }
-        }
-    }
-
-    private suspend fun syncNutritionLogToHealthConnect() {
-        val canWrite = runCatching {
-            container.healthConnect.hasPermissions(HealthFeatures(writeNutrition = true))
-        }.getOrDefault(false)
-        if (!canWrite) return
-        val shared = try {
-            pushNutritionToHealthConnect()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            return
-        }
-        healthConnectUiState.update { state ->
-            state.copy(sharedNutritionEntryCount = shared)
-        }
-    }
+    fun healthConnectPermissionsChanged() = healthSync.request()
 
     private fun cancelAnalysis() {
         analysisRequestId += 1
@@ -2988,96 +2280,6 @@ class AppViewModel(
         // The pages belong to the lookup that opened them. A label photo or a cached barcode has
         // no pages of its own and used to be saved citing the previous meal's research.
         consultedResearchUrls = emptyList()
-    }
-
-    /**
-     * Repairs a mistyped food against the ones already in the log.
-     *
-     * It runs before the cache lookup on purpose: a corrected spelling can hit the local
-     * catalog exactly, so a typo in something eaten every week costs no provider request at
-     * all. The correction is strict about variants - it will fix "junebrry" but never trade one
-     * edition for another - and it leaves anything it is not sure about untouched for research.
-     */
-    private fun ParsedFoodIntent.withKnownSpellings(): ParsedFoodIntent {
-        val known = recentFoodsSnapshot.map(FoodEntity::canonicalName)
-        if (known.isEmpty()) return this
-        return copy(
-            items = items.map { item ->
-                val corrected = FoodNameCorrection.correctedOrNull(item.name, known)
-                if (corrected == null) item else item.copy(name = corrected)
-            },
-        )
-    }
-
-    /** Reuses an exact local catalog match before paying for another provider request. */
-    private suspend fun cachedNutritionAnalysis(intent: ParsedFoodIntent): FoodAnalysis? {
-        val reconciled = UserQuantityResolver.reconcileIntent(intent, Locale.getDefault().country)
-        if (reconciled.items.isEmpty()) return null
-
-        val analyzed = mutableListOf<AnalyzedFoodItem>()
-        for (requested in reconciled.items) {
-            val quantity = requested.quantity ?: return null
-            val unit = requested.unit?.takeIf(String::isNotBlank) ?: return null
-            val normalizedName = requested.name.trim()
-                .lowercase(Locale.ROOT)
-                .replace(Regex("\\s+"), " ")
-            val normalizedBrand = requested.brand?.trim()?.lowercase(Locale.ROOT)
-            val food = recentFoodsSnapshot.firstOrNull {
-                it.normalizedName == normalizedName &&
-                    it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
-            } ?: repository.foodByIdentity(normalizedName, normalizedBrand) ?: return null
-            if (!food.isTrustedForNutritionReuse()) return null
-            val scaled = runCatching {
-                ServingNutritionNormalizer.normalizeSourceServingTo(
-                    sourceServingItem = food.toAnalyzedItem("Nomi local food cache"),
-                    loggedQuantity = quantity,
-                    loggedUnit = unit,
-                    loggedGramsEquivalent = requested.gramsEquivalent,
-                    loggedResolvedVolumeMl = requested.resolvedVolumeMl,
-                ).copy(quantityResolution = requested.quantityResolution)
-            }.getOrNull() ?: return null
-            analyzed += scaled
-        }
-        return FoodAnalysis(items = analyzed, overallConfidence = 1.0)
-    }
-    private suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
-        runWithSmartFallback(
-            primary = {
-                withConfiguredResearchProvider { provider ->
-                    provider.researchNutrition(intent)
-                }
-            },
-            fallback = {
-                withConfiguredSmartFallback { config, key ->
-                    providerFor(config, key).researchNutrition(intent)
-                }
-            },
-            onFallback = { error ->
-                recordResearchFallback(status = "FALLBACK_STARTED", error = error)
-            },
-            onFallbackSuccess = { analysis ->
-                recordResearchFallback(status = "FALLBACK_VALIDATED", analysis = analysis)
-            },
-        ).withCleanDisplayNames()
-
-    /**
-     * Every researched item passes through here on its way to the page, so the name that is
-     * previewed is the same one that is saved and later reopened for rewriting. The prompts
-     * ask the model for a clean short name; this only removes what a provider left behind.
-     */
-    private fun FoodAnalysis.withCleanDisplayNames(): FoodAnalysis =
-        copy(items = items.map { it.copy(name = FoodDisplayName.clean(it.name)) })
-
-    private fun currentResearchProviderWebsite(): String? {
-        val selection = preferences.value.foodResearchProvider
-        return when (selection.providerId.lowercase(Locale.ROOT)) {
-            "perplexity" -> "https://www.perplexity.ai"
-            "openrouter" -> "https://openrouter.ai"
-            "openai" -> "https://openai.com"
-            "exa-gemini" -> "https://exa.ai"
-            "codex-easy" -> "https://codex-easy.ai"
-            else -> selection.endpoint
-        }
     }
 
     private fun foodAnalysisCacheKey(text: String): FoodAnalysisCacheKey {
@@ -3091,83 +2293,6 @@ class AppViewModel(
         )
     }
 
-    private suspend fun loadedPreferences(): AppPreferences = repository.preferences.first()
-
-    private suspend fun <T> withConfiguredProvider(
-        pipeline: ProviderPipeline,
-        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
-    ): T {
-        val prefs = loadedPreferences()
-        val selection = prefs.selectionFor(pipeline)
-        require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
-        return container.secretStore.useSecret(secretId(selection)) { chars ->
-            val credential = AiRuntimeCredential.from(chars.concatToString())
-            block(selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled), credential)
-        } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
-    }
-
-    private suspend fun <T> withConfiguredResearchProvider(
-        block: suspend (NutritionResearchProvider) -> T,
-    ): T {
-        val prefs = loadedPreferences()
-        val selection = prefs.foodResearchProvider
-        if (!selection.providerId.equals("exa-gemini", true)) {
-            return withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
-                block(providerFor(config, key))
-            }
-        }
-        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
-        return container.secretStore.useSecret(secretId(selection)) { geminiChars ->
-            val geminiCredential = AiRuntimeCredential.from(geminiChars.concatToString())
-            container.secretStore.useSecret(exaSecretId()) { exaChars ->
-                val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
-                block(exaGeminiProvider(config, geminiCredential, exaCredential))
-            } ?: error("Add the Exa API key in Settings first.")
-        } ?: error("Add the Google Gemini API key in Settings first.")
-    }
-    private suspend fun <T : Any> withConfiguredSmartFallback(
-        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
-    ): T {
-        val prefs = loadedPreferences()
-        return withSmartFallbackCredential(prefs, prefs.smartFallbackProvider, block)
-    }
-
-    private suspend fun <T : Any> withSmartFallbackCredential(
-        prefs: AppPreferences,
-        selection: ProviderSelection,
-        block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
-    ): T {
-        require(selection.providerId.isNotBlank()) {
-            "Configure Fallback in Settings first."
-        }
-        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
-        suspend fun use(secret: String): T? = container.secretStore.useSecret(secret) { chars ->
-            block(config, AiRuntimeCredential.from(chars.concatToString()))
-        }
-        smartFallbackCredentialIds(selection, prefs.foodResearchProvider).forEach { secret ->
-            use(secret)?.let { return it }
-        }
-        error(
-            "Configure Fallback in Settings with an API key, or select the same provider " +
-                "as Food research to reuse its key.",
-        )
-    }
-
-    private fun exaGeminiProvider(
-        config: AiProviderConfig,
-        geminiCredential: AiRuntimeCredential,
-        exaCredential: AiRuntimeCredential,
-    ) = ExaGeminiNutritionProvider(
-        exaSearch = container.exaGeminiClient,
-        geminiExtractor = container.exaGeminiClient,
-        exaCredential = { exaCredential },
-        geminiConfig = config,
-        geminiCredential = { geminiCredential },
-        searchProgressSink = ::showResearchSources,
-        debugSink = ::recordExaGeminiTrace,
-        calorieBiasProvider = { preferences.value.calorieEstimateBias },
-    )
-
     private fun showResearchSources(sourceUrls: List<String>) {
         // Kept whatever the stage is: the save needs the full list, while the spinner only wants
         // it while it is on screen.
@@ -3178,642 +2303,6 @@ class AppViewModel(
         ) return
         mutableLoggingState.value = current.copy(
             sourceUrls = sourceUrls.distinct().take(3),
-        )
-    }
-
-    private suspend fun recordExaGeminiTrace(trace: ExaGeminiDebugTrace) {
-        if (!preferences.value.aiDebugEnabled) return
-        runCatching {
-            repository.recordAiDebugEvent(
-                AiDebugEventEntity(
-                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
-                    providerId = trace.provider,
-                    model = trace.model,
-                    durationMillis = trace.totalLatencyMillis,
-                    cacheHit = false,
-                    sourceSummary = trace.returnedSources.joinToString(" | ") {
-                        "${it.sourceId}: ${it.title} (${it.url})"
-                    }.take(4_000),
-                    parsedResultJson = container.exaGeminiClient.json.encodeToString(trace),
-                    validationStatus = trace.status,
-                    // The typed per-item reasons are what make one bad item in a meal
-                    // diagnosable; the whole-request reason is the fallback for a pass that
-                    // never got as far as resolving items.
-                    failureCategory = trace.itemFailures.firstOrNull()?.reason
-                        ?: trace.failureReason?.let { "EXA_GEMINI_REJECTED" },
-                    safeMessage = (
-                        trace.itemFailures.map { failure ->
-                            "item ${failure.itemIndex + 1} ${failure.itemName}: " +
-                                "${failure.reason} - ${failure.detail}"
-                        } + listOfNotNull(trace.failureReason)
-                        ).joinToString(" | ").takeIf(String::isNotBlank),
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
-    private suspend fun recordResearchFallback(
-        status: String,
-        error: Throwable? = null,
-        analysis: FoodAnalysis? = null,
-    ) {
-        if (!preferences.value.aiDebugEnabled) return
-        val selection = preferences.value.smartFallbackProvider
-        val sourceUrls = analysis?.items.orEmpty().flatMap { item ->
-            listOfNotNull(item.sourceUrl) + item.supportingSourceUrls
-        }.distinct()
-        runCatching {
-            repository.recordAiDebugEvent(
-                AiDebugEventEntity(
-                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
-                    providerId = selection.providerId,
-                    model = selection.model,
-                    durationMillis = 0,
-                    cacheHit = false,
-                    sourceSummary = sourceUrls.joinToString(" | ").take(4_000),
-                    validationStatus = status,
-                    failureCategory = error?.nutritionFailureReason()?.name
-                        ?: error?.javaClass?.simpleName,
-                    safeMessage = error?.researchFailureDetail()
-                        ?: error?.safeProviderFailureMessage()
-                        ?: if (analysis != null) {
-                            "The configured fallback provider returned validated nutrition."
-                        } else {
-                            "The primary research provider failed validation; using the configured fallback."
-                        },
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
-
-    private suspend fun recordNutritionScalingTrace(trace: NutritionScalingDebugTrace) {
-        if (!preferences.value.aiDebugEnabled) return
-        runCatching {
-            repository.recordAiDebugEvent(
-                AiDebugEventEntity(
-                    pipeline = ProviderPipeline.FOOD_RESEARCH.name,
-                    providerId = trace.provider,
-                    model = trace.model,
-                    durationMillis = 0,
-                    cacheHit = false,
-                    sourceSummary = trace.source,
-                    parsedResultJson = container.openAiClient.json.encodeToString(trace),
-                    validationStatus = "PORTION_NORMALIZED",
-                    safeMessage = trace.items.joinToString(" | ") { item ->
-                        "${item.requestedAmount}; ${item.researchBasis}; " +
-                            "factor=${item.scalingFactor}; final=${item.finalPortionValues}"
-                    }.take(4_000),
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                ),
-            )
-        }
-    }
-
-    private fun recordCachedNutritionTrace(cacheKind: String, analysis: FoodAnalysis) {
-        if (!preferences.value.aiDebugEnabled) return
-        viewModelScope.launch {
-            runCatching {
-                val summaries = analysis.items.map { item ->
-                    val basis = item.servingValidation
-                    "${item.name}: requested=${item.quantity} ${item.unit}, " +
-                        "researchBasis=${item.nutritionBasis}, " +
-                        "per100={kcal=${basis?.caloriesPer100}, protein=${basis?.proteinGramsPer100}, " +
-                        "carbs=${basis?.carbohydrateGramsPer100}, fat=${basis?.fatGramsPer100}, " +
-                        "fiber=${basis?.fiberGramsPer100}, sugar=${basis?.sugarGramsPer100}, " +
-                        "saturatedFat=${basis?.saturatedFatGramsPer100}, " +
-                        "sodiumMg=${basis?.sodiumMilligramsPer100}}, factor=${basis?.scaleFactor}, " +
-                        "final={kcal=${item.calories}, protein=${item.proteinGrams}, " +
-                        "carbs=${item.carbohydrateGrams}, fat=${item.fatGrams}, " +
-                        "fiber=${item.fiberGrams}, sugar=${item.sugarGrams}, " +
-                        "saturatedFat=${item.saturatedFatGrams}, sodiumMg=${item.sodiumMilligrams}}"
-                }
-                repository.recordAiDebugEvent(
-                    AiDebugEventEntity(
-                        pipeline = ProviderPipeline.FOOD_RESEARCH.name,
-                        providerId = "nomi-local",
-                        model = cacheKind,
-                        durationMillis = 0,
-                        cacheHit = true,
-                        sourceSummary = cacheKind,
-                        parsedResultJson = summaries.joinToString("\n").take(16_000),
-                        validationStatus = "PORTION_NORMALIZED",
-                        safeMessage = summaries.joinToString(" | ").take(4_000),
-                        createdAtEpochMillis = System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-    }
-
-    private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =
-        OpenAiCompatibleProviders(
-            client = container.openAiClient,
-            parsingConfig = config,
-            parsingCredential = { credential },
-            nutritionConfig = config,
-            nutritionCredential = { credential },
-            portionConfig = config,
-            portionCredential = { credential },
-            visionConfig = config,
-            visionCredential = { credential },
-            calorieBiasProvider = { preferences.value.calorieEstimateBias },
-            nutritionDebugSink = ::recordNutritionScalingTrace,
-        )
-
-    private fun mapToday(
-        date: LocalDate,
-        logs: List<FoodLogEntity>,
-        plan: NutritionPlanEntity?,
-        micronutrients: MicronutrientPreferences,
-        goalsCardStyle: GoalsCardStyle,
-        freshInputs: Map<String, String>,
-    ): TodayUiState {
-        val totals = logs.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
-        return TodayUiState(
-            date = date,
-            caloriesConsumed = totals.caloriesKcal,
-            calorieTarget = plan?.calorieTargetKcal ?: 2_000.0,
-            protein = MacroProgress(totals.proteinGrams, plan?.proteinTargetGrams ?: 130.0),
-            carbohydrates = MacroProgress(totals.carbohydrateGrams, plan?.carbohydrateTargetGrams ?: 240.0),
-            fat = MacroProgress(totals.fatGrams, plan?.fatTargetGrams ?: 65.0),
-            micronutrients = micronutrients.toProgress(logs, totals),
-            entries = logs.toGroupedTodayEntries(freshInputs),
-            goalsCardStyle = goalsCardStyle,
-        )
-    }
-
-    /**
-     * Builds the day's micronutrient rows for the nutrients the user chose to track.
-     *
-     * A row is marked partial when only some of the day's foods reported the nutrient, because
-     * a total assembled from half the plate is a floor rather than an answer, and the card says
-     * so instead of presenting it as complete.
-     */
-    private fun MicronutrientPreferences.toProgress(
-        logs: List<FoodLogEntity>,
-        totals: NutritionValues,
-    ): List<MicronutrientProgress> = enabledMicronutrients().map { nutrient ->
-        val reportingLogs = logs.count { nutrient.amountIn(it.nutritionSnapshot) != null }
-        MicronutrientProgress(
-            nutrient = nutrient,
-            consumed = nutrient.amountIn(totals),
-            target = settingFor(nutrient).resolvedTarget(nutrient),
-            isPartial = reportingLogs in 1 until logs.size,
-        )
-    }
-
-    /** Reads one optional nutrient out of a stored snapshot, keeping "not reported" as null. */
-    private fun Micronutrient.amountIn(values: NutritionValues): Double? = when (this) {
-        Micronutrient.FIBER -> values.fiberGrams
-        Micronutrient.SUGAR -> values.sugarGrams
-        Micronutrient.SATURATED_FAT -> values.saturatedFatGrams
-        Micronutrient.SODIUM -> values.sodiumMilligrams
-    }
-
-    private fun mapHistory(
-        logs: List<FoodLogEntity>,
-        query: String,
-        selected: LocalDate,
-        plan: NutritionPlanEntity?,
-    ): HistoryUiState {
-        val filtered = query.trim().lowercase(Locale.ROOT).let { normalized ->
-            if (normalized.isBlank()) logs else logs.filter {
-                it.displayNameSnapshot.lowercase(Locale.ROOT).contains(normalized) ||
-                    it.brandSnapshot?.lowercase(Locale.ROOT)?.contains(normalized) == true
-            }
-        }
-        val days = filtered.groupBy { LocalDate.parse(it.localDate) }
-            .toSortedMap(compareByDescending { it })
-            .map { (date, entries) ->
-                val nutrition = entries.fold(NutritionValues()) { total, log -> total + log.nutritionSnapshot }
-                HistoryDay(
-                    date = date,
-                    calories = nutrition.caloriesKcal,
-                    calorieTarget = plan?.calorieTargetKcal ?: 2_000.0,
-                    proteinGrams = nutrition.proteinGrams,
-                    carbohydrateGrams = nutrition.carbohydrateGrams,
-                    fatGrams = nutrition.fatGrams,
-                    entries = entries.toGroupedTodayEntries(),
-                )
-            }
-        return HistoryUiState(query, selected, days, isSearching = false)
-    }
-
-    /** Keeps one compact Today row per meal group while retaining every product for drill-down. */
-    private fun List<FoodLogEntity>.toGroupedTodayEntries(
-        freshInputs: Map<String, String> = emptyMap(),
-    ): List<TodayFoodEntry> = groupBy { log -> log.entryGroupId ?: "single:${log.id}" }
-        .values
-        .sortedBy { group -> group.minOf(FoodLogEntity::loggedAtEpochMillis) }
-        .map { group ->
-            val items = group
-                .sortedWith(compareBy<FoodLogEntity> { it.loggedAtEpochMillis }.thenBy { it.id })
-                .map { log ->
-                    log.toTodayEntry(revealText = log.entryGroupId?.let(freshInputs::get))
-                }
-            if (items.size == 1) return@map items.single()
-
-            val first = items.first()
-            val title = groupedMealTitle(items.map(TodayFoodEntry::name), currentLanguage())
-            TodayFoodEntry(
-                id = first.id,
-                name = title,
-                amountText = "",
-                calories = items.sumOf(TodayFoodEntry::calories),
-                proteinGrams = items.sumOf(TodayFoodEntry::proteinGrams),
-                carbohydrateGrams = items.sumOf(TodayFoodEntry::carbohydrateGrams),
-                fatGrams = items.sumOf(TodayFoodEntry::fatGrams),
-                fiberGrams = items.mapNotNull(TodayFoodEntry::fiberGrams)
-                    .takeIf(List<Double>::isNotEmpty)?.sum(),
-                sugarGrams = items.mapNotNull(TodayFoodEntry::sugarGrams)
-                    .takeIf(List<Double>::isNotEmpty)?.sum(),
-                saturatedFatGrams = items.mapNotNull(TodayFoodEntry::saturatedFatGrams)
-                    .takeIf(List<Double>::isNotEmpty)?.sum(),
-                sodiumMilligrams = items.mapNotNull(TodayFoodEntry::sodiumMilligrams)
-                    .takeIf(List<Double>::isNotEmpty)?.sum(),
-                mealCategory = first.mealCategory,
-                time = first.time,
-                isEstimated = items.any(TodayFoodEntry::isEstimated),
-                citedSourceUrls = items.flatMap(TodayFoodEntry::citedSourceUrls).distinct(),
-                confidence = items.mapNotNull(TodayFoodEntry::confidence).minOrNull(),
-                groupItems = items,
-                originalInput = first.originalInput,
-                revealText = first.revealText,
-            )
-        }
-
-    private fun mapSettings(
-        prefs: AppPreferences,
-        plan: NutritionPlanEntity?,
-        keys: Map<ProviderPipeline, ProviderKeyPresence>,
-        health: HealthConnectUiState,
-        stepEstimate: StepCalorieEstimate?,
-    ): SettingsUiState {
-        val providers = ProviderPipeline.entries.map { pipeline ->
-            val selected = prefs.selectionFor(pipeline)
-            AiProviderSetting(
-                purpose = pipeline.displayName(),
-                provider = selected.providerId.toProviderKind(),
-                model = selected.model,
-                endpoint = runCatching { selected.toRuntimeConfig().endpoint }
-                    .getOrElse { selected.endpoint.orEmpty() },
-                hasApiKey = keys[pipeline]?.complete == true,
-                hasPrimaryApiKey = keys[pipeline]?.primary == true,
-                hasSearchApiKey = keys[pipeline]?.search == true &&
-                    selected.providerId.equals("exa-gemini", true),
-            )
-        }
-        val reminders = prefs.reminders
-        return SettingsUiState(
-            themeMode = prefs.theme.toThemeMode(),
-            dynamicColor = prefs.dynamicColorEnabled,
-            language = currentLanguage(),
-            unitSystem = if (prefs.weightUnit == WeightUnitPreference.KILOGRAMS) UnitSystem.METRIC else UnitSystem.IMPERIAL,
-            activityTargetAdjustment = prefs.adjustTargetFromActivity,
-            calorieEstimateBias = prefs.calorieEstimateBias,
-            goalsCardStyle = prefs.goalsCardStyle,
-            healthConnectAvailable = health.status != HealthConnectPermissionStatus.UNAVAILABLE,
-            healthConnectEnabled = health.status == HealthConnectPermissionStatus.CONNECTED ||
-                health.status == HealthConnectPermissionStatus.PARTIAL,
-            healthConnect = health.copy(
-                estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
-                stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
-            ),
-            nutritionTargets = NutritionTargetSetting(
-                calories = plan?.calorieTargetKcal?.roundToInt() ?: 2_000,
-                proteinGrams = plan?.proteinTargetGrams?.roundToInt() ?: 130,
-                carbohydrateGrams = plan?.carbohydrateTargetGrams?.roundToInt() ?: 240,
-                fatGrams = plan?.fatTargetGrams?.roundToInt() ?: 65,
-                isCustom = plan?.let {
-                    it.calorieTargetCustom || it.proteinTargetCustom ||
-                        it.carbohydrateTargetCustom || it.fatTargetCustom
-                } ?: false,
-            ),
-            trackedMicronutrients = prefs.micronutrients.enabledMicronutrients(),
-            aiProviders = providers,
-            aiRequestTimeoutDisabled = prefs.aiRequestTimeoutDisabled,
-            reminders = listOf(
-                com.nomi.app.ui.settings.ReminderSetting("Breakfast", reminders.breakfast.enabled, reminders.breakfast.localTime),
-                com.nomi.app.ui.settings.ReminderSetting("Lunch", reminders.lunch.enabled, reminders.lunch.localTime),
-                com.nomi.app.ui.settings.ReminderSetting("Dinner", reminders.dinner.enabled, reminders.dinner.localTime),
-                com.nomi.app.ui.settings.ReminderSetting("Daily summary", reminders.dailySummary.enabled, reminders.dailySummary.localTime),
-                com.nomi.app.ui.settings.ReminderSetting("Weight", reminders.weight.enabled, reminders.weight.localTime),
-            ),
-            appVersion = BuildConfig.VERSION_NAME,
-        )
-    }
-
-    private fun FoodLogEntity.toTodayEntry(revealText: String? = null): TodayFoodEntry = TodayFoodEntry(
-        id = id,
-        name = displayNameSnapshot,
-        brand = brandSnapshot,
-        amountText = "${amount.cleanNumber()} $unit",
-        calories = nutritionSnapshot.caloriesKcal,
-        proteinGrams = nutritionSnapshot.proteinGrams,
-        carbohydrateGrams = nutritionSnapshot.carbohydrateGrams,
-        fatGrams = nutritionSnapshot.fatGrams,
-        fiberGrams = nutritionSnapshot.fiberGrams,
-        sugarGrams = nutritionSnapshot.sugarGrams,
-        saturatedFatGrams = nutritionSnapshot.saturatedFatGrams,
-        sodiumMilligrams = nutritionSnapshot.sodiumMilligrams,
-        mealCategory = mealCategory.toMealCategory(),
-        time = Instant.ofEpochMilli(loggedAtEpochMillis).atZone(runCatching { ZoneId.of(zoneId) }.getOrDefault(this@AppViewModel.zoneId)).toLocalTime(),
-        isEstimated = isEstimated,
-        foodId = foodId,
-        amount = amount,
-        unit = unit,
-        grams = grams,
-        sourceName = sourceSnapshot.displayName,
-        sourceUrl = sourceSnapshot.url,
-        citedSourceUrls = sourceSnapshot.citedUrlList(),
-        confidence = sourceSnapshot.confidence,
-        sourceProductName = sourceSnapshot.productName,
-        sourceServingQuantity = sourceSnapshot.servingQuantity,
-        sourceServingUnit = sourceSnapshot.servingUnit,
-        calorieExplanation = sourceSnapshot.calorieExplanation,
-        inputMethod = inputMethod,
-        originalInput = originalInput,
-        revealText = revealText,
-    )
-
-    private fun AnalyzedFoodItem.toLog(
-        category: MealCategory,
-        inputMethod: String,
-        consultedUrls: List<String> = emptyList(),
-        originalInput: String? = null,
-    ): FoodLogEntity {
-        val now = System.currentTimeMillis()
-        val date = selectedDate.value
-        val enteredServingUnit = quantityResolution?.enteredUnit
-            ?.takeIf { it.isSpoonLoggingUnit() || it.isHouseholdCountLoggingUnit() }
-        val enteredServingQuantity = quantityResolution?.enteredQuantity
-            ?.takeIf { enteredServingUnit != null && it.isFinite() && it > 0.0 }
-        return FoodLogEntity(
-            mealCategory = category.name,
-            displayNameSnapshot = name.trim(),
-            brandSnapshot = brand,
-            amount = enteredServingQuantity ?: quantity,
-            unit = enteredServingUnit?.takeIf { enteredServingQuantity != null } ?: unit,
-            grams = resolvedWeightGrams,
-            resolvedVolumeMl = resolvedVolumeMl,
-            resolutionSource = resolutionSource,
-            nutritionSnapshot = NutritionValues(
-                caloriesKcal = calories,
-                proteinGrams = proteinGrams,
-                carbohydrateGrams = carbohydrateGrams,
-                fatGrams = fatGrams,
-                fiberGrams = fiberGrams,
-                sugarGrams = sugarGrams,
-                saturatedFatGrams = saturatedFatGrams,
-                sodiumMilligrams = sodiumMilligrams,
-            ),
-            sourceSnapshot = NutritionSourceSnapshot(
-                kind = if (isEstimate) "ai_estimate" else "database",
-                providerName = sourceName,
-                displayName = sourceName,
-                url = sourceUrl,
-                // The primary source leads so the detail view can show it first without
-                // re-deriving which of the citations the numbers actually came from. An estimate
-                // cites nothing, but the research still opened pages to reach it, and those are
-                // recorded instead of leaving the entry looking unresearched.
-                citedUrls = (listOfNotNull(sourceUrl) + supportingSourceUrls)
-                    .ifEmpty { consultedUrls }
-                    .toCitedUrlColumn(),
-                confidence = confidence,
-                productName = sourceProductName,
-                servingQuantity = sourceServingQuantity,
-                servingUnit = sourceServingUnit,
-                calorieExplanation = calorieExplanation,
-                retrievedAtEpochMillis = now,
-                verifiedAtEpochMillis = now.takeUnless { isEstimate },
-            ),
-            isEstimated = isEstimate,
-            inputMethod = inputMethod,
-            originalInput = originalInput?.trim()?.takeIf(String::isNotBlank),
-            localDate = date.toString(),
-            loggedAtEpochMillis = loggedAtFor(date, Instant.ofEpochMilli(now), zoneId),
-            zoneId = zoneId.id,
-            createdAtEpochMillis = now,
-            updatedAtEpochMillis = now,
-        )
-    }
-
-    private companion object {
-        /**
-         * Stored verbatim so it is stable across releases and languages, and resolved for display
-         * at the read boundary rather than baked in at write time. See [nomiString].
-         */
-        const val MANUAL_SOURCE_NAME = "Manual entry"
-        const val LIBRARY_SOURCE_NAME = "Nomi food library"
-    }
-
-    private fun ManualFoodDraft.toLog(): FoodLogEntity {
-        // DecimalInput so a comma decimal - which is what nine of the ten supported keyboards
-        // produce - is the same number as a point decimal. isValid already gated this shape.
-        fun field(raw: String, label: String): Double = DecimalInput.parseOrNull(raw)
-            ?: throw IllegalArgumentException("$label must be a number")
-        return AnalyzedFoodItem(
-            name = name.trim(),
-            quantity = field(amount, "Amount"),
-            unit = unit.trim(),
-            calories = field(calories, "Calories"),
-            proteinGrams = field(protein, "Protein"),
-            carbohydrateGrams = field(carbohydrates, "Carbohydrates"),
-            fatGrams = field(fat, "Fat"),
-            isEstimate = false,
-            sourceName = MANUAL_SOURCE_NAME,
-        ).toLog(mealCategory, "manual")
-    }
-
-    private fun FoodEntity.toLog(): FoodLogEntity = AnalyzedFoodItem(
-        name = canonicalName,
-        brand = brand,
-        quantity = 100.0,
-        unit = "g",
-        gramsEquivalent = 100.0,
-        calories = nutritionPer100g.caloriesKcal,
-        proteinGrams = nutritionPer100g.proteinGrams,
-        carbohydrateGrams = nutritionPer100g.carbohydrateGrams,
-        fatGrams = nutritionPer100g.fatGrams,
-        fiberGrams = nutritionPer100g.fiberGrams,
-        sugarGrams = nutritionPer100g.sugarGrams,
-        saturatedFatGrams = nutritionPer100g.saturatedFatGrams,
-        sodiumMilligrams = nutritionPer100g.sodiumMilligrams,
-        sourceName = LIBRARY_SOURCE_NAME,
-        isEstimate = isEstimated,
-    ).toLog(defaultMealCategory(), "recent").copy(foodId = id)
-
-    private fun FavoriteFoodWithCatalog.toLog(): FoodLogEntity {
-        val grams = favorite.typicalGrams ?: favorite.typicalAmount.takeIf { favorite.typicalUnit.equals("g", true) } ?: 100.0
-        val factor = grams / 100.0
-        val values = food.nutritionPer100g
-        return AnalyzedFoodItem(
-            name = food.canonicalName,
-            brand = food.brand,
-            quantity = favorite.typicalAmount,
-            unit = favorite.typicalUnit,
-            gramsEquivalent = grams,
-            calories = values.caloriesKcal * factor,
-            proteinGrams = values.proteinGrams * factor,
-            carbohydrateGrams = values.carbohydrateGrams * factor,
-            fatGrams = values.fatGrams * factor,
-            fiberGrams = values.fiberGrams?.times(factor),
-            sugarGrams = values.sugarGrams?.times(factor),
-            saturatedFatGrams = values.saturatedFatGrams?.times(factor),
-            sodiumMilligrams = values.sodiumMilligrams?.times(factor),
-            sourceName = "Nomi favorite",
-            isEstimate = food.isEstimated,
-        ).toLog(defaultMealCategory(), "favorite").copy(foodId = food.id)
-    }
-
-    private fun FoodEntity.toLibraryItem(kind: LibraryItemKind, amountText: String = "100 g") = LibraryItem(
-        id = id,
-        kind = kind,
-        title = canonicalName,
-        subtitle = listOfNotNull(brand, amountText).joinToString(" · "),
-        calories = nutritionPer100g.caloriesKcal,
-    )
-
-    private fun BarcodeProduct.toAnalyzedItemOrNull(): AnalyzedFoodItem? {
-        val calories = caloriesPer100g?.takeIf { it.isFinite() && it in 0.0..1_500.0 } ?: return null
-        val protein = proteinPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
-        val carbohydrates = carbohydratesPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
-        val fat = fatPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 } ?: return null
-        val basisUnit = nutritionBasisUnit.takeIf { it == "ml" } ?: "g"
-        return SourceIntegrityVerifier.resolveItem(
-            AnalyzedFoodItem(
-                name = name.take(300),
-                brand = brand?.take(200),
-                quantity = 100.0,
-                unit = basisUnit,
-                gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
-                calories = calories,
-                proteinGrams = protein,
-                carbohydrateGrams = carbohydrates,
-                fatGrams = fat,
-                fiberGrams = fiberPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
-                sugarGrams = sugarPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
-                saturatedFatGrams = saturatedFatPer100g?.takeIf { it.isFinite() && it in 0.0..100.0 },
-                // 100 g of pure salt carries 40,000 mg of sodium, so that bounds a per-100 value.
-                sodiumMilligrams = sodiumMilligramsPer100g
-                    ?.takeIf { it.isFinite() && it in 0.0..40_000.0 },
-                sourceName = sourceName,
-                sourceUrl = sourceUrl,
-                sourceProductName = name.take(300),
-                sourceServingQuantity = 100.0,
-                sourceServingUnit = basisUnit,
-                sourceServingGramsEquivalent = 100.0.takeIf { basisUnit == "g" },
-                isEstimate = false,
-            ),
-        )
-    }
-
-    private fun FoodEntity.toAnalyzedItem(source: String) = AnalyzedFoodItem(
-        name = canonicalName,
-        brand = brand,
-        quantity = 100.0,
-        unit = "g",
-        gramsEquivalent = 100.0,
-        calories = nutritionPer100g.caloriesKcal,
-        proteinGrams = nutritionPer100g.proteinGrams,
-        carbohydrateGrams = nutritionPer100g.carbohydrateGrams,
-        fatGrams = nutritionPer100g.fatGrams,
-        fiberGrams = nutritionPer100g.fiberGrams,
-        sugarGrams = nutritionPer100g.sugarGrams,
-        saturatedFatGrams = nutritionPer100g.saturatedFatGrams,
-        sodiumMilligrams = nutritionPer100g.sodiumMilligrams,
-        sourceName =source,
-        sourceServingQuantity = 100.0,
-        sourceServingUnit = "g",
-        sourceServingGramsEquivalent = 100.0,
-        isEstimate = isEstimated,
-    )
-
-    private fun AnalyzedFoodItem.asBarcodeSourceServing(): AnalyzedFoodItem = copy(
-        sourceServingQuantity = quantity,
-        sourceServingUnit = unit,
-        sourceServingGramsEquivalent = gramsEquivalent,
-        servingValidation = null,
-        requiresServingValidation = false,
-    )
-
-    private suspend fun cacheLogFood(log: FoodLogEntity): Long? = cacheAnalyzedFood(
-        AnalyzedFoodItem(
-            name = log.displayNameSnapshot,
-            brand = log.brandSnapshot,
-            quantity = log.amount,
-            unit = log.unit,
-            gramsEquivalent = log.grams ?: log.amount.takeIf { log.unit.equals("g", true) },
-            resolvedVolumeMl = log.resolvedVolumeMl,
-            resolutionSource = log.resolutionSource,
-            calories = log.nutritionSnapshot.caloriesKcal,
-            proteinGrams = log.nutritionSnapshot.proteinGrams,
-            carbohydrateGrams = log.nutritionSnapshot.carbohydrateGrams,
-            fatGrams = log.nutritionSnapshot.fatGrams,
-            fiberGrams = log.nutritionSnapshot.fiberGrams,
-            sugarGrams = log.nutritionSnapshot.sugarGrams,
-            saturatedFatGrams = log.nutritionSnapshot.saturatedFatGrams,
-            sodiumMilligrams = log.nutritionSnapshot.sodiumMilligrams,
-            sourceName = log.sourceSnapshot.displayName,
-            sourceUrl = log.sourceSnapshot.url,
-            isEstimate = log.isEstimated,
-        ),
-    )
-
-    private suspend fun cacheAnalyzedFood(item: AnalyzedFoodItem, barcode: String? = null): Long? {
-        val grams = item.gramsEquivalent ?: item.quantity.takeIf { item.unit.equals("g", true) } ?: return null
-        if (!grams.isFinite() || grams <= 0.0) return null
-        val normalized = item.name.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
-        val normalizedBrand = item.brand?.trim()?.lowercase(Locale.ROOT)
-        val existing = barcode?.let { repository.foodByBarcode(it) }
-            ?: recentFoodsSnapshot.firstOrNull {
-                it.normalizedName == normalized &&
-                    it.brand?.trim()?.lowercase(Locale.ROOT) == normalizedBrand
-            }
-            ?: repository.foodByIdentity(normalized, normalizedBrand)
-        val factor = 100.0 / grams
-        val now = System.currentTimeMillis()
-        val nutritionPer100 = NutritionValues(
-            caloriesKcal = item.calories * factor,
-            proteinGrams = item.proteinGrams * factor,
-            carbohydrateGrams = item.carbohydrateGrams * factor,
-            fatGrams = item.fatGrams * factor,
-            fiberGrams = item.fiberGrams?.times(factor),
-            sugarGrams = item.sugarGrams?.times(factor),
-            saturatedFatGrams = item.saturatedFatGrams?.times(factor),
-            sodiumMilligrams = item.sodiumMilligrams?.times(factor),
-        )
-        if (existing != null) {
-            if (existing.acceptsVerifiedUpgradeFrom(item.isEstimate)) {
-                repository.updateFood(
-                    existing.copy(
-                        canonicalName = item.name.trim().take(300),
-                        normalizedName = normalized.take(300),
-                        brand = item.brand?.trim()?.take(200),
-                        barcode = barcode ?: existing.barcode,
-                        nutritionPer100g = nutritionPer100,
-                        isEstimated = false,
-                        lastVerifiedAtEpochMillis = now,
-                        updatedAtEpochMillis = now,
-                    ),
-                )
-            }
-            return existing.id
-        }
-        return repository.addFood(
-            FoodEntity(
-                canonicalName = item.name.trim().take(300),
-                normalizedName = normalized.take(300),
-                brand = item.brand?.trim()?.take(200),
-                barcode = barcode,
-                nutritionPer100g = nutritionPer100,
-                isUserCreated = item.sourceName == "Manual entry",
-                isEstimated = item.isEstimate,
-                lastVerifiedAtEpochMillis = now.takeUnless { item.isEstimate },
-                createdAtEpochMillis = now,
-                updatedAtEpochMillis = now,
-            ),
         )
     }
 
@@ -3832,528 +2321,9 @@ class AppViewModel(
         NomiLanguage.fromTag(preferences.value.languageTag)
             ?: NomiLanguage.matching(Locale.getDefault())
 
-    /**
-     * Turns a research failure into something the user can act on.
-     *
-     * Raw source-ID language is not UI, but neither is one sentence for every cause. A typed
-     * [NutritionResearchException] names the item that failed and why, so the message can say
-     * which food it was and what would fix it. Everything else keeps its existing wording,
-     * including the provider-level timeout, rate-limit and model errors that
-     * [safeAiMessage] already tells apart.
-     */
-    private fun researchFailureMessage(error: Throwable): String {
-        val research = error.causeChain().filterIsInstance<NutritionResearchException>().firstOrNull()
-        if (research != null) {
-            val food = research.itemName?.trim()?.takeIf(String::isNotBlank)
-            val template = if (food == null) {
-                // Retrieval and contract failures belong to the whole request, not to one food.
-                requestLevelFailureMessage(research.reason)
-            } else {
-                researchFailureTemplate(research.reason)
-            }
-            return when {
-                template == null ->
-                    // Transport failures already carry their own distinct wording, which names
-                    // the provider and the status code; a food name adds nothing to those.
-                    inUserLanguage(error.safeAiMessage())
-                food == null -> inUserLanguage(template)
-                else -> inUserLanguage(template, food)
-            }
-        }
-        val technicalEvidenceFailure = error is AiValidationException && listOf(
-            "Exa source",
-            "nutrition evidence",
-            "support Gemini",
-            "not compatible",
-        ).any { marker -> error.message?.contains(marker, ignoreCase = true) == true }
-        if (!technicalEvidenceFailure) return inUserLanguage(error.safeAiMessage())
-        return inUserLanguage(
-            "Nomi couldn't verify nutrition for every product. Try again or edit the entry.",
-        )
-    }
-
-    private fun defaultMealCategory(): MealCategory = when (LocalTime.now(zoneId).hour) {
-        in 4..10 -> MealCategory.BREAKFAST
-        in 11..15 -> MealCategory.LUNCH
-        in 16..21 -> MealCategory.DINNER
-        else -> MealCategory.SNACKS
-    }
-
-    private fun ProgressRange.dayCount(): Int = when (this) {
-        ProgressRange.SEVEN_DAYS -> 7
-        ProgressRange.THIRTY_DAYS -> 30
-        ProgressRange.THREE_MONTHS -> 90
-        ProgressRange.SIX_MONTHS -> 180
-        ProgressRange.ONE_YEAR -> 365
-        ProgressRange.ALL -> 3_650
-    }
 }
 
 /** Room for a described plate without room for a pasted document. */
 private const val MAX_PHOTO_DESCRIPTION_CHARS = 1_000
 private const val MAX_PHOTO_PLACE_CHARS = 120
 private const val MAX_MENU_LOGGING_TEXT_CHARS = 1_500
-
-/** Nomi cannot contain a legitimate journal entry before Unix time; this covers all app history. */
-private const val HEALTH_CONNECT_HISTORY_START_LOCAL_DATE = "1970-01-01"
-private const val HEALTH_CONNECT_HISTORY_END_LOCAL_DATE = "9999-12-31"
-
-/** Long enough for a whole multi-item meal to be inserted before anything is pushed. */
-private const val NUTRITION_SYNC_DEBOUNCE_MILLIS = 1_500L
-
-private operator fun NutritionValues.plus(other: NutritionValues) = NutritionValues(
-    caloriesKcal = caloriesKcal + other.caloriesKcal,
-    proteinGrams = proteinGrams + other.proteinGrams,
-    carbohydrateGrams = carbohydrateGrams + other.carbohydrateGrams,
-    fatGrams = fatGrams + other.fatGrams,
-    fiberGrams = fiberGrams.plusOptional(other.fiberGrams),
-    sugarGrams = sugarGrams.plusOptional(other.sugarGrams),
-    saturatedFatGrams = saturatedFatGrams.plusOptional(other.saturatedFatGrams),
-    sodiumMilligrams = sodiumMilligrams.plusOptional(other.sodiumMilligrams),
-)
-
-/**
- * Sums what is known and stays null while nothing is. A day whose foods never reported sugar
- * has no sugar total, which is a different statement from a day that genuinely contained none -
- * and the difference is what stops Today from showing a confident 0 g it cannot support.
- */
-private fun Double?.plusOptional(other: Double?): Double? =
-    if (this == null && other == null) null else (this ?: 0.0) + (other ?: 0.0)
-
-private fun String.toMealCategory(): MealCategory = runCatching {
-    MealCategory.valueOf(trim().uppercase(Locale.ROOT))
-}.getOrDefault(MealCategory.SNACKS)
-
-private fun Double.cleanNumber(): String = if (this == toLong().toDouble()) toLong().toString()
-else String.format(Locale.US, "%.1f", this)
-
-/** Minimal stored snapshot needed by the existing portion-only arithmetic/router. */
-private fun TodayFoodEntry.toAmountEditItem(): AnalyzedFoodItem = AnalyzedFoodItem(
-    name = name,
-    brand = brand,
-    quantity = amount,
-    unit = unit,
-    gramsEquivalent = grams,
-    calories = calories,
-    proteinGrams = proteinGrams,
-    carbohydrateGrams = carbohydrateGrams,
-    fatGrams = fatGrams,
-    sourceName = sourceName,
-    sourceUrl = sourceUrl,
-    calorieExplanation = calorieExplanation,
-    isEstimate = isEstimated,
-)
-
-private fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSelection = when (pipeline) {
-    ProviderPipeline.FOOD_RESEARCH -> foodResearchProvider
-    ProviderPipeline.FOOD_INTERPRETATION -> foodInterpretationProvider
-    ProviderPipeline.PORTION_CHANGE -> portionChangeProvider
-    ProviderPipeline.VISION -> visionProvider
-    ProviderPipeline.SMART_FALLBACK -> smartFallbackProvider
-}
-
-private fun AiProviderEditorState.toProviderSelection(
-    pipeline: ProviderPipeline = ProviderPipeline.FOOD_INTERPRETATION,
-): ProviderSelection = ProviderSelection(
-    providerId = provider.toProviderId(),
-    model = model.trim(),
-    endpoint = endpoint.asHttpsEndpoint(),
-).withSupportedModel(pipeline)
-
-
-private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
-    if ("://" in endpoint) endpoint else "https://$endpoint"
-}
-private fun ProviderSelection.resolvedEndpoint(): String {
-    val resolved = when (providerId.toProviderKind()) {
-        AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
-        AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
-        AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
-        AiProviderKind.EXA_GEMINI -> GEMINI_API_ENDPOINT
-        // Codex Easy publishes both a bare host and a /v1 base; Nomi appends OpenAI request
-        // paths, so the versioned base is the one that resolves to /v1/chat/completions.
-        AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
-        AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint?.trim()?.takeIf(String::isNotBlank)
-            ?: error("Enter a provider endpoint in Settings.")
-    }.trimEnd('/')
-    val uri = runCatching { URI(resolved) }.getOrNull()
-    require(uri?.scheme.equals("https", ignoreCase = true) && !uri?.host.isNullOrBlank()) {
-        "AI endpoints must use a valid HTTPS URL."
-    }
-    return resolved
-}
-/**
- * [timeoutDisabled] comes from the user's "Never time out" setting: research that runs long is
- * then waited out instead of being cut off.
- */
-private fun ProviderSelection.toRuntimeConfig(timeoutDisabled: Boolean = false): AiProviderConfig {
-    val kind = providerId.toProviderKind()
-    require(model.isNotBlank()) { "Choose a model in Settings." }
-    val defaults = AiProviderConfig(kind, resolvedEndpoint(), model.trim())
-    return if (timeoutDisabled) defaults.copy(timeoutMillis = null) else defaults
-}
-
-private fun ProviderSelection.cacheIdentity(): String = listOf(
-    providerId.trim().lowercase(Locale.ROOT),
-    model.trim(),
-    runCatching { resolvedEndpoint() }.getOrElse { endpoint.orEmpty().trim() },
-    advancedParametersJson.orEmpty().trim(),
-).joinToString(separator = "\u001f")
-
-private fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.ROOT)) {
-    "perplexity" -> AiProviderKind.PERPLEXITY
-    "openrouter" -> AiProviderKind.OPEN_ROUTER
-    "openai" -> AiProviderKind.OPEN_AI
-    "exa-gemini" -> AiProviderKind.EXA_GEMINI
-    "codex-easy" -> AiProviderKind.CODEX_EASY
-    else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
-}
-private fun AiProviderKind.toProviderId(): String = when (this) {
-    AiProviderKind.PERPLEXITY -> "perplexity"
-    AiProviderKind.OPEN_ROUTER -> "openrouter"
-    AiProviderKind.OPEN_AI -> "openai"
-    AiProviderKind.EXA_GEMINI -> "exa-gemini"
-    AiProviderKind.CODEX_EASY -> "codex-easy"
-    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
-}
-private fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)) {
-    "perplexity" -> "Perplexity"
-    "openrouter" -> "OpenRouter"
-    "openai" -> "OpenAI"
-    "exa-gemini" -> "Exa + Gemini"
-    "codex-easy" -> "Codex Easy"
-    else -> "custom provider"
-}
-private fun ProviderPipeline.displayName(): String = when (this) {
-    ProviderPipeline.FOOD_RESEARCH -> "Food research"
-    ProviderPipeline.FOOD_INTERPRETATION -> "Food interpretation"
-    ProviderPipeline.PORTION_CHANGE -> "Portion changes"
-    ProviderPipeline.VISION -> "Photo recognition"
-    ProviderPipeline.SMART_FALLBACK -> "Fallback"
-}
-
-internal fun ProviderPipeline.requiresWebResearch(): Boolean =
-    this == ProviderPipeline.FOOD_RESEARCH || this == ProviderPipeline.SMART_FALLBACK
-
-private fun ProviderSelection.sharesCredentialWith(other: ProviderSelection): Boolean =
-    providerId.equals(other.providerId, ignoreCase = true) &&
-        runCatching { resolvedEndpoint() }.getOrNull()
-            ?.equals(runCatching { other.resolvedEndpoint() }.getOrNull(), ignoreCase = true) == true
-
-internal fun smartFallbackCredentialIds(
-    selection: ProviderSelection,
-    primary: ProviderSelection,
-): List<String> = buildList {
-    add(secretId(selection))
-    // Only a fallback on the same provider account may reuse the research key.
-    if (selection.sharesCredentialWith(primary)) add(secretId(primary))
-}.distinct()
-
-internal suspend fun <T> runWithSmartFallback(
-    primary: suspend () -> T,
-    fallback: suspend () -> T,
-    onFallback: suspend (Throwable) -> Unit = {},
-    onFallbackSuccess: suspend (T) -> Unit = {},
-): T = try {
-    primary()
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (primaryError: Throwable) {
-    onFallback(primaryError)
-    try {
-        fallback().also { onFallbackSuccess(it) }
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (fallbackError: Throwable) {
-        // The configured primary provider's error is the actionable one; a misconfigured
-        // fallback must not mask it.
-        primaryError.addSuppressed(fallbackError)
-        throw primaryError
-    }
-}
-
-/** Prefills the amount field without a trailing ".0" on whole amounts. */
-internal fun formatLoggedAmountInput(amount: Double): String =
-    if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
-
-private fun ThemePreference.toThemeMode(): ThemeMode = when (this) {
-    ThemePreference.SYSTEM -> ThemeMode.SYSTEM
-    ThemePreference.LIGHT -> ThemeMode.LIGHT
-    ThemePreference.DARK -> ThemeMode.DARK
-}
-
-private fun ThemeMode.toPreference(): ThemePreference = when (this) {
-    ThemeMode.SYSTEM -> ThemePreference.SYSTEM
-    ThemeMode.LIGHT -> ThemePreference.LIGHT
-    ThemeMode.DARK -> ThemePreference.DARK
-}
-
-/**
- * Keys are scoped to the provider account, not to the pipeline that happens to use it. All five
- * pipelines run on the same OpenRouter key by default, so entering it once in any of them
- * configures the rest; a second provider still gets its own separate secret.
- */
-private fun secretId(selection: ProviderSelection): String = providerSecretId(
-    providerId = selection.providerId,
-    endpoint = selection.resolvedEndpoint(),
-)
-
-private fun exaSecretId(): String = providerSecretId("exa", EXA_API_ENDPOINT)
-
-private fun providerSecretId(providerId: String, endpoint: String): String {
-    val material = "${providerId.lowercase(Locale.ROOT)}|${endpoint.lowercase(Locale.ROOT)}"
-    val digest = MessageDigest.getInstance("SHA-256").digest(material.toByteArray(Charsets.UTF_8))
-    val token = digest.take(16).joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
-    return "provider:$token"
-}
-
-internal fun String.normalizedApiKeyCharsOrNull(): CharArray? =
-    trim().takeIf(String::isNotEmpty)?.toCharArray()
-
-private fun providerConnectionTestIntent(): ParsedFoodIntent = ParsedFoodIntent(
-    originalText = "100 g apple",
-    items = listOf(
-        ParsedFoodItem(
-            name = "apple",
-            quantity = 100.0,
-            unit = "g",
-            gramsEquivalent = 100.0,
-        ),
-    ),
-)
-
-private fun String.isSpoonLoggingUnit(): Boolean = trim()
-    .lowercase(Locale.ROOT)
-    .replace('ö', 'o')
-    .replace("oe", "o") in setOf(
-    "el", "essloffel", "tbsp", "tbs", "tablespoon", "tablespoons",
-    "tl", "teeloffel", "tsp", "teaspoon", "teaspoons",
-    "loffel", "spoon", "spoons",
-)
-
-private fun String.isHouseholdCountLoggingUnit(): Boolean = trim()
-    .lowercase(Locale.ROOT)
-    .replace('\u00fc', 'u')
-    .replace("ue", "u") in setOf(
-    "piece", "pieces", "pc", "pcs", "stuck", "stucke",
-    "kugel", "kugeln", "scoop", "scoops",
-)
-private fun Throwable.safeProviderSettingsMessage(): String = when {
-    causeChain().any { it is SecretUnavailableException } ->
-        "Nomi couldn't access secure API-key storage. Re-enter the key and try again."
-    message?.contains("Configure", ignoreCase = true) == true -> message.orEmpty()
-    message?.contains("endpoint", ignoreCase = true) == true ->
-        "Enter a valid HTTPS API endpoint."
-    message?.contains("model", ignoreCase = true) == true ->
-        "Enter a model name."
-    else -> "Nomi couldn't update this provider. Try again."
-}
-
-internal fun Throwable.safeAiMessage(): String {
-    if (this is AiValidationException && message?.contains("not compatible", ignoreCase = true) == true) {
-        return "Nomi couldn't match that source serving to your amount. Try g, ml, EL, or TL."
-    }
-    if (this is AiValidationException) {
-        return message ?: "The serving amount could not be validated."
-    }
-    if (message?.contains("API key", ignoreCase = true) == true ||
-        message?.contains("Configure", ignoreCase = true) == true
-    ) {
-        return message.orEmpty()
-    }
-    return safeProviderFailureMessage()
-        ?: "Nomi couldn't finish that analysis. Try again or enter the food manually."
-}
-
-internal fun Throwable.safeProviderConnectionMessage(): String =
-    safeProviderFailureMessage()
-        ?: message?.takeIf {
-            it.contains("API key", ignoreCase = true) ||
-                it.contains("Configure", ignoreCase = true)
-        }
-        ?: "Connection failed. Check the API key, HTTPS endpoint, model, and network connection."
-
-private fun Throwable.safeProviderFailureMessage(): String? {
-    val causes = causeChain()
-    if (causes.any { it is SecretUnavailableException }) {
-        return "Nomi couldn't read the stored API key. Remove it in Settings and enter it again."
-    }
-    causes.filterIsInstance<ProviderTemporarilyUnavailableException>().firstOrNull()?.let { error ->
-        // A retried 429 is a quota problem, not an outage. Waiting is the answer to one and
-        // reporting an outage is the answer to the other, so they do not share a sentence.
-        if (error.statusCode == HTTP_TOO_MANY_REQUESTS) {
-            return "${error.providerName} rejected the request for exceeding its rate limit, " +
-                "even after automatic retries. Wait a moment and try again."
-        }
-        return "${error.providerName} is temporarily unavailable (HTTP ${error.statusCode}) " +
-            "after automatic retries. Try again shortly."
-    }
-    val responseError = causes.filterIsInstance<ResponseException>().firstOrNull()
-    if (responseError != null) {
-        val status = responseError.response.status.value
-        return when (status) {
-            401 -> "The provider rejected that API key. Check it in Settings."
-            402 -> "The provider account is out of credit. Top it up or switch the provider in Settings."
-            403 -> "The provider denied access. Check the API key and model access in Settings."
-            404 -> "The provider endpoint or model variant was not found. If the model ends " +
-                "in :free, OpenRouter may not currently offer a free endpoint for it. Check " +
-                "the exact model ID in Settings."
-            408 -> "The provider took too long. Try again."
-            429 -> "The provider rate limit was reached. Wait a moment and try again."
-            in 400..499 ->
-                "The provider rejected the request (HTTP $status). The selected model may not " +
-                    "support live web search. For OpenAI pick a search model such as " +
-                    "gpt-4o-search-preview, or use Perplexity/OpenRouter for Food research."
-            else -> "The provider is temporarily unavailable (HTTP $status). Try again."
-        }
-    }
-    if (causes.any {
-            it is HttpRequestTimeoutException || it is ConnectTimeoutException ||
-                it is SocketTimeoutException
-        }
-    ) {
-        return "The provider took too long. Try again."
-    }
-    // A base URL missing its version segment still answers 200, but with the provider's own
-    // web page. That arrives as a content type Ktor cannot read as a completion, and blaming
-    // the model would send someone looking in the wrong place.
-    if (causes.any { it is NoTransformationFoundException } ||
-        causeMessageContains("No transformation found")
-    ) {
-        return "That endpoint answered with a web page instead of an API response. Check the " +
-            "base URL in Settings — an OpenAI-compatible endpoint usually ends in /v1."
-    }
-    if (causes.any { it is SerializationException } ||
-        causeMessageContains("JSON", "serialize", "deserialize", "structured content")
-    ) {
-        return "The provider returned a response Nomi couldn't read. Check the selected model in Settings."
-    }
-    if (causes.any {
-            it is UnknownHostException || it is ConnectException || it is IOException
-        }
-    ) {
-        return "Nomi couldn't reach the provider. Check the internet connection and endpoint."
-    }
-    return when {
-        causeMessageContains("401") -> "The provider rejected that API key. Check it in Settings."
-        causeMessageContains("403") ->
-            "The provider denied access. Check the API key and model access in Settings."
-        causeMessageContains("404") ->
-            "The provider endpoint or model was not found. Check Settings."
-        causeMessageContains("429", "rate limit") ->
-            "The provider rate limit was reached. Wait a moment and try again."
-        causeMessageContains("timeout", "timed out") -> "The provider took too long. Try again."
-        else -> null
-    }
-}
-
-/**
- * The user-facing sentence for a nutrition failure that belongs to one named item.
- *
- * Each cause needs a different answer from the user, so each gets its own sentence with the food
- * in it. Transport causes return null: they already have wording that names the provider and the
- * status code, and the food name adds nothing to a rate limit.
- */
-internal fun researchFailureTemplate(reason: NutritionFailureReason): String? = when (reason) {
-    NutritionFailureReason.MISSING_PORTION_WEIGHT ->
-        "Nomi found nutrition for \"{0}\" but could not resolve that serving. Try again or add product details."
-    NutritionFailureReason.SOURCE_IDENTITY_MISMATCH ->
-        "Nomi only found sources for a different product than \"{0}\". Check the name, or add " +
-            "the brand."
-    NutritionFailureReason.NO_SUITABLE_SOURCE ->
-        "Nomi found no nutrition source for \"{0}\". Try again or describe it more precisely."
-    NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES ->
-        "Nomi couldn't confirm the nutrition numbers for \"{0}\". Try again or edit the entry."
-    NutritionFailureReason.INVALID_NUTRITION_BASIS ->
-        "The nutrition Nomi found for \"{0}\" is given for a serving it cannot convert to your " +
-            "amount. Try again or add product details."
-    NutritionFailureReason.PARSING_FAILURE ->
-        "Nomi couldn't read the nutrition answer for \"{0}\". Try again."
-    NutritionFailureReason.PROVIDER_TIMEOUT,
-    NutritionFailureReason.PROVIDER_RATE_LIMITED,
-    NutritionFailureReason.MODEL_UNAVAILABLE,
-    NutritionFailureReason.PROVIDER_UNREACHABLE,
-    -> null
-}
-
-/**
- * The user-facing sentence for a failure that belongs to the whole request rather than to one
- * food: retrieval came back with nothing usable, or the answer did not match the contract.
- */
-private fun requestLevelFailureMessage(reason: NutritionFailureReason): String? = when (reason) {
-    NutritionFailureReason.NO_SUITABLE_SOURCE ->
-        "Nomi found no usable nutrition sources for that entry. Try again in a moment."
-    NutritionFailureReason.PARSING_FAILURE ->
-        "Nomi couldn't read the nutrition answer for that entry. Try again."
-    NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
-    NutritionFailureReason.UNSUPPORTED_NUTRITION_VALUES,
-    NutritionFailureReason.INVALID_NUTRITION_BASIS,
-    NutritionFailureReason.MISSING_PORTION_WEIGHT,
-    ->
-        // These always belong to a named item; reaching here means the name was lost, so the
-        // old shared sentence is the honest answer rather than a guess about which food it was.
-        "Nomi couldn't verify nutrition for every product. Try again or edit the entry."
-    // Transport causes keep their own provider wording.
-    NutritionFailureReason.PROVIDER_TIMEOUT,
-    NutritionFailureReason.PROVIDER_RATE_LIMITED,
-    NutritionFailureReason.MODEL_UNAVAILABLE,
-    NutritionFailureReason.PROVIDER_UNREACHABLE,
-    -> null
-}
-
-/** The typed research detail behind a failure, for the debug log rather than the screen. */
-private fun Throwable.researchFailureDetail(): String? =
-    causeChain().filterIsInstance<NutritionResearchException>().firstOrNull()?.message
-
-private const val HTTP_TOO_MANY_REQUESTS = 429
-
-/**
- * The typed cause behind a nutrition failure, whatever layer raised it.
- *
- * Validation already carries its own [NutritionResearchException]; transport failures arrive as
- * Ktor and IO exceptions and are classified here, so a debug event records "PROVIDER_TIMEOUT"
- * rather than a class name that says nothing about what went wrong.
- */
-internal fun Throwable.nutritionFailureReason(): NutritionFailureReason? {
-    val causes = causeChain()
-    causes.filterIsInstance<NutritionResearchException>().firstOrNull()?.let { return it.reason }
-    causes.filterIsInstance<ProviderTemporarilyUnavailableException>().firstOrNull()?.let { error ->
-        return if (error.statusCode == HTTP_TOO_MANY_REQUESTS) {
-            NutritionFailureReason.PROVIDER_RATE_LIMITED
-        } else {
-            NutritionFailureReason.PROVIDER_UNREACHABLE
-        }
-    }
-    causes.filterIsInstance<ResponseException>().firstOrNull()?.let { error ->
-        return when (error.response.status.value) {
-            HTTP_TOO_MANY_REQUESTS -> NutritionFailureReason.PROVIDER_RATE_LIMITED
-            HttpStatusCode.RequestTimeout.value -> NutritionFailureReason.PROVIDER_TIMEOUT
-            HttpStatusCode.NotFound.value -> NutritionFailureReason.MODEL_UNAVAILABLE
-            else -> NutritionFailureReason.PROVIDER_UNREACHABLE
-        }
-    }
-    if (causes.any {
-            it is HttpRequestTimeoutException || it is ConnectTimeoutException ||
-                it is SocketTimeoutException
-        } || causeMessageContains("timeout", "timed out")
-    ) {
-        return NutritionFailureReason.PROVIDER_TIMEOUT
-    }
-    if (causes.any { it is SerializationException } ||
-        causes.any { it is NoTransformationFoundException }
-    ) {
-        return NutritionFailureReason.PARSING_FAILURE
-    }
-    if (causes.any { it is UnknownHostException || it is ConnectException || it is IOException }) {
-        return NutritionFailureReason.PROVIDER_UNREACHABLE
-    }
-    return null
-}
-
-private fun Throwable.causeChain(): List<Throwable> =
-    generateSequence(this) { it.cause }.take(8).toList()
-
-private fun Throwable.causeMessageContains(vararg values: String): Boolean =
-    causeChain().any { error ->
-        values.any { value -> error.message?.contains(value, ignoreCase = true) == true }
-    }
