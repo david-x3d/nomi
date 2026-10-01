@@ -249,7 +249,7 @@ fun SettingsScreen(
                 ToggleSetting(
                     icon = { Icon(Icons.Default.CloudSync, contentDescription = null) },
                     title = nomiString("Adjust target from activity"),
-                    supporting = nomiString("Off by default. When on, changes are shown transparently."),
+                    supporting = nomiString("Add estimated step calories to today's calorie target."),
                     checked = state.activityTargetAdjustment,
                     onCheckedChange = onActivityTargetAdjustmentChanged,
                     iconColor = MaterialTheme.colorScheme.primary,

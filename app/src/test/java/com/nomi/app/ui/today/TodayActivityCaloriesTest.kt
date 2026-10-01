@@ -49,6 +49,31 @@ class TodayActivityCaloriesTest {
     }
 
     @Test
+    fun `activity switch adds only the step estimate once and updates calories left`() {
+        val base = TodayUiState(
+            caloriesConsumed = 1_400.0,
+            calorieTarget = 2_000.0,
+            estimatedStepCaloriesKcal = 300.0,
+            activeCaloriesKcal = 191.0,
+        )
+
+        val adjusted = base.withActivityTargetAdjustment(enabled = true)
+        assertEquals(2_000.0, adjusted.baseCalorieTarget, 0.0)
+        assertEquals(300.0, adjusted.activityTargetAdjustmentKcal, 0.0)
+        assertEquals(2_300.0, adjusted.calorieTarget, 0.0)
+        assertEquals(900.0, adjusted.caloriesDifference, 0.0)
+        assertEquals(2_300.0, adjusted.withActivityTargetAdjustment(enabled = true).calorieTarget, 0.0)
+        assertEquals(2_000.0, adjusted.withActivityTargetAdjustment(enabled = false).calorieTarget, 0.0)
+    }
+
+    @Test
+    fun `enabled activity switch keeps base goal when steps are unavailable`() {
+        val base = TodayUiState(calorieTarget = 2_000.0, activeCaloriesKcal = 191.0)
+        assertEquals(2_000.0, base.withActivityTargetAdjustment(enabled = true).calorieTarget, 0.0)
+        assertEquals(0.0, base.withActivityTargetAdjustment(enabled = true).activityTargetAdjustmentKcal, 0.0)
+    }
+
+    @Test
     fun `step estimate stays visibly approximate and rounds to five kcal`() {
         assertEquals("≈ 250 kcal", estimatedStepCaloriesText(248.1, Locale.US))
         assertEquals("< 5 kcal", estimatedStepCaloriesText(3.2, Locale.US))

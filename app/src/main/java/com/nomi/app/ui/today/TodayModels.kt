@@ -245,9 +245,12 @@ data class TodayUiState(
     val activeCaloriesKcal: Double? = null,
     /** Net walking energy Nomi estimates locally; never added to Health Connect activity. */
     val estimatedStepCaloriesKcal: Double? = null,
+    /** Extra food calories shown only when activity adjustment is enabled for today. */
+    val activityTargetAdjustmentKcal: Double = 0.0,
     val stepEstimateUsesProfileHeight: Boolean = false,
     val steps: Long? = null,
 ) {
+    val baseCalorieTarget: Double get() = calorieTarget - activityTargetAdjustmentKcal
     val caloriesDifference: Double get() = calorieTarget - caloriesConsumed
     val calorieFraction: Float
         get() = if (calorieTarget <= 0) 0f else (caloriesConsumed / calorieTarget).toFloat().coerceIn(0f, 1f)
@@ -272,4 +275,15 @@ data class TodayUiState(
 
     fun entriesFor(category: MealCategory): List<TodayFoodEntry> =
         entries.filter { it.mealCategory == category }.sortedBy { it.time }
+}
+
+/** Applies the displayed walking estimate once to today's planned food target. */
+internal fun TodayUiState.withActivityTargetAdjustment(enabled: Boolean): TodayUiState {
+    val extra = estimatedStepCaloriesKcal
+        ?.takeIf { enabled && it.isFinite() && it > 0.0 }
+        ?: 0.0
+    return copy(
+        calorieTarget = baseCalorieTarget + extra,
+        activityTargetAdjustmentKcal = extra,
+    )
 }

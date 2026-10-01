@@ -106,6 +106,7 @@ private fun CalorieRow(state: TodayUiState) {
                 strokeCap = StrokeCap.Round,
                 modifier = Modifier.fillMaxWidth().size(width = 0.dp, height = 10.dp),
             )
+            ActivityTargetBreakdown(state)
         }
         state.effectiveBurnedCaloriesKcal?.let {
             BurnedRow(state = state)
@@ -113,13 +114,32 @@ private fun CalorieRow(state: TodayUiState) {
     }
 }
 
+@Composable
+internal fun ActivityTargetBreakdown(state: TodayUiState) {
+    if (state.activityTargetAdjustmentKcal <= 0.0) return
+    val locale = nomiLocale()
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "${state.baseCalorieTarget.roundToInt().formatted(locale)} + " +
+                "${state.activityTargetAdjustmentKcal.roundToInt().formatted(locale)} = " +
+                "${state.calorieTarget.roundToInt().formatted(locale)} kcal",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = nomiString("Estimated from steps"),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 /**
  * Movement on the same scale as the plate.
  *
  * The second bar shares the calorie target with the one above it, so equal lengths mean equal
- * calories and the two can be read against each other. Nothing is subtracted from the day: Nomi
- * states what was burned and leaves the arithmetic to the reader, the same way it states what
- * was eaten.
+ * calories and the two can be read against each other. When activity adjustment is enabled,
+ * the food target above includes this same estimate once and shows the calculation explicitly.
  *
  * Only Nomi's walking estimate is displayed, consistently with the activity pill.
  */

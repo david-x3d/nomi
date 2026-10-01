@@ -143,6 +143,17 @@ internal val settingsTranslations: Map<String, NomiTranslation> = mapOf(
         sq = "Përshtat objektivin sipas aktivitetit", sv = "Justera målet efter aktivitet",
         tr = "Hedefi aktiviteye göre ayarla",
     ),
+    "Add estimated step calories to today's calorie target." to NomiTranslation(
+        de = "Geschätzte Schrittkalorien zum heutigen Kalorienziel addieren.",
+        es = "Añadir las calorías estimadas de los pasos al objetivo de hoy.",
+        fr = "Ajouter les calories estimées des pas à l’objectif du jour.",
+        it = "Aggiungi le calorie stimate dai passi all’obiettivo di oggi.",
+        nl = "Geschatte stapcalorieën toevoegen aan het doel van vandaag.",
+        pt = "Adicionar as calorias estimadas dos passos ao objetivo de hoje.",
+        sq = "Shto kaloritë e vlerësuara nga hapat te objektivi i sotëm.",
+        sv = "Lägg till uppskattade kalorier från steg i dagens mål.",
+        tr = "Tahmini adım kalorilerini bugünkü kalori hedefine ekle.",
+    ),
     "Off by default. When on, changes are shown transparently." to NomiTranslation(
         de = "Standardmäßig aus. Änderungen werden transparent angezeigt.",
         es = "Desactivado por defecto. Si lo activas, los cambios se muestran con claridad.",

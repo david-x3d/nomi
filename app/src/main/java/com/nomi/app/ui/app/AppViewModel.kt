@@ -87,6 +87,7 @@ import com.nomi.app.ui.today.LoggedAmountEditUiState
 import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import com.nomi.app.ui.today.TodayUiState
+import com.nomi.app.ui.today.withActivityTargetAdjustment
 import com.nomi.app.ui.today.reeditableText
 import com.nomi.app.update.GitHubReleaseSource
 import com.nomi.app.update.ReleaseVersion
@@ -323,7 +324,8 @@ class AppViewModel(
         loggedTodayState,
         healthConnectUiState,
         stepCalorieEstimate,
-    ) { state, health, stepEstimate ->
+        repository.preferences,
+    ) { state, health, stepEstimate, prefs ->
         if (state.date != today) {
             state
         } else {
@@ -334,7 +336,7 @@ class AppViewModel(
                 estimatedStepCaloriesKcal = stepEstimate?.activeCaloriesKcal,
                 stepEstimateUsesProfileHeight = stepEstimate?.usesProfileHeight == true,
                 steps = health.todaySteps.takeIf { activityBelongsToSelectedDay },
-            )
+            ).withActivityTargetAdjustment(prefs.adjustTargetFromActivity)
         }
     }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState(isLoading = true))

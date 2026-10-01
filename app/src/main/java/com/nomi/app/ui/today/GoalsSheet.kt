@@ -166,6 +166,7 @@ private fun CalorieGoalCard(state: TodayUiState) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            ActivityTargetBreakdown(state)
             // Movement drawn against the same target as the plate above it, so the two waves can
             // be compared. Always use Nomi’s walking estimate, just like the activity pill.
             state.effectiveBurnedCaloriesKcal?.let { burned ->
