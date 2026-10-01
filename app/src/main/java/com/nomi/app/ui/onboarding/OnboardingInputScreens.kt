@@ -1,5 +1,6 @@
 package com.nomi.app.ui.onboarding
 
+import com.nomi.app.ui.components.NomiFoxAvatar
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -25,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -912,22 +912,7 @@ private fun NomiNoteBubble(text: String) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Surface(
-            modifier = Modifier.size(34.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            Image(
-                // The launcher icon's face: the logo carries the "Nomi" wordmark under it, which
-                // pushed the fox above the middle of a round avatar.
-                painter = painterResource(R.drawable.nomi_icon_foreground),
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
-            )
-        }
+        NomiFoxAvatar(size = 34.dp)
         Surface(
             // The corner nearest the fox is tight, so the bubble reads as coming from it.
             shape = RoundedCornerShape(topStart = 6.dp, topEnd = 20.dp, bottomEnd = 20.dp, bottomStart = 20.dp),

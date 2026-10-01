@@ -9,6 +9,7 @@ import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.FoodDisplayName
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
+import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
@@ -84,7 +85,7 @@ internal class AiProviderAccess(
         block: suspend (AiProviderConfig, AiRuntimeCredential) -> T,
     ): T {
         val prefs = loadedPreferences()
-        val selection = prefs.selectionFor(pipeline)
+        val selection = prefs.providerSelection(pipeline)
         require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
         return container.secretStore.useSecret(secretId(selection)) { chars ->
             val credential = AiRuntimeCredential.from(chars.concatToString())
@@ -175,7 +176,7 @@ internal class AiProviderAccess(
         scope.launch {
             val prefs = loadedPreferences()
             mutableKeyPresence.value = ProviderPipeline.entries.associateWith { pipeline ->
-                val selection = prefs.selectionFor(pipeline)
+                val selection = prefs.providerSelection(pipeline)
                 val primary = runCatching {
                     container.secretStore.contains(secretId(selection))
                 }.getOrDefault(false)

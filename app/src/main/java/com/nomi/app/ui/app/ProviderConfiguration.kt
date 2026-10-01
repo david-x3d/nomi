@@ -4,7 +4,6 @@ import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
-import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.preferences.withSupportedModel
@@ -21,14 +20,6 @@ import kotlinx.coroutines.CancellationException
  * it resolves to, which secret holds its key, and what it is called on screen. Nothing here
  * touches the network or the secret store.
  */
-
-internal fun AppPreferences.selectionFor(pipeline: ProviderPipeline): ProviderSelection = when (pipeline) {
-    ProviderPipeline.FOOD_RESEARCH -> foodResearchProvider
-    ProviderPipeline.FOOD_INTERPRETATION -> foodInterpretationProvider
-    ProviderPipeline.PORTION_CHANGE -> portionChangeProvider
-    ProviderPipeline.VISION -> visionProvider
-    ProviderPipeline.SMART_FALLBACK -> smartFallbackProvider
-}
 
 internal fun AiProviderEditorState.toProviderSelection(
     pipeline: ProviderPipeline = ProviderPipeline.FOOD_INTERPRETATION,

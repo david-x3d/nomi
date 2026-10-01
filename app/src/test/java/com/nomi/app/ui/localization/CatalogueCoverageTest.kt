@@ -91,21 +91,6 @@ class CatalogueCoverageTest {
     }
 
     /**
-     * Every `"literal"` run joined by `+` that precedes a `to NomiTranslation(`.
-     *
-     * A long key is written across two or more lines, with the `+` at the end of the line *above*
-     * the one carrying `to NomiTranslation(`:
-     *
-     * ```
-     * "Nomi scans common EAN and UPC barcodes automatically. Nothing is captured until a code is " +
-     *     "visible." to NomiTranslation(
-     * ```
-     *
-     * So the run is read upwards from the `to NomiTranslation(` line, and only while the line
-     * above actually ends in `+`. The `+` is stripped *after* deciding to keep walking, otherwise
-     * the check that the continuation is still a bare literal never sees it.
-     */
-    /**
      * Every key in the catalogue, found by walking backwards from each `NomiTranslation(` value.
      *
      * Anchoring on the *value* rather than on the key's own line is what makes this work across

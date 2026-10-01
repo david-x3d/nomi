@@ -372,10 +372,6 @@ internal fun AiProviderConfig.supportsJsonObjectResponseFormat(): Boolean {
 }
 
 /**
- * OpenRouter variants can also differ in sampling-parameter support, so let the routed endpoint
- * use its default. Direct OpenAI gpt-5 and o-series models likewise require their default.
- */
-/**
  * Whether this model does its own web search as part of answering.
  *
  * Sonar and OpenRouter's `:online` variants search natively through chat completions. They are
@@ -394,6 +390,10 @@ internal fun AiProviderConfig.usesNativeWebSearch(): Boolean {
         slug.contains(":online")
 }
 
+/**
+ * OpenRouter variants can also differ in sampling-parameter support, so let the routed endpoint
+ * use its default. Direct OpenAI gpt-5 and o-series models likewise require their default.
+ */
 internal fun AiProviderConfig.supportsCustomTemperature(): Boolean {
     if (kind == AiProviderKind.OPEN_ROUTER) return false
     val normalized = model.trim().lowercase(Locale.ROOT).removePrefix("openai/")

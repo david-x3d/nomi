@@ -1,6 +1,5 @@
 package com.nomi.app.ai.model
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -328,16 +327,6 @@ data class PortionAdjustment(
     val requiresConfirmation: Boolean = false,
 )
 
-@Serializable
-data class AiDebugSummary(
-    val provider: AiProviderKind,
-    val model: String,
-    val requestDurationMillis: Long,
-    val cacheHit: Boolean,
-    val source: String,
-    val validationStatus: String,
-    val redactedResult: String,
-)
 
 enum class AiProcessingStage {
     UNDERSTANDING_MEAL,

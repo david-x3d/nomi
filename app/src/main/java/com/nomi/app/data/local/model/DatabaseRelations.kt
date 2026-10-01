@@ -11,7 +11,6 @@ import com.nomi.app.data.local.entity.NutritionSourceEntity
 import com.nomi.app.data.local.entity.SavedMealEntity
 import com.nomi.app.data.local.entity.SavedMealItemEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
-import com.nomi.app.data.local.entity.WeightEntryEntity
 
 data class FoodWithDetails(
     @Embedded val food: FoodEntity,
@@ -68,7 +67,3 @@ data class MealNutritionTotals(
     val fatGrams: Double,
 )
 
-data class WeightRange(
-    val oldest: WeightEntryEntity?,
-    val newest: WeightEntryEntity?,
-)

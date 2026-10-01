@@ -7,6 +7,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -177,4 +180,28 @@ private fun playingFrame(loop: FoxLoop): Int {
         }
     }
     return loop.frames[index.coerceIn(loop.frames.indices)]
+}
+
+/**
+ * The fox's face in a round avatar, for the places where Nomi speaks in the first person.
+ *
+ * The launcher icon's face rather than the logo: the logo carries the "Nomi" wordmark under it,
+ * which pushed the fox above the middle of the circle.
+ */
+@Composable
+fun NomiFoxAvatar(size: Dp, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.size(size),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.nomi_icon_foreground),
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
+        )
+    }
 }

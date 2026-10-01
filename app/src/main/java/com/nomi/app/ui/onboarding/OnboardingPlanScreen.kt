@@ -1,5 +1,6 @@
 package com.nomi.app.ui.onboarding
 
+import com.nomi.app.ui.components.NomiFoxAvatar
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.expandVertically
@@ -79,11 +80,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.nomi.app.ui.localization.nomiMessage
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import com.nomi.app.R
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.graphics.graphicsLayer
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 
 @Composable
@@ -171,22 +167,7 @@ internal fun PlanRevealScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // The same fox that answered along the way hands over the result.
-                    Surface(
-                        modifier = Modifier.size(56.dp),
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ) {
-                        Image(
-                            // The launcher icon's face: the logo carries the "Nomi" wordmark under it, which
-                            // pushed the fox above the middle of a round avatar.
-                            painter = painterResource(R.drawable.nomi_icon_foreground),
-                            contentDescription = null,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer(scaleX = 1.35f, scaleY = 1.35f),
-                        )
-                    }
+                    NomiFoxAvatar(size = 56.dp)
                     Spacer(Modifier.height(14.dp))
                     Text(nomiString("Daily energy target"), style = MaterialTheme.typography.titleMedium)
                     Text(

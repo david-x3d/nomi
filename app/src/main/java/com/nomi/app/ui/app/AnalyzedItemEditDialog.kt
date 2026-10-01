@@ -37,8 +37,8 @@ fun AnalyzedItemEditDialog(
     var carbs by remember(item) { mutableStateOf(item.carbohydrateGrams.toString()) }
     var fat by remember(item) { mutableStateOf(item.fatGrams.toString()) }
     var error by remember(item) { mutableStateOf<String?>(null) }
-    val parsed = listOf(quantity, calories, protein, carbs, fat).map { DecimalInput.parseOrNull(it) }
-    val valid = unit.isNotBlank() && parsed.all { it != null && it >= 0.0 } && (parsed.firstOrNull() ?: 0.0) > 0.0
+    val edited = EditedValues.parseOrNull(quantity, calories, protein, carbs, fat)
+    val valid = unit.isNotBlank() && edited != null
 
     NomiDialog(
         onDismissRequest = onDismiss,
@@ -46,12 +46,14 @@ fun AnalyzedItemEditDialog(
         icon = Icons.Default.Tune,
         subtitle = nomiString("Values are saved as an immutable snapshot for this log entry."),
         confirmLabel = nomiString("Apply"),
-        onConfirm = {
-            val nutrientsChanged = parsed[1]!! != item.calories ||
-                parsed[2]!! != item.proteinGrams ||
-                parsed[3]!! != item.carbohydrateGrams ||
-                parsed[4]!! != item.fatGrams
-            val amountChanged = parsed[0]!! != item.quantity || unit.trim() != item.unit
+        onConfirm = confirm@{
+            // The button is disabled while a field does not parse, so this is only a guard.
+            val values = edited ?: return@confirm
+            val nutrientsChanged = values.calories != item.calories ||
+                values.proteinGrams != item.proteinGrams ||
+                values.carbohydrateGrams != item.carbohydrateGrams ||
+                values.fatGrams != item.fatGrams
+            val amountChanged = values.quantity != item.quantity || unit.trim() != item.unit
             // Applying an untouched dialog is not a correction. It used to relabel a verified
             // source reading as a hand-made estimate.
             if (!nutrientsChanged && !amountChanged) {
@@ -64,10 +66,10 @@ fun AnalyzedItemEditDialog(
                 val corrected = if (nutrientsChanged) {
                     ServingNutritionNormalizer.applyUserNutrientCorrection(
                         item = item,
-                        calories = parsed[1]!!,
-                        proteinGrams = parsed[2]!!,
-                        carbohydrateGrams = parsed[3]!!,
-                        fatGrams = parsed[4]!!,
+                        calories = values.calories,
+                        proteinGrams = values.proteinGrams,
+                        carbohydrateGrams = values.carbohydrateGrams,
+                        fatGrams = values.fatGrams,
                     )
                 } else {
                     item
@@ -76,7 +78,7 @@ fun AnalyzedItemEditDialog(
                     if (amountChanged) {
                         ServingNutritionNormalizer.applyUserAmountOverride(
                             item = corrected,
-                            quantity = parsed[0]!!,
+                            quantity = values.quantity,
                             unit = unit,
                         )
                     } else {
@@ -140,4 +142,29 @@ private fun DecimalField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         modifier = modifier,
     )
+}
+
+/** The five numeric fields of the dialog, present only when every one of them is usable. */
+private data class EditedValues(
+    val quantity: Double,
+    val calories: Double,
+    val proteinGrams: Double,
+    val carbohydrateGrams: Double,
+    val fatGrams: Double,
+) {
+    companion object {
+        /** Null unless all five parse, none is negative and the amount is above zero. */
+        fun parseOrNull(
+            quantity: String,
+            calories: String,
+            protein: String,
+            carbs: String,
+            fat: String,
+        ): EditedValues? {
+            val parsed = listOf(quantity, calories, protein, carbs, fat)
+                .map { DecimalInput.parseOrNull(it)?.takeIf { value -> value >= 0.0 } ?: return null }
+            if (parsed[0] <= 0.0) return null
+            return EditedValues(parsed[0], parsed[1], parsed[2], parsed[3], parsed[4])
+        }
+    }
 }

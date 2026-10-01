@@ -15,24 +15,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.MonitorWeight
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -56,8 +50,6 @@ import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.settings.HealthConnectUiState
 import com.nomi.app.ui.today.estimatedStepCaloriesText
 import com.nomi.app.ui.today.formatted
-import com.nomi.app.ui.today.MealCategory
-import com.nomi.app.ui.today.TodayFoodEntry
 import kotlin.math.roundToInt
 import com.nomi.app.ui.localization.nomiMessage
 
@@ -99,105 +91,6 @@ fun WeightEntryDialog(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FoodEntryDetailScreen(
-    entry: TodayFoodEntry?,
-    onBack: () -> Unit,
-    onDuplicate: (Long) -> Unit,
-    onDelete: (Long) -> Unit,
-    onFavorite: (Long) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(nomiString("Food details")) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back"))
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        if (entry == null) {
-            Column(Modifier.padding(padding).padding(24.dp)) {
-                Text(nomiString("This entry is no longer available."), style = MaterialTheme.typography.titleLarge)
-                TextButton(onClick = onBack) { Text(nomiString("Go back")) }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = padding,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                item {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Icon(Icons.Default.Restaurant, contentDescription = null)
-                        Text(entry.name, style = MaterialTheme.typography.headlineLarge)
-                        entry.brand?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        Text("${entry.amountText} · ${entry.mealCategory.localizedDisplayName()} · ${entry.time}")
-                        if (entry.isEstimated) Text(nomiString("Estimated nutrition"), color = MaterialTheme.colorScheme.tertiary)
-                    }
-                }
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        shape = nomiCardShape(),
-                        elevation = nomiCardElevation(),
-                        border = nomiCardBorder(),
-                    ) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(nomiString("Nutrition"), style = MaterialTheme.typography.titleLarge)
-                            NutritionLine(nomiString("Calories"), "${entry.calories.roundToInt()} kcal")
-                            NutritionLine(nomiString("Protein"), "${entry.proteinGrams.roundToInt()} g")
-                            NutritionLine(nomiString("Carbohydrates"), "${entry.carbohydrateGrams.roundToInt()} g")
-                            NutritionLine(nomiString("Fat"), "${entry.fatGrams.roundToInt()} g")
-                            entry.sourceName?.let { source ->
-                                NutritionLine(nomiString("Source"), source)
-                                entry.sourceUrl?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        FilledTonalButton(
-                            onClick = { onDuplicate(entry.id); onBack() },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Default.ContentCopy, contentDescription = null)
-                            Text(nomiString("Duplicate"))
-                        }
-                        FilledTonalButton(
-                            onClick = { onFavorite(entry.id) },
-                            enabled = entry.foodId != null,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(Icons.Default.Favorite, contentDescription = null)
-                            Text(nomiString("Favorite"))
-                        }
-                    }
-                }
-                item {
-                    TextButton(onClick = { onDelete(entry.id); onBack() }, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Text(nomiString("Delete"))
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun NutritionLine(label: String, value: String) {
     Row(
@@ -212,14 +105,6 @@ private fun NutritionLine(label: String, value: String) {
         )
         Text(value, style = MaterialTheme.typography.titleMedium)
     }
-}
-
-@Composable
-private fun MealCategory.localizedDisplayName(): String = when (this) {
-    MealCategory.BREAKFAST -> nomiString("Breakfast")
-    MealCategory.LUNCH -> nomiString("Lunch")
-    MealCategory.DINNER -> nomiString("Dinner")
-    MealCategory.SNACKS -> nomiString("Snacks")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

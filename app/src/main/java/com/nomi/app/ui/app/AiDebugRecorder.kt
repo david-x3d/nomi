@@ -4,6 +4,7 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
+import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.remote.ai.ExaGeminiDebugTrace
 import com.nomi.app.data.remote.ai.NutritionScalingDebugTrace
 import com.nomi.app.di.AppContainer
@@ -168,7 +169,7 @@ internal class AiDebugRecorder(
         if (!enabled) return
         scope.launch {
             runCatching {
-                val selection = preferences.value.selectionFor(
+                val selection = preferences.value.providerSelection(
                     if (route == NutritionRoute.CONTENT_RERESEARCH) {
                         ProviderPipeline.FOOD_RESEARCH
                     } else {

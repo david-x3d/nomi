@@ -61,8 +61,10 @@ android {
 
     buildTypes {
         release {
-            // Debuggable builds skip ART's ahead-of-time optimization and keep Compose's
-            // debug instrumentation, which is what made animations stutter.
+            // A release build exists for what it leaves out: it is not debuggable, so ART
+            // optimizes it ahead of time and Compose drops its debug instrumentation, which is
+            // what made animations stutter. R8 stays off - nothing here has been verified
+            // against shrinking, and proguard-rules.pro is kept ready for when it is.
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(

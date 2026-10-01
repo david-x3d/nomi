@@ -68,14 +68,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -83,14 +81,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -105,8 +101,6 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
@@ -139,7 +133,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -174,13 +167,9 @@ import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.components.NomiIcons
 import com.nomi.app.ui.components.NomiSheet
-import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.hairlineOnPitchBlack
-import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
-import com.nomi.app.ui.components.nomiCardElevation
-import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.feedback.nomiPress
 import com.nomi.app.ui.feedback.rememberNomiPressFeedback
@@ -192,7 +181,6 @@ import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.profile.localizedName
 import com.nomi.app.ui.share.LocalNomiShareCoordinator
 import com.nomi.app.ui.share.ShareMenuSection
-import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.NomiTheme
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
 import com.nomi.app.ui.theme.nomiLayoutMotionSpec
@@ -2766,9 +2754,6 @@ private fun GoalWave(fraction: Float, color: Color) {
         trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
     )
 }
-
-private fun cleanAmount(value: Double, locale: Locale): String =
-    if (value % 1.0 == 0.0) value.roundToInt().toString() else String.format(locale, "%.1f", value)
 
 internal fun Int.formatted(locale: Locale): String = String.format(locale, "%,d", this)
 

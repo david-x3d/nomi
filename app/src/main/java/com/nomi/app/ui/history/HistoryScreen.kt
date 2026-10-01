@@ -94,7 +94,8 @@ fun HistoryScreen(
     modifier: Modifier = Modifier,
     selection: HistorySelection? = null,
 ) {
-    var showDatePicker by remember { mutableStateOf(false) }    // The pick waiting for a name, resolved once at the moment the user confirmed it. Holding the
+    var showDatePicker by remember { mutableStateOf(false) }
+    // The pick waiting for a name, resolved once at the moment the user confirmed it. Holding the
     // day and the log ids means the name step does not have to find them in live state again,
     // which could fail under the user's feet if the log changed while the dialog was open.
     var pendingSave by remember { mutableStateOf<PendingMealSave?>(null) }

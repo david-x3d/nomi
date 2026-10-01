@@ -62,12 +62,3 @@ fun interface FoodEditClassificationProvider {
     ): FoodEditClassification
 }
 
-data class AiProviderRegistry(
-    val foodParser: FoodParsingProvider,
-    val nutritionResearcher: NutritionResearchProvider,
-    val visionFoodProvider: VisionFoodProvider,
-    val menuVisionProvider: MenuVisionProvider,
-    val nutritionLabelProvider: NutritionLabelProvider,
-    val portionAdjustmentProvider: PortionAdjustmentProvider,
-    val foodEditClassifier: FoodEditClassificationProvider,
-)

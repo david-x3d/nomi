@@ -4,6 +4,7 @@ import com.nomi.app.BuildConfig
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
+import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.preferences.ThemePreference
 import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.data.preferences.enabledMicronutrients
@@ -36,7 +37,7 @@ internal fun mapSettings(
     language: NomiLanguage,
 ): SettingsUiState {
     val providers = ProviderPipeline.entries.map { pipeline ->
-        val selected = prefs.selectionFor(pipeline)
+        val selected = prefs.providerSelection(pipeline)
         AiProviderSetting(
             purpose = pipeline.displayName(),
             provider = selected.providerId.toProviderKind(),
