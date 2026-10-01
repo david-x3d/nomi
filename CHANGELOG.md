@@ -1,5 +1,11 @@
 # Changelog
 
+## Nomi v2.10.2 — 2026-10-01
+
+### History
+
+- Fix the empty search message using dark text on a gray background with some Material color schemes. The History page and its "Nothing found" heading now use the active theme's readable foreground color.
+
 ## Nomi v2.10.1 — 2026-10-01
 
 ### Counted foods and Gemini model suggestions

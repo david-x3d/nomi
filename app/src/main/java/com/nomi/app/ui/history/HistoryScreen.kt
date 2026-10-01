@@ -134,6 +134,7 @@ fun HistoryScreen(
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = pageContainerColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         topBar = {
             LargeFlexibleTopAppBar(
                 scrollBehavior = scrollBehavior,
@@ -393,6 +394,7 @@ private fun EmptyHistory(query: String, modifier: Modifier = Modifier) {
                 if (searching) "Nothing found" else "Your logged days will appear here.",
             ),
             style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
         )
         Text(
