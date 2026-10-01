@@ -24,8 +24,9 @@ import com.nomi.app.ui.localization.fillTemplate
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.PortionEditSheet
-import com.nomi.app.ui.settings.AiProviderEditorDialog
+import com.nomi.app.ui.settings.AiProviderEditorScreen
 import com.nomi.app.ui.settings.AiProviderEditorState
+import com.nomi.app.ui.settings.switchedTo
 import com.nomi.app.ui.share.NomiShareCoordinator
 import com.nomi.app.ui.share.NomiShareEvent
 import com.nomi.app.ui.share.ShareReceivedDialog
@@ -37,7 +38,8 @@ import kotlinx.coroutines.flow.collectLatest
 
 /*
  * The dialogs and sheets that sit above the main interface whatever screen is underneath:
- * the tap-to-share screens, the update prompt, the AI provider editor and the preview editors.
+ * the tap-to-share screens, the update prompt and the preview editors. The AI provider editor's
+ * page is hosted here too, next to the session that holds its draft.
  */
 
 /**
@@ -149,7 +151,7 @@ internal fun UpdateDialogHost(viewModel: AppViewModel) {
     }
 }
 
-/** The provider being edited from Settings, if any, and which pipeline slot it belongs to. */
+/** The provider being edited from the AI page, if any, and which pipeline slot it belongs to. */
 @Stable
 internal class AiProviderEditorSession {
     var index by mutableIntStateOf(-1)
@@ -162,54 +164,88 @@ internal class AiProviderEditorSession {
     }
 }
 
-/** Shows the provider editor while [session] has one open, and runs its three actions. */
+/**
+ * The provider editor's page: shows the draft [session] holds and runs its actions.
+ *
+ * The draft lives in the session rather than in saved state because it can hold a key that has
+ * been typed and not yet stored, and that must not be written anywhere a process death would
+ * leave it. When there is no draft - after exactly such a death - the page closes itself.
+ */
 @Composable
-internal fun AiProviderEditorHost(viewModel: AppViewModel, session: AiProviderEditorSession) {
-    session.editor?.let { editor ->
-        AiProviderEditorDialog(
-            state = editor,
-            onStateChanged = { session.editor = it },
-            onTestConnection = {
-                session.editor = editor.copy(isTesting = true, testResult = null)
-                viewModel.testProvider(session.index, editor) { result ->
-                    session.editor = session.editor?.copy(isTesting = false, testResult = result)
-                }
-            },
-            onSave = {
-                session.editor = editor.copy(isSaving = true, errorMessage = null, testResult = null)
-                viewModel.saveProvider(session.index, editor) { success, message ->
-                    if (success) {
-                        session.editor = null
-                    } else {
-                        session.editor = session.editor?.copy(
-                            isSaving = false,
-                            errorMessage = message,
-                        )
-                    }
-                }
-            },
-            onRemoveStoredKey = {
-                session.editor = editor.copy(
-                    isRemovingKey = true,
-                    errorMessage = null,
-                    testResult = null,
-                )
-                viewModel.removeProviderKey(session.index, editor) { success, message ->
-                    val current = session.editor
-                    if (current != null) {
-                        session.editor = current.copy(
-                            isRemovingKey = false,
-                            hasStoredApiKey = if (success) false else current.hasStoredApiKey,
-                            apiKeyInput = if (success) "" else current.apiKeyInput,
-                            testResult = if (success) message else null,
-                            errorMessage = if (success) null else message,
-                        )
-                    }
-                }
-            },
-            onDismiss = { session.editor = null },
-        )
+internal fun AiProviderEditorPage(
+    viewModel: AppViewModel,
+    session: AiProviderEditorSession,
+    onClose: () -> Unit,
+) {
+    val editor = session.editor
+    if (editor == null) {
+        LaunchedEffect(Unit) { onClose() }
+        return
     }
+    AiProviderEditorScreen(
+        state = editor,
+        onStateChanged = { session.editor = it },
+        onProviderSelected = { provider ->
+            val switched = editor.switchedTo(provider)
+            session.editor = switched
+            viewModel.storedProviderKeys(session.index, switched) { primary, search ->
+                // Applied only if the draft still points at the provider that was looked up.
+                val current = session.editor
+                if (current != null && current.provider == switched.provider &&
+                    current.endpoint == switched.endpoint
+                ) {
+                    session.editor = current.copy(
+                        hasStoredApiKey = primary,
+                        hasStoredSearchApiKey = search,
+                    )
+                }
+            }
+        },
+        onTestConnection = {
+            session.editor = editor.copy(isTesting = true, testResult = null)
+            viewModel.testProvider(session.index, editor) { result ->
+                session.editor = session.editor?.copy(isTesting = false, testResult = result)
+            }
+        },
+        onSave = {
+            session.editor = editor.copy(isSaving = true, errorMessage = null, testResult = null)
+            viewModel.saveProvider(session.index, editor) { success, message ->
+                if (success) {
+                    session.editor = null
+                    onClose()
+                } else {
+                    session.editor = session.editor?.copy(
+                        isSaving = false,
+                        errorMessage = message,
+                    )
+                }
+            }
+        },
+        onRemoveStoredKey = {
+            session.editor = editor.copy(
+                isRemovingKey = true,
+                errorMessage = null,
+                testResult = null,
+            )
+            viewModel.removeProviderKey(session.index, editor) { success, message ->
+                val current = session.editor
+                if (current != null) {
+                    session.editor = current.copy(
+                        isRemovingKey = false,
+                        hasStoredApiKey = if (success) false else current.hasStoredApiKey,
+                        hasStoredSearchApiKey = if (success) false else current.hasStoredSearchApiKey,
+                        apiKeyInput = if (success) "" else current.apiKeyInput,
+                        testResult = if (success) message else null,
+                        errorMessage = if (success) null else message,
+                    )
+                }
+            }
+        },
+        onBack = {
+            session.editor = null
+            onClose()
+        },
+    )
 }
 
 /** The two editors that can sit on top of a preview: one item's numbers, or its portion. */

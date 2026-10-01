@@ -1,44 +1,53 @@
 package com.nomi.app.ui.settings
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
-import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiFieldShape
 import com.nomi.app.ui.components.NomiInlineError
+import com.nomi.app.ui.components.NomiSecretField
+import com.nomi.app.ui.components.NomiSecureWindow
 import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
-import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.localization.nomiFormat
-import java.net.URI
 import com.nomi.app.ui.localization.nomiMessage
+import com.nomi.app.ui.localization.nomiString
+import java.net.URI
 
 data class AiProviderEditorState(
     val purpose: String,
@@ -56,195 +65,279 @@ data class AiProviderEditorState(
     val errorMessage: String? = null,
 )
 
+/**
+ * One task's provider, on a page of its own.
+ *
+ * It used to be a dialog, which is a shape for a question with one answer. This is a form - a
+ * provider, a model, one or two keys, a test - and in a dialog the two buttons that finish it
+ * scrolled away under the keyboard. Here the form scrolls and Test and Save stay where they are.
+ *
+ * [onProviderSelected] is separate from [onStateChanged] because switching provider changes which
+ * stored key applies, and only the host can look that up.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AiProviderEditorDialog(
+fun AiProviderEditorScreen(
     state: AiProviderEditorState,
     onStateChanged: (AiProviderEditorState) -> Unit,
+    onProviderSelected: (AiProviderKind) -> Unit,
     onTestConnection: () -> Unit,
     onSave: () -> Unit,
     onRemoveStoredKey: () -> Unit,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val activity = LocalContext.current.findActivity()
+    NomiSecureWindow()
+    val uriHandler = LocalUriHandler.current
     val busy = state.isTesting || state.isSaving || state.isRemovingKey
     val configurationError = state.configurationError(
         blankModelMessage = nomiString("Enter a model name."),
         missingEndpointMessage = nomiString("Enter an API endpoint."),
         invalidEndpointMessage = nomiString("Enter a valid HTTPS API endpoint."),
     )
+    val usesExaGemini = state.provider == AiProviderKind.EXA_GEMINI
     val hasReasoningKey = state.hasStoredApiKey || state.apiKeyInput.isNotBlank()
-    val hasSearchKey = state.provider != AiProviderKind.EXA_GEMINI ||
+    val hasSearchKey = !usesExaGemini ||
         state.hasStoredSearchApiKey || state.searchApiKeyInput.isNotBlank()
     val canTest = configurationError == null && hasReasoningKey && hasSearchKey && !busy
-    DisposableEffect(activity) {
-        activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
-    }
-    NomiDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
+
+    SettingsSubpageScaffold(
         title = state.purpose.localizedPurpose(),
-        icon = Icons.Outlined.Key,
-        confirmLabel = if (state.isSaving) {
-            nomiString("Saving…")
-        } else {
-            nomiString("Save")
-        },
-        onConfirm = onSave,
-        confirmEnabled = configurationError == null && !busy,
-        dismissLabel = nomiString("Cancel"),
-        onDismissAction = { if (!busy) onDismiss() },
-    ) {
-        Text(
-            nomiString("Provider"),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        providerRows(state.purpose).forEach { providers ->
+        onBack = { if (!busy) onBack() },
+        modifier = modifier.imePadding(),
+        bottomBar = {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                providers.forEach { provider ->
+                OutlinedButton(
+                    onClick = onTestConnection,
+                    enabled = canTest,
+                    shape = NomiShapes.Action,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                ) {
+                    Text(
+                        if (state.isTesting) nomiString("Testing…") else nomiString("Test connection"),
+                        maxLines = 1,
+                    )
+                }
+                Button(
+                    onClick = onSave,
+                    enabled = configurationError == null && !busy,
+                    shape = NomiShapes.Action,
+                    modifier = Modifier.weight(1f).height(56.dp),
+                ) {
+                    Text(
+                        if (state.isSaving) nomiString("Saving…") else nomiString("Save"),
+                        maxLines = 1,
+                    )
+                }
+            }
+        },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            FormLabel(nomiString("Provider"))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                providersFor(state.purpose).forEach { provider ->
                     FilterChip(
                         selected = state.provider == provider,
-                        onClick = {
-                            if (state.provider != provider) {
-                                onStateChanged(state.switchTo(provider))
-                            }
-                        },
+                        onClick = { if (state.provider != provider) onProviderSelected(provider) },
                         enabled = !busy,
                         shape = NomiShapes.Action,
                         label = { Text(provider.localizedDisplayName()) },
                     )
                 }
             }
-        }
-        NomiTextField(
-            value = state.provider.canonicalEndpoint() ?: state.endpoint,
-            onValueChange = { value ->
-                val targetChanged = value.secretEndpointKey() != state.endpoint.secretEndpointKey()
-                onStateChanged(
-                    state.copy(
-                        endpoint = value,
-                        hasStoredApiKey = if (targetChanged) false else state.hasStoredApiKey,
-                        testResult = null,
-                        errorMessage = null,
-                    ),
+
+            // A built-in provider's address is Nomi's business; showing it as a field nobody can
+            // type into only made the form longer.
+            if (state.provider.canonicalEndpoint() == null) {
+                NomiTextField(
+                    value = state.endpoint,
+                    onValueChange = { value ->
+                        val targetChanged = value.secretEndpointKey() != state.endpoint.secretEndpointKey()
+                        onStateChanged(
+                            state.copy(
+                                endpoint = value,
+                                hasStoredApiKey = if (targetChanged) false else state.hasStoredApiKey,
+                                testResult = null,
+                                errorMessage = null,
+                            ),
+                        )
+                    },
+                    label = nomiString("API endpoint"),
+                    enabled = !busy,
+                    isError = configurationError?.contains("endpoint", ignoreCase = true) == true,
+                    supportingText = nomiString("OpenAI-compatible base URL (https:// optional)"),
                 )
-            },
-            label = nomiString("API endpoint"),
-            readOnly = state.provider.canonicalEndpoint() != null,
-            enabled = !busy,
-            isError = configurationError?.contains("endpoint", ignoreCase = true) == true,
-            supportingText = if (state.provider.canonicalEndpoint() != null) {
-                nomiString("Built-in provider endpoint managed by Nomi")
-            } else {
-                nomiString("OpenAI-compatible base URL (https:// optional)")
-            },
-        )
-        NomiTextField(
-            value = state.model,
-            onValueChange = {
-                onStateChanged(
-                    state.copy(model = it, testResult = null, errorMessage = null),
-                )
-            },
-            label = nomiString("Model"),
-            enabled = !busy,
-            isError = state.model.isBlank(),
-        )
-        val keyName = if (state.provider == AiProviderKind.EXA_GEMINI) {
-            nomiString("Google Gemini API key")
-        } else {
-            nomiString("API key")
-        }
-        NomiTextField(
-            value = state.apiKeyInput,
-            onValueChange = {
-                onStateChanged(
-                    state.copy(apiKeyInput = it, testResult = null, errorMessage = null),
-                )
-            },
-            label = if (state.hasStoredApiKey) nomiFormat("{0} (stored securely)", keyName) else keyName,
-            placeholder = if (state.hasStoredApiKey) {
-                nomiString("Leave blank to keep existing key")
-            } else {
-                null
-            },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            enabled = !busy,
-        )
-        if (state.provider == AiProviderKind.EXA_GEMINI) {
+            }
+
             NomiTextField(
-                value = state.searchApiKeyInput,
+                value = state.model,
                 onValueChange = {
-                    onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
+                    onStateChanged(state.copy(model = it, testResult = null, errorMessage = null))
                 },
-                label = if (state.hasStoredSearchApiKey) {
-                    nomiFormat("{0} (stored securely)", nomiString("Exa API key"))
-                } else {
-                    nomiString("Exa API key")
-                },
-                placeholder = if (state.hasStoredSearchApiKey) {
-                    nomiString("Leave blank to keep existing key")
-                } else {
-                    null
-                },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                label = nomiString("Model"),
                 enabled = !busy,
+                isError = state.model.isBlank(),
+                // An empty field says what is missing in its own caption, where the eye already
+                // is, rather than in a second red box further down the form.
+                supportingText = if (state.model.isBlank()) {
+                    nomiString("Enter a model name.")
+                } else {
+                    nomiString("The model ID, exactly as the provider lists it.")
+                },
             )
-            Text(
-                nomiString("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device."),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
-            TextButton(
-                onClick = onRemoveStoredKey,
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (state.isRemovingKey) nomiString("Removing stored key…") else nomiString("Remove stored key"))
+            val suggestions = state.provider.modelSuggestions(state.purpose)
+                .filterNot { it == state.model.trim() }
+            if (suggestions.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    suggestions.forEach { suggestion ->
+                        SuggestionChip(
+                            onClick = {
+                                onStateChanged(
+                                    state.copy(model = suggestion, testResult = null, errorMessage = null),
+                                )
+                            },
+                            enabled = !busy,
+                            shape = NomiShapes.Action,
+                            label = { Text(suggestion) },
+                        )
+                    }
+                }
             }
-        }
-        configurationError?.let { NomiInlineError(it) }
-        OutlinedButton(
-            onClick = onTestConnection,
-            enabled = canTest,
-            shape = NomiShapes.Action,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) {
-            Text(if (state.isTesting) nomiString("Testing…") else nomiString("Test connection"))
-        }
-        state.testResult?.let {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = NomiFieldShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Text(
-                    nomiMessage(it),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+
+            val keyName = if (usesExaGemini) {
+                nomiString("Google Gemini API key")
+            } else {
+                nomiString("API key")
+            }
+            NomiSecretField(
+                value = state.apiKeyInput,
+                onValueChange = {
+                    onStateChanged(state.copy(apiKeyInput = it, testResult = null, errorMessage = null))
+                },
+                label = if (state.hasStoredApiKey) nomiFormat("{0} (stored securely)", keyName) else keyName,
+                placeholder = nomiString("Leave blank to keep existing key").takeIf { state.hasStoredApiKey },
+                enabled = !busy,
+                imeAction = if (usesExaGemini) ImeAction.Next else ImeAction.Done,
+            )
+            state.provider.keyPageUrl()?.let { url ->
+                KeyPageLink(
+                    label = nomiFormat("Get a key from {0}", state.provider.keyPageName()),
+                    onClick = { runCatching { uriHandler.openUri(url) } },
                 )
             }
+            if (usesExaGemini) {
+                NomiSecretField(
+                    value = state.searchApiKeyInput,
+                    onValueChange = {
+                        onStateChanged(state.copy(searchApiKeyInput = it, testResult = null, errorMessage = null))
+                    },
+                    label = if (state.hasStoredSearchApiKey) {
+                        nomiFormat("{0} (stored securely)", nomiString("Exa API key"))
+                    } else {
+                        nomiString("Exa API key")
+                    },
+                    placeholder = nomiString("Leave blank to keep existing key")
+                        .takeIf { state.hasStoredSearchApiKey },
+                    enabled = !busy,
+                )
+                KeyPageLink(
+                    label = nomiFormat("Get a key from {0}", "Exa"),
+                    onClick = { runCatching { uriHandler.openUri(EXA_KEY_PAGE_URL) } },
+                )
+                Text(
+                    nomiString("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.hasStoredApiKey || state.hasStoredSearchApiKey) {
+                TextButton(onClick = onRemoveStoredKey, enabled = !busy) {
+                    Text(
+                        if (state.isRemovingKey) {
+                            nomiString("Removing stored key…")
+                        } else {
+                            nomiString("Remove stored key")
+                        },
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            configurationError?.takeIf { state.model.isNotBlank() }?.let { NomiInlineError(it) }
+            state.testResult?.let {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = NomiFieldShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    Text(
+                        nomiMessage(it),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                }
+            }
+            state.errorMessage?.let { NomiInlineError(it) }
+            Spacer(Modifier.height(8.dp))
         }
-        state.errorMessage?.let { NomiInlineError(it) }
     }
 }
 
-private val BASE_PROVIDER_ROWS = listOf(
-    listOf(AiProviderKind.PERPLEXITY, AiProviderKind.OPEN_ROUTER),
-    listOf(AiProviderKind.OPEN_AI, AiProviderKind.CODEX_EASY),
-    listOf(AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE),
+@Composable
+private fun FormLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.semantics { heading() },
+    )
+}
+
+/** The way to the page where a key is made, for someone who arrived without one. */
+@Composable
+internal fun KeyPageLink(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(onClick = onClick, modifier = modifier) {
+        Icon(
+            Icons.AutoMirrored.Outlined.OpenInNew,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(label)
+    }
+}
+
+private val BASE_PROVIDERS = listOf(
+    AiProviderKind.OPEN_ROUTER,
+    AiProviderKind.PERPLEXITY,
+    AiProviderKind.OPEN_AI,
+    AiProviderKind.CODEX_EASY,
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
 )
 
-private fun providerRows(purpose: String) = BASE_PROVIDER_ROWS +
-    listOfNotNull(listOf(AiProviderKind.EXA_GEMINI).takeIf { purpose == "Food research" })
+/** Exa + Gemini retrieves and reads web pages, which is only what research does. */
+private fun providersFor(purpose: String): List<AiProviderKind> =
+    if (purpose == "Food research") BASE_PROVIDERS + AiProviderKind.EXA_GEMINI else BASE_PROVIDERS
 
 private fun AiProviderEditorState.configurationError(
     blankModelMessage: String,
@@ -257,13 +350,19 @@ private fun AiProviderEditorState.configurationError(
     else -> null
 }
 
-private fun AiProviderEditorState.switchTo(provider: AiProviderKind): AiProviderEditorState = copy(
+/**
+ * The same form pointed at another provider.
+ *
+ * A key already typed is kept: pasting the key first and choosing the provider second is the
+ * natural order for someone coming back from the provider's website, and wiping the field
+ * punished it. Whether a key is already stored for the new provider is not known here, so both
+ * flags drop to false until the host has looked.
+ */
+internal fun AiProviderEditorState.switchedTo(provider: AiProviderKind): AiProviderEditorState = copy(
     provider = provider,
     endpoint = provider.canonicalEndpoint().orEmpty(),
-    searchApiKeyInput = "",
     model = provider.suggestedModel(purpose),
     hasStoredSearchApiKey = false,
-    apiKeyInput = "",
     hasStoredApiKey = false,
     testResult = null,
     errorMessage = null,
@@ -294,8 +393,51 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
     -> ""
 }
 
+/**
+ * Models offered as one-tap answers under the field, so an empty field is never a dead end.
+ *
+ * Only names Nomi already relies on elsewhere are listed. Research and Fallback have to search
+ * the web, which is why OpenAI is offered its search model there and not the general one alone.
+ */
+private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
+    val searches = purpose == "Food research" || purpose == "Fallback"
+    return when (this) {
+        AiProviderKind.OPEN_ROUTER ->
+            listOf(if (purpose == "Food research") DEFAULT_OPENROUTER_RESEARCH_MODEL else DEFAULT_OPENROUTER_MODEL)
+        AiProviderKind.PERPLEXITY -> listOf("sonar", "sonar-pro")
+        AiProviderKind.OPEN_AI ->
+            if (searches) listOf("gpt-4o-search-preview", "gpt-5.2") else listOf("gpt-5.2")
+        AiProviderKind.EXA_GEMINI -> listOf(DEFAULT_GEMINI_NUTRITION_MODEL)
+        AiProviderKind.CODEX_EASY,
+        AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
+        -> emptyList()
+    }
+}
+
+/** Where a key for this provider is made. A custom endpoint has no such page. */
+internal fun AiProviderKind.keyPageUrl(): String? = when (this) {
+    AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/keys"
+    AiProviderKind.PERPLEXITY -> "https://www.perplexity.ai/settings/api"
+    AiProviderKind.OPEN_AI -> "https://platform.openai.com/api-keys"
+    AiProviderKind.EXA_GEMINI -> "https://aistudio.google.com/apikey"
+    AiProviderKind.CODEX_EASY -> "https://codex-easy.ai"
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
+}
+
+/** Who issues the key, which for Exa + Gemini's first field is Google rather than the pair. */
+internal fun AiProviderKind.keyPageName(): String = when (this) {
+    AiProviderKind.OPEN_ROUTER -> "OpenRouter"
+    AiProviderKind.PERPLEXITY -> "Perplexity"
+    AiProviderKind.OPEN_AI -> "OpenAI"
+    AiProviderKind.EXA_GEMINI -> "Google AI Studio"
+    AiProviderKind.CODEX_EASY -> "Codex Easy"
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> ""
+}
+
+private const val EXA_KEY_PAGE_URL = "https://dashboard.exa.ai/api-keys"
+
 @Composable
-private fun AiProviderKind.localizedDisplayName(): String = when (this) {
+internal fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "Perplexity"
     AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
@@ -305,7 +447,7 @@ private fun AiProviderKind.localizedDisplayName(): String = when (this) {
 }
 
 @Composable
-private fun String.localizedPurpose(): String = when (this) {
+internal fun String.localizedPurpose(): String = when (this) {
     "Food research" -> nomiString("Food research")
     "Food interpretation" -> nomiString("Food interpretation")
     "Portion changes" -> nomiString("Portion changes")
@@ -319,14 +461,8 @@ private fun String.isValidHttpsEndpoint(): Boolean {
     return uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
 }
 
-
 private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
     if ("://" in endpoint) endpoint else "https://$endpoint"
 }
-private fun String.secretEndpointKey(): String = trim().trimEnd('/').lowercase()
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
-}
+private fun String.secretEndpointKey(): String = trim().trimEnd('/').lowercase()

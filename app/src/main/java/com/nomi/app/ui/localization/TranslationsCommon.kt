@@ -362,13 +362,6 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
         nl = "AI-debug", pt = "Depuração de IA", sq = "Korrigjimi i IA-së", sv = "AI-felsökning",
         tr = "YZ hata ayıklama",
     ),
-    "Privacy-safe diagnostics" to NomiTranslation(
-        de = "Datenschutzfreundliche Diagnose", es = "Diagnóstico respetuoso con la privacidad",
-        fr = "Diagnostics respectueux de la vie privée", it = "Diagnostica rispettosa della privacy",
-        nl = "Privacyveilige diagnostiek", pt = "Diagnóstico respeitador da privacidade",
-        sq = "Diagnostikë që respekton privatësinë", sv = "Integritetssäker diagnostik",
-        tr = "Gizliliğe saygılı tanılama",
-    ),
     "Events contain provider, model, timing, cache and validation status—never API keys or " +
         "request headers." to NomiTranslation(
         de = "Ereignisse enthalten Anbieter, Modell, Dauer, Cache- und Prüfstatus – niemals " +
@@ -389,20 +382,6 @@ internal val commonTranslations: Map<String, NomiTranslation> = mapOf(
             "aldrig API-nycklar eller förfrågningsrubriker.",
         tr = "Olaylar sağlayıcı, model, süre, önbellek ve doğrulama durumunu içerir; API " +
             "anahtarlarını veya istek başlıklarını asla içermez.",
-    ),
-    "Disable debug events" to NomiTranslation(
-        de = "Debug-Ereignisse deaktivieren", es = "Desactivar eventos de depuración",
-        fr = "Désactiver les événements de débogage", it = "Disattiva gli eventi di debug",
-        nl = "Debug-gebeurtenissen uitschakelen", pt = "Desativar eventos de depuração",
-        sq = "Çaktivizo ngjarjet e korrigjimit", sv = "Stäng av felsökningshändelser",
-        tr = "Hata ayıklama olaylarını kapat",
-    ),
-    "Enable debug events" to NomiTranslation(
-        de = "Debug-Ereignisse aktivieren", es = "Activar eventos de depuración",
-        fr = "Activer les événements de débogage", it = "Attiva gli eventi di debug",
-        nl = "Debug-gebeurtenissen inschakelen", pt = "Ativar eventos de depuração",
-        sq = "Aktivizo ngjarjet e korrigjimit", sv = "Slå på felsökningshändelser",
-        tr = "Hata ayıklama olaylarını aç",
     ),
     "No debug events recorded." to NomiTranslation(
         de = "Noch keine Debug-Ereignisse aufgezeichnet.",

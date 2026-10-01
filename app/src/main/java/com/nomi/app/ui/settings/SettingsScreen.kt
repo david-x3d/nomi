@@ -5,23 +5,20 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DonutLarge
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.HealthAndSafety
-import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -31,25 +28,19 @@ import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,29 +49,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
-import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.components.NomiDialog
 import com.nomi.app.ui.components.NomiSelectionRow
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
-import com.nomi.app.ui.components.NomiCardShadowElevation
-import com.nomi.app.ui.components.nomiCardBorder
-import com.nomi.app.ui.components.nomiCardContainerColor
-import com.nomi.app.ui.components.nomiCardTonalElevation
-import com.nomi.app.ui.feedback.nomiPress
-import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.localization.NomiLanguage
-import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.localizedName
-import com.nomi.app.ui.theme.nomiPageContainerColor
-import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -94,17 +72,14 @@ fun SettingsScreen(
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
     onMicronutrients: () -> Unit,
-    onAiProvider: (Int) -> Unit,
-    onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
+    onAi: () -> Unit,
     onHealthConnect: () -> Unit,
     onReminderChanged: (Int, Boolean) -> Unit,
-    onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
     onGoalsCardStyleChanged: (GoalsCardStyle) -> Unit,
     onReminderTimeChanged: (index: Int, hour: Int, minute: Int) -> Unit,
     onExport: () -> Unit,
     onExportDiary: () -> Unit,
     onImport: () -> Unit,
-    onDeveloper: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var picker by remember { mutableStateOf<SettingPicker?>(null) }
@@ -112,10 +87,7 @@ fun SettingsScreen(
     // The title collapses into the bar as the list scrolls, the same way it does on Progress
     // and History, so the three top-level screens behave alike.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val pageContainerColor = nomiPageContainerColor(
-        accent = MaterialTheme.colorScheme.tertiaryContainer,
-        strength = 0.09f,
-    )
+    val pageContainerColor = settingsPageColor()
     Scaffold(
         modifier = modifier
             .fillMaxSize()
@@ -136,6 +108,18 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxSize().background(pageContainerColor),
             contentPadding = innerPadding,
         ) {
+            // The one thing that stops Nomi working is said first, not found in a section.
+            if (state.aiSetupNeeded) {
+                item(key = "ai-setup") {
+                    SettingsLink(
+                        icon = { Icon(Icons.Default.Key, contentDescription = null) },
+                        title = nomiString("Add your AI key"),
+                        supporting = nomiString("Nomi can't look up food until a key is saved."),
+                        onClick = onAi,
+                        iconColor = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
             item { SectionTitle(nomiString("You")) }
             item {
                 SettingsLink(
@@ -174,6 +158,23 @@ fun SettingsScreen(
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
             }
+            // One row for everything AI. The provider of each task, the estimate bias, the
+            // timeout and the debug log are all a page down, where the people who want them look.
+            item { SectionTitle(nomiString("AI")) }
+            item {
+                SettingsLink(
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
+                    title = nomiString("AI provider"),
+                    supporting = state.aiSummary(),
+                    supportingColor = if (state.aiSetupNeeded) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        Color.Unspecified
+                    },
+                    onClick = onAi,
+                    iconColor = MaterialTheme.colorScheme.secondary,
+                )
+            }
             item { SectionTitle(nomiString("Appearance & units")) }
             item {
                 SettingsLink(
@@ -186,7 +187,7 @@ fun SettingsScreen(
             }
             item {
                 ToggleSetting(
-                    icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Wallpaper, contentDescription = null) },
                     title = nomiString("Dynamic colors"),
                     supporting = nomiString("Use colors from your Android wallpaper"),
                     checked = state.dynamicColor,
@@ -216,55 +217,11 @@ fun SettingsScreen(
             }
             item {
                 SettingsLink(
-                    icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
+                    icon = { Icon(Icons.Default.DonutLarge, contentDescription = null) },
                     title = nomiString("Goals view"),
                     supporting = state.goalsCardStyle.localizedDisplayName(),
                     onClick = { picker = SettingPicker.GoalsStyle },
-                    iconColor = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            item { SectionTitle(nomiString("AI providers")) }
-            item {
-                SettingsInfo(
-                    icon = { Icon(Icons.Default.Key, contentDescription = null) },
-                    title = nomiString("One key for everything"),
-                    supporting = nomiString(
-                        "Nomi is preconfigured for OpenRouter. Enter your OpenRouter API key " +
-                            "in any pipeline below and all of them use it.",
-                    ),
-                    iconColor = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            if (state.aiProviders.isEmpty()) {
-                item {
-                    SettingsInfo(
-                        icon = { Icon(Icons.Default.Key, contentDescription = null) },
-                        title = nomiString("No provider configured"),
-                        supporting = nomiString("Configure a provider to analyze text, photos and portions."),
-                        iconColor = MaterialTheme.colorScheme.error,
-                    )
-                }
-            } else {
-                state.aiProviders.forEachIndexed { index, provider ->
-                    item(key = "provider-$index") {
-                        SettingsLink(
-                            icon = { Icon(Icons.Default.Key, contentDescription = null) },
-                            title = provider.purpose.localizedPurpose(),
-                            supporting = "${provider.provider.localizedDisplayName()} · ${provider.model}",
-                            onClick = { onAiProvider(index) },
-                            iconColor = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                }
-            }
-            item {
-                ToggleSetting(
-                    icon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
-                    title = nomiString("Never time out"),
-                    supporting = nomiString("Wait as long as the provider needs instead of giving up after 45 seconds"),
-                    checked = state.aiRequestTimeoutDisabled,
-                    onCheckedChange = onAiRequestTimeoutDisabledChanged,
-                    iconColor = MaterialTheme.colorScheme.secondary,
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
             item { SectionTitle(nomiString("Health & activity")) }
@@ -295,12 +252,6 @@ fun SettingsScreen(
                     checked = state.activityTargetAdjustment,
                     onCheckedChange = onActivityTargetAdjustmentChanged,
                     iconColor = MaterialTheme.colorScheme.primary,
-                )
-            }
-            item {
-                CalorieBiasSetting(
-                    bias = state.calorieEstimateBias,
-                    onBiasChanged = onCalorieEstimateBiasChanged,
                 )
             }
             item { SectionTitle(nomiString("Reminders")) }
@@ -345,16 +296,6 @@ fun SettingsScreen(
                     supporting = nomiString("Validated before existing data changes"),
                     onClick = onImport,
                     iconColor = MaterialTheme.colorScheme.primary,
-                )
-            }
-            item { SectionTitle(nomiString("Developer")) }
-            item {
-                SettingsLink(
-                    icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                    title = nomiString("AI debug"),
-                    supporting = nomiString("Provider, timing, source and validation — never keys"),
-                    onClick = onDeveloper,
-                    iconColor = MaterialTheme.colorScheme.error,
                 )
             }
             item {
@@ -422,150 +363,6 @@ fun SettingsScreen(
         )
 
         null -> Unit
-    }
-}
-
-@Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 6.dp)
-            .semantics { heading() },
-    )
-}
-
-@Composable
-private fun SettingsLink(
-    icon: @Composable () -> Unit,
-    title: String,
-    supporting: String,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    iconColor: Color = Color.Unspecified,
-) {
-    val resolvedIconColor = if (iconColor == Color.Unspecified) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        iconColor
-    }
-    SettingSurface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        onClick = onClick,
-        enabled = enabled,
-    ) {
-        ListItem(
-            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
-            supportingContent = { Text(supporting) },
-            leadingContent = { SettingsIconTile(resolvedIconColor, icon) },
-            trailingContent = {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-    }
-}
-
-@Composable
-private fun ToggleSetting(
-    icon: @Composable () -> Unit,
-    title: String,
-    supporting: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null,
-    iconColor: Color = Color.Unspecified,
-) {
-    val resolvedIconColor = if (iconColor == Color.Unspecified) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        iconColor
-    }
-    SettingSurface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        onClick = { onClick?.invoke() ?: onCheckedChange(!checked) },
-    ) {
-        ListItem(
-            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
-            supportingContent = { Text(supporting) },
-            leadingContent = { SettingsIconTile(resolvedIconColor, icon) },
-            trailingContent = {
-                Switch(checked = checked, onCheckedChange = onCheckedChange)
-            },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-    }
-}
-
-@Composable
-private fun SettingsInfo(
-    icon: @Composable () -> Unit,
-    title: String,
-    supporting: String,
-    iconColor: Color,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = nomiCardContainerColor(),
-        tonalElevation = nomiCardTonalElevation(),
-        shadowElevation = NomiCardShadowElevation,
-        border = nomiCardBorder(),
-    ) {
-        ListItem(
-            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
-            supportingContent = { Text(supporting) },
-            leadingContent = { SettingsIconTile(iconColor, icon) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-    }
-}
-
-@Composable
-private fun SettingSurface(
-    modifier: Modifier,
-    onClick: () -> Unit,
-    enabled: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    val press = rememberNomiPressFeedback(pressedScale = 0.985f)
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        interactionSource = press.interactionSource,
-        modifier = modifier.nomiPress(press),
-        shape = RoundedCornerShape(22.dp),
-        color = nomiCardContainerColor(),
-        tonalElevation = nomiCardTonalElevation(),
-        shadowElevation = NomiCardShadowElevation,
-        border = nomiCardBorder(),
-        content = content,
-    )
-}
-
-@Composable
-private fun SettingsIconTile(
-    color: Color,
-    icon: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = Modifier,
-        shape = RoundedCornerShape(13.dp),
-        color = color.copy(alpha = 0.14f),
-        contentColor = color,
-    ) {
-        Box(
-            modifier = Modifier.padding(10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            icon()
-        }
     }
 }
 
@@ -655,141 +452,23 @@ private fun UnitSystem.localizedDisplayName(): String = when (this) {
     UnitSystem.IMPERIAL -> nomiString("Imperial")
 }
 
-/**
- * Five discrete stops on one official Material slider.
- *
- * The setting is a scale with a natural middle, not five unrelated options, so a slider says what
- * a list cannot: that "no bias" is the centre and each step moves the same distance away from it.
- * The example underneath updates as the thumb moves, so the effect is visible before release.
- * The preference is only written on release; dragging must not fire a DataStore write per pixel.
- */
-@Composable
-private fun CalorieBiasSetting(
-    bias: CalorieEstimateBias,
-    onBiasChanged: (CalorieEstimateBias) -> Unit,
-) {
-    val entries = CalorieEstimateBias.entries
-    var position by remember(bias) { mutableFloatStateOf(entries.indexOf(bias).toFloat()) }
-    fun entryAt(value: Float) = entries[value.roundToInt().coerceIn(0, entries.lastIndex)]
-    val selected = entryAt(position)
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = nomiCardContainerColor(),
-        tonalElevation = nomiCardTonalElevation(),
-        shadowElevation = NomiCardShadowElevation,
-        border = nomiCardBorder(),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SettingsIconTile(MaterialTheme.colorScheme.error) {
-                    Icon(Icons.Default.Straighten, contentDescription = null)
-                }
-                Column {
-                    Text(
-                        nomiString("Calorie estimate bias"),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = selected.localizedDisplayName(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            Slider(
-                value = position,
-                onValueChange = { position = it },
-                // Read the stop at release rather than the one this composition captured. A tap on
-                // the track reports its value and finishes inside the same frame, before any
-                // recomposition, so the captured stop is still the previous one and would be
-                // written back as if the tap had never happened.
-                onValueChangeFinished = { onBiasChanged(entryAt(position)) },
-                valueRange = 0f..entries.lastIndex.toFloat(),
-                steps = entries.size - 2,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = nomiString("Lower"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = nomiString("Higher"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = selected.localizedSupportingText(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
- * Says what the setting does to a real number rather than naming it again, because "Overestimate"
- * on its own does not tell anyone how much.
- */
-@Composable
-private fun CalorieEstimateBias.localizedSupportingText(): String {
-    val example = CalorieBiasAdjuster.scaleFor(uncertaintyPercent = 16.7, bias = this) * 600.0
-    val rounded = example.roundToInt()
-    return when (this) {
-        CalorieEstimateBias.NONE -> nomiString("Estimates are logged as given. A 500-700 kcal meal counts as 600.")
-        else -> nomiFormat(
-            "{0} - a 500-700 kcal meal counts as {1}.",
-            localizedDisplayName(),
-            rounded,
-        )
-    }
-}
-
 @Composable
 private fun GoalsCardStyle.localizedDisplayName(): String = when (this) {
     GoalsCardStyle.BARS -> nomiString("Calories and bars")
     GoalsCardStyle.RINGS -> nomiString("One card with rings")
 }
 
+/** The AI row's second line: which provider, and whether it has what it needs. */
 @Composable
-private fun CalorieEstimateBias.localizedDisplayName(): String = when (this) {
-    CalorieEstimateBias.STRONGLY_UNDERESTIMATE ->
-        nomiString("Underestimate more")
-    CalorieEstimateBias.UNDERESTIMATE -> nomiString("Underestimate")
-    CalorieEstimateBias.NONE -> nomiString("No bias")
-    CalorieEstimateBias.OVERESTIMATE -> nomiString("Overestimate")
-    CalorieEstimateBias.STRONGLY_OVERESTIMATE ->
-        nomiString("Overestimate more")
-}
-
-@Composable
-private fun com.nomi.app.ai.model.AiProviderKind.localizedDisplayName(): String = when (this) {
-    com.nomi.app.ai.model.AiProviderKind.PERPLEXITY -> "Perplexity"
-    com.nomi.app.ai.model.AiProviderKind.OPEN_ROUTER -> "OpenRouter"
-    com.nomi.app.ai.model.AiProviderKind.OPEN_AI -> "OpenAI"
-    com.nomi.app.ai.model.AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
-    com.nomi.app.ai.model.AiProviderKind.CODEX_EASY -> "Codex Easy"
-    com.nomi.app.ai.model.AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom endpoint")
-}
-
-@Composable
-private fun String.localizedPurpose(): String = when (this) {
-    "Food research" -> nomiString("Food research")
-    "Food interpretation" -> nomiString("Food interpretation")
-    "Portion changes" -> nomiString("Portion changes")
-    "Photo recognition" -> nomiString("Photo recognition")
-    "Fallback" -> nomiString("Fallback")
-    else -> this
+private fun SettingsUiState.aiSummary(): String {
+    val status = if (aiSetupNeeded) nomiString("API key missing") else nomiString("Ready")
+    val shared = sharedAiProvider
+    return when {
+        // Not loaded yet, which is not the same as not set up.
+        aiProviders.isEmpty() -> ""
+        shared != null -> "${shared.provider.localizedDisplayName()} · $status"
+        else -> "${nomiString("A provider per task")} · $status"
+    }
 }
 
 @Composable

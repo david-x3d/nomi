@@ -53,6 +53,9 @@ fun OnboardingRoute(
     modifier: Modifier = Modifier,
     onDraftChanged: (OnboardingDraft) -> Unit = {},
     onMicronutrientsChanged: (MicronutrientPreferences) -> Unit = {},
+    aiKeyStored: Boolean = false,
+    onConnectAiKey: (key: String, onResult: (success: Boolean, message: String) -> Unit) -> Unit =
+        { _, _ -> },
     viewModel: OnboardingViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -74,6 +77,8 @@ fun OnboardingRoute(
     OnboardingFlow(
         state = state,
         actions = viewModel,
+        aiKeyStored = aiKeyStored,
+        onConnectAiKey = onConnectAiKey,
         onComplete = {
             state.finalPlan?.let { plan -> onComplete(state.draft, plan) }
         },
@@ -87,6 +92,9 @@ internal fun OnboardingFlow(
     actions: OnboardingActions,
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
+    aiKeyStored: Boolean = false,
+    onConnectAiKey: (key: String, onResult: (success: Boolean, message: String) -> Unit) -> Unit =
+        { _, _ -> },
 ) {
     val spatialSpec = nomiPageMotionSpec<IntOffset>()
     val effectsSpec = nomiFadeMotionSpec<Float>()
@@ -134,6 +142,11 @@ internal fun OnboardingFlow(
                     OnboardingStep.ACTIVITY -> ActivityScreen(state = state, actions = actions)
                     OnboardingStep.PROGRESS_RATE -> ProgressRateScreen(state = state, actions = actions)
                     OnboardingStep.MICRONUTRIENTS -> MicronutrientsScreen(state = state, actions = actions)
+                    OnboardingStep.AI_KEY -> AiKeyScreen(
+                        keyStored = aiKeyStored,
+                        onConnectKey = onConnectAiKey,
+                        onContinue = actions::goNext,
+                    )
                     OnboardingStep.PLAN -> PlanRevealScreen(
                         state = state,
                         actions = actions,

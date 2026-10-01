@@ -475,4 +475,27 @@ internal val todayTranslations: Map<String, NomiTranslation> = mapOf(
         sq = "{0} kcal bëhen {1} kcal", sv = "{0} kcal blir {1} kcal",
         tr = "{0} kcal, {1} kcal oluyor",
     ),
+    // The way to the AI page from a keyless Today.
+    "Set up" to NomiTranslation(
+        de = "Einrichten",
+        es = "Configurar",
+        fr = "Configurer",
+        it = "Configura",
+        nl = "Instellen",
+        pt = "Configurar",
+        sq = "Konfiguro",
+        sv = "Ställ in",
+        tr = "Kur",
+    ),
+    "Open AI settings" to NomiTranslation(
+        de = "KI-Einstellungen öffnen",
+        es = "Abrir ajustes de IA",
+        fr = "Ouvrir les réglages d’IA",
+        it = "Apri impostazioni IA",
+        nl = "AI-instellingen openen",
+        pt = "Abrir definições de IA",
+        sq = "Hap cilësimet e IA-së",
+        sv = "Öppna AI-inställningar",
+        tr = "YZ ayarlarını aç",
+    ),
 )

@@ -67,6 +67,7 @@ import com.nomi.app.domain.model.EnergySex
 import com.nomi.app.domain.model.GoalType
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.ProgressRate
+import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardElevation
@@ -115,234 +116,242 @@ internal fun PlanRevealScreen(
         haptics.confirmed()
     }
 
-    LazyColumn(
+    // The button that ends onboarding is pinned, like Continue on every step before it, rather
+    // than waiting under the calculation and the plan editor.
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding()
-            .imePadding()
-            .testTag("plan_reveal"),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .imePadding(),
     ) {
-        item {
-            Column {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .testTag("plan_reveal"),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            item {
+                Column {
+                    Text(
+                        text = nomiString("YOUR STARTING PLAN"),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = nomiString("A target built around you"),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = nomiString("Start here, watch your real trend, and adjust when your body gives you better information."),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("daily_calorie_target"),
+                    shape = nomiCardShape(),
+                    elevation = nomiCardElevation(),
+                    border = nomiCardBorder(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        // The same fox that answered along the way hands over the result.
+                        NomiFoxAvatar(size = 56.dp)
+                        Spacer(Modifier.height(14.dp))
+                        Text(nomiString("Daily energy target"), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = animatedCalories.value.roundToInt().toString(),
+                            style = MaterialTheme.typography.displayLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(nomiString("kcal / day"), style = MaterialTheme.typography.titleMedium)
+                        if (plan.isCalorieCustomized || plan.areMacrosCustomized) {
+                            Spacer(Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Outlined.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(nomiString("Adjusted by you"), style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    MacroCard(
+                        label = nomiString("Protein"),
+                        grams = plan.proteinGrams,
+                        modifier = Modifier.weight(1f),
+                        testTag = "plan_protein",
+                    )
+                    MacroCard(
+                        label = nomiString("Carbs"),
+                        grams = plan.carbohydrateGrams,
+                        modifier = Modifier.weight(1f),
+                        testTag = "plan_carbs",
+                    )
+                    MacroCard(
+                        label = nomiString("Fat"),
+                        grams = plan.fatGrams,
+                        modifier = Modifier.weight(1f),
+                        testTag = "plan_fat",
+                    )
+                }
+            }
+
+            item { TrajectoryCard(plan = plan) }
+
+            if (plan.safetyLimitApplied) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
+                            Icon(Icons.Outlined.Info, contentDescription = null)
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(nomiString("A safer starting point"), style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    nomiString("The requested rate would push calories beyond the calculator's safety boundary, so Nomi used a gentler target."),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item { SectionLabel(nomiString("USER INPUT")) }
+            item {
+                DetailCard {
+                    InputRows(state = state)
+                }
+            }
+
+            item { SectionLabel(nomiString("CALCULATED RESULTS")) }
+            item {
+                DetailCard {
+                    ResultRow(nomiString("Age today"), nomiFormat("{0} years", plan.ageYears))
+                    plan.bmrKcal?.let { ResultRow(nomiString("Resting energy"), "${it.roundToInt()} kcal") }
+                    plan.activityMultiplier?.let { ResultRow(nomiString("Activity multiplier"), "× ${it.oneOrTwoDecimals(nomiLocale())}") }
+                    plan.maintenanceKcal?.let { ResultRow(nomiString("Estimated maintenance"), "${it.roundToInt()} kcal") }
+                    ResultRow(
+                        label = nomiString("Goal adjustment"),
+                        value = signedCalories(plan.goalAdjustmentKcal),
+                    )
+                    ResultRow(nomiString("Rounded target"), "${plan.caloriesKcal} kcal/day", emphasized = true)
+                }
+            }
+
+            item {
+                TextButton(
+                    onClick = actions::toggleCalculationBreakdown,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("calculation_breakdown_toggle"),
+                ) {
+                    Icon(Icons.Outlined.Calculate, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(nomiString("How was this calculated?"))
+                    Spacer(Modifier.weight(1f))
+                    Icon(
+                        imageVector = if (state.isCalculationExpanded) {
+                            Icons.Outlined.ExpandLess
+                        } else {
+                            Icons.Outlined.ExpandMore
+                        },
+                        contentDescription = nomiString(if (state.isCalculationExpanded) "Collapse" else "Expand"),
+                    )
+                }
+            }
+            item {
+                AnimatedVisibility(
+                    visible = state.isCalculationExpanded,
+                    enter = expandVertically(animationSpec = expandAnimation) + fadeIn(animationSpec = fadeAnimation),
+                    exit = shrinkVertically(animationSpec = expandAnimation) + fadeOut(animationSpec = fadeAnimation),
+                ) {
+                    CalculationBreakdown(plan = plan)
+                }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = actions::togglePlanEditor,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .testTag("adjust_plan"),
+                ) {
+                    Icon(Icons.Outlined.Tune, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(nomiString(if (state.isPlanEditorExpanded) "Close adjustments" else "Adjust plan"))
+                }
+            }
+            item {
+                AnimatedVisibility(
+                    visible = state.isPlanEditorExpanded,
+                    enter = expandVertically(animationSpec = expandAnimation) + fadeIn(animationSpec = fadeAnimation),
+                    exit = shrinkVertically(animationSpec = expandAnimation) + fadeOut(animationSpec = fadeAnimation),
+                ) {
+                    PlanEditor(
+                        state = state,
+                        actions = actions,
+                        onApply = {
+                            focusManager.clearFocus()
+                            actions.applyPlanEdits()
+                        },
+                    )
+                }
+            }
+
+            item {
                 Text(
-                    text = nomiString("YOUR STARTING PLAN"),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = nomiString("A target built around you"),
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = nomiString("Start here, watch your real trend, and adjust when your body gives you better information."),
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = nomiString("This estimate is for planning, not medical advice. Adjust based on your logged trend and professional guidance."),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("daily_calorie_target"),
-                shape = nomiCardShape(),
-                elevation = nomiCardElevation(),
-                border = nomiCardBorder(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // The same fox that answered along the way hands over the result.
-                    NomiFoxAvatar(size = 56.dp)
-                    Spacer(Modifier.height(14.dp))
-                    Text(nomiString("Daily energy target"), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = animatedCalories.value.roundToInt().toString(),
-                        style = MaterialTheme.typography.displayLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(nomiString("kcal / day"), style = MaterialTheme.typography.titleMedium)
-                    if (plan.isCalorieCustomized || plan.areMacrosCustomized) {
-                        Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Outlined.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(nomiString("Adjusted by you"), style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                MacroCard(
-                    label = nomiString("Protein"),
-                    grams = plan.proteinGrams,
-                    modifier = Modifier.weight(1f),
-                    testTag = "plan_protein",
-                )
-                MacroCard(
-                    label = nomiString("Carbs"),
-                    grams = plan.carbohydrateGrams,
-                    modifier = Modifier.weight(1f),
-                    testTag = "plan_carbs",
-                )
-                MacroCard(
-                    label = nomiString("Fat"),
-                    grams = plan.fatGrams,
-                    modifier = Modifier.weight(1f),
-                    testTag = "plan_fat",
-                )
-            }
-        }
-
-        item { TrajectoryCard(plan = plan) }
-
-        if (plan.safetyLimitApplied) {
-            item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Outlined.Info, contentDescription = null)
-                        Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(nomiString("A safer starting point"), style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                nomiString("The requested rate would push calories beyond the calculator's safety boundary, so Nomi used a gentler target."),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        item { SectionLabel(nomiString("USER INPUT")) }
-        item {
-            DetailCard {
-                InputRows(state = state)
-            }
-        }
-
-        item { SectionLabel(nomiString("CALCULATED RESULTS")) }
-        item {
-            DetailCard {
-                ResultRow(nomiString("Age today"), nomiFormat("{0} years", plan.ageYears))
-                plan.bmrKcal?.let { ResultRow(nomiString("Resting energy"), "${it.roundToInt()} kcal") }
-                plan.activityMultiplier?.let { ResultRow(nomiString("Activity multiplier"), "× ${it.oneOrTwoDecimals(nomiLocale())}") }
-                plan.maintenanceKcal?.let { ResultRow(nomiString("Estimated maintenance"), "${it.roundToInt()} kcal") }
-                ResultRow(
-                    label = nomiString("Goal adjustment"),
-                    value = signedCalories(plan.goalAdjustmentKcal),
-                )
-                ResultRow(nomiString("Rounded target"), "${plan.caloriesKcal} kcal/day", emphasized = true)
-            }
-        }
-
-        item {
-            TextButton(
-                onClick = actions::toggleCalculationBreakdown,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("calculation_breakdown_toggle"),
-            ) {
-                Icon(Icons.Outlined.Calculate, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(nomiString("How was this calculated?"))
-                Spacer(Modifier.weight(1f))
-                Icon(
-                    imageVector = if (state.isCalculationExpanded) {
-                        Icons.Outlined.ExpandLess
-                    } else {
-                        Icons.Outlined.ExpandMore
-                    },
-                    contentDescription = nomiString(if (state.isCalculationExpanded) "Collapse" else "Expand"),
-                )
-            }
-        }
-        item {
-            AnimatedVisibility(
-                visible = state.isCalculationExpanded,
-                enter = expandVertically(animationSpec = expandAnimation) + fadeIn(animationSpec = fadeAnimation),
-                exit = shrinkVertically(animationSpec = expandAnimation) + fadeOut(animationSpec = fadeAnimation),
-            ) {
-                CalculationBreakdown(plan = plan)
-            }
-        }
-
-        item {
-            OutlinedButton(
-                onClick = actions::togglePlanEditor,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-                    .testTag("adjust_plan"),
-            ) {
-                Icon(Icons.Outlined.Tune, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(nomiString(if (state.isPlanEditorExpanded) "Close adjustments" else "Adjust plan"))
-            }
-        }
-        item {
-            AnimatedVisibility(
-                visible = state.isPlanEditorExpanded,
-                enter = expandVertically(animationSpec = expandAnimation) + fadeIn(animationSpec = fadeAnimation),
-                exit = shrinkVertically(animationSpec = expandAnimation) + fadeOut(animationSpec = fadeAnimation),
-            ) {
-                PlanEditor(
-                    state = state,
-                    actions = actions,
-                    onApply = {
-                        focusManager.clearFocus()
-                        actions.applyPlanEdits()
-                    },
-                )
-            }
-        }
-
-        item {
-            Button(
-                onClick = onComplete,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .testTag("start_tracking"),
-            ) {
-                Text(nomiString("Start tracking"))
-            }
-        }
-        item {
-            Text(
-                text = nomiString("This estimate is for planning, not medical advice. Adjust based on your logged trend and professional guidance."),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Button(
+            onClick = onComplete,
+            shape = NomiShapes.Action,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp)
+                .height(60.dp)
+                .testTag("start_tracking"),
+        ) {
+            Text(nomiString("Start tracking"), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

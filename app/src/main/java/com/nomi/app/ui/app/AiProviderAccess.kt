@@ -188,6 +188,48 @@ internal class AiProviderAccess(
         }
     }
 
+    /**
+     * Checks [key] against the provider the interpretation pipeline runs on and stores it once
+     * that provider has answered.
+     *
+     * Keys belong to the provider account rather than to a pipeline, so on the default setup,
+     * where all five pipelines share one provider, this one key configures every one of them.
+     * It is what the single key field in onboarding and on the AI page calls. Interpretation is
+     * the pipeline tested because its check is one small completion; research would run a paid
+     * web search just to say hello.
+     */
+    suspend fun connectKey(key: String) {
+        val pipeline = ProviderPipeline.FOOD_INTERPRETATION
+        val selection = loadedPreferences().providerSelection(pipeline)
+        val state = AiProviderEditorState(
+            purpose = pipeline.displayName(),
+            provider = selection.providerId.toProviderKind(),
+            endpoint = runCatching { selection.toRuntimeConfig().endpoint }
+                .getOrElse { selection.endpoint.orEmpty() },
+            model = selection.model,
+            apiKeyInput = key,
+        )
+        testConnection(pipeline, state)
+        save(pipeline, state)
+    }
+
+    /**
+     * Whether keys are already stored for the provider a draft points at, so the editor can say
+     * "stored" for a provider the user has just switched to. False for a draft that does not
+     * resolve to an endpoint yet.
+     */
+    suspend fun storedKeyPresence(
+        pipeline: ProviderPipeline,
+        state: AiProviderEditorState,
+    ): ProviderKeyPresence {
+        val selection = state.toProviderSelection(pipeline)
+        val primary = runCatching { container.secretStore.contains(secretId(selection)) }
+            .getOrDefault(false)
+        val search = selection.usesExaGemini &&
+            runCatching { container.secretStore.contains(exaSecretId()) }.getOrDefault(false)
+        return ProviderKeyPresence(primary = primary, search = search)
+    }
+
     /** Stores the edited provider and any key typed with it. Throws when the draft is unusable. */
     suspend fun save(pipeline: ProviderPipeline, state: AiProviderEditorState) {
         val draft = state.toProviderSelection(pipeline)

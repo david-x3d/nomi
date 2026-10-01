@@ -755,44 +755,67 @@ private fun MicronutrientOption(
     )
 }
 
+/**
+ * One question: what is asked, the answer, and the way forward.
+ *
+ * The button is pinned under the list rather than being its last row. As a row it scrolled out of
+ * reach on the longer questions and went under the keyboard on the ones that are typed, so the
+ * one control every step needs was the one most often off screen. An error sits directly above
+ * it for the same reason: a tap that is refused has to be answered where the tap happened.
+ */
 @Composable
-private fun QuestionPage(
+internal fun QuestionPage(
     title: String,
     supportingText: String,
     error: String?,
     onContinue: () -> Unit,
     note: String? = null,
+    continueLabel: String = nomiString("Continue"),
+    continueEnabled: Boolean = true,
+    secondaryAction: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val focusManager = LocalFocusManager.current
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding()
             .imePadding(),
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
-        item {
-            Text(
-                text = supportingText,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        item { Spacer(Modifier.height(4.dp)) }
-        item { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
-        item { NomiNote(text = note) }
-        error?.let { message ->
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             item {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
+            item {
+                Text(
+                    text = supportingText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            item { Spacer(Modifier.height(4.dp)) }
+            item { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { content() } }
+            item { NomiNote(text = note) }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            error?.let { message ->
                 NomiInlineError(
                     message = nomiMessage(message),
                     modifier = Modifier
@@ -800,21 +823,19 @@ private fun QuestionPage(
                         .testTag("onboarding_error"),
                 )
             }
-        }
-        item { Spacer(Modifier.height(8.dp)) }
-        item {
             Button(
                 onClick = {
                     focusManager.clearFocus()
                     onContinue()
                 },
+                enabled = continueEnabled,
                 shape = NomiShapes.Action,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
                     .testTag("onboarding_continue"),
             ) {
-                Text(nomiString("Continue"), style = MaterialTheme.typography.titleMedium)
+                Text(continueLabel, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.width(8.dp))
                 Icon(
                     imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
@@ -822,6 +843,7 @@ private fun QuestionPage(
                     modifier = Modifier.size(20.dp),
                 )
             }
+            secondaryAction?.invoke()
         }
     }
 }

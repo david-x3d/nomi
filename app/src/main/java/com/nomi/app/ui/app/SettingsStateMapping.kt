@@ -28,6 +28,17 @@ internal data class ProviderKeyPresence(
     val complete: Boolean get() = primary && search
 }
 
+/**
+ * Whether typing a meal would fail for want of a key: interpretation and research are the two
+ * pipelines every entry passes through. An empty map means the key store has not been read yet,
+ * which is not the same as the keys being absent.
+ */
+internal fun Map<ProviderPipeline, ProviderKeyPresence>.needsAiSetup(): Boolean =
+    isNotEmpty() && listOf(
+        ProviderPipeline.FOOD_INTERPRETATION,
+        ProviderPipeline.FOOD_RESEARCH,
+    ).any { this[it]?.complete != true }
+
 internal fun mapSettings(
     prefs: AppPreferences,
     plan: NutritionPlanEntity?,
@@ -78,7 +89,9 @@ internal fun mapSettings(
         ),
         trackedMicronutrients = prefs.micronutrients.enabledMicronutrients(),
         aiProviders = providers,
+        aiSetupNeeded = keys.needsAiSetup(),
         aiRequestTimeoutDisabled = prefs.aiRequestTimeoutDisabled,
+        aiDebugEnabled = prefs.aiDebugEnabled,
         reminders = listOf(
             ReminderSetting("Breakfast", reminders.breakfast.enabled, reminders.breakfast.localTime),
             ReminderSetting("Lunch", reminders.lunch.enabled, reminders.lunch.localTime),

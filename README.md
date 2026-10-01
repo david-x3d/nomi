@@ -18,7 +18,7 @@
 </div>
 
 > [!IMPORTANT]
-> **Bring your own API key.** Nomi does not include hosted AI credits or a shared cloud account. AI-powered food research, interpretation, and image analysis require keys for the providers you choose in **Settings → AI providers**. Provider usage may incur charges on your own account.
+> **Bring your own API key.** Nomi does not include hosted AI credits or a shared cloud account. AI-powered food research, interpretation, and image analysis require a key for the provider you choose. Nomi asks for it during setup, and it can be changed in **Settings → AI provider**. Provider usage may incur charges on your own account.
 
 ## 📸 Screenshots
 
@@ -81,10 +81,13 @@ Food logging speaks the same languages: you can write or dictate a meal in any o
 > [!TIP]
 > **Recommended: Exa + Gemini.** Exa retrieves focused web evidence and Gemini turns those sources into structured nutrition data. A Gemini Flash Lite model is the recommended cost-conscious choice when it is available for your Google API project.
 
-1. Install Nomi and open **Settings → AI providers**.
-2. Select **Exa + Gemini** for food research, or choose another supported provider.
-3. Enter your own Gemini and Exa API keys.
-4. Tap **Test connection** before logging food.
+Nomi is set up for OpenRouter, where one key runs every task. Paste that key in the last setup step, or later under **Settings → AI provider**, and Nomi checks it before saving.
+
+To use the recommended Exa + Gemini research instead:
+
+1. Open **Settings → AI provider → Provider and model per task → Food research**.
+2. Select **Exa + Gemini** and enter your own Gemini and Exa API keys.
+3. Tap **Test connection**, then **Save**.
 
 Supported configurations include Sonar, Exa + Gemini, Perplexity, OpenRouter, OpenAI, and compatible custom endpoints. Exa + Gemini requires both a Google Gemini API key and an Exa API key. Only the text or image needed for the selected action is sent to the configured provider.
 

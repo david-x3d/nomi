@@ -105,12 +105,18 @@ fun NomiRoot(
                 LoadingIndicator()
             }
 
-            AppStartState.Onboarding -> OnboardingRoute(
-                onComplete = viewModel::completeOnboarding,
-                onDraftChanged = viewModel::persistOnboardingDraft,
-                onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
-                modifier = modifier,
-            )
+            AppStartState.Onboarding -> {
+                val aiSetupNeeded by viewModel.aiSetupNeeded.collectAsStateWithLifecycle()
+                val keyPresenceLoaded by viewModel.aiKeyPresenceLoaded.collectAsStateWithLifecycle()
+                OnboardingRoute(
+                    onComplete = viewModel::completeOnboarding,
+                    onDraftChanged = viewModel::persistOnboardingDraft,
+                    onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
+                    aiKeyStored = keyPresenceLoaded && !aiSetupNeeded,
+                    onConnectAiKey = viewModel::connectAiKey,
+                    modifier = modifier,
+                )
+            }
 
             AppStartState.Main -> NomiMain(
                 container = container,
@@ -322,16 +328,12 @@ private fun NomiMain(
                     onLanguage = viewModel::setLanguage,
                     onUnits = viewModel::setUnits,
                     onActivityAdjustment = viewModel::setActivityAdjustment,
-                    onCalorieEstimateBias = viewModel::setCalorieEstimateBias,
                     onGoalsCardStyle = viewModel::setGoalsCardStyle,
                     onReminderTime = viewModel::setReminderTime,
                     onProfile = { navController.navigate(Routes.PROFILE) },
                     onNutrition = { navController.navigate(Routes.PLAN) },
                     onMicronutrients = { navController.navigate(Routes.MICRONUTRIENTS) },
-                    onAiProvider = { index ->
-                        providerSession.open(index, viewModel.providerEditorState(index))
-                    },
-                    onAiRequestTimeoutDisabled = viewModel::setAiRequestTimeoutDisabled,
+                    onAiSettings = { navController.navigate(Routes.AI) },
                     onHealth = { navController.navigate(Routes.HEALTH) },
                     onReminder = { index, enabled ->
                         val needsPermission = enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -344,7 +346,6 @@ private fun NomiMain(
                     onExport = backup.export,
                     onExportDiary = backup.exportDiary,
                     onImport = backup.import,
-                    onDeveloper = { navController.navigate(Routes.DEVELOPER) },
                 )
             }
 
@@ -374,6 +375,7 @@ private fun NomiMain(
                 navController = navController,
                 viewModel = viewModel,
                 libraryKind = { libraryKind },
+                providerSession = providerSession,
                 onConnectHealth = { healthPermissionLauncher.launch(healthPermissions) },
             )
         }
@@ -406,8 +408,6 @@ private fun NomiMain(
             onDismiss = viewModel::cancelBarcodeAmount,
         )
     }
-
-    AiProviderEditorHost(viewModel, providerSession)
 
     LoggingEditingOverlays(
         viewModel = viewModel,

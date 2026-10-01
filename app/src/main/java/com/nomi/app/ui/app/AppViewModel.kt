@@ -434,6 +434,16 @@ class AppViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
 
+    /** True once the key store has been read and typing a meal would fail for want of a key. */
+    val aiSetupNeeded: StateFlow<Boolean> = providers.keyPresence
+        .map { keys -> keys.needsAiSetup() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** False until the key store has been read, when "no key" would still be a guess. */
+    val aiKeyPresenceLoaded: StateFlow<Boolean> = providers.keyPresence
+        .map { keys -> keys.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
         repository.currentPlan,
@@ -2247,6 +2257,37 @@ class AppViewModel(
                     )
                 }
                 .onFailure { error -> onResult(false, error.safeProviderSettingsMessage()) }
+        }
+    }
+
+    /**
+     * Checks one key against the shared provider and stores it when the provider answers.
+     * The single key field in onboarding and on the AI page ends here.
+     */
+    fun connectAiKey(key: String, onResult: (success: Boolean, message: String) -> Unit) {
+        viewModelScope.launch {
+            runCatching { providers.connectKey(key) }
+                .onSuccess {
+                    recentFoodAnalysisCache.clear()
+                    providers.refreshKeyPresence()
+                    onResult(true, "Connection successful")
+                }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    onResult(false, error.safeProviderConnectionMessage())
+                }
+        }
+    }
+
+    /** Looks up whether the provider a draft was just switched to already has its keys stored. */
+    fun storedProviderKeys(
+        index: Int,
+        state: AiProviderEditorState,
+        onResult: (primary: Boolean, search: Boolean) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val presence = providers.storedKeyPresence(pipelineAt(index), state)
+            onResult(presence.primary, presence.search)
         }
     }
 

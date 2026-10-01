@@ -15,6 +15,7 @@ internal enum class OnboardingStep {
     ACTIVITY,
     PROGRESS_RATE,
     MICRONUTRIENTS,
+    AI_KEY,
     PLAN,
 }
 
@@ -80,6 +81,7 @@ internal data class OnboardingUiState(
         add(OnboardingStep.ACTIVITY)
         if (draft.goalType?.name != "MAINTAIN") add(OnboardingStep.PROGRESS_RATE)
         add(OnboardingStep.MICRONUTRIENTS)
+        add(OnboardingStep.AI_KEY)
         add(OnboardingStep.PLAN)
     }
 }

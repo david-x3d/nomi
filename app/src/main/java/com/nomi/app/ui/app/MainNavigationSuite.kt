@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.ui.capture.PhotoCaptureSubject
@@ -93,20 +92,17 @@ internal fun MainNavigationSuite(
     onLanguage: (NomiLanguage) -> Unit,
     onUnits: (com.nomi.app.ui.settings.UnitSystem) -> Unit,
     onActivityAdjustment: (Boolean) -> Unit,
-    onCalorieEstimateBias: (CalorieEstimateBias) -> Unit,
     onGoalsCardStyle: (GoalsCardStyle) -> Unit,
     onReminderTime: (index: Int, hour: Int, minute: Int) -> Unit,
     onProfile: () -> Unit,
     onNutrition: () -> Unit,
     onMicronutrients: () -> Unit,
-    onAiProvider: (Int) -> Unit,
-    onAiRequestTimeoutDisabled: (Boolean) -> Unit,
+    onAiSettings: () -> Unit,
     onHealth: () -> Unit,
     onReminder: (Int, Boolean) -> Unit,
     onExport: () -> Unit,
     onExportDiary: () -> Unit,
     onImport: () -> Unit,
-    onDeveloper: () -> Unit,
 ) {
     var selected by rememberSaveable { mutableStateOf(MainDestination.TODAY) }
     val haptics = rememberNomiHaptics()
@@ -203,6 +199,7 @@ internal fun MainNavigationSuite(
                         val todayState by viewModel.todayState.collectAsStateWithLifecycle()
                         val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
                         val editedEntryId by viewModel.editedEntryId.collectAsStateWithLifecycle()
+                        val aiSetupNeeded by viewModel.aiSetupNeeded.collectAsStateWithLifecycle()
                         NomiNotesTodayScreen(
                             state = todayState,
                             loggingState = loggingState,
@@ -234,6 +231,8 @@ internal fun MainNavigationSuite(
                             onPhotoDescriptionChanged = viewModel::updatePhotoDescription,
                             onPhotoPlaceChanged = viewModel::updatePhotoPlace,
                             onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
+                            aiSetupNeeded = aiSetupNeeded,
+                            onOpenAiSettings = { haptics.selected(); onAiSettings() },
                         )
                     }
                     MainDestination.PROGRESS -> {
@@ -258,11 +257,9 @@ internal fun MainNavigationSuite(
                             onProfile = { haptics.selected(); onProfile() },
                             onNutrition = { haptics.selected(); onNutrition() },
                             onMicronutrients = { haptics.selected(); onMicronutrients() },
-                            onAiProvider = { haptics.selected(); onAiProvider(it) },
-                            onAiRequestTimeoutDisabledChanged = { haptics.toggled(); onAiRequestTimeoutDisabled(it) },
+                            onAi = { haptics.selected(); onAiSettings() },
                             onHealthConnect = { haptics.selected(); onHealth() },
                             onReminderChanged = { index, enabled -> haptics.toggled(); onReminder(index, enabled) },
-                            onCalorieEstimateBiasChanged = { haptics.toggled(); onCalorieEstimateBias(it) },
                             onGoalsCardStyleChanged = { haptics.toggled(); onGoalsCardStyle(it) },
                             onReminderTimeChanged = { index, hour, minute ->
                                 haptics.confirmed(); onReminderTime(index, hour, minute)
@@ -270,7 +267,6 @@ internal fun MainNavigationSuite(
                             onExport = { haptics.selected(); onExport() },
                             onExportDiary = { haptics.selected(); onExportDiary() },
                             onImport = { haptics.selected(); onImport() },
-                            onDeveloper = { haptics.selected(); onDeveloper() },
                         )
                     }
                 }

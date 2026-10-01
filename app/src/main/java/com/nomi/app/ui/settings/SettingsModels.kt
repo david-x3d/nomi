@@ -67,7 +67,10 @@ data class SettingsUiState(
     /** The micronutrients currently being tracked, in presentation order. */
     val trackedMicronutrients: List<Micronutrient> = emptyList(),
     val aiProviders: List<AiProviderSetting> = emptyList(),
+    /** True once the key store has been read and logging a meal would fail for want of a key. */
+    val aiSetupNeeded: Boolean = false,
     val aiRequestTimeoutDisabled: Boolean = false,
+    val aiDebugEnabled: Boolean = false,
     val reminders: List<ReminderSetting> = listOf(
         ReminderSetting("Breakfast", timeText = "08:00"),
         ReminderSetting("Lunch", timeText = "12:30"),
@@ -76,4 +79,17 @@ data class SettingsUiState(
         ReminderSetting("Weight", timeText = "08:00"),
     ),
     val appVersion: String = "1.0.0",
-)
+) {
+    /**
+     * The provider every task runs on, or null when tasks are split across providers.
+     *
+     * The default setup is one provider on one key, and that is the case the AI page can offer a
+     * single key field for. Exa + Gemini needs two keys and only ever serves research, so it never
+     * counts as shared.
+     */
+    val sharedAiProvider: AiProviderSetting?
+        get() = aiProviders.firstOrNull()?.takeIf { first ->
+            first.provider != AiProviderKind.EXA_GEMINI &&
+                aiProviders.all { it.provider == first.provider && it.endpoint == first.endpoint }
+        }
+}

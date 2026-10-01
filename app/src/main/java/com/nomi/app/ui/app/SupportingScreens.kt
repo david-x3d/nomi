@@ -8,26 +8,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.MonitorWeight
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,19 +32,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.domain.UnitFormatter
 import com.nomi.app.ui.components.NomiDialog
+import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.NomiTextField
-import com.nomi.app.ui.components.nomiCardBorder
-import com.nomi.app.ui.components.nomiCardElevation
-import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.settings.HealthConnectUiState
+import com.nomi.app.ui.settings.SectionTitle
+import com.nomi.app.ui.settings.SettingsCard
+import com.nomi.app.ui.settings.SettingsIconTile
+import com.nomi.app.ui.settings.SettingsSubpageScaffold
+import com.nomi.app.ui.settings.ToggleSetting
 import com.nomi.app.ui.today.estimatedStepCaloriesText
 import com.nomi.app.ui.today.formatted
 import kotlin.math.roundToInt
@@ -107,7 +108,13 @@ private fun NutritionLine(label: String, value: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Health Connect, drawn with the rows and cards the rest of Settings uses.
+ *
+ * The first card says what state the connection is in, because that decides what the page is for:
+ * something to switch on, something to finish, or something to check on. The one action that
+ * moves it forward is the filled button; syncing again is the quieter one beside it.
+ */
 @Composable
 fun HealthConnectScreen(
     available: Boolean,
@@ -125,138 +132,178 @@ fun HealthConnectScreen(
     modifier: Modifier = Modifier,
 ) {
     val locale = nomiLocale()
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text("Health Connect") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back"))
-                    }
-                },
-            )
-        },
+    val canSyncGrantedCategories =
+        health.status == HealthConnectPermissionStatus.CONNECTED ||
+            health.status == HealthConnectPermissionStatus.PARTIAL
+    val canConnect =
+        health.status == HealthConnectPermissionStatus.DISCONNECTED ||
+            health.status == HealthConnectPermissionStatus.PARTIAL
+    SettingsSubpageScaffold(
+        title = "Health Connect",
+        onBack = onBack,
+        modifier = modifier,
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.Start,
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = padding,
         ) {
-            Icon(Icons.Default.HealthAndSafety, contentDescription = null)
-            Text(
-                nomiString("Optional health sync"),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Text(
-                nomiString("Nomi reads today's steps and active calories, imports your accessible weight history, and sends pending weights plus your complete food log to Health Connect."),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                when (health.status) {
-                    HealthConnectPermissionStatus.UNAVAILABLE -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.")
-                    HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString("Health Connect must be installed or updated before Nomi can connect.")
-                    HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve the required categories.")
-                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Allowed categories keep syncing. Approve the missing permissions to enable everything.")
-                    HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected. You can change access at any time in Health Connect.")
-                },
-            )
-
-            if (health.isSyncing) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    CircularProgressIndicator()
-                    Text(nomiString("Syncing health data..."))
+            item(key = "status") {
+                SettingsCard(modifier = Modifier.padding(top = 8.dp)) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                nomiString("Optional health sync"),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                when (health.status) {
+                                    HealthConnectPermissionStatus.UNAVAILABLE -> nomiString("Health Connect isn't available on this device. Nomi works fully without it.")
+                                    HealthConnectPermissionStatus.UPDATE_REQUIRED -> nomiString("Health Connect must be installed or updated before Nomi can connect.")
+                                    HealthConnectPermissionStatus.DISCONNECTED -> nomiString("Nothing is shared until you approve the required categories.")
+                                    HealthConnectPermissionStatus.PARTIAL -> nomiString("Allowed categories keep syncing. Approve the missing permissions to enable everything.")
+                                    HealthConnectPermissionStatus.CONNECTED -> nomiString("Connected. You can change access at any time in Health Connect.")
+                                },
+                            )
+                        },
+                        leadingContent = {
+                            SettingsIconTile(
+                                when (health.status) {
+                                    HealthConnectPermissionStatus.CONNECTED -> MaterialTheme.colorScheme.primary
+                                    HealthConnectPermissionStatus.PARTIAL -> MaterialTheme.colorScheme.error
+                                    else -> MaterialTheme.colorScheme.tertiary
+                                },
+                            ) {
+                                Icon(Icons.Default.HealthAndSafety, contentDescription = null)
+                            }
+                        },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    )
                 }
             }
+            item(key = "what") {
+                PageNote(
+                    nomiString("Nomi reads today's steps and active calories, imports your accessible weight history, and sends pending weights plus your complete food log to Health Connect."),
+                )
+            }
 
-            val canSyncGrantedCategories =
-                health.status == HealthConnectPermissionStatus.CONNECTED ||
-                    health.status == HealthConnectPermissionStatus.PARTIAL
             if (canSyncGrantedCategories) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = nomiCardShape(),
-                    elevation = nomiCardElevation(),
-                    border = nomiCardBorder(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(nomiString("Today's activity"), style = MaterialTheme.typography.titleLarge)
-                        NutritionLine(
-                            nomiString("Steps"),
-                            health.todaySteps?.formatted(locale) ?: nomiString("Not synced yet"),
-                        )
-                        NutritionLine(
-                            nomiString("Estimated from steps"),
-                            health.estimatedStepCaloriesKcal?.let {
-                                estimatedStepCaloriesText(it, locale)
-                            } ?: nomiString("Not synced yet"),
-                        )
-                        health.todayActiveCaloriesKcal?.let {
+                item { SectionTitle(nomiString("Today's activity")) }
+                item(key = "activity") {
+                    SettingsCard {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
                             NutritionLine(
-                                nomiString("Active calories"),
-                                "${it.roundToInt().formatted(locale)} kcal"
+                                nomiString("Steps"),
+                                health.todaySteps?.formatted(locale) ?: nomiString("Not synced yet"),
+                            )
+                            NutritionLine(
+                                nomiString("Estimated from steps"),
+                                health.estimatedStepCaloriesKcal?.let {
+                                    estimatedStepCaloriesText(it, locale)
+                                } ?: nomiString("Not synced yet"),
+                            )
+                            health.todayActiveCaloriesKcal?.let {
+                                NutritionLine(
+                                    nomiString("Active calories"),
+                                    "${it.roundToInt().formatted(locale)} kcal",
+                                )
+                            }
+                            NutritionLine(
+                                nomiString("Food entries shared"),
+                                health.sharedNutritionEntryCount?.toString()
+                                    ?: nomiString("Not synced yet"),
                             )
                         }
-                        NutritionLine(
-                            nomiString("Food entries shared"),
-                            health.sharedNutritionEntryCount?.toString()
-                                ?: nomiString("Not synced yet"),
-                        )
                     }
                 }
-                Text(
-                    nomiString(
-                        "Step calories are estimated locally from your current weight and height " +
-                            "when available. They are not added to Health Connect active calories.",
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = onSyncNow, enabled = !health.isSyncing) {
-                    Text(nomiString("Sync now"))
-                }
-            }
-
-            if (
-                health.status == HealthConnectPermissionStatus.DISCONNECTED ||
-                health.status == HealthConnectPermissionStatus.PARTIAL
-            ) {
-                Button(onClick = onConnect, enabled = available && !health.isSyncing) {
-                    Text(
-                        if (health.status == HealthConnectPermissionStatus.PARTIAL) {
-                            nomiString("Complete permissions")
-                        } else {
-                            nomiString("Choose permissions")
-                        },
+                item(key = "estimate-note") {
+                    PageNote(
+                        nomiString(
+                            "Step calories are estimated locally from your current weight and height " +
+                                "when available. They are not added to Health Connect active calories.",
+                        ),
                     )
                 }
             }
 
-            health.message?.let { message ->
-                Text(
-                    nomiMessage(message),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (canConnect || canSyncGrantedCategories) {
+                item(key = "actions") {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        if (canConnect) {
+                            Button(
+                                onClick = onConnect,
+                                enabled = available && !health.isSyncing,
+                                shape = NomiShapes.Action,
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                            ) {
+                                Text(
+                                    if (health.status == HealthConnectPermissionStatus.PARTIAL) {
+                                        nomiString("Complete permissions")
+                                    } else {
+                                        nomiString("Choose permissions")
+                                    },
+                                )
+                            }
+                        }
+                        if (canSyncGrantedCategories) {
+                            FilledTonalButton(
+                                onClick = onSyncNow,
+                                enabled = !health.isSyncing,
+                                shape = NomiShapes.Action,
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                            ) {
+                                if (health.isSyncing) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(nomiString("Syncing health data..."))
+                                } else {
+                                    Text(nomiString("Sync now"))
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            Text(
-                nomiString("Health data is used only for your local Nomi experience and is never sold."),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+
+            health.message?.let { message ->
+                item(key = "message") { PageNote(nomiMessage(message)) }
+            }
+            item(key = "privacy") {
+                PageNote(nomiString("Health data is used only for your local Nomi experience and is never sold."))
+            }
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
-@OptIn(ExperimentalMaterial3Api::class)
+
+/** A sentence that belongs to the page rather than to a card on it. */
+@Composable
+private fun PageNote(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+    )
+}
+
+/**
+ * The AI debug log.
+ *
+ * Recording is a switch, like every other on-or-off in Settings. It used to be a button whose
+ * label flipped between "Enable" and "Disable", which made the current state something to work
+ * out from the word that was not shown.
+ */
 @Composable
 fun DeveloperScreen(
     debugEnabled: Boolean,
@@ -265,37 +312,43 @@ fun DeveloperScreen(
     onDebugEnabledChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(nomiString("AI debug")) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = nomiString("Back"))
-                    }
-                },
-            )
-        },
+    SettingsSubpageScaffold(
+        title = nomiString("AI debug"),
+        onBack = onBack,
+        modifier = modifier,
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = padding) {
-            item {
-                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(nomiString("Privacy-safe diagnostics"), style = MaterialTheme.typography.headlineSmall)
-                    Text(nomiString("Events contain provider, model, timing, cache and validation status—never API keys or request headers."))
-                    Button(onClick = { onDebugEnabledChanged(!debugEnabled) }) {
-                        Text(if (debugEnabled) nomiString("Disable debug events") else nomiString("Enable debug events"))
-                    }
+            item(key = "record") {
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    ToggleSetting(
+                        icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                        title = nomiString("Record debug events"),
+                        supporting = nomiString("Events contain provider, model, timing, cache and validation status—never API keys or request headers."),
+                        checked = debugEnabled,
+                        onCheckedChange = onDebugEnabledChanged,
+                        iconColor = MaterialTheme.colorScheme.tertiary,
+                    )
                 }
             }
+            item { SectionTitle(nomiString("Recent events")) }
             if (events.isEmpty()) {
-                item { Text(nomiString("No debug events recorded."), modifier = Modifier.padding(20.dp)) }
+                item(key = "empty") { PageNote(nomiString("No debug events recorded.")) }
             } else {
                 items(events, key = { it.id }) { event ->
-                    ListItem(
-                        headlineContent = { Text("${event.pipeline} · ${event.validationStatus}") },
-                        supportingContent = { Text("${event.providerId} / ${event.model} · ${event.durationMillis} ms") },
-                    )
+                    SettingsCard {
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    "${event.pipeline} · ${event.validationStatus}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                            },
+                            supportingContent = {
+                                Text("${event.providerId} / ${event.model} · ${event.durationMillis} ms")
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        )
+                    }
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }

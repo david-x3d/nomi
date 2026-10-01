@@ -42,13 +42,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -141,6 +144,8 @@ fun NomiNotesTodayScreen(
     onPhotoDescriptionChanged: (String) -> Unit = {},
     onPhotoPlaceChanged: (String) -> Unit = {},
     onConfirmPhotoDescription: () -> Unit = {},
+    aiSetupNeeded: Boolean = false,
+    onOpenAiSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberNomiHaptics()
@@ -446,6 +451,27 @@ fun NomiNotesTodayScreen(
                     }
                 }
 
+                // Sits after the camera so the camera keeps its place as the second row, which
+                // is where opening it scrolls to.
+                item(key = "ai-setup") {
+                    AnimatedVisibility(
+                        // An error that already offers the way to the AI page says the same
+                        // thing with the meal attached, so the note steps aside for it.
+                        visible = aiSetupNeeded &&
+                            (loggingState as? FoodLoggingUiState.Error)?.pointsToSettings != true,
+                        enter = expandVertically(
+                            animationSpec = contentSizeSpec,
+                            expandFrom = Alignment.Top,
+                        ) + fadeIn(animationSpec = itemFadeSpec),
+                        exit = shrinkVertically(
+                            animationSpec = contentSizeSpec,
+                            shrinkTowards = Alignment.Top,
+                        ) + fadeOut(animationSpec = itemFadeSpec),
+                    ) {
+                        AiSetupNote(onOpenAiSettings = onOpenAiSettings)
+                    }
+                }
+
                 val entries = displayedEntries
                 item(key = "empty") {
                     AnimatedVisibility(
@@ -556,6 +582,7 @@ fun NomiNotesTodayScreen(
                             onEditText = onEditText,
                             onEditPreview = onEditPreview,
                             onDismissDraft = onDismissDraft,
+                            onOpenAiSettings = onOpenAiSettings,
                         )
                     }
                 }
@@ -764,6 +791,51 @@ private fun NotesHeader(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Says, before anything is typed, that nothing typed can be looked up yet.
+ *
+ * Without it the first thing a keyless install learns about keys is an error on its first meal.
+ * It is a note on the page rather than a dialog over it: the day can still be read, and manual
+ * entries and saved foods still work.
+ */
+@Composable
+private fun AiSetupNote(onOpenAiSettings: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        border = hairlineOnPitchBlack(),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Default.Key, contentDescription = null)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(
+                    text = nomiString("Add your AI key"),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = nomiString("Nomi can't look up food until a key is saved."),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            // Filled, not tonal: a tonal button is the colour of the note it sits on.
+            Button(onClick = onOpenAiSettings) {
+                Text(nomiString("Set up"), maxLines = 1)
             }
         }
     }

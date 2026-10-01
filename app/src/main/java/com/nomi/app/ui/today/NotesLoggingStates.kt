@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -78,6 +79,7 @@ import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
+import com.nomi.app.ui.localization.nomiMessage
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
@@ -109,6 +111,7 @@ internal fun InlineLoggingState(
     onPhotoDescriptionChanged: (String) -> Unit,
     onPhotoPlaceChanged: (String) -> Unit,
     onConfirmPhotoDescription: () -> Unit,
+    onOpenAiSettings: () -> Unit = {},
 ) {
     AnimatedContent(
         targetState = state,
@@ -170,6 +173,8 @@ internal fun InlineLoggingState(
                 description = rememberedDescription,
                 message = animatedState.message,
                 canRetry = animatedState.canRetry,
+                pointsToSettings = animatedState.pointsToSettings,
+                onOpenAiSettings = onOpenAiSettings,
                 onRetry = onRetry,
                 onEditText = onEditText,
                 onCancel = onDismissDraft,
@@ -577,6 +582,8 @@ private fun ErrorNote(
     description: String,
     message: String,
     canRetry: Boolean,
+    pointsToSettings: Boolean,
+    onOpenAiSettings: () -> Unit,
     onRetry: () -> Unit,
     onEditText: () -> Unit,
     onCancel: () -> Unit,
@@ -607,7 +614,7 @@ private fun ErrorNote(
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
                     Text(
-                        text = message,
+                        text = nomiMessage(message),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
@@ -617,13 +624,27 @@ private fun ErrorNote(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (canRetry) {
+                // An error that says "check it in Settings" takes you there. Trying again
+                // with the same missing key only produces the same sentence, so when the fix is
+                // elsewhere the way to it is the main action and Retry steps back.
+                if (pointsToSettings) {
                     Button(
-                        onClick = onRetry,
+                        onClick = onOpenAiSettings,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp),
                     ) {
+                        Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(6.dp))
+                        Text(
+                            text = nomiString("Open AI settings"),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
+                if (canRetry) {
+                    val retryLabel: @Composable () -> Unit = {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.size(6.dp))
                         Text(
@@ -631,6 +652,14 @@ private fun ErrorNote(
                             maxLines = 1,
                             softWrap = false,
                         )
+                    }
+                    val retryModifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                    if (pointsToSettings) {
+                        FilledTonalButton(onClick = onRetry, modifier = retryModifier) { retryLabel() }
+                    } else {
+                        Button(onClick = onRetry, modifier = retryModifier) { retryLabel() }
                     }
                 }
                 Row(

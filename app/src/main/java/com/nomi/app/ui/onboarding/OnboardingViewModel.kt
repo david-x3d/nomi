@@ -470,6 +470,9 @@ class OnboardingViewModel(
         }
         // Tracking nothing extra is a valid answer, so this step never blocks the journey.
         OnboardingStep.MICRONUTRIENTS -> null
+        // The key is checked and stored by the step itself, and skipping it is allowed: the plan
+        // is worth having even if the first meal has to wait for a key.
+        OnboardingStep.AI_KEY -> null
         OnboardingStep.PLAN -> if (state.finalPlan == null) "Your plan isn't ready yet." else null
     }
 

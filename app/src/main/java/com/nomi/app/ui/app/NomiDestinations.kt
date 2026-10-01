@@ -10,6 +10,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,8 @@ import com.nomi.app.ui.library.LibraryScreen
 import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
+import com.nomi.app.ui.settings.AiKeyEntryState
+import com.nomi.app.ui.settings.AiSettingsScreen
 import com.nomi.app.ui.today.AddFoodMethod
 
 /**
@@ -137,6 +141,7 @@ internal fun NavGraphBuilder.detailDestinations(
     navController: NavHostController,
     viewModel: AppViewModel,
     libraryKind: () -> LibraryItemKind,
+    providerSession: AiProviderEditorSession,
     onConnectHealth: () -> Unit,
 ) {
     composable(Routes.LIBRARY) {
@@ -248,6 +253,45 @@ internal fun NavGraphBuilder.detailDestinations(
         )
     }
 
+    composable(Routes.AI) {
+        val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
+        // The key being typed is held here and nowhere else: not in saved state, and not past
+        // the moment it is stored.
+        var keyEntry by remember { mutableStateOf(AiKeyEntryState()) }
+        AiSettingsScreen(
+            state = settingsState,
+            keyEntry = keyEntry,
+            onKeyChanged = { keyEntry = AiKeyEntryState(input = it) },
+            onConnectKey = {
+                val key = keyEntry.input
+                keyEntry = keyEntry.copy(isChecking = true, message = null, failed = false)
+                viewModel.connectAiKey(key) { success, message ->
+                    keyEntry = if (success) {
+                        AiKeyEntryState(message = message)
+                    } else {
+                        AiKeyEntryState(input = key, message = message, failed = true)
+                    }
+                }
+            },
+            onProvider = { index ->
+                providerSession.open(index, viewModel.providerEditorState(index))
+                navController.navigate(Routes.AI_PROVIDER)
+            },
+            onCalorieEstimateBiasChanged = viewModel::setCalorieEstimateBias,
+            onAiRequestTimeoutDisabledChanged = viewModel::setAiRequestTimeoutDisabled,
+            onDebug = { navController.navigate(Routes.DEVELOPER) },
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable(Routes.AI_PROVIDER) {
+        AiProviderEditorPage(
+            viewModel = viewModel,
+            session = providerSession,
+            onClose = { navController.popBackStack(Routes.AI, inclusive = false) },
+        )
+    }
+
     composable(Routes.DEVELOPER) {
         val preferences by viewModel.preferences.collectAsStateWithLifecycle()
         val debugEvents by viewModel.aiDebugEvents.collectAsStateWithLifecycle()
@@ -282,6 +326,8 @@ internal object Routes {
     const val PLAN = "plan"
     const val MICRONUTRIENTS = "micronutrients"
     const val HEALTH = "health"
+    const val AI = "ai"
+    const val AI_PROVIDER = "ai_provider"
     const val DEVELOPER = "developer"
     fun food(id: Long) = "food/$id"
 }

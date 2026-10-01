@@ -59,7 +59,15 @@ sealed interface FoodLoggingUiState {
         val message: String,
         val canRetry: Boolean = true,
         val originalText: String = "",
-    ) : FoodLoggingUiState
+    ) : FoodLoggingUiState {
+        /**
+         * True when the way out is in Settings - a missing or rejected key, a model the provider
+         * does not know. The messages are the English catalogue keys and every one of those names
+         * Settings, so the note can offer the way there instead of only pointing at it.
+         */
+        val pointsToSettings: Boolean
+            get() = message.contains("Settings", ignoreCase = true)
+    }
     data class Manual(val draft: ManualFoodDraft = ManualFoodDraft()) : FoodLoggingUiState
 }
 
