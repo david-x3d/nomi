@@ -75,6 +75,7 @@ import com.nomi.app.ui.progress.ProgressUiState
 import com.nomi.app.ui.progress.WeightPoint
 import com.nomi.app.ui.progress.loggingStreakDays
 import com.nomi.app.ui.progress.longestLoggingStreakDays
+import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.settings.AiProviderEditorState
 import com.nomi.app.ui.settings.AiProviderSetting
 import com.nomi.app.ui.settings.SettingsUiState
@@ -439,11 +440,6 @@ class AppViewModel(
         .map { keys -> keys.needsAiSetup() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
-    /** False until the key store has been read, when "no key" would still be a guess. */
-    val aiKeyPresenceLoaded: StateFlow<Boolean> = providers.keyPresence
-        .map { keys -> keys.isNotEmpty() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
     val settingsState: StateFlow<SettingsUiState> = combine(
         repository.preferences,
         repository.currentPlan,
@@ -538,7 +534,18 @@ class AppViewModel(
         }
         // Provider keys are local and safe to inspect immediately. Health Connect reads, on the
         // other hand, must wait for MainActivity.onStart so they run while Nomi is foregrounded.
-        providers.refreshKeyPresence()
+        viewModelScope.launch {
+            // An install already past onboarding when this build first runs was set up on the
+            // old provider defaults. That goes on record before the keys are looked up, because
+            // which keys are looked for depends on it. The profile is the truth here; the
+            // onboarding flag in preferences is only a startup hint and can be missing.
+            runCatching {
+                if (repository.profile.first()?.onboardingCompleted == true) {
+                    repository.appPreferencesStore.keepLegacyProviderDefaults()
+                }
+            }
+            providers.refreshKeyPresence()
+        }
         healthSync.observeFoodLog()
         viewModelScope.launch {
             runCatching { container.reminderScheduler.reconcileFrom(repository.appPreferencesStore) }
@@ -2261,20 +2268,32 @@ class AppViewModel(
     }
 
     /**
-     * Checks one key against the shared provider and stores it when the provider answers.
-     * The single key field in onboarding and on the AI page ends here.
+     * Checks the keys from the one-step key form and stores each one its provider accepts.
+     * Onboarding and the AI page both end here. [onResult] names the field a failure belongs to
+     * when that is known, so the form can mark it.
      */
-    fun connectAiKey(key: String, onResult: (success: Boolean, message: String) -> Unit) {
+    fun connectAiKeys(
+        key: String,
+        searchKey: String,
+        onResult: (success: Boolean, message: String, failedField: AiKeyField?) -> Unit,
+    ) {
         viewModelScope.launch {
-            runCatching { providers.connectKey(key) }
+            runCatching { providers.connectKeys(key, searchKey) }
                 .onSuccess {
                     recentFoodAnalysisCache.clear()
                     providers.refreshKeyPresence()
-                    onResult(true, "Connection successful")
+                    onResult(true, "Connection successful", null)
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
-                    onResult(false, error.safeProviderConnectionMessage())
+                    // A first key may have been stored before the second one failed.
+                    providers.refreshKeyPresence()
+                    val check = error as? KeyCheckException
+                    onResult(
+                        false,
+                        (check?.cause ?: error).safeProviderConnectionMessage(),
+                        check?.field,
+                    )
                 }
         }
     }

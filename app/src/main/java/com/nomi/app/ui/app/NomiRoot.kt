@@ -55,6 +55,7 @@ import com.nomi.app.ui.localization.NomiTranslations
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.logging.FoodLoggingScreen
 import com.nomi.app.ui.onboarding.OnboardingRoute
+import com.nomi.app.ui.settings.AiKeySetup
 import com.nomi.app.ui.share.LocalNomiShareCoordinator
 import com.nomi.app.ui.share.NomiShareCoordinator
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
@@ -106,14 +107,16 @@ fun NomiRoot(
             }
 
             AppStartState.Onboarding -> {
-                val aiSetupNeeded by viewModel.aiSetupNeeded.collectAsStateWithLifecycle()
-                val keyPresenceLoaded by viewModel.aiKeyPresenceLoaded.collectAsStateWithLifecycle()
+                // A fresh install is always the Gemini + Exa pair; anything else reads as no keys.
+                val settings by viewModel.settingsState.collectAsStateWithLifecycle()
+                val keys = settings.aiKeySetup as? AiKeySetup.GeminiWithExa
                 OnboardingRoute(
                     onComplete = viewModel::completeOnboarding,
                     onDraftChanged = viewModel::persistOnboardingDraft,
                     onMicronutrientsChanged = viewModel::saveMicronutrientPreferences,
-                    aiKeyStored = keyPresenceLoaded && !aiSetupNeeded,
-                    onConnectAiKey = viewModel::connectAiKey,
+                    geminiKeyStored = keys?.hasGeminiKey == true,
+                    exaKeyStored = keys?.hasExaKey == true,
+                    onConnectAiKeys = viewModel::connectAiKeys,
                     modifier = modifier,
                 )
             }

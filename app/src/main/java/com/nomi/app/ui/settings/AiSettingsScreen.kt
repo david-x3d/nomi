@@ -40,7 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import com.nomi.app.ui.components.NomiFieldShape
@@ -53,29 +55,40 @@ import com.nomi.app.ui.localization.nomiMessage
 import com.nomi.app.ui.localization.nomiString
 import kotlin.math.roundToInt
 
-/** The one key field on the AI page: what is typed, and what came of checking it. */
+/** One of the two keys a setup can ask for: the provider's own, and Exa's for web search. */
+enum class AiKeyField { PRIMARY, SEARCH }
+
+/** The key form on the AI page: what is typed, and what came of checking it. */
 data class AiKeyEntryState(
     val input: String = "",
+    /** The Exa key, which only the Gemini + Exa setup asks for. */
+    val searchInput: String = "",
     val isChecking: Boolean = false,
     /** What the last check said, already worded for the user. */
     val message: String? = null,
     val failed: Boolean = false,
-)
+    /** The field a failed check belongs to, when the check could tell. */
+    val failedField: AiKeyField? = null,
+) {
+    val hasInput: Boolean get() = input.isNotBlank() || searchInput.isNotBlank()
+}
 
 /**
  * Everything about the AI Nomi runs on, behind one row of Settings.
  *
  * The page answers its questions in the order people have them. Does it work - the status at the
- * top. What do I have to give it - one key field, because the default setup is one provider on
- * one key. Only then the provider and model of each task, folded away until someone wants them,
- * and below that the three settings that only matter to someone tuning or debugging.
+ * top. What do I have to give it - the keys the setup needs, which is two for the recommended
+ * Gemini + Exa pair and one for a single provider. Only then the provider and model of each task,
+ * folded away until someone wants them, and below that the three settings that only matter to
+ * someone tuning or debugging.
  */
 @Composable
 fun AiSettingsScreen(
     state: SettingsUiState,
     keyEntry: AiKeyEntryState,
     onKeyChanged: (String) -> Unit,
-    onConnectKey: () -> Unit,
+    onSearchKeyChanged: (String) -> Unit,
+    onConnectKeys: () -> Unit,
     onProvider: (Int) -> Unit,
     onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
@@ -85,10 +98,11 @@ fun AiSettingsScreen(
 ) {
     NomiSecureWindow()
     val uriHandler = LocalUriHandler.current
-    val shared = state.sharedAiProvider
-    // With tasks already split across providers there is no single key to ask for, so the list is
+    val setup = state.aiKeySetup
+    // With tasks spread over providers there are no keys to ask for in one place, so the list is
     // the page; otherwise it stays folded until asked for.
-    var tasksExpanded by rememberSaveable(shared == null) { mutableStateOf(shared == null) }
+    val perTask = setup is AiKeySetup.PerTask
+    var tasksExpanded by rememberSaveable(perTask) { mutableStateOf(perTask) }
 
     SettingsSubpageScaffold(
         title = nomiString("AI provider"),
@@ -100,10 +114,10 @@ fun AiSettingsScreen(
             contentPadding = innerPadding,
         ) {
             item(key = "status") {
-                AiStatusCard(ready = !state.aiSetupNeeded, sharedProvider = shared)
+                AiStatusCard(ready = !state.aiSetupNeeded, setup = setup)
             }
 
-            if (shared != null) {
+            if (!perTask) {
                 item(key = "key") {
                     // On the page rather than in a card: a field is cut from the same tone as a
                     // card, and inside one it stopped looking like somewhere to type.
@@ -111,41 +125,54 @@ fun AiSettingsScreen(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        val keyName = nomiFormat("{0} API key", shared.provider.localizedDisplayName())
-                        NomiSecretField(
+                        val pair = setup as? AiKeySetup.GeminiWithExa
+                        val single = (setup as? AiKeySetup.Single)?.provider
+                        val provider = single?.provider ?: AiProviderKind.GEMINI
+                        val keyStored = pair?.hasGeminiKey ?: (single?.hasPrimaryApiKey == true)
+                        val submit = { if (keyEntry.hasInput) onConnectKeys() }
+                        StoredKeyField(
                             value = keyEntry.input,
                             onValueChange = onKeyChanged,
-                            label = if (shared.hasPrimaryApiKey) {
-                                nomiFormat("{0} (stored securely)", keyName)
-                            } else {
-                                keyName
-                            },
-                            placeholder = nomiString("Leave blank to keep existing key")
-                                .takeIf { shared.hasPrimaryApiKey },
+                            name = nomiFormat("{0} API key", provider.localizedDisplayName()),
+                            stored = keyStored,
                             enabled = !keyEntry.isChecking,
-                            isError = keyEntry.failed,
-                            keyboardActions = KeyboardActions(
-                                onDone = { if (keyEntry.input.isNotBlank()) onConnectKey() },
-                            ),
+                            isError = keyEntry.failedField == AiKeyField.PRIMARY,
+                            imeAction = if (pair != null) ImeAction.Next else ImeAction.Done,
+                            onDone = submit,
                         )
+                        provider.keyPageUrl()?.let { url ->
+                            KeyPageLink(
+                                label = nomiFormat("Get a key from {0}", provider.keyPageName()),
+                                onClick = { runCatching { uriHandler.openUri(url) } },
+                            )
+                        }
+                        if (pair != null) {
+                            StoredKeyField(
+                                value = keyEntry.searchInput,
+                                onValueChange = onSearchKeyChanged,
+                                name = nomiString("Exa API key"),
+                                stored = pair.hasExaKey,
+                                enabled = !keyEntry.isChecking,
+                                isError = keyEntry.failedField == AiKeyField.SEARCH,
+                                onDone = submit,
+                            )
+                            KeyPageLink(
+                                label = nomiFormat("Get a key from {0}", "Exa"),
+                                onClick = { runCatching { uriHandler.openUri(EXA_KEY_PAGE_URL) } },
+                            )
+                        }
                         Button(
-                            onClick = onConnectKey,
-                            enabled = keyEntry.input.isNotBlank() && !keyEntry.isChecking,
+                            onClick = onConnectKeys,
+                            enabled = keyEntry.hasInput && !keyEntry.isChecking,
                             shape = NomiShapes.Action,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                         ) {
                             Text(
-                                if (keyEntry.isChecking) {
-                                    nomiString("Checking…")
-                                } else {
-                                    nomiString("Check and save key")
+                                when {
+                                    keyEntry.isChecking -> nomiString("Checking…")
+                                    pair != null -> nomiString("Check and save keys")
+                                    else -> nomiString("Check and save key")
                                 },
-                            )
-                        }
-                        shared.provider.keyPageUrl()?.let { url ->
-                            KeyPageLink(
-                                label = nomiFormat("Get a key from {0}", shared.provider.keyPageName()),
-                                onClick = { runCatching { uriHandler.openUri(url) } },
                             )
                         }
                         keyEntry.message?.let { message ->
@@ -185,13 +212,19 @@ fun AiSettingsScreen(
                         SettingsLink(
                             icon = { Icon(Icons.Default.Key, contentDescription = null) },
                             title = provider.purpose.localizedPurpose(),
-                            supporting = if (provider.hasApiKey) {
-                                "${provider.provider.localizedDisplayName()} · ${provider.model}"
-                            } else {
-                                "${provider.provider.localizedDisplayName()} · " +
-                                    nomiString("API key missing")
+                            // Nothing depends on Fallback, so one without a key is unused, not
+                            // broken, and is not painted as a fault.
+                            supporting = when {
+                                provider.hasApiKey ->
+                                    "${provider.provider.localizedDisplayName()} · ${provider.model}"
+                                provider.purpose == "Fallback" ->
+                                    "${provider.provider.localizedDisplayName()} · " +
+                                        nomiString("Optional")
+                                else ->
+                                    "${provider.provider.localizedDisplayName()} · " +
+                                        nomiString("API key missing")
                             },
-                            supportingColor = if (provider.hasApiKey) {
+                            supportingColor = if (provider.hasApiKey || provider.purpose == "Fallback") {
                                 Color.Unspecified
                             } else {
                                 MaterialTheme.colorScheme.error
@@ -238,7 +271,7 @@ fun AiSettingsScreen(
 
 /** Whether logging a meal will work, said before anything is asked for. */
 @Composable
-private fun AiStatusCard(ready: Boolean, sharedProvider: AiProviderSetting?) {
+private fun AiStatusCard(ready: Boolean, setup: AiKeySetup) {
     val accent = if (ready) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
     SettingsCard(modifier = Modifier.padding(top = 8.dp)) {
         ListItem(
@@ -250,12 +283,13 @@ private fun AiStatusCard(ready: Boolean, sharedProvider: AiProviderSetting?) {
             },
             supportingContent = {
                 Text(
-                    text = when {
-                        sharedProvider != null -> nomiFormat(
+                    text = when (setup) {
+                        is AiKeySetup.GeminiWithExa -> nomiString("Nomi has no AI credits of its own. Google Gemini reads what you log and Exa finds the nutrition sources, each on a key that is yours.")
+                        is AiKeySetup.Single -> nomiFormat(
                             "Nomi has no AI credits of its own. Every lookup runs on your {0} key, and one key covers every task.",
-                            sharedProvider.provider.localizedDisplayName(),
+                            setup.provider.provider.localizedDisplayName(),
                         )
-                        else -> nomiString("Nomi has no AI credits of its own. Each task runs on the provider and key chosen for it below.")
+                        AiKeySetup.PerTask -> nomiString("Nomi has no AI credits of its own. Each task runs on the provider and key chosen for it below.")
                     },
                 )
             },
@@ -270,6 +304,35 @@ private fun AiStatusCard(ready: Boolean, sharedProvider: AiProviderSetting?) {
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
+}
+
+/**
+ * A key field that knows whether a key is already stored: it says so in its label and offers to
+ * keep it, so an empty field next to a stored key does not read as a missing one.
+ */
+@Composable
+internal fun StoredKeyField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    name: String,
+    stored: Boolean,
+    enabled: Boolean,
+    isError: Boolean,
+    onDone: () -> Unit,
+    modifier: Modifier = Modifier,
+    imeAction: ImeAction = ImeAction.Done,
+) {
+    NomiSecretField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        label = if (stored) nomiFormat("{0} (stored securely)", name) else name,
+        placeholder = nomiString("Leave blank to keep existing key").takeIf { stored },
+        enabled = enabled,
+        isError = isError,
+        imeAction = imeAction,
+        keyboardActions = KeyboardActions(onDone = { onDone() }),
+    )
 }
 
 /** A settings row that folds the rows under it away instead of leading to another page. */

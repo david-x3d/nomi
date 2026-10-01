@@ -14,7 +14,10 @@ import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
 import com.nomi.app.di.AppContainer
+import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.settings.AiProviderEditorState
+import io.ktor.client.plugins.ResponseException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -189,28 +192,58 @@ internal class AiProviderAccess(
     }
 
     /**
-     * Checks [key] against the provider the interpretation pipeline runs on and stores it once
-     * that provider has answered.
+     * Checks the keys typed into the one-step key form and stores each as soon as its provider
+     * has answered. It is what onboarding and the AI page call.
      *
-     * Keys belong to the provider account rather than to a pipeline, so on the default setup,
-     * where all five pipelines share one provider, this one key configures every one of them.
-     * It is what the single key field in onboarding and on the AI page calls. Interpretation is
-     * the pipeline tested because its check is one small completion; research would run a paid
-     * web search just to say hello.
+     * Keys belong to the provider account rather than to a pipeline, so one key covers every
+     * pipeline on that account. The reading pipeline is checked first: it is one small
+     * completion, and it proves the main key before anything is spent on research. When research
+     * runs on Exa + Gemini it is checked next, which is the only way to prove the Exa key, and
+     * by then the Gemini key is known to be good, so a refused credential there is Exa's.
+     *
+     * A blank key means "the stored one", so a second attempt after fixing only the Exa key
+     * does not ask for the Gemini key again.
      */
-    suspend fun connectKey(key: String) {
-        val pipeline = ProviderPipeline.FOOD_INTERPRETATION
-        val selection = loadedPreferences().providerSelection(pipeline)
-        val state = AiProviderEditorState(
+    suspend fun connectKeys(key: String, searchKey: String) {
+        val prefs = loadedPreferences()
+        val reading = ProviderPipeline.FOOD_INTERPRETATION
+        val readingDraft = prefs.keyFormDraft(reading).copy(apiKeyInput = key)
+        checking(AiKeyField.PRIMARY) { testConnection(reading, readingDraft) }
+        save(reading, readingDraft)
+
+        val research = ProviderPipeline.FOOD_RESEARCH
+        if (!prefs.providerSelection(research).usesExaGemini) return
+        val researchDraft = prefs.keyFormDraft(research)
+            .copy(apiKeyInput = key, searchApiKeyInput = searchKey)
+        try {
+            testConnection(research, researchDraft)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            throw KeyCheckException(AiKeyField.SEARCH.takeIf { error.blamesCredential() }, error)
+        }
+        save(research, researchDraft)
+    }
+
+    private suspend fun checking(field: AiKeyField, check: suspend () -> Unit) {
+        try {
+            check()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            throw KeyCheckException(field, error)
+        }
+    }
+
+    private fun AppPreferences.keyFormDraft(pipeline: ProviderPipeline): AiProviderEditorState {
+        val selection = providerSelection(pipeline)
+        return AiProviderEditorState(
             purpose = pipeline.displayName(),
             provider = selection.providerId.toProviderKind(),
             endpoint = runCatching { selection.toRuntimeConfig().endpoint }
                 .getOrElse { selection.endpoint.orEmpty() },
             model = selection.model,
-            apiKeyInput = key,
         )
-        testConnection(pipeline, state)
-        save(pipeline, state)
     }
 
     /**
@@ -347,3 +380,17 @@ internal class AiProviderAccess(
         }
     }
 }
+
+/**
+ * A key check that failed, and the field the failure belongs to when that is known. The cause is
+ * what gets worded for the user.
+ */
+internal class KeyCheckException(val field: AiKeyField?, cause: Throwable) :
+    Exception(cause.message, cause)
+
+/** True for a key that is missing or that the provider refused, as opposed to a bad connection. */
+private fun Throwable.blamesCredential(): Boolean =
+    generateSequence(this) { it.cause }.any { cause ->
+        (cause as? ResponseException)?.response?.status?.value in setOf(401, 403) ||
+            cause.message?.contains("API key", ignoreCase = true) == true
+    }

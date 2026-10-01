@@ -46,6 +46,21 @@ class ProviderCredentialRoutingTest {
     }
 
     @Test
+    fun `gemini on its own and the gemini half of exa + gemini are one stored key`() {
+        val research = ProviderSelection(providerId = "exa-gemini", model = "gemini-2.5-flash")
+        val reading = ProviderSelection(providerId = "gemini", model = "gemini-2.5-flash-lite")
+
+        // One Google key at one address, so the recommended setup asks for it once.
+        assertEquals(secretId(research), secretId(reading))
+        // Exa's key is a different account and is never the Gemini one.
+        assertNotEquals(secretId(research), exaSecretId())
+        assertNotEquals(
+            secretId(reading),
+            secretId(ProviderSelection(providerId = "openrouter", model = "perplexity/sonar")),
+        )
+    }
+
+    @Test
     fun `a second provider still gets its own key`() {
         val openRouter = ProviderSelection(providerId = "openrouter", model = "perplexity/sonar")
         val perplexity = ProviderSelection(providerId = "perplexity", model = "sonar")
@@ -124,7 +139,7 @@ class ProviderCredentialRoutingTest {
         val error = IllegalStateException(
             "No transformation found: class io.ktor.utils.io.ByteBufferChannel -> " +
                 "class ChatCompletionResponse, with response from " +
-                "https://codex-easy.ai/chat/completions, Content-Type: text/html",
+                "https://api.example.com/chat/completions, Content-Type: text/html",
         )
 
         assertEquals(

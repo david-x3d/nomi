@@ -81,15 +81,41 @@ data class SettingsUiState(
     val appVersion: String = "1.0.0",
 ) {
     /**
-     * The provider every task runs on, or null when tasks are split across providers.
-     *
-     * The default setup is one provider on one key, and that is the case the AI page can offer a
-     * single key field for. Exa + Gemini needs two keys and only ever serves research, so it never
-     * counts as shared.
+     * Which keys the AI page can ask for outright, read from the four tasks every entry or photo
+     * passes through. Fallback is left out: it is optional and usually sits on another provider.
      */
-    val sharedAiProvider: AiProviderSetting?
-        get() = aiProviders.firstOrNull()?.takeIf { first ->
-            first.provider != AiProviderKind.EXA_GEMINI &&
-                aiProviders.all { it.provider == first.provider && it.endpoint == first.endpoint }
+    val aiKeySetup: AiKeySetup
+        get() {
+            val tasks = aiProviders.take(ESSENTIAL_AI_TASKS)
+            val research = tasks.firstOrNull() ?: return AiKeySetup.PerTask
+            val readers = tasks.drop(1)
+            return when {
+                research.provider == AiProviderKind.EXA_GEMINI &&
+                    readers.all { it.provider == AiProviderKind.GEMINI } ->
+                    AiKeySetup.GeminiWithExa(
+                        hasGeminiKey = research.hasPrimaryApiKey,
+                        hasExaKey = research.hasSearchApiKey,
+                    )
+                research.provider != AiProviderKind.EXA_GEMINI &&
+                    readers.all {
+                        it.provider == research.provider && it.endpoint == research.endpoint
+                    } -> AiKeySetup.Single(research)
+                else -> AiKeySetup.PerTask
+            }
         }
+}
+
+/** Research, interpretation, portion changes and photos, in the order the settings list them. */
+private const val ESSENTIAL_AI_TASKS = 4
+
+/** The shape of the AI setup, as far as asking for keys goes. */
+sealed interface AiKeySetup {
+    /** The recommended pair: Exa + Gemini researches, Gemini reads. One Google key and one Exa key. */
+    data class GeminiWithExa(val hasGeminiKey: Boolean, val hasExaKey: Boolean) : AiKeySetup
+
+    /** Every task on one provider, which takes one key. */
+    data class Single(val provider: AiProviderSetting) : AiKeySetup
+
+    /** Tasks spread over providers in some other way; each is set up on its own page. */
+    data object PerTask : AiKeySetup
 }

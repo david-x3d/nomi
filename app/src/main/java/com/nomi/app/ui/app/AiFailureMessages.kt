@@ -76,6 +76,14 @@ internal fun Throwable.safeProviderFailureMessage(): String? {
     val responseError = causes.filterIsInstance<ResponseException>().firstOrNull()
     if (responseError != null) {
         val status = responseError.response.status.value
+        // Google answers a wrong key with 400 rather than 401 and says so only in the body,
+        // which Ktor quotes in the exception. Left to the 400 wording below, a mistyped Gemini
+        // key was reported as a model that cannot search.
+        if (status == 400 &&
+            responseError.message.orEmpty().contains("valid API key", ignoreCase = true)
+        ) {
+            return "The provider rejected that API key. Check it in Settings."
+        }
         return when (status) {
             401 -> "The provider rejected that API key. Check it in Settings."
             402 -> "The provider account is out of credit. Top it up or switch the provider in Settings."

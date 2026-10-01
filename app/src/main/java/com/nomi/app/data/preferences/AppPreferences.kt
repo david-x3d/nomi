@@ -167,26 +167,16 @@ data class AppPreferences(
     val languageTag: String = "",
     val weightUnit: WeightUnitPreference = WeightUnitPreference.KILOGRAMS,
     val heightUnit: HeightUnitPreference = HeightUnitPreference.CENTIMETERS,
-    val foodResearchProvider: ProviderSelection = ProviderSelection(
-        providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_RESEARCH_MODEL,
-    ),
-    val foodInterpretationProvider: ProviderSelection = ProviderSelection(
-        providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_MODEL,
-    ),
-    val portionChangeProvider: ProviderSelection = ProviderSelection(
-        providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_MODEL,
-    ),
-    val visionProvider: ProviderSelection = ProviderSelection(
-        providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_MODEL,
-    ),
-    val smartFallbackProvider: ProviderSelection = ProviderSelection(
-        providerId = "openrouter",
-        model = DEFAULT_OPENROUTER_MODEL,
-    ),
+    val foodResearchProvider: ProviderSelection =
+        ProviderPipeline.FOOD_RESEARCH.recommendedProvider(),
+    val foodInterpretationProvider: ProviderSelection =
+        ProviderPipeline.FOOD_INTERPRETATION.recommendedProvider(),
+    val portionChangeProvider: ProviderSelection =
+        ProviderPipeline.PORTION_CHANGE.recommendedProvider(),
+    val visionProvider: ProviderSelection =
+        ProviderPipeline.VISION.recommendedProvider(),
+    val smartFallbackProvider: ProviderSelection =
+        ProviderPipeline.SMART_FALLBACK.recommendedProvider(),
     val reminders: ReminderPreferences = ReminderPreferences(),
     val micronutrients: MicronutrientPreferences = MicronutrientPreferences(),
     val onboardingDraft: PersistedOnboardingDraft? = null,
@@ -201,9 +191,9 @@ data class AppPreferences(
 )
 
 /**
- * Every pipeline runs through OpenRouter on one key. Research uses Sonar because it searches
- * natively over chat completions and returns its own citations; the remaining pipelines only
- * interpret text or images, so they use the cheap fast model.
+ * On OpenRouter every pipeline runs on one key. Research uses Sonar because it searches natively
+ * and returns its own citations; the remaining pipelines only interpret text or images, so they
+ * use the cheap fast model.
  */
 internal const val DEFAULT_OPENROUTER_RESEARCH_MODEL = "perplexity/sonar"
 internal const val DEFAULT_OPENROUTER_MODEL = "google/gemini-3.5-flash-lite"
@@ -212,6 +202,8 @@ internal const val PREVIOUS_OPENROUTER_MODEL = "deepseek/deepseek-v4-flash"
 internal const val PREVIOUS_OPENROUTER_DEFAULT_MODEL = "openai/gpt-5.6-sol"
 internal const val PREVIOUS_OPENROUTER_GEMINI_NUTRITION_MODEL = "google/gemini-3.6-flash"
 internal const val DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL = "gemini-2.5-flash"
+/** Reading a sentence or a photo needs no research model, so Gemini on its own runs the light one. */
+internal const val DEFAULT_DIRECT_GEMINI_MODEL = "gemini-2.5-flash-lite"
 private val RETIRED_OPENROUTER_MODELS = setOf(
     RETIRED_OPENROUTER_MODEL,
     PREVIOUS_OPENROUTER_MODEL,
@@ -229,9 +221,53 @@ internal fun ProviderPipeline.defaultOpenRouterModel(): String =
     }
 
 /**
+ * What a fresh install runs on, and what Settings marks as recommended.
+ *
+ * Research goes to Exa + Gemini: Exa finds the pages and Gemini reads them. Everything that only
+ * reads - a sentence, a portion change, a photo - goes to Gemini on its own, on the same Google
+ * key, so two keys cover all four. Fallback has to search the web, which Gemini alone cannot, and
+ * nothing depends on it, so it stays where it was and is simply unused until someone gives it a
+ * key.
+ */
+internal fun ProviderPipeline.recommendedProvider(): ProviderSelection = when (this) {
+    ProviderPipeline.FOOD_RESEARCH -> ProviderSelection(
+        providerId = "exa-gemini",
+        model = DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL,
+    )
+    ProviderPipeline.FOOD_INTERPRETATION,
+    ProviderPipeline.PORTION_CHANGE,
+    ProviderPipeline.VISION,
+    -> ProviderSelection(providerId = "gemini", model = DEFAULT_DIRECT_GEMINI_MODEL)
+    ProviderPipeline.SMART_FALLBACK -> legacyProvider()
+}
+
+/** What an install set up before Gemini became the default runs on: OpenRouter, on one key. */
+internal fun ProviderPipeline.legacyProvider(): ProviderSelection = ProviderSelection(
+    providerId = "openrouter",
+    model = defaultOpenRouterModel(),
+)
+
+/** Stamped on an install that was already set up when this build first ran. */
+internal const val LEGACY_PROVIDER_DEFAULTS = 1
+
+/** Stamped when onboarding finishes on a build whose defaults are [recommendedProvider]. */
+internal const val RECOMMENDED_PROVIDER_DEFAULTS = 2
+
+/**
+ * Whether a pipeline with no saved choice should still mean OpenRouter.
+ *
+ * A provider is only written to storage when someone saves it, so most installs hold nothing for
+ * most pipelines and run on whatever the default is. Changing the default would therefore move
+ * every existing user onto a provider they have no key for. An install that was already past
+ * onboarding when this build first ran is stamped as legacy and keeps the old default; every
+ * other install gets the new one.
+ */
+internal fun usesLegacyProviderDefaults(providerDefaults: Int?): Boolean =
+    providerDefaults == LEGACY_PROVIDER_DEFAULTS
+
+/**
  * Keeps a deliberately chosen provider untouched while filling in anything unconfigured and
- * replacing models that are no longer the default, so an existing install lands on the same
- * one-key OpenRouter setup as a fresh one.
+ * replacing models that are no longer the default.
  */
 internal fun ProviderSelection.withSupportedModel(
     pipeline: ProviderPipeline = ProviderPipeline.FOOD_INTERPRETATION,
@@ -252,6 +288,9 @@ internal fun ProviderSelection.withSupportedModel(
         } else {
             this
         }
+    }
+    if (providerId.equals("gemini", ignoreCase = true)) {
+        return if (model.isBlank()) copy(model = DEFAULT_DIRECT_GEMINI_MODEL) else this
     }
     if (!providerId.equals("openrouter", ignoreCase = true)) return this
     val slug = model.trim().lowercase()

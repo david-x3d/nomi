@@ -1437,4 +1437,15 @@ internal val errorTranslations: Map<String, NomiTranslation> = mapOf(
         sq = "Të dhënat e Nomi nuk mund të koduheshin në mënyrë të sigurt", sv = "Nomi-data kunde inte kodas på ett säkert sätt",
         tr = "Nomi verileri güvenli biçimde kodlanamadı",
     ),
+    "Configure Food research with Exa + Gemini, which searches the web. Google Gemini on its own cannot." to NomiTranslation(
+        de = "Richte die Lebensmittelrecherche mit Exa + Gemini ein, das im Web sucht. Google Gemini allein kann das nicht.",
+        es = "Configura la investigación de alimentos con Exa + Gemini, que busca en la web. Google Gemini por sí solo no puede.",
+        fr = "Configure la recherche alimentaire avec Exa + Gemini, qui cherche sur le web. Google Gemini seul ne le peut pas.",
+        it = "Configura la ricerca sugli alimenti con Exa + Gemini, che cerca sul web. Google Gemini da solo non può.",
+        nl = "Stel voedingsonderzoek in met Exa + Gemini, dat op het web zoekt. Google Gemini alleen kan dat niet.",
+        pt = "Configura a pesquisa de alimentos com Exa + Gemini, que pesquisa na web. O Google Gemini sozinho não consegue.",
+        sq = "Konfiguro kërkimin e ushqimeve me Exa + Gemini, i cili kërkon në internet. Google Gemini i vetëm nuk mundet.",
+        sv = "Konfigurera livsmedelsforskning med Exa + Gemini, som söker på webben. Google Gemini ensamt kan inte det.",
+        tr = "Besin araştırmasını web'de arama yapan Exa + Gemini ile yapılandır. Google Gemini tek başına bunu yapamaz.",
+    ),
 )

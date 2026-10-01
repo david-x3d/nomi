@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.data.preferences.DEFAULT_DIRECT_GEMINI_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.data.remote.ai.DEFAULT_GEMINI_NUTRITION_MODEL
@@ -161,6 +162,13 @@ fun AiProviderEditorScreen(
                     )
                 }
             }
+            recommendedProviderFor(state.purpose)?.let { recommended ->
+                Text(
+                    text = nomiFormat("Recommended: {0}", recommended.localizedDisplayName()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             // A built-in provider's address is Nomi's business; showing it as a field nobody can
             // type into only made the form longer.
@@ -223,7 +231,7 @@ fun AiProviderEditorScreen(
                 }
             }
 
-            val keyName = if (usesExaGemini) {
+            val keyName = if (usesExaGemini || state.provider == AiProviderKind.GEMINI) {
                 nomiString("Google Gemini API key")
             } else {
                 nomiString("API key")
@@ -327,17 +335,31 @@ internal fun KeyPageLink(label: String, onClick: () -> Unit, modifier: Modifier 
     }
 }
 
-private val BASE_PROVIDERS = listOf(
+private val SEARCHING_PROVIDERS = listOf(
     AiProviderKind.OPEN_ROUTER,
     AiProviderKind.PERPLEXITY,
     AiProviderKind.OPEN_AI,
-    AiProviderKind.CODEX_EASY,
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
 )
 
-/** Exa + Gemini retrieves and reads web pages, which is only what research does. */
-private fun providersFor(purpose: String): List<AiProviderKind> =
-    if (purpose == "Food research") BASE_PROVIDERS + AiProviderKind.EXA_GEMINI else BASE_PROVIDERS
+/**
+ * The providers a task can run on, the recommended one first.
+ *
+ * Research and Fallback have to search the web. Exa + Gemini does that for research; Gemini on
+ * its own cannot, so it is only offered to the tasks that read a sentence or a photo.
+ */
+private fun providersFor(purpose: String): List<AiProviderKind> = when (purpose) {
+    "Food research" -> listOf(AiProviderKind.EXA_GEMINI) + SEARCHING_PROVIDERS
+    "Fallback" -> SEARCHING_PROVIDERS
+    else -> listOf(AiProviderKind.GEMINI) + SEARCHING_PROVIDERS
+}
+
+/** What a fresh install runs this task on. Fallback is optional and has no recommendation. */
+private fun recommendedProviderFor(purpose: String): AiProviderKind? = when (purpose) {
+    "Food research" -> AiProviderKind.EXA_GEMINI
+    "Fallback" -> null
+    else -> AiProviderKind.GEMINI
+}
 
 private fun AiProviderEditorState.configurationError(
     blankModelMessage: String,
@@ -370,10 +392,11 @@ internal fun AiProviderEditorState.switchedTo(provider: AiProviderKind): AiProvi
 
 private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
-    AiProviderKind.EXA_GEMINI -> GEMINI_API_ENDPOINT
+    AiProviderKind.EXA_GEMINI,
+    AiProviderKind.GEMINI,
+    -> GEMINI_API_ENDPOINT
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
     AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
-    AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
 
@@ -386,11 +409,8 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
     AiProviderKind.EXA_GEMINI -> DEFAULT_GEMINI_NUTRITION_MODEL
-    // Codex Easy relays whatever models the account is entitled to, so the name is left to
-    // the user rather than guessed; `/v1/models` on the same key lists them.
-    AiProviderKind.CODEX_EASY,
-    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
-    -> ""
+    AiProviderKind.GEMINI -> DEFAULT_DIRECT_GEMINI_MODEL
+    AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> ""
 }
 
 /**
@@ -408,9 +428,8 @@ private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
         AiProviderKind.OPEN_AI ->
             if (searches) listOf("gpt-4o-search-preview", "gpt-5.2") else listOf("gpt-5.2")
         AiProviderKind.EXA_GEMINI -> listOf(DEFAULT_GEMINI_NUTRITION_MODEL)
-        AiProviderKind.CODEX_EASY,
-        AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE,
-        -> emptyList()
+        AiProviderKind.GEMINI -> listOf(DEFAULT_DIRECT_GEMINI_MODEL, DEFAULT_GEMINI_NUTRITION_MODEL)
+        AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> emptyList()
     }
 }
 
@@ -419,8 +438,9 @@ internal fun AiProviderKind.keyPageUrl(): String? = when (this) {
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/keys"
     AiProviderKind.PERPLEXITY -> "https://www.perplexity.ai/settings/api"
     AiProviderKind.OPEN_AI -> "https://platform.openai.com/api-keys"
-    AiProviderKind.EXA_GEMINI -> "https://aistudio.google.com/apikey"
-    AiProviderKind.CODEX_EASY -> "https://codex-easy.ai"
+    AiProviderKind.EXA_GEMINI,
+    AiProviderKind.GEMINI,
+    -> "https://aistudio.google.com/apikey"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
 
@@ -429,12 +449,13 @@ internal fun AiProviderKind.keyPageName(): String = when (this) {
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.PERPLEXITY -> "Perplexity"
     AiProviderKind.OPEN_AI -> "OpenAI"
-    AiProviderKind.EXA_GEMINI -> "Google AI Studio"
-    AiProviderKind.CODEX_EASY -> "Codex Easy"
+    AiProviderKind.EXA_GEMINI,
+    AiProviderKind.GEMINI,
+    -> "Google AI Studio"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> ""
 }
 
-private const val EXA_KEY_PAGE_URL = "https://dashboard.exa.ai/api-keys"
+internal const val EXA_KEY_PAGE_URL = "https://dashboard.exa.ai/api-keys"
 
 @Composable
 internal fun AiProviderKind.localizedDisplayName(): String = when (this) {
@@ -442,7 +463,7 @@ internal fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.OPEN_AI -> "OpenAI"
-    AiProviderKind.CODEX_EASY -> "Codex Easy"
+    AiProviderKind.GEMINI -> "Google Gemini"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> nomiString("Custom")
 }
 

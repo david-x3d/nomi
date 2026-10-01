@@ -9,8 +9,11 @@ enum class AiProviderKind {
     OPEN_AI,
     /** One Exa retrieval request followed by one native Gemini structured extraction request. */
     EXA_GEMINI,
-    /** Codex Easy: an OpenAI-compatible relay that speaks the OpenAI API under its own key. */
-    CODEX_EASY,
+    /**
+     * Google Gemini on its own, for the tasks that read text or a photo and search nothing.
+     * It runs on the same Google key as [EXA_GEMINI], so the pair needs two keys, not three.
+     */
+    GEMINI,
     CUSTOM_OPEN_AI_COMPATIBLE,
 }
 

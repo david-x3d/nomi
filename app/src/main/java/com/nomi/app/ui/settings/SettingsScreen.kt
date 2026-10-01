@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.integration.health.HealthConnectPermissionStatus
 import com.nomi.app.ui.components.NomiDialog
@@ -461,14 +462,16 @@ private fun GoalsCardStyle.localizedDisplayName(): String = when (this) {
 /** The AI row's second line: which provider, and whether it has what it needs. */
 @Composable
 private fun SettingsUiState.aiSummary(): String {
+    // Not loaded yet, which is not the same as not set up.
+    if (aiProviders.isEmpty()) return ""
     val status = if (aiSetupNeeded) nomiString("API key missing") else nomiString("Ready")
-    val shared = sharedAiProvider
-    return when {
-        // Not loaded yet, which is not the same as not set up.
-        aiProviders.isEmpty() -> ""
-        shared != null -> "${shared.provider.localizedDisplayName()} · $status"
-        else -> "${nomiString("A provider per task")} · $status"
+    val providers = when (val setup = aiKeySetup) {
+        is AiKeySetup.GeminiWithExa ->
+            "${AiProviderKind.GEMINI.localizedDisplayName()} + Exa"
+        is AiKeySetup.Single -> setup.provider.provider.localizedDisplayName()
+        AiKeySetup.PerTask -> nomiString("A provider per task")
     }
+    return "$providers · $status"
 }
 
 @Composable

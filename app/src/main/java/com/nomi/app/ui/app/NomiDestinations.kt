@@ -34,6 +34,7 @@ import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.settings.AiKeyEntryState
+import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.settings.AiSettingsScreen
 import com.nomi.app.ui.today.AddFoodMethod
 
@@ -261,15 +262,24 @@ internal fun NavGraphBuilder.detailDestinations(
         AiSettingsScreen(
             state = settingsState,
             keyEntry = keyEntry,
-            onKeyChanged = { keyEntry = AiKeyEntryState(input = it) },
-            onConnectKey = {
-                val key = keyEntry.input
-                keyEntry = keyEntry.copy(isChecking = true, message = null, failed = false)
-                viewModel.connectAiKey(key) { success, message ->
+            onKeyChanged = { keyEntry = AiKeyEntryState(it, keyEntry.searchInput) },
+            onSearchKeyChanged = { keyEntry = AiKeyEntryState(keyEntry.input, it) },
+            onConnectKeys = {
+                val typed = keyEntry
+                keyEntry = AiKeyEntryState(typed.input, typed.searchInput, isChecking = true)
+                viewModel.connectAiKeys(typed.input, typed.searchInput) { success, message, field ->
                     keyEntry = if (success) {
                         AiKeyEntryState(message = message)
                     } else {
-                        AiKeyEntryState(input = key, message = message, failed = true)
+                        AiKeyEntryState(
+                            // A first key that passed before the second failed is stored
+                            // already, so it is not left sitting in its field.
+                            input = if (field == AiKeyField.SEARCH) "" else typed.input,
+                            searchInput = typed.searchInput,
+                            message = message,
+                            failed = true,
+                            failedField = field,
+                        )
                     }
                 }
             },

@@ -270,8 +270,27 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
-    fun `codex easy keeps json object mode like the openai api it relays`() {
-        val config = config(AiProviderKind.CODEX_EASY, "gpt-5.2")
+    fun `gemini posts to the openai surface under the documented api root`() {
+        val config = AiProviderConfig(
+            kind = AiProviderKind.GEMINI,
+            endpoint = "https://generativelanguage.googleapis.com/v1beta/",
+            model = "gemini-2.5-flash-lite",
+        )
+
+        assertEquals(
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            config.chatCompletionsUrl(),
+        )
+        // Every other provider is addressed exactly where its base URL says.
+        assertEquals(
+            "https://openrouter.ai/api/v1/chat/completions",
+            config(AiProviderKind.OPEN_ROUTER, "perplexity/sonar").chatCompletionsUrl(),
+        )
+    }
+
+    @Test
+    fun `gemini relies on the json-only prompt and keeps its temperature`() {
+        val config = config(AiProviderKind.GEMINI, "gemini-2.5-flash-lite")
         val encoded = json.encodeToString(
             chatCompletionRequest(
                 config,
@@ -279,56 +298,23 @@ class OpenAiCompatibleClientTest {
             ),
         )
 
-        assertTrue(config.supportsJsonObjectResponseFormat())
-        assertTrue(encoded.contains("\"response_format\":{\"type\":\"json_object\"}"))
-        assertFalse(encoded.contains("web_search_options"))
+        assertFalse(config.supportsJsonObjectResponseFormat())
+        assertFalse(encoded.contains("response_format"))
+        assertTrue(encoded.contains("\"temperature\":0.1"))
     }
 
     @Test
-    fun `codex easy research asks the responses api to search and to name its sources`() {
-        val encoded = json.encodeToString(
-            openAiResponsesResearchRequest(
-                config(AiProviderKind.CODEX_EASY, "gpt-5.6-sol"),
-                "You report web-cited nutrition as JSON.",
-                "Research Barilla Penne Rigate, 100 g",
-            ),
-        )
+    fun `gemini on its own is refused for research, which has to cite pages`() {
+        val error = runCatching {
+            chatCompletionRequest(
+                config(AiProviderKind.GEMINI, "gemini-2.5-flash-lite"),
+                listOf(ChatMessage("user", JsonPrimitive("Research this food"))),
+                requireWebSearch = true,
+            )
+        }.exceptionOrNull()
 
-        assertTrue(encoded.contains("\"tools\":[{\"type\":\"web_search\"}]"))
-        assertTrue(encoded.contains("Sources:"))
-        // Relays of this API reject the field, and OpenRouter's bound does not apply here.
-        assertFalse(encoded.contains("max_tool_calls"))
-    }
-
-    @Test
-    fun `codex easy research reads citations from provider annotations, not the json`() {
-        val fixture = """
-            {
-              "output": [
-                {"type": "reasoning", "content": []},
-                {"type": "web_search_call", "status": "completed",
-                 "action": {"type": "search", "query": "barilla penne rigate nutrition"}},
-                {"type": "message", "content": [{
-                  "type": "output_text",
-                  "text": "{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}\nSources: Barilla product page.",
-                  "annotations": [{
-                    "type": "url_citation",
-                    "url": "https://www.barilla.com/products/pasta/penne-rigate"
-                  }]
-                }]}
-              ]
-            }
-        """.trimIndent()
-
-        val completion = decodeOpenAiResponsesResearchPayload(json, fixture)
-
-        assertEquals("{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}", completion.content)
-        assertEquals(
-            setOf("https://www.barilla.com/products/pasta/penne-rigate"),
-            completion.evidenceUrls,
-        )
-        // Only OpenRouter's server tools fetch the page, so this path cannot demand a fetch.
-        assertFalse(completion.requiresFetchedBrandedSource)
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message.orEmpty().contains("Exa + Gemini"))
     }
 
     @Test
@@ -345,7 +331,7 @@ class OpenAiCompatibleClientTest {
             }
         """.trimIndent()
 
-        val completion = decodeOpenAiResponsesResearchPayload(json, fixture)
+        val completion = decodeOpenRouterResponsesResearchPayload(json, fixture)
 
         assertEquals("{\"items\":[{\"name\":\"Penne Rigate\",\"calories\":359}]}", completion.content)
         assertTrue(completion.evidenceUrls.isEmpty())
@@ -409,7 +395,7 @@ class OpenAiCompatibleClientTest {
     fun `native web search is an openrouter concern only`() {
         // Direct Perplexity already has its own request path and must not be diverted by this flag.
         assertFalse(config(AiProviderKind.PERPLEXITY, "sonar").usesNativeWebSearch())
-        assertFalse(config(AiProviderKind.CODEX_EASY, "gpt-5.6-sol").usesNativeWebSearch())
+        assertFalse(config(AiProviderKind.GEMINI, "gemini-2.5-flash-lite").usesNativeWebSearch())
     }
 
     @Test
@@ -449,7 +435,7 @@ class OpenAiCompatibleClientTest {
         kind = kind,
         endpoint = when (kind) {
             AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
-            AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
+            AiProviderKind.GEMINI -> "https://generativelanguage.googleapis.com/v1beta"
             else -> "https://openrouter.ai/api/v1"
         },
         model = model,

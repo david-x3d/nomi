@@ -1,22 +1,54 @@
 package com.nomi.app.data.preferences
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProviderSelectionMigrationTest {
     @Test
-    fun `every pipeline defaults to OpenRouter with its hardcoded model`() {
+    fun `a fresh install researches with Exa + Gemini and reads with Gemini`() {
         val preferences = AppPreferences()
 
-        assertEquals("openrouter", preferences.foodResearchProvider.providerId)
-        assertEquals(DEFAULT_OPENROUTER_RESEARCH_MODEL, preferences.foodResearchProvider.model)
-        assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.foodInterpretationProvider.model)
-        assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.portionChangeProvider.model)
-        assertEquals("openrouter", preferences.visionProvider.providerId)
-        assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.visionProvider.model)
+        assertEquals("exa-gemini", preferences.foodResearchProvider.providerId)
+        assertEquals(DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL, preferences.foodResearchProvider.model)
+        listOf(
+            preferences.foodInterpretationProvider,
+            preferences.portionChangeProvider,
+            preferences.visionProvider,
+        ).forEach { reader ->
+            assertEquals("gemini", reader.providerId)
+            assertEquals(DEFAULT_DIRECT_GEMINI_MODEL, reader.model)
+        }
+        // Fallback has to search the web, which Gemini alone cannot, so it stays on OpenRouter.
         assertEquals("openrouter", preferences.smartFallbackProvider.providerId)
         assertEquals(DEFAULT_OPENROUTER_MODEL, preferences.smartFallbackProvider.model)
+    }
+
+    @Test
+    fun `an install set up before the change keeps OpenRouter where it saved nothing`() {
+        assertTrue(usesLegacyProviderDefaults(LEGACY_PROVIDER_DEFAULTS))
+        ProviderPipeline.entries.forEach { pipeline ->
+            assertEquals("openrouter", pipeline.legacyProvider().providerId)
+            assertEquals(pipeline.defaultOpenRouterModel(), pipeline.legacyProvider().model)
+        }
+    }
+
+    @Test
+    fun `an install that is new, or finished onboarding since, gets the recommended setup`() {
+        // Nothing stamped yet: a fresh install on its way through onboarding.
+        assertFalse(usesLegacyProviderDefaults(null))
+        assertFalse(usesLegacyProviderDefaults(RECOMMENDED_PROVIDER_DEFAULTS))
+    }
+
+    @Test
+    fun `gemini with no model saved gets the light one`() {
+        val blank = ProviderSelection(providerId = "gemini")
+
+        assertEquals(DEFAULT_DIRECT_GEMINI_MODEL, blank.withSupportedModel(ProviderPipeline.VISION).model)
+        val chosen = ProviderSelection(providerId = "gemini", model = "gemini-2.5-flash")
+        assertSame(chosen, chosen.withSupportedModel(ProviderPipeline.VISION))
     }
 
     @Test

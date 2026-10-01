@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +28,13 @@ interface AppPreferencesStore {
     suspend fun setMicronutrients(micronutrients: MicronutrientPreferences)
     suspend fun setOnboardingDraft(draft: PersistedOnboardingDraft?)
     suspend fun markOnboardingCompleted(completed: Boolean, clearDraft: Boolean = completed)
+
+    /**
+     * Records that this install was set up before Gemini became the default, so pipelines it
+     * never saved a provider for stay on OpenRouter. Does nothing once the install is stamped
+     * either way.
+     */
+    suspend fun keepLegacyProviderDefaults()
     suspend fun setAiDebugEnabled(enabled: Boolean)
     suspend fun setAdjustTargetFromActivity(enabled: Boolean)
     suspend fun setCalorieEstimateBias(bias: CalorieEstimateBias)
@@ -114,8 +122,21 @@ class DataStoreAppPreferencesStore(
 
     override suspend fun markOnboardingCompleted(completed: Boolean, clearDraft: Boolean) {
         dataStore.edit { values ->
+            // Onboarding finishing on this build is what makes an install a new one. An
+            // install already stamped as legacy stays legacy.
+            if (completed && values[Keys.PROVIDER_DEFAULTS] == null) {
+                values[Keys.PROVIDER_DEFAULTS] = RECOMMENDED_PROVIDER_DEFAULTS
+            }
             values[Keys.ONBOARDING_COMPLETED] = completed
             if (clearDraft) values.remove(Keys.ONBOARDING_DRAFT)
+        }
+    }
+
+    override suspend fun keepLegacyProviderDefaults() {
+        dataStore.edit { values ->
+            if (values[Keys.PROVIDER_DEFAULTS] == null) {
+                values[Keys.PROVIDER_DEFAULTS] = LEGACY_PROVIDER_DEFAULTS
+            }
         }
     }
 
@@ -151,6 +172,9 @@ class DataStoreAppPreferencesStore(
 
     private fun decodePreferences(values: Preferences): AppPreferences {
         val defaults = AppPreferences()
+        val legacyProviders = usesLegacyProviderDefaults(values[Keys.PROVIDER_DEFAULTS])
+        fun unsaved(pipeline: ProviderPipeline): ProviderSelection =
+            if (legacyProviders) pipeline.legacyProvider() else pipeline.recommendedProvider()
         return AppPreferences(
             theme = values[Keys.THEME]
                 ?.let { encoded -> enumValues<ThemePreference>().firstOrNull { it.name == encoded } }
@@ -170,23 +194,23 @@ class DataStoreAppPreferencesStore(
                 ?: defaults.heightUnit,
             foodResearchProvider = decode(
                 values[Keys.FOOD_RESEARCH_PROVIDER],
-                defaults.foodResearchProvider,
+                unsaved(ProviderPipeline.FOOD_RESEARCH),
             ).withSupportedModel(ProviderPipeline.FOOD_RESEARCH),
             foodInterpretationProvider = decode(
                 values[Keys.FOOD_INTERPRETATION_PROVIDER],
-                defaults.foodInterpretationProvider,
+                unsaved(ProviderPipeline.FOOD_INTERPRETATION),
             ).withSupportedModel(ProviderPipeline.FOOD_INTERPRETATION),
             portionChangeProvider = decode(
                 values[Keys.PORTION_CHANGE_PROVIDER],
-                defaults.portionChangeProvider,
+                unsaved(ProviderPipeline.PORTION_CHANGE),
             ).withSupportedModel(ProviderPipeline.PORTION_CHANGE),
             visionProvider = decode(
                 values[Keys.VISION_PROVIDER],
-                defaults.visionProvider,
+                unsaved(ProviderPipeline.VISION),
             ).withSupportedModel(ProviderPipeline.VISION),
             smartFallbackProvider = decode(
                 values[Keys.SMART_FALLBACK_PROVIDER],
-                defaults.smartFallbackProvider,
+                unsaved(ProviderPipeline.SMART_FALLBACK),
             ).withSupportedModel(ProviderPipeline.SMART_FALLBACK),
             reminders = decode(values[Keys.REMINDERS], defaults.reminders),
             micronutrients = decode(values[Keys.MICRONUTRIENTS], defaults.micronutrients),
@@ -229,6 +253,7 @@ class DataStoreAppPreferencesStore(
         val PORTION_CHANGE_PROVIDER = stringPreferencesKey("providers.portion_change")
         val VISION_PROVIDER = stringPreferencesKey("providers.vision")
         val SMART_FALLBACK_PROVIDER = stringPreferencesKey("providers.smart_fallback")
+        val PROVIDER_DEFAULTS = intPreferencesKey("providers.defaults")
         val REMINDERS = stringPreferencesKey("reminders")
         val MICRONUTRIENTS = stringPreferencesKey("nutrition.micronutrients")
         val ONBOARDING_DRAFT = stringPreferencesKey("onboarding.draft")

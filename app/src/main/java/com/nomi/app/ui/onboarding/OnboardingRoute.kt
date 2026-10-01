@@ -43,9 +43,17 @@ import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.theme.nomiFadeMotionSpec
 import com.nomi.app.ui.theme.nomiPageMotionSpec
 import com.nomi.app.ui.theme.nomiProgressMotionSpec
+
+/** Checks and stores the Gemini and Exa keys, then reports back which field a failure is about. */
+typealias ConnectAiKeys = (
+    geminiKey: String,
+    exaKey: String,
+    onResult: (success: Boolean, message: String, failedField: AiKeyField?) -> Unit,
+) -> Unit
 
 @Composable
 fun OnboardingRoute(
@@ -53,9 +61,9 @@ fun OnboardingRoute(
     modifier: Modifier = Modifier,
     onDraftChanged: (OnboardingDraft) -> Unit = {},
     onMicronutrientsChanged: (MicronutrientPreferences) -> Unit = {},
-    aiKeyStored: Boolean = false,
-    onConnectAiKey: (key: String, onResult: (success: Boolean, message: String) -> Unit) -> Unit =
-        { _, _ -> },
+    geminiKeyStored: Boolean = false,
+    exaKeyStored: Boolean = false,
+    onConnectAiKeys: ConnectAiKeys = { _, _, _ -> },
     viewModel: OnboardingViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,8 +85,9 @@ fun OnboardingRoute(
     OnboardingFlow(
         state = state,
         actions = viewModel,
-        aiKeyStored = aiKeyStored,
-        onConnectAiKey = onConnectAiKey,
+        geminiKeyStored = geminiKeyStored,
+        exaKeyStored = exaKeyStored,
+        onConnectAiKeys = onConnectAiKeys,
         onComplete = {
             state.finalPlan?.let { plan -> onComplete(state.draft, plan) }
         },
@@ -92,9 +101,9 @@ internal fun OnboardingFlow(
     actions: OnboardingActions,
     onComplete: () -> Unit,
     modifier: Modifier = Modifier,
-    aiKeyStored: Boolean = false,
-    onConnectAiKey: (key: String, onResult: (success: Boolean, message: String) -> Unit) -> Unit =
-        { _, _ -> },
+    geminiKeyStored: Boolean = false,
+    exaKeyStored: Boolean = false,
+    onConnectAiKeys: ConnectAiKeys = { _, _, _ -> },
 ) {
     val spatialSpec = nomiPageMotionSpec<IntOffset>()
     val effectsSpec = nomiFadeMotionSpec<Float>()
@@ -143,8 +152,9 @@ internal fun OnboardingFlow(
                     OnboardingStep.PROGRESS_RATE -> ProgressRateScreen(state = state, actions = actions)
                     OnboardingStep.MICRONUTRIENTS -> MicronutrientsScreen(state = state, actions = actions)
                     OnboardingStep.AI_KEY -> AiKeyScreen(
-                        keyStored = aiKeyStored,
-                        onConnectKey = onConnectAiKey,
+                        geminiKeyStored = geminiKeyStored,
+                        exaKeyStored = exaKeyStored,
+                        onConnectKeys = onConnectAiKeys,
                         onContinue = actions::goNext,
                     )
                     OnboardingStep.PLAN -> PlanRevealScreen(

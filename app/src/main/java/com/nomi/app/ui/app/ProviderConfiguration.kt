@@ -38,10 +38,9 @@ private fun ProviderSelection.resolvedEndpoint(): String {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
         AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
         AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
-        AiProviderKind.EXA_GEMINI -> GEMINI_API_ENDPOINT
-        // Codex Easy publishes both a bare host and a /v1 base; Nomi appends OpenAI request
-        // paths, so the versioned base is the one that resolves to /v1/chat/completions.
-        AiProviderKind.CODEX_EASY -> "https://codex-easy.ai/v1"
+        AiProviderKind.EXA_GEMINI,
+        AiProviderKind.GEMINI,
+        -> GEMINI_API_ENDPOINT
         AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint?.trim()?.takeIf(String::isNotBlank)
             ?: error("Enter a provider endpoint in Settings.")
     }.trimEnd('/')
@@ -74,7 +73,7 @@ internal fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.RO
     "openrouter" -> AiProviderKind.OPEN_ROUTER
     "openai" -> AiProviderKind.OPEN_AI
     "exa-gemini" -> AiProviderKind.EXA_GEMINI
-    "codex-easy" -> AiProviderKind.CODEX_EASY
+    "gemini" -> AiProviderKind.GEMINI
     else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
 }
 private fun AiProviderKind.toProviderId(): String = when (this) {
@@ -82,7 +81,7 @@ private fun AiProviderKind.toProviderId(): String = when (this) {
     AiProviderKind.OPEN_ROUTER -> "openrouter"
     AiProviderKind.OPEN_AI -> "openai"
     AiProviderKind.EXA_GEMINI -> "exa-gemini"
-    AiProviderKind.CODEX_EASY -> "codex-easy"
+    AiProviderKind.GEMINI -> "gemini"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
 }
 internal fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)) {
@@ -90,7 +89,7 @@ internal fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)
     "openrouter" -> "OpenRouter"
     "openai" -> "OpenAI"
     "exa-gemini" -> "Exa + Gemini"
-    "codex-easy" -> "Codex Easy"
+    "gemini" -> "Google Gemini"
     else -> "custom provider"
 }
 internal fun ProviderPipeline.displayName(): String = when (this) {
@@ -111,7 +110,7 @@ internal fun ProviderSelection.website(): String? = when (providerId.toProviderK
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai"
     AiProviderKind.OPEN_AI -> "https://openai.com"
     AiProviderKind.EXA_GEMINI -> "https://exa.ai"
-    AiProviderKind.CODEX_EASY -> "https://codex-easy.ai"
+    AiProviderKind.GEMINI -> "https://ai.google.dev"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint
 }
 
@@ -119,9 +118,20 @@ internal fun ProviderPipeline.requiresWebResearch(): Boolean =
     this == ProviderPipeline.FOOD_RESEARCH || this == ProviderPipeline.SMART_FALLBACK
 
 private fun ProviderSelection.sharesCredentialWith(other: ProviderSelection): Boolean =
-    providerId.equals(other.providerId, ignoreCase = true) &&
+    credentialAccount().equals(other.credentialAccount(), ignoreCase = true) &&
         runCatching { resolvedEndpoint() }.getOrNull()
             ?.equals(runCatching { other.resolvedEndpoint() }.getOrNull(), ignoreCase = true) == true
+
+/**
+ * The account a key belongs to.
+ *
+ * Google Gemini on its own and the Gemini half of Exa + Gemini are one Google key at one address.
+ * Filing them under one name is what lets the recommended setup ask for two keys - Gemini and
+ * Exa - rather than the same Gemini key twice. "exa-gemini" is the name kept because keys stored
+ * before Gemini was offered on its own are already filed under it.
+ */
+private fun ProviderSelection.credentialAccount(): String =
+    if (providerId.equals("gemini", ignoreCase = true)) "exa-gemini" else providerId
 
 internal fun smartFallbackCredentialIds(
     selection: ProviderSelection,
@@ -156,12 +166,12 @@ internal suspend fun <T> runWithSmartFallback(
 }
 
 /**
- * Keys are scoped to the provider account, not to the pipeline that happens to use it. All five
- * pipelines run on the same OpenRouter key by default, so entering it once in any of them
- * configures the rest; a second provider still gets its own separate secret.
+ * Keys are scoped to the provider account, not to the pipeline that happens to use it. Every
+ * pipeline on one account runs on the same key, so entering it once in any of them configures
+ * the rest; a second provider still gets its own separate secret.
  */
 internal fun secretId(selection: ProviderSelection): String = providerSecretId(
-    providerId = selection.providerId,
+    providerId = selection.credentialAccount(),
     endpoint = selection.resolvedEndpoint(),
 )
 

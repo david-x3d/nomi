@@ -81,9 +81,9 @@ Food logging speaks the same languages: you can write or dictate a meal in any o
 > [!TIP]
 > **Recommended: Exa + Gemini.** Exa retrieves focused web evidence and Gemini turns those sources into structured nutrition data. A Gemini Flash Lite model is the recommended cost-conscious choice when it is available for your Google API project.
 
-Nomi is set up for OpenRouter, where one key runs every task. Paste that key in the last setup step, or later under **Settings → AI provider**, and Nomi checks it before saving.
+A new install is set up for Exa + Gemini: Exa researches the food, and Gemini interprets what you log, changes portions and reads photos. The last setup step asks for a Google Gemini API key and an Exa API key and checks them before saving. You can skip it and add the keys later under **Settings → AI provider**.
 
-To use the recommended Exa + Gemini research instead:
+Installs that were set up before v2.10.0 keep the providers they had. To move one to Exa + Gemini:
 
 1. Open **Settings → AI provider → Provider and model per task → Food research**.
 2. Select **Exa + Gemini** and enter your own Gemini and Exa API keys.
