@@ -236,7 +236,7 @@ object BackupValidator {
             }
             positive(row.typicalAmount, "$path.typicalAmount", issues)
             optionalPositive(row.typicalGrams, "$path.typicalGrams", issues)
-            validateText(row.typicalUnit, "$path.typicalUnit", issues, max = 100)
+            validateText(row.typicalUnit, "$path.typicalUnit", issues, required = false, max = 100)
             timestamp(row.createdAtEpochMillis, "$path.createdAtEpochMillis", issues)
             optionalTimestamp(row.lastUsedAtEpochMillis, "$path.lastUsedAtEpochMillis", issues)
         }
@@ -249,14 +249,19 @@ object BackupValidator {
                 if (it !in sourceIds) issue("$path.nutritionSourceId", "unknown nutrition source")
             }
             validateText(row.entryGroupId, "$path.entryGroupId", issues, max = 200)
-            validateText(row.originalInput, "$path.originalInput", issues, max = 4_000)
+            // Bounded by the note ceiling, not a tighter one of its own: logging accepts 8,192
+            // characters of typed text, and a 4,000 limit here meant one long entry made every
+            // later export of the whole diary fail.
+            validateText(row.originalInput, "$path.originalInput", issues, max = MAX_NOTE)
             validateText(row.mealCategory, "$path.mealCategory", issues, max = 100)
             validateText(row.displayNameSnapshot, "$path.displayNameSnapshot", issues)
             validateText(row.brandSnapshot, "$path.brandSnapshot", issues)
             positive(row.amount, "$path.amount", issues)
             optionalPositive(row.grams, "$path.grams", issues)
             optionalPositive(row.resolvedVolumeMl, "$path.resolvedVolumeMl", issues)
-            validateText(row.unit, "$path.unit", issues, max = 100)
+            // A blank unit is ugly but harmless, and older builds could store one from a manual
+            // entry. Refusing it turned that one row into a diary that could not be backed up.
+            validateText(row.unit, "$path.unit", issues, required = false, max = 100)
             validateNutrition(row.nutritionSnapshot, "$path.nutritionSnapshot", issues)
             validateSourceSnapshot(row.sourceSnapshot, "$path.sourceSnapshot", issues)
             validateText(row.inputMethod, "$path.inputMethod", issues, max = 100)
@@ -287,7 +292,9 @@ object BackupValidator {
             positive(row.amount, "$path.amount", issues)
             optionalPositive(row.grams, "$path.grams", issues)
             optionalPositive(row.resolvedVolumeMl, "$path.resolvedVolumeMl", issues)
-            validateText(row.unit, "$path.unit", issues, max = 100)
+            // A blank unit is ugly but harmless, and older builds could store one from a manual
+            // entry. Refusing it turned that one row into a diary that could not be backed up.
+            validateText(row.unit, "$path.unit", issues, required = false, max = 100)
             validateNutrition(row.nutritionSnapshot, "$path.nutritionSnapshot", issues)
             validateSourceSnapshot(row.sourceSnapshot, "$path.sourceSnapshot", issues)
         }

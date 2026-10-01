@@ -74,7 +74,8 @@ data class ManualFoodDraft(
     val mealCategory: MealCategory = MealCategory.SNACKS,
 ) {
     val isValid: Boolean
-        get() = name.isNotBlank() && DecimalInput.parseOrNull(amount)?.let { it > 0 } == true &&
+        get() = name.isNotBlank() && unit.isNotBlank() &&
+            DecimalInput.parseOrNull(amount)?.let { it > 0 } == true &&
             DecimalInput.parseOrNull(calories) != null &&
             DecimalInput.parseOrNull(protein) != null &&
             DecimalInput.parseOrNull(carbohydrates) != null &&

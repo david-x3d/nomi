@@ -68,6 +68,7 @@ import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
 import com.nomi.app.data.repository.HEALTH_CONNECT_WEIGHT_SOURCE
 import com.nomi.app.data.repository.SaveLoggedMealRequest
+import com.nomi.app.data.repository.duplicatedLogs
 import com.nomi.app.data.repository.mapping.toCompleteOnboardingRequest
 import com.nomi.app.data.repository.mapping.toEntity
 import com.nomi.app.data.repository.mapping.toPersistedDraft
@@ -217,7 +218,12 @@ class AppViewModel(
     private val container: AppContainer,
 ) : ViewModel() {
     private val repository = container.repository
-    private val zoneId: ZoneId = ZoneId.systemDefault()
+    /**
+     * Read on every use rather than captured once. Android keeps the process alive across a
+     * time-zone change, so a captured zone left "today", the day rollover and every new log on
+     * the zone the app happened to start in until the process died.
+     */
+    private val zoneId: ZoneId get() = ZoneId.systemDefault()
     private val today: LocalDate get() = LocalDate.now(zoneId)
 
     /**
@@ -680,6 +686,9 @@ class AppViewModel(
 
     fun beginLogging(method: AddFoodMethod, initialText: String = "") {
         cancelAnalysis()
+        // A new entry is not a rewrite of the row that happened to be open. Leaving this set made
+        // the next saved food - dictated, photographed or scanned - delete that row.
+        mutableEditedEntryId.value = null
         pendingMenuDishes = emptyList()
         pendingMenuLoggingText = null
         barcodeLookupRequestId += 1
@@ -1317,6 +1326,7 @@ class AppViewModel(
      */
     fun analyzeNutritionLabel(bytes: ByteArray, mediaType: String) {
         cancelAnalysis()
+        mutableEditedEntryId.value = null
         val requestId = ++barcodeLookupRequestId
         val category = defaultMealCategory()
         mutableBarcodeAmountState.value = null
@@ -1403,6 +1413,7 @@ class AppViewModel(
      */
     fun analyzePhoto(bytes: ByteArray, mediaType: String) {
         analysisJob?.cancel()
+        mutableEditedEntryId.value = null
         val requestId = ++analysisRequestId
         val job = viewModelScope.launch {
             val category = defaultMealCategory()
@@ -1542,6 +1553,7 @@ class AppViewModel(
 
     fun lookupBarcode(barcode: String) {
         cancelAnalysis()
+        mutableEditedEntryId.value = null
         val requestId = ++barcodeLookupRequestId
         val category = defaultMealCategory()
         mutableBarcodeAmountState.value = null
@@ -1791,13 +1803,16 @@ class AppViewModel(
      */
     fun importSharedDay(envelope: ShareEnvelopeV1) {
         viewModelScope.launch {
+            // A sender whose clock or zone is ahead can name a date this phone has not reached;
+            // Today cannot page forward, so those rows would be saved where nobody can see them.
             val eatenOn = runCatching { LocalDate.parse(envelope.day.date) }
-                .getOrElse { LocalDate.now() }
+                .getOrElse { today }
+                .coerceAtMost(today)
             val logs = NomiShareImporter.logsFor(
                 envelope = envelope,
                 date = eatenOn,
                 zone = zoneId,
-                now = System.currentTimeMillis(),
+                now = loggedAtFor(eatenOn, Instant.now(), zoneId),
             )
             if (logs.isEmpty()) {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("That shared day had no food in it.")))
@@ -2068,8 +2083,20 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching {
                 val source = requireNotNull(repository.foodLog(id))
-                val now = System.currentTimeMillis()
-                repository.addLog(source.copy(id = 0, loggedAtEpochMillis = now, createdAtEpochMillis = now, updatedAtEpochMillis = now))
+                val group = source.entryGroupId
+                    ?.let { repository.logsByEntryGroup(it) }
+                    .orEmpty()
+                    .ifEmpty { listOf(source) }
+                val now = Instant.now()
+                val date = runCatching { LocalDate.parse(source.localDate) }.getOrDefault(today)
+                repository.addLogs(
+                    duplicatedLogs(
+                        source = source,
+                        group = group,
+                        loggedAtEpochMillis = loggedAtFor(date, now, zoneId),
+                        nowEpochMillis = now.toEpochMilli(),
+                    ),
+                )
             }.onFailure {
                 mutableEvents.emit(AppEvent.Message(inUserLanguage("That food is no longer available")))
             }
@@ -2180,7 +2207,7 @@ class AppViewModel(
                             savedMealId = item.id,
                             mealCategory = defaultMealCategory().name,
                             localDate = selectedDate.value.toString(),
-                            startEpochMillis = System.currentTimeMillis(),
+                            startEpochMillis = loggedAtFor(selectedDate.value, Instant.now(), zoneId),
                             zoneId = zoneId.id,
                         ),
                     )
@@ -2958,6 +2985,9 @@ class AppViewModel(
         analysisRequestId += 1
         analysisJob?.cancel()
         analysisJob = null
+        // The pages belong to the lookup that opened them. A label photo or a cached barcode has
+        // no pages of its own and used to be saved citing the previous meal's research.
+        consultedResearchUrls = emptyList()
     }
 
     /**
@@ -3135,6 +3165,7 @@ class AppViewModel(
         geminiCredential = { geminiCredential },
         searchProgressSink = ::showResearchSources,
         debugSink = ::recordExaGeminiTrace,
+        calorieBiasProvider = { preferences.value.calorieEstimateBias },
     )
 
     private fun showResearchSources(sourceUrls: List<String>) {
@@ -3513,6 +3544,7 @@ class AppViewModel(
         originalInput: String? = null,
     ): FoodLogEntity {
         val now = System.currentTimeMillis()
+        val date = selectedDate.value
         val enteredServingUnit = quantityResolution?.enteredUnit
             ?.takeIf { it.isSpoonLoggingUnit() || it.isHouseholdCountLoggingUnit() }
         val enteredServingQuantity = quantityResolution?.enteredQuantity
@@ -3559,8 +3591,8 @@ class AppViewModel(
             isEstimated = isEstimate,
             inputMethod = inputMethod,
             originalInput = originalInput?.trim()?.takeIf(String::isNotBlank),
-            localDate = selectedDate.value.toString(),
-            loggedAtEpochMillis = now,
+            localDate = date.toString(),
+            loggedAtEpochMillis = loggedAtFor(date, Instant.ofEpochMilli(now), zoneId),
             zoneId = zoneId.id,
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now,

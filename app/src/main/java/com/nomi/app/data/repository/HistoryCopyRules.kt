@@ -82,6 +82,36 @@ internal fun copiedDayLogs(
     }
 }
 
+/**
+ * The rows a "duplicate" of [source] creates.
+ *
+ * A duplicate is a second, independent entry, so it always gets a group id of its own. Copying the
+ * source's id - which every typed or dictated entry has - welded the duplicate onto the original:
+ * Today showed the two as one combined meal and deleting it removed both.
+ *
+ * Today shows a grouped meal as one row carrying its first product's id, so duplicating that id
+ * duplicates the whole meal. Any other product of a meal is duplicated on its own.
+ */
+internal fun duplicatedLogs(
+    source: FoodLogEntity,
+    group: List<FoodLogEntity>,
+    loggedAtEpochMillis: Long,
+    nowEpochMillis: Long,
+    groupId: String = UUID.randomUUID().toString(),
+): List<FoodLogEntity> {
+    val ordered = group.sortedWith(compareBy<FoodLogEntity> { it.loggedAtEpochMillis }.thenBy { it.id })
+    val rows = if (ordered.size > 1 && ordered.first().id == source.id) ordered else listOf(source)
+    return rows.mapIndexed { index, log ->
+        log.copy(
+            id = 0,
+            entryGroupId = groupId,
+            loggedAtEpochMillis = loggedAtEpochMillis + index,
+            createdAtEpochMillis = nowEpochMillis,
+            updatedAtEpochMillis = nowEpochMillis,
+        )
+    }
+}
+
 internal const val COPIED_DAY_INPUT_METHOD = "copied_day"
 internal const val COPIED_MEAL_INPUT_METHOD = "copied_meal"
 internal const val COPIED_ITEMS_INPUT_METHOD = "copied_items"

@@ -228,6 +228,11 @@ class NomiBackupService(
         preferencesStore.setProvider(ProviderPipeline.SMART_FALLBACK, value.smartFallbackProvider)
         preferencesStore.setReminders(value.reminders)
         preferencesStore.setAdjustTargetFromActivity(value.adjustTargetFromActivity)
+        // Everything applyBackupPreferences writes is put back, or a failed import leaves the
+        // user's tracked nutrients, estimate bias and goals card on the backup's values.
+        preferencesStore.setMicronutrients(value.micronutrients)
+        preferencesStore.setCalorieEstimateBias(value.calorieEstimateBias)
+        preferencesStore.setGoalsCardStyle(value.goalsCardStyle)
         preferencesStore.setAiDebugEnabled(value.aiDebugEnabled)
         preferencesStore.setAiRequestTimeoutDisabled(value.aiRequestTimeoutDisabled)
         preferencesStore.setOnboardingDraft(value.onboardingDraft)
