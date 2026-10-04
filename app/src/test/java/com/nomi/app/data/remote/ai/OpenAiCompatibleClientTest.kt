@@ -69,6 +69,23 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `a preferred openrouter provider is asked first on every openrouter request`() {
+        val preferred = config(AiProviderKind.OPEN_ROUTER, "z-ai/glm-5.3-flash")
+            .copy(openRouterProviderOrder = listOf("baseten"))
+
+        val chat = json.encodeToString(
+            chatCompletionRequest(preferred, listOf(ChatMessage("user", JsonPrimitive("Hi")))),
+        )
+        val research = json.encodeToString(
+            openRouterResponsesResearchRequest(preferred, systemPrompt = "S", userPrompt = "U"),
+        )
+
+        // Only the order: no price ceiling or schema requirement on tasks that did not ask.
+        assertTrue(chat, chat.contains("\"provider\":{\"order\":[\"baseten\"]}"))
+        assertTrue(research, research.contains("\"provider\":{\"order\":[\"baseten\"]}"))
+    }
+
+    @Test
     fun `direct perplexity request also omits unsupported json object format`() {
         val config = config(AiProviderKind.PERPLEXITY, "sonar")
         val encoded = json.encodeToString(

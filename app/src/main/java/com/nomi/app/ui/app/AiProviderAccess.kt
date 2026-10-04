@@ -95,7 +95,7 @@ internal class AiProviderAccess(
         require(selection.providerId.isNotBlank()) { "Configure this AI provider in Settings first." }
         return container.secretStore.useSecret(secretId(selection)) { chars ->
             val credential = AiRuntimeCredential.from(chars.concatToString())
-            block(selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled), credential)
+            block(selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled, prefs.openRouterPreferredProvider), credential)
         } ?: error("Add the ${selection.providerId.displayProviderName()} API key in Settings first.")
     }
 
@@ -109,7 +109,7 @@ internal class AiProviderAccess(
                 block(providerFor(config, key))
             }
         }
-        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
+        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled, prefs.openRouterPreferredProvider)
         return container.secretStore.useSecret(secretId(selection)) { readerChars ->
             val readerCredential = AiRuntimeCredential.from(readerChars.concatToString())
             container.secretStore.useSecret(exaSecretId()) { exaChars ->
@@ -134,7 +134,7 @@ internal class AiProviderAccess(
         require(selection.providerId.isNotBlank()) {
             "Configure Fallback in Settings first."
         }
-        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
+        val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled, prefs.openRouterPreferredProvider)
         suspend fun use(secret: String): T? = container.secretStore.useSecret(secret) { chars ->
             block(config, AiRuntimeCredential.from(chars.concatToString()))
         }
@@ -168,7 +168,7 @@ internal class AiProviderAccess(
                     models = models,
                     research = { model ->
                         val config = account.copy(model = model)
-                            .toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
+                            .toRuntimeConfig(prefs.aiRequestTimeoutDisabled, prefs.openRouterPreferredProvider)
                         exaResearchProvider(
                             config = config,
                             readerCredential = readerCredential,
@@ -193,9 +193,7 @@ internal class AiProviderAccess(
     ) = ExaGeminiNutritionProvider(
         exaSearch = exaSearch,
         geminiExtractor = if (config.kind == AiProviderKind.EXA_OPEN_ROUTER) {
-            OpenRouterNutritionExtractor(container.openAiClient) {
-                preferences.value.openRouterPreferredProvider
-            }
+            OpenRouterNutritionExtractor(container.openAiClient)
         } else {
             container.exaGeminiClient
         },
@@ -315,7 +313,9 @@ internal class AiProviderAccess(
     /** Stores the edited provider and any key typed with it. Throws when the draft is unusable. */
     suspend fun save(pipeline: ProviderPipeline, state: AiProviderEditorState) {
         val draft = state.toProviderSelection(pipeline)
-        val config = draft.toRuntimeConfig()
+        val config = draft.toRuntimeConfig(
+            openRouterPreferredProvider = preferences.value.openRouterPreferredProvider,
+        )
         val selection = draft.copy(endpoint = config.endpoint)
         state.apiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
             try {
@@ -352,7 +352,9 @@ internal class AiProviderAccess(
      */
     suspend fun testConnection(pipeline: ProviderPipeline, state: AiProviderEditorState) {
         val draft = state.toProviderSelection(pipeline)
-        val config = draft.toRuntimeConfig()
+        val config = draft.toRuntimeConfig(
+            openRouterPreferredProvider = preferences.value.openRouterPreferredProvider,
+        )
         val selection = draft.copy(endpoint = config.endpoint)
         suspend fun testWith(
             targetConfig: AiProviderConfig,

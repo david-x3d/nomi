@@ -79,8 +79,8 @@ class OpenRouterNutritionExtractorTest {
             )
         }
 
-        extractor(engine, preferredProvider = " Baseten ").extract(
-            config = config,
+        extractor(engine).extract(
+            config = config.copy(openRouterProviderOrder = listOf("baseten")),
             credential = AiRuntimeCredential.from("openrouter-secret"),
             systemPrompt = "Return JSON.",
             userPrompt = "Extract nutrition.",
@@ -115,10 +115,7 @@ class OpenRouterNutritionExtractorTest {
         assertEquals(OPENROUTER_RESEARCH_MODEL_REFUSED, error.message)
     }
 
-    private fun extractor(
-        engine: MockEngine,
-        preferredProvider: String = "",
-    ): OpenRouterNutritionExtractor {
+    private fun extractor(engine: MockEngine): OpenRouterNutritionExtractor {
         val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
@@ -131,6 +128,6 @@ class OpenRouterNutritionExtractorTest {
                 expectSuccess = true
             },
         )
-        return OpenRouterNutritionExtractor(client) { preferredProvider }
+        return OpenRouterNutritionExtractor(client)
     }
 }

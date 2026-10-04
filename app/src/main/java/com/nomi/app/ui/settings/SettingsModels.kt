@@ -87,8 +87,11 @@ data class SettingsUiState(
      * passes through. Fallback is left out: it is optional and usually sits on another provider.
      */
     /** Whether any task researches through Exa, the only provider that reads source pages. */
-    val usesExaOpenRouter: Boolean
-        get() = aiProviders.any { it.provider == AiProviderKind.EXA_OPEN_ROUTER }
+    /** Whether any task, the fallback included, sends requests through OpenRouter. */
+    val usesOpenRouter: Boolean
+        get() = aiProviders.any {
+            it.provider == AiProviderKind.OPEN_ROUTER || it.provider == AiProviderKind.EXA_OPEN_ROUTER
+        }
 
     val usesExaSearch: Boolean
         get() = aiProviders.any {

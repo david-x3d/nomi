@@ -182,8 +182,11 @@ internal fun AiProviderEditorPage(
         LaunchedEffect(Unit) { onClose() }
         return
     }
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     AiProviderEditorScreen(
         state = editor,
+        openRouterPreferredProvider = preferences.openRouterPreferredProvider,
+        onOpenRouterPreferredProviderChanged = viewModel::setOpenRouterPreferredProvider,
         onStateChanged = { session.editor = it },
         onProviderSelected = { provider ->
             val switched = editor.switchedTo(provider)

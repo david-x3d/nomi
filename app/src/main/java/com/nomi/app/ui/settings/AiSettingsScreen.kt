@@ -263,7 +263,18 @@ fun AiSettingsScreen(
                     )
                 }
             }
-            if (state.usesExaOpenRouter) {
+            item(key = "compare-models") {
+                SettingsLink(
+                    icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
+                    title = nomiString("Compare OpenRouter models"),
+                    supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
+                    onClick = onCompareModels,
+                    iconColor = MaterialTheme.colorScheme.secondary,
+                )
+            }
+
+            if (state.usesOpenRouter) {
+                item { SectionTitle("OpenRouter") }
                 item(key = "openrouter-provider") {
                     // Kept locally while typing, so a save echoing back never moves the cursor.
                     var slug by rememberSaveable { mutableStateOf(state.openRouterPreferredProvider) }
@@ -275,21 +286,11 @@ fun AiSettingsScreen(
                         },
                         label = nomiString("Preferred OpenRouter provider"),
                         placeholder = "baseten",
-                        supportingText = nomiString("Exa + OpenRouter asks this provider first. If it is unavailable, OpenRouter uses the next one within the price ceiling. Leave blank to let OpenRouter choose."),
+                        supportingText = nomiString("Every OpenRouter request asks this provider first, for every task. If it is unavailable, OpenRouter uses the next one. Leave blank to let OpenRouter choose."),
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
             }
-            item(key = "compare-models") {
-                SettingsLink(
-                    icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
-                    title = nomiString("Compare OpenRouter models"),
-                    supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
-                    onClick = onCompareModels,
-                    iconColor = MaterialTheme.colorScheme.secondary,
-                )
-            }
-
             item { SectionTitle(nomiString("Troubleshooting")) }
             item(key = "timeout") {
                 ToggleSetting(

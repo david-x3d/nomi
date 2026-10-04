@@ -31,6 +31,8 @@ data class AiProviderConfig(
     /** `null` lets the request run as long as the provider needs, with no client-side limit. */
     val timeoutMillis: Long? = 45_000,
     val extraHeaders: Map<String, String> = emptyMap(),
+    /** OpenRouter only: provider slugs to try first; the others stay available as fallbacks. */
+    val openRouterProviderOrder: List<String> = emptyList(),
 )
 
 /** Holds a credential without putting it in generated data-class toString/copy output. */

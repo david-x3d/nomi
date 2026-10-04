@@ -56,10 +56,19 @@ private fun ProviderSelection.resolvedEndpoint(): String {
  * [timeoutDisabled] comes from the user's "Never time out" setting: research that runs long is
  * then waited out instead of being cut off.
  */
-internal fun ProviderSelection.toRuntimeConfig(timeoutDisabled: Boolean = false): AiProviderConfig {
+internal fun ProviderSelection.toRuntimeConfig(
+    timeoutDisabled: Boolean = false,
+    /** The "Preferred OpenRouter provider" setting, applied to every OpenRouter request. */
+    openRouterPreferredProvider: String = "",
+): AiProviderConfig {
     val kind = providerId.toProviderKind()
     require(model.isNotBlank()) { "Choose a model in Settings." }
-    val defaults = AiProviderConfig(kind, resolvedEndpoint(), model.trim())
+    val order = if (kind == AiProviderKind.OPEN_ROUTER || kind == AiProviderKind.EXA_OPEN_ROUTER) {
+        listOfNotNull(openRouterPreferredProvider.trim().lowercase(Locale.ROOT).takeIf(String::isNotEmpty))
+    } else {
+        emptyList()
+    }
+    val defaults = AiProviderConfig(kind, resolvedEndpoint(), model.trim(), openRouterProviderOrder = order)
     return if (timeoutDisabled) defaults.copy(timeoutMillis = null) else defaults
 }
 

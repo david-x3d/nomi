@@ -27,6 +27,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.heading
@@ -86,6 +90,9 @@ fun AiProviderEditorScreen(
     onRemoveStoredKey: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The app-wide preferred OpenRouter provider, edited here too for OpenRouter tasks. */
+    openRouterPreferredProvider: String = "",
+    onOpenRouterPreferredProviderChanged: (String) -> Unit = {},
 ) {
     NomiSecureWindow()
     val uriHandler = LocalUriHandler.current
@@ -251,6 +258,22 @@ fun AiProviderEditorScreen(
                 KeyPageLink(
                     label = nomiFormat("Get a key from {0}", state.provider.keyPageName()),
                     onClick = { runCatching { uriHandler.openUri(url) } },
+                )
+            }
+            if (state.provider == AiProviderKind.OPEN_ROUTER || usesExaOpenRouter) {
+                // Kept locally while typing, so a save echoing back never moves the cursor.
+                var slug by rememberSaveable { mutableStateOf(openRouterPreferredProvider) }
+                NomiTextField(
+                    value = slug,
+                    onValueChange = {
+                        slug = it
+                        onOpenRouterPreferredProviderChanged(it)
+                    },
+                    label = nomiString("Preferred OpenRouter provider"),
+                    placeholder = "baseten",
+                    supportingText = nomiString("Every OpenRouter request asks this provider first, for every task. If it is unavailable, OpenRouter uses the next one. Leave blank to let OpenRouter choose."),
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (usesExa) {

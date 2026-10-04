@@ -17,6 +17,22 @@ import org.junit.Test
 
 class ProviderCredentialRoutingTest {
     @Test
+    fun `the preferred openrouter provider reaches both openrouter kinds and nothing else`() {
+        fun order(providerId: String) =
+            ProviderSelection(providerId = providerId, model = "some/model")
+                .toRuntimeConfig(openRouterPreferredProvider = "  Baseten ")
+                .openRouterProviderOrder
+
+        assertEquals(listOf("baseten"), order("openrouter"))
+        assertEquals(listOf("baseten"), order("exa-openrouter"))
+        assertEquals(emptyList<String>(), order("perplexity"))
+        assertEquals(
+            emptyList<String>(),
+            ProviderSelection(providerId = "openrouter", model = "m").toRuntimeConfig().openRouterProviderOrder,
+        )
+    }
+
+    @Test
     fun `api key input is trimmed and blank input is ignored`() {
         val chars = "  sk-example  ".normalizedApiKeyCharsOrNull()
 

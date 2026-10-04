@@ -243,17 +243,15 @@ internal data class OpenRouterRequestLimits(
     val maxPromptPrice: Double,
     val maxCompletionPrice: Double,
     val reasoningEffort: String,
-    /** Provider slugs OpenRouter tries first; the rest stay available as fallbacks. */
-    val preferredProviders: List<String> = emptyList(),
 )
 
 @Serializable
 internal data class OpenRouterProviderPreferences(
-    @SerialName("max_price") val maxPrice: OpenRouterMaxPrice,
+    @SerialName("max_price") val maxPrice: OpenRouterMaxPrice? = null,
     /** Providers to try first, in order. Left out when empty, so OpenRouter picks. */
     val order: List<String>? = null,
     /** Skip endpoints that would ignore the JSON schema instead of honouring it. */
-    @SerialName("require_parameters") val requireParameters: Boolean = true,
+    @SerialName("require_parameters") val requireParameters: Boolean? = null,
 )
 
 @Serializable
@@ -273,6 +271,7 @@ internal data class OpenRouterResponsesResearchRequest(
     val input: String,
     val tools: List<OpenRouterServerTool>,
     @SerialName("max_tool_calls") val maxToolCalls: Int,
+    val provider: OpenRouterProviderPreferences? = null,
 )
 
 @Serializable
@@ -434,12 +433,7 @@ internal fun chatCompletionRequest(
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
     maxTokens = maxTokens,
-    provider = openRouterLimits?.let { limits ->
-        OpenRouterProviderPreferences(
-            maxPrice = OpenRouterMaxPrice(limits.maxPromptPrice, limits.maxCompletionPrice),
-            order = limits.preferredProviders.takeIf { it.isNotEmpty() },
-        )
-    },
+    provider = config.openRouterProviderPreferences(openRouterLimits),
     reasoning = openRouterLimits?.let { OpenRouterReasoning(effort = it.reasoningEffort) },
 ).also {
     require(openRouterLimits == null || config.kind == AiProviderKind.OPEN_ROUTER) {
@@ -473,6 +467,23 @@ internal fun openRouterResponsesResearchRequest(
         input = userPrompt,
         tools = openRouterResearchTools(),
         maxToolCalls = 15,
+        provider = config.openRouterProviderPreferences(limits = null),
+    )
+}
+
+/**
+ * OpenRouter's routing block: the price ceiling and schema requirement when [limits] are set,
+ * and the preferred provider order whenever one is chosen. `null` when there is nothing to say.
+ */
+private fun AiProviderConfig.openRouterProviderPreferences(
+    limits: OpenRouterRequestLimits?,
+): OpenRouterProviderPreferences? {
+    val order = openRouterProviderOrder.takeIf { it.isNotEmpty() && kind == AiProviderKind.OPEN_ROUTER }
+    if (limits == null && order == null) return null
+    return OpenRouterProviderPreferences(
+        maxPrice = limits?.let { OpenRouterMaxPrice(it.maxPromptPrice, it.maxCompletionPrice) },
+        order = order,
+        requireParameters = limits?.let { true },
     )
 }
 
