@@ -58,7 +58,7 @@ internal fun mapSettings(
             hasApiKey = keys[pipeline]?.complete == true,
             hasPrimaryApiKey = keys[pipeline]?.primary == true,
             hasSearchApiKey = keys[pipeline]?.search == true &&
-                selected.usesExaGemini,
+                selected.usesExaSearch,
         )
     }
     val reminders = prefs.reminders

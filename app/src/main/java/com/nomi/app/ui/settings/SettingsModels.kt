@@ -87,7 +87,9 @@ data class SettingsUiState(
      */
     /** Whether any task researches through Exa, the only provider that reads source pages. */
     val usesExaSearch: Boolean
-        get() = aiProviders.any { it.provider == AiProviderKind.EXA_GEMINI }
+        get() = aiProviders.any {
+            it.provider == AiProviderKind.EXA_GEMINI || it.provider == AiProviderKind.EXA_OPEN_ROUTER
+        }
 
     val aiKeySetup: AiKeySetup
         get() {

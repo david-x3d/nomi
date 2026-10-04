@@ -190,7 +190,7 @@ data class AppPreferences(
     /**
      * When on, Exa returns each source page's own text beside its excerpts. Grounding checks
      * then see the table heading and serving sentence an excerpt can leave out, at the cost of
-     * Exa billing page text separately and Gemini reading more.
+     * Exa billing page text separately and the reading model reading more.
      */
     val exaFullPageText: Boolean = false,
     val healthNutritionSync: HealthNutritionSyncState = HealthNutritionSyncState(),
@@ -210,6 +210,12 @@ internal const val PREVIOUS_OPENROUTER_GEMINI_NUTRITION_MODEL = "google/gemini-3
 internal const val DEFAULT_DIRECT_GEMINI_NUTRITION_MODEL = "gemini-2.5-flash"
 /** Reading a sentence or a photo needs no research model, so Gemini on its own runs the light one. */
 internal const val DEFAULT_DIRECT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+
+/**
+ * What Exa + OpenRouter reads with unless the user picks another model: about as capable as
+ * Gemini 3.8 Flash on general benchmarks at a tenth of its token price, with structured output.
+ */
+internal const val DEFAULT_EXA_OPENROUTER_MODEL = "z-ai/glm-5.3-flash"
 private val RETIRED_OPENROUTER_MODELS = setOf(
     RETIRED_OPENROUTER_MODEL,
     PREVIOUS_OPENROUTER_MODEL,
@@ -297,6 +303,9 @@ internal fun ProviderSelection.withSupportedModel(
     }
     if (providerId.equals("gemini", ignoreCase = true)) {
         return if (model.isBlank()) copy(model = DEFAULT_DIRECT_GEMINI_MODEL) else this
+    }
+    if (providerId.equals("exa-openrouter", ignoreCase = true)) {
+        return if (model.isBlank()) copy(model = DEFAULT_EXA_OPENROUTER_MODEL) else this
     }
     if (!providerId.equals("openrouter", ignoreCase = true)) return this
     val slug = model.trim().lowercase()

@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.data.preferences.DEFAULT_EXA_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
 import com.nomi.app.data.remote.ai.GEMINI_API_ENDPOINT
@@ -95,8 +96,10 @@ fun AiProviderEditorScreen(
         invalidEndpointMessage = nomiString("Enter a valid HTTPS API endpoint."),
     )
     val usesExaGemini = state.provider == AiProviderKind.EXA_GEMINI
+    val usesExaOpenRouter = state.provider == AiProviderKind.EXA_OPEN_ROUTER
+    val usesExa = usesExaGemini || usesExaOpenRouter
     val hasReasoningKey = state.hasStoredApiKey || state.apiKeyInput.isNotBlank()
-    val hasSearchKey = !usesExaGemini ||
+    val hasSearchKey = !usesExa ||
         state.hasStoredSearchApiKey || state.searchApiKeyInput.isNotBlank()
     val canTest = configurationError == null && hasReasoningKey && hasSearchKey && !busy
 
@@ -229,10 +232,10 @@ fun AiProviderEditorScreen(
                 }
             }
 
-            val keyName = if (usesExaGemini || state.provider == AiProviderKind.GEMINI) {
-                nomiString("Google Gemini API key")
-            } else {
-                nomiString("API key")
+            val keyName = when {
+                usesExaGemini || state.provider == AiProviderKind.GEMINI -> nomiString("Google Gemini API key")
+                usesExaOpenRouter -> nomiString("OpenRouter API key")
+                else -> nomiString("API key")
             }
             NomiSecretField(
                 value = state.apiKeyInput,
@@ -242,7 +245,7 @@ fun AiProviderEditorScreen(
                 label = if (state.hasStoredApiKey) nomiFormat("{0} (stored securely)", keyName) else keyName,
                 placeholder = nomiString("Leave blank to keep existing key").takeIf { state.hasStoredApiKey },
                 enabled = !busy,
-                imeAction = if (usesExaGemini) ImeAction.Next else ImeAction.Done,
+                imeAction = if (usesExa) ImeAction.Next else ImeAction.Done,
             )
             state.provider.keyPageUrl()?.let { url ->
                 KeyPageLink(
@@ -250,7 +253,7 @@ fun AiProviderEditorScreen(
                     onClick = { runCatching { uriHandler.openUri(url) } },
                 )
             }
-            if (usesExaGemini) {
+            if (usesExa) {
                 NomiSecretField(
                     value = state.searchApiKeyInput,
                     onValueChange = {
@@ -270,7 +273,11 @@ fun AiProviderEditorScreen(
                     onClick = { runCatching { uriHandler.openUri(EXA_KEY_PAGE_URL) } },
                 )
                 Text(
-                    nomiString("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device."),
+                    if (usesExaOpenRouter) {
+                        nomiString("Exa retrieves sources through Exa's official API; an OpenRouter model reads them. Nomi only uses OpenRouter endpoints that cost at most $1 per million input and $5 per million output tokens, and caps every answer's length. For a hard spending limit, set a credit limit on the key at OpenRouter. Both keys stay encrypted on this device.")
+                    } else {
+                        nomiString("Exa retrieves sources through Exa's official API; Gemini runs directly through Google's Gemini API. Both keys stay encrypted on this device.")
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -347,7 +354,8 @@ private val SEARCHING_PROVIDERS = listOf(
  * its own cannot, so it is only offered to the tasks that read a sentence or a photo.
  */
 private fun providersFor(purpose: String): List<AiProviderKind> = when (purpose) {
-    "Food research" -> listOf(AiProviderKind.EXA_GEMINI) + SEARCHING_PROVIDERS
+    "Food research" ->
+        listOf(AiProviderKind.EXA_GEMINI, AiProviderKind.EXA_OPEN_ROUTER) + SEARCHING_PROVIDERS
     "Fallback" -> SEARCHING_PROVIDERS
     else -> listOf(AiProviderKind.GEMINI) + SEARCHING_PROVIDERS
 }
@@ -393,7 +401,9 @@ private fun AiProviderKind.canonicalEndpoint(): String? = when (this) {
     AiProviderKind.EXA_GEMINI,
     AiProviderKind.GEMINI,
     -> GEMINI_API_ENDPOINT
-    AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
+    AiProviderKind.OPEN_ROUTER,
+    AiProviderKind.EXA_OPEN_ROUTER,
+    -> "https://openrouter.ai/api/v1"
     AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> null
 }
@@ -409,9 +419,20 @@ private fun AiProviderKind.suggestedModel(purpose: String): String = when (this)
     }
     AiProviderKind.OPEN_AI -> if (purpose == "Fallback") "gpt-5.2" else ""
     AiProviderKind.EXA_GEMINI -> SUGGESTED_GEMINI_MODEL
+    AiProviderKind.EXA_OPEN_ROUTER -> DEFAULT_EXA_OPENROUTER_MODEL
     AiProviderKind.GEMINI -> SUGGESTED_GEMINI_MODEL
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> ""
 }
+
+/**
+ * Cheap OpenRouter readers with structured output, the default first. All of them sit well under
+ * the research price ceiling, which refuses anything dearer anyway.
+ */
+private val SUGGESTED_EXA_OPENROUTER_MODELS = listOf(
+    DEFAULT_EXA_OPENROUTER_MODEL,
+    "openai/gpt-6-luna",
+    "qwen/qwen3.8-flash",
+)
 
 /**
  * Models offered as one-tap answers under the field, so an empty field is never a dead end.
@@ -428,6 +449,7 @@ private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
         AiProviderKind.OPEN_AI ->
             if (searches) listOf("gpt-4o-search-preview", "gpt-5.2") else listOf("gpt-5.2")
         AiProviderKind.EXA_GEMINI -> listOf(SUGGESTED_GEMINI_MODEL)
+        AiProviderKind.EXA_OPEN_ROUTER -> SUGGESTED_EXA_OPENROUTER_MODELS
         AiProviderKind.GEMINI -> listOf(SUGGESTED_GEMINI_MODEL)
         AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> emptyList()
     }
@@ -435,7 +457,9 @@ private fun AiProviderKind.modelSuggestions(purpose: String): List<String> {
 
 /** Where a key for this provider is made. A custom endpoint has no such page. */
 internal fun AiProviderKind.keyPageUrl(): String? = when (this) {
-    AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/keys"
+    AiProviderKind.OPEN_ROUTER,
+    AiProviderKind.EXA_OPEN_ROUTER,
+    -> "https://openrouter.ai/keys"
     AiProviderKind.PERPLEXITY -> "https://www.perplexity.ai/settings/api"
     AiProviderKind.OPEN_AI -> "https://platform.openai.com/api-keys"
     AiProviderKind.EXA_GEMINI,
@@ -446,7 +470,9 @@ internal fun AiProviderKind.keyPageUrl(): String? = when (this) {
 
 /** Who issues the key, which for Exa + Gemini's first field is Google rather than the pair. */
 internal fun AiProviderKind.keyPageName(): String = when (this) {
-    AiProviderKind.OPEN_ROUTER -> "OpenRouter"
+    AiProviderKind.OPEN_ROUTER,
+    AiProviderKind.EXA_OPEN_ROUTER,
+    -> "OpenRouter"
     AiProviderKind.PERPLEXITY -> "Perplexity"
     AiProviderKind.OPEN_AI -> "OpenAI"
     AiProviderKind.EXA_GEMINI,
@@ -461,6 +487,7 @@ internal const val EXA_KEY_PAGE_URL = "https://dashboard.exa.ai/api-keys"
 internal fun AiProviderKind.localizedDisplayName(): String = when (this) {
     AiProviderKind.PERPLEXITY -> "Perplexity"
     AiProviderKind.EXA_GEMINI -> "Exa + Gemini"
+    AiProviderKind.EXA_OPEN_ROUTER -> "Exa + OpenRouter"
     AiProviderKind.OPEN_ROUTER -> "OpenRouter"
     AiProviderKind.OPEN_AI -> "OpenAI"
     AiProviderKind.GEMINI -> "Google Gemini"

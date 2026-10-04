@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HourglassEmpty
@@ -94,6 +95,7 @@ fun AiSettingsScreen(
     onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
     onExaFullPageTextChanged: (Boolean) -> Unit,
+    onCompareModels: () -> Unit,
     onDebug: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -246,18 +248,27 @@ fun AiSettingsScreen(
                 )
             }
 
+            item { SectionTitle(nomiString("Food research")) }
             if (state.usesExaSearch) {
-                item { SectionTitle(nomiString("Food research")) }
                 item(key = "full-pages") {
                     ToggleSetting(
                         icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null) },
                         title = nomiString("Read whole source pages"),
-                        supporting = nomiString("Exa gives Gemini each page's full text instead of excerpts. Finds nutrition more reliably, but uses more Exa and Gemini credits."),
+                        supporting = nomiString("Exa gives the AI each page's full text instead of excerpts. Finds nutrition more reliably, but uses more Exa and AI credits."),
                         checked = state.exaFullPageText,
                         onCheckedChange = onExaFullPageTextChanged,
                         iconColor = MaterialTheme.colorScheme.secondary,
                     )
                 }
+            }
+            item(key = "compare-models") {
+                SettingsLink(
+                    icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
+                    title = nomiString("Compare OpenRouter models"),
+                    supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
+                    onClick = onCompareModels,
+                    iconColor = MaterialTheme.colorScheme.secondary,
+                )
             }
 
             item { SectionTitle(nomiString("Troubleshooting")) }

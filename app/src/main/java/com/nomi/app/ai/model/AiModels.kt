@@ -10,6 +10,11 @@ enum class AiProviderKind {
     /** One Exa retrieval request followed by one native Gemini structured extraction request. */
     EXA_GEMINI,
     /**
+     * The same Exa retrieval, read by an OpenRouter model instead of Gemini. It runs on the
+     * OpenRouter key the other OpenRouter tasks use, under a fixed price ceiling per token.
+     */
+    EXA_OPEN_ROUTER,
+    /**
      * Google Gemini on its own, for the tasks that read text or a photo and search nothing.
      * It runs on the same Google key as [EXA_GEMINI], so the pair needs two keys, not three.
      */

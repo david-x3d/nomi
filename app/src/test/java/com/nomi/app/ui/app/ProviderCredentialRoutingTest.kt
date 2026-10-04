@@ -1,5 +1,6 @@
 package com.nomi.app.ui.app
 
+import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.security.SecretUnavailableException
@@ -43,6 +44,22 @@ class ProviderCredentialRoutingTest {
                 research.copy(model = "perplexity/sonar-pro"),
             ),
         )
+    }
+
+    @Test
+    fun `exa + openrouter reads with the stored openrouter key and searches with exa`() {
+        val research = ProviderSelection(providerId = "exa-openrouter", model = "z-ai/glm-5.3-flash")
+        val fallback = ProviderSelection(providerId = "openrouter", model = "openai/gpt-5.6-luna")
+
+        // The OpenRouter key already stored for the fallback is the one research reads with.
+        assertEquals(secretId(fallback), secretId(research))
+        assertEquals(1, smartFallbackCredentialIds(fallback, research).size)
+        assertTrue(research.usesExaSearch)
+        assertFalse(research.usesExaGemini)
+        val config = research.toRuntimeConfig()
+        assertEquals(AiProviderKind.EXA_OPEN_ROUTER, config.kind)
+        assertEquals("https://openrouter.ai/api/v1", config.endpoint)
+        assertEquals("Exa + OpenRouter", research.providerId.displayProviderName())
     }
 
     @Test

@@ -1359,6 +1359,24 @@ class ExaGeminiNutritionProviderTest {
     }
 
     @Test
+    fun `an OpenRouter reader is named in the debug trace`() = runBlocking {
+        val traces = mutableListOf<ExaGeminiDebugTrace>()
+        provider(
+            sources = listOf(source(HANS_IM_GLUECK_TITLE, HANS_IM_GLUECK_URL, HANS_IM_GLUECK_PAGE)),
+            extraction = extraction(klassikItem(basisText = "Nährwert & Allergene", servingUnit = "Burger")),
+            onTrace = traces::add,
+            readerConfig = config.copy(
+                kind = AiProviderKind.EXA_OPEN_ROUTER,
+                endpoint = "https://openrouter.ai/api/v1",
+                model = "z-ai/glm-5.3-flash",
+            ),
+        ).researchNutrition(klassikIntent(quantity = null, unit = null))
+
+        assertEquals("exa-openrouter", traces.single().provider)
+        assertEquals("z-ai/glm-5.3-flash", traces.single().model)
+    }
+
+    @Test
     fun `a validated pass keeps no page text in its trace`() = runBlocking {
         val traces = mutableListOf<ExaGeminiDebugTrace>()
         provider(
@@ -1417,6 +1435,7 @@ class ExaGeminiNutritionProviderTest {
         fullPageText: Boolean = false,
         onIncludePageText: (Boolean) -> Unit = {},
         onTrace: (ExaGeminiDebugTrace) -> Unit = {},
+        readerConfig: AiProviderConfig = config,
     ) = ExaGeminiNutritionProvider(
         exaSearch = ExaNutritionSearchGateway { query, _, _, _, includePageText ->
             onQuery(query)
@@ -1429,7 +1448,7 @@ class ExaGeminiNutritionProviderTest {
             extraction
         },
         exaCredential = { credential },
-        geminiConfig = config,
+        geminiConfig = readerConfig,
         geminiCredential = { credential },
         localeCountryProvider = { localeCountry },
         searchProgressSink = { onSources(it) },

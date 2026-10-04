@@ -36,7 +36,9 @@ private fun String.asHttpsEndpoint(): String = trim().let { endpoint ->
 private fun ProviderSelection.resolvedEndpoint(): String {
     val resolved = when (providerId.toProviderKind()) {
         AiProviderKind.PERPLEXITY -> "https://api.perplexity.ai"
-        AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai/api/v1"
+        AiProviderKind.OPEN_ROUTER,
+        AiProviderKind.EXA_OPEN_ROUTER,
+        -> "https://openrouter.ai/api/v1"
         AiProviderKind.OPEN_AI -> "https://api.openai.com/v1"
         AiProviderKind.EXA_GEMINI,
         AiProviderKind.GEMINI,
@@ -73,6 +75,7 @@ internal fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.RO
     "openrouter" -> AiProviderKind.OPEN_ROUTER
     "openai" -> AiProviderKind.OPEN_AI
     "exa-gemini" -> AiProviderKind.EXA_GEMINI
+    "exa-openrouter" -> AiProviderKind.EXA_OPEN_ROUTER
     "gemini" -> AiProviderKind.GEMINI
     else -> AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE
 }
@@ -81,6 +84,7 @@ private fun AiProviderKind.toProviderId(): String = when (this) {
     AiProviderKind.OPEN_ROUTER -> "openrouter"
     AiProviderKind.OPEN_AI -> "openai"
     AiProviderKind.EXA_GEMINI -> "exa-gemini"
+    AiProviderKind.EXA_OPEN_ROUTER -> "exa-openrouter"
     AiProviderKind.GEMINI -> "gemini"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> "custom"
 }
@@ -89,6 +93,7 @@ internal fun String.displayProviderName(): String = when (lowercase(Locale.ROOT)
     "openrouter" -> "OpenRouter"
     "openai" -> "OpenAI"
     "exa-gemini" -> "Exa + Gemini"
+    "exa-openrouter" -> "Exa + OpenRouter"
     "gemini" -> "Google Gemini"
     else -> "custom provider"
 }
@@ -100,16 +105,22 @@ internal fun ProviderPipeline.displayName(): String = when (this) {
     ProviderPipeline.SMART_FALLBACK -> "Fallback"
 }
 
-/** Exa retrieval plus Gemini extraction is the one provider that needs two keys. */
+/** Exa retrieval plus Gemini extraction, whose reading key is the Google one. */
 internal val ProviderSelection.usesExaGemini: Boolean
     get() = providerId.equals("exa-gemini", ignoreCase = true)
+
+/** Research that retrieves through Exa, so it needs the Exa key beside its reading key. */
+internal val ProviderSelection.usesExaSearch: Boolean
+    get() = usesExaGemini || providerId.equals("exa-openrouter", ignoreCase = true)
 
 /** The provider's public site, shown as the first "source" while its research is starting. */
 internal fun ProviderSelection.website(): String? = when (providerId.toProviderKind()) {
     AiProviderKind.PERPLEXITY -> "https://www.perplexity.ai"
     AiProviderKind.OPEN_ROUTER -> "https://openrouter.ai"
     AiProviderKind.OPEN_AI -> "https://openai.com"
-    AiProviderKind.EXA_GEMINI -> "https://exa.ai"
+    AiProviderKind.EXA_GEMINI,
+    AiProviderKind.EXA_OPEN_ROUTER,
+    -> "https://exa.ai"
     AiProviderKind.GEMINI -> "https://ai.google.dev"
     AiProviderKind.CUSTOM_OPEN_AI_COMPATIBLE -> endpoint
 }
@@ -129,9 +140,15 @@ private fun ProviderSelection.sharesCredentialWith(other: ProviderSelection): Bo
  * Filing them under one name is what lets the recommended setup ask for two keys - Gemini and
  * Exa - rather than the same Gemini key twice. "exa-gemini" is the name kept because keys stored
  * before Gemini was offered on its own are already filed under it.
+ *
+ * The OpenRouter half of Exa + OpenRouter is the OpenRouter account, so a key already stored for
+ * an OpenRouter task - the fallback, say - is the one it reads with.
  */
-private fun ProviderSelection.credentialAccount(): String =
-    if (providerId.equals("gemini", ignoreCase = true)) "exa-gemini" else providerId
+private fun ProviderSelection.credentialAccount(): String = when {
+    providerId.equals("gemini", ignoreCase = true) -> "exa-gemini"
+    providerId.equals("exa-openrouter", ignoreCase = true) -> "openrouter"
+    else -> providerId
+}
 
 internal fun smartFallbackCredentialIds(
     selection: ProviderSelection,

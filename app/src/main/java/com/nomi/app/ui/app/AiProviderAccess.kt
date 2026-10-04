@@ -12,7 +12,10 @@ import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
+import com.nomi.app.data.remote.ai.ExaNutritionSearchGateway
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
+import com.nomi.app.data.remote.ai.OpenRouterNutritionExtractor
+import com.nomi.app.data.remote.ai.SharedExaSearch
 import com.nomi.app.di.AppContainer
 import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.settings.AiProviderEditorState
@@ -101,19 +104,19 @@ internal class AiProviderAccess(
     ): T {
         val prefs = loadedPreferences()
         val selection = prefs.foodResearchProvider
-        if (!selection.usesExaGemini) {
+        if (!selection.usesExaSearch) {
             return withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
                 block(providerFor(config, key))
             }
         }
         val config = selection.toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
-        return container.secretStore.useSecret(secretId(selection)) { geminiChars ->
-            val geminiCredential = AiRuntimeCredential.from(geminiChars.concatToString())
+        return container.secretStore.useSecret(secretId(selection)) { readerChars ->
+            val readerCredential = AiRuntimeCredential.from(readerChars.concatToString())
             container.secretStore.useSecret(exaSecretId()) { exaChars ->
                 val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
-                block(exaGeminiProvider(config, geminiCredential, exaCredential))
+                block(exaResearchProvider(config, readerCredential, exaCredential))
             } ?: error("Add the Exa API key in Settings first.")
-        } ?: error("Add the Google Gemini API key in Settings first.")
+        } ?: error("Add the ${config.kind.readerKeyOwner()} API key in Settings first.")
     }
 
     private suspend fun <T : Any> withConfiguredSmartFallback(
@@ -144,17 +147,60 @@ internal class AiProviderAccess(
         )
     }
 
-    private fun exaGeminiProvider(
+    /**
+     * Researches [intent] with each OpenRouter model through Exa + OpenRouter, for the model
+     * comparison in Settings. All models read the same Exa results, paid for once, and none falls
+     * back to anything else, since a fallback's answer would say nothing about the model.
+     */
+    suspend fun compareOpenRouterModels(
+        intent: ParsedFoodIntent,
+        models: List<String>,
+        onRun: suspend (ModelRun) -> Unit,
+    ): List<ModelRun> {
+        val prefs = loadedPreferences()
+        val account = ProviderSelection(providerId = "exa-openrouter")
+        return container.secretStore.useSecret(secretId(account)) { readerChars ->
+            val readerCredential = AiRuntimeCredential.from(readerChars.concatToString())
+            container.secretStore.useSecret(exaSecretId()) { exaChars ->
+                val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
+                val sharedSearch = SharedExaSearch(container.exaGeminiClient)
+                compareModels(
+                    models = models,
+                    research = { model ->
+                        val config = account.copy(model = model)
+                            .toRuntimeConfig(prefs.aiRequestTimeoutDisabled)
+                        exaResearchProvider(
+                            config = config,
+                            readerCredential = readerCredential,
+                            exaCredential = exaCredential,
+                            exaSearch = sharedSearch,
+                            showsProgress = false,
+                        ).researchNutrition(intent).withCleanDisplayNames()
+                    },
+                    onRun = onRun,
+                )
+            } ?: error("Add the Exa API key in Settings first.")
+        } ?: error("Add the OpenRouter API key in Settings first.")
+    }
+
+    /** Exa retrieval read by Gemini or, for Exa + OpenRouter, by the chosen OpenRouter model. */
+    private fun exaResearchProvider(
         config: AiProviderConfig,
-        geminiCredential: AiRuntimeCredential,
+        readerCredential: AiRuntimeCredential,
         exaCredential: AiRuntimeCredential,
+        exaSearch: ExaNutritionSearchGateway = container.exaGeminiClient,
+        showsProgress: Boolean = true,
     ) = ExaGeminiNutritionProvider(
-        exaSearch = container.exaGeminiClient,
-        geminiExtractor = container.exaGeminiClient,
+        exaSearch = exaSearch,
+        geminiExtractor = if (config.kind == AiProviderKind.EXA_OPEN_ROUTER) {
+            OpenRouterNutritionExtractor(container.openAiClient)
+        } else {
+            container.exaGeminiClient
+        },
         exaCredential = { exaCredential },
         geminiConfig = config,
-        geminiCredential = { geminiCredential },
-        searchProgressSink = onResearchSources,
+        geminiCredential = { readerCredential },
+        searchProgressSink = { sources -> if (showsProgress) onResearchSources(sources) },
         debugSink = debug::recordExaGeminiTrace,
         calorieBiasProvider = { preferences.value.calorieEstimateBias },
         fullPageTextProvider = { preferences.value.exaFullPageText },
@@ -184,7 +230,7 @@ internal class AiProviderAccess(
                 val primary = runCatching {
                     container.secretStore.contains(secretId(selection))
                 }.getOrDefault(false)
-                val search = if (selection.usesExaGemini) {
+                val search = if (selection.usesExaSearch) {
                     runCatching { container.secretStore.contains(exaSecretId()) }.getOrDefault(false)
                 } else true
                 ProviderKeyPresence(primary = primary, search = search)
@@ -259,7 +305,7 @@ internal class AiProviderAccess(
         val selection = state.toProviderSelection(pipeline)
         val primary = runCatching { container.secretStore.contains(secretId(selection)) }
             .getOrDefault(false)
-        val search = selection.usesExaGemini &&
+        val search = selection.usesExaSearch &&
             runCatching { container.secretStore.contains(exaSecretId()) }.getOrDefault(false)
         return ProviderKeyPresence(primary = primary, search = search)
     }
@@ -276,7 +322,7 @@ internal class AiProviderAccess(
                 chars.fill('\u0000')
             }
         }
-        if (config.kind == AiProviderKind.EXA_GEMINI) {
+        if (config.kind.retrievesWithExa()) {
             state.searchApiKeyInput.normalizedApiKeyCharsOrNull()?.let { chars ->
                 try {
                     container.secretStore.put(exaSecretId(), chars)
@@ -292,7 +338,7 @@ internal class AiProviderAccess(
     suspend fun removeStoredKeys(pipeline: ProviderPipeline, state: AiProviderEditorState): Boolean {
         val selection = state.toProviderSelection(pipeline)
         val primaryRemoved = container.secretStore.delete(secretId(selection))
-        val searchRemoved = if (selection.usesExaGemini) {
+        val searchRemoved = if (selection.usesExaSearch) {
             container.secretStore.delete(exaSecretId())
         } else false
         return primaryRemoved || searchRemoved
@@ -343,18 +389,22 @@ internal class AiProviderAccess(
             } ?: error(missingMessage)
         }
 
-        if (config.kind == AiProviderKind.EXA_GEMINI) {
+        if (config.kind.retrievesWithExa()) {
             withDraftOrStoredCredential(
                 input = state.apiKeyInput,
                 storedId = secretId(selection),
-                missingMessage = "Enter a Google Gemini API key before testing this provider.",
-            ) { geminiCredential ->
+                missingMessage = if (config.kind == AiProviderKind.EXA_OPEN_ROUTER) {
+                    "Enter an OpenRouter API key before testing this provider."
+                } else {
+                    "Enter a Google Gemini API key before testing this provider."
+                },
+            ) { readerCredential ->
                 withDraftOrStoredCredential(
                     input = state.searchApiKeyInput,
                     storedId = exaSecretId(),
                     missingMessage = "Enter an Exa API key before testing this provider.",
                 ) { exaCredential ->
-                    exaGeminiProvider(config, geminiCredential, exaCredential)
+                    exaResearchProvider(config, readerCredential, exaCredential)
                         .researchNutrition(providerConnectionTestIntent())
                 }
             }
@@ -388,6 +438,13 @@ internal class AiProviderAccess(
  */
 internal class KeyCheckException(val field: AiKeyField?, cause: Throwable) :
     Exception(cause.message, cause)
+
+private fun AiProviderKind.retrievesWithExa(): Boolean =
+    this == AiProviderKind.EXA_GEMINI || this == AiProviderKind.EXA_OPEN_ROUTER
+
+/** Who issued the key an Exa research provider reads with. */
+private fun AiProviderKind.readerKeyOwner(): String =
+    if (this == AiProviderKind.EXA_OPEN_ROUTER) "OpenRouter" else "Google Gemini"
 
 /** True for a key that is missing or that the provider refused, as opposed to a bad connection. */
 private fun Throwable.blamesCredential(): Boolean =

@@ -35,6 +35,40 @@ class OpenAiCompatibleClientTest {
     }
 
     @Test
+    fun `openrouter limits put a price ceiling and low reasoning on the request`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "z-ai/glm-5.3-flash"),
+                listOf(ChatMessage("user", JsonPrimitive("Extract"))),
+                maxTokens = 8_000,
+                openRouterLimits = OpenRouterRequestLimits(
+                    maxPromptPrice = 1.0,
+                    maxCompletionPrice = 5.0,
+                    reasoningEffort = "low",
+                ),
+            ),
+        )
+
+        assertTrue(encoded, encoded.contains("\"provider\":{\"max_price\":{\"prompt\":1.0,\"completion\":5.0},\"require_parameters\":true}"))
+        assertTrue(encoded, encoded.contains("\"reasoning\":{\"effort\":\"low\",\"exclude\":true}"))
+        assertTrue(encoded, encoded.contains("\"max_tokens\":8000"))
+        assertFalse(encoded, encoded.contains("temperature"))
+    }
+
+    @Test
+    fun `requests without limits carry no openrouter routing fields`() {
+        val encoded = json.encodeToString(
+            chatCompletionRequest(
+                config(AiProviderKind.OPEN_ROUTER, "perplexity/sonar"),
+                listOf(ChatMessage("user", JsonPrimitive("Reply with JSON"))),
+            ),
+        )
+
+        assertFalse(encoded, encoded.contains("\"provider\""))
+        assertFalse(encoded, encoded.contains("\"reasoning\""))
+    }
+
+    @Test
     fun `direct perplexity request also omits unsupported json object format`() {
         val config = config(AiProviderKind.PERPLEXITY, "sonar")
         val encoded = json.encodeToString(

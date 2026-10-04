@@ -1,6 +1,7 @@
 package com.nomi.app.data.remote.ai
 
 import com.nomi.app.ai.model.AiProviderConfig
+import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
@@ -53,6 +54,17 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal const val DEFAULT_GEMINI_NUTRITION_MODEL = "gemini-2.5-flash"
+
+/**
+ * The most Exa + OpenRouter will pay, in dollars per million tokens. OpenRouter enforces it: a
+ * model whose every endpoint costs more is refused before anything is billed. The ceiling sits
+ * well above the suggested models and well below premium ones.
+ */
+internal const val OPENROUTER_RESEARCH_MAX_PROMPT_PRICE = 1.0
+internal const val OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE = 5.0
+
+/** Answer and reasoning together; a lookup's JSON needs a fraction of it. */
+private const val OPENROUTER_RESEARCH_MAX_TOKENS = 8_000
 internal const val EXA_API_ENDPOINT = "https://api.exa.ai"
 internal const val GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta"
 
@@ -252,6 +264,62 @@ internal class ProviderTemporarilyUnavailableException(
     cause: Throwable,
 ) : IOException("$providerName is temporarily unavailable (HTTP $statusCode) after retrying.", cause)
 
+/**
+ * The OpenRouter half of Exa + OpenRouter: the extraction contract Gemini answers, answered by an
+ * OpenRouter model that supports structured JSON.
+ *
+ * Every request carries its cost limits. OpenRouter serves it only from endpoints within the
+ * price ceiling and only from ones that honour the JSON schema; the output budget caps answer
+ * and reasoning together; and reasoning stays low, because this is field mapping over retrieved
+ * text rather than open-ended thinking. A model outside those limits fails on its first request
+ * instead of running up a bill.
+ */
+internal class OpenRouterNutritionExtractor(
+    private val client: OpenAiCompatibleClient,
+) : GeminiNutritionExtractionGateway {
+    override suspend fun extract(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+    ): GeminiNutritionExtraction {
+        val content = try {
+            client.completeStructuredJson(
+                // OpenRouter's own rules apply to the request: no custom temperature, since the
+                // routed endpoint may not accept one.
+                config = config.copy(kind = AiProviderKind.OPEN_ROUTER),
+                credential = credential,
+                systemPrompt = systemPrompt,
+                userPrompt = userPrompt,
+                schemaName = "nomi_nutrition_extraction",
+                schema = GEMINI_NUTRITION_EXTRACTION_SCHEMA,
+                maxTokens = OPENROUTER_RESEARCH_MAX_TOKENS,
+                openRouterLimits = OpenRouterRequestLimits(
+                    maxPromptPrice = OPENROUTER_RESEARCH_MAX_PROMPT_PRICE,
+                    maxCompletionPrice = OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE,
+                    reasoningEffort = "low",
+                ),
+            )
+        } catch (failure: ResponseException) {
+            // OpenRouter answers 404 when no endpoint of the model fits the request: too
+            // expensive, no structured output, or no such model. All three are fixed by the
+            // model choice, which the generic "endpoint not found" wording does not say.
+            if (failure.response.status.value == HTTP_NOT_FOUND) {
+                throw AiValidationException(OPENROUTER_RESEARCH_MODEL_REFUSED)
+            }
+            throw failure
+        }
+        return client.json.decodeFromString(extractJsonDocument(content))
+    }
+}
+
+internal const val OPENROUTER_RESEARCH_MODEL_REFUSED =
+    "OpenRouter has no endpoint for this model that returns structured JSON within Nomi's " +
+        "research price limit of \$1 input and \$5 output per million tokens. Check the model " +
+        "ID or choose a cheaper model."
+
+private const val HTTP_NOT_FOUND = 404
+
 internal fun transientRetryDelayMillis(attempt: Int, retryAfterMillis: Long?): Long {
     val exponential = TRANSIENT_HTTP_BASE_DELAY_MILLIS * (1L shl attempt.coerceIn(0, 3))
     return maxOf(exponential, retryAfterMillis ?: 0L).coerceAtMost(TRANSIENT_HTTP_MAX_DELAY_MILLIS)
@@ -443,6 +511,7 @@ internal class ExaGeminiNutritionProvider(
             }
             debugSink(
                 debugTrace(
+                    provider = geminiConfig.kind.researchProviderId(),
                     model = geminiConfig.model,
                     originalInput = passIntent.originalText,
                     searchQuery = searchQuery,
@@ -466,6 +535,7 @@ internal class ExaGeminiNutritionProvider(
             runCatching {
                 debugSink(
                     debugTrace(
+                        provider = geminiConfig.kind.researchProviderId(),
                         model = geminiConfig.model,
                         originalInput = passIntent.originalText,
                         searchQuery = searchQuery,
@@ -1528,7 +1598,11 @@ internal data class ExaGeminiItemFailure(
     val detail: String,
 )
 
+private fun AiProviderKind.researchProviderId(): String =
+    if (this == AiProviderKind.EXA_OPEN_ROUTER) "exa-openrouter" else "exa-gemini"
+
 private fun debugTrace(
+    provider: String,
     model: String,
     originalInput: String,
     searchQuery: String,
@@ -1542,6 +1616,7 @@ private fun debugTrace(
     failureReason: String? = null,
     itemFailures: List<ExaGeminiItemFailure> = emptyList(),
 ): ExaGeminiDebugTrace = ExaGeminiDebugTrace(
+    provider = provider,
     model = model,
     originalInput = originalInput,
     searchQuery = searchQuery,

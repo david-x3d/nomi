@@ -28,6 +28,7 @@ import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.HeightUnitPreference
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
+import com.nomi.app.data.preferences.ProviderSelection
 import com.nomi.app.data.preferences.WeightUnitPreference
 import com.nomi.app.data.repository.AddSavedMealToLogRequest
 import com.nomi.app.data.repository.SaveLoggedMealRequest
@@ -2222,6 +2223,95 @@ class AppViewModel(
 
     fun setExaFullPageText(enabled: Boolean) {
         viewModelScope.launch { repository.appPreferencesStore.setExaFullPageText(enabled) }
+    }
+
+    private val mutableModelComparison = MutableStateFlow(ModelComparisonUiState())
+    internal val modelComparison: StateFlow<ModelComparisonUiState> = mutableModelComparison.asStateFlow()
+    private var modelComparisonJob: Job? = null
+
+    fun setModelComparisonInput(text: String) {
+        mutableModelComparison.update { it.copy(input = text) }
+    }
+
+    fun toggleComparedModel(model: String) {
+        mutableModelComparison.update { it.toggled(model) }
+    }
+
+    fun setCustomComparedModel(text: String) {
+        mutableModelComparison.update { it.copy(customModelInput = text) }
+    }
+
+    fun addCustomComparedModel() {
+        mutableModelComparison.update { it.withCustomModel() }
+    }
+
+    /**
+     * Reads the meal once, then has every selected OpenRouter model research it through Exa.
+     * A comparison started while one is running replaces it.
+     */
+    fun runModelComparison() {
+        val start = mutableModelComparison.value
+        val text = start.input.trim()
+        val models = start.selectedInOrder()
+        if (text.isEmpty() || models.isEmpty()) return
+        modelComparisonJob?.cancel()
+        mutableModelComparison.update { state ->
+            state.copy(
+                isRunning = true,
+                errorMessage = null,
+                cards = models.map { ModelComparisonCard(it, ModelComparisonStatus.RUNNING) },
+            )
+        }
+        modelComparisonJob = viewModelScope.launch {
+            try {
+                val intent = interpret(text)
+                providers.compareOpenRouterModels(intent, models) { run ->
+                    val card = run.result.fold(
+                        onSuccess = { analysis ->
+                            ModelComparisonCard(
+                                model = run.model,
+                                status = ModelComparisonStatus.DONE,
+                                analysis = analysis,
+                                durationMillis = run.durationMillis,
+                            )
+                        },
+                        onFailure = { error ->
+                            ModelComparisonCard(
+                                model = run.model,
+                                status = ModelComparisonStatus.FAILED,
+                                errorMessage = researchFailureMessage(error, currentLanguage()),
+                                durationMillis = run.durationMillis,
+                            )
+                        },
+                    )
+                    mutableModelComparison.update { state ->
+                        state.copy(cards = state.cards.map { if (it.model == run.model) card else it })
+                    }
+                }
+                mutableModelComparison.update { it.copy(isRunning = false) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Throwable) {
+                mutableModelComparison.update {
+                    it.copy(
+                        isRunning = false,
+                        cards = emptyList(),
+                        errorMessage = researchFailureMessage(error, currentLanguage()),
+                    )
+                }
+            }
+        }
+    }
+
+    /** Makes [model] the food research reader, through Exa + OpenRouter. */
+    fun useResearchModel(model: String) {
+        viewModelScope.launch {
+            repository.appPreferencesStore.setProvider(
+                ProviderPipeline.FOOD_RESEARCH,
+                ProviderSelection(providerId = "exa-openrouter", model = model),
+            )
+            providers.refreshKeyPresence()
+        }
     }
 
     fun providerEditorState(index: Int): AiProviderEditorState {

@@ -52,6 +52,18 @@ class ProviderSelectionMigrationTest {
     }
 
     @Test
+    fun `exa + openrouter with no model saved reads with the cheap default`() {
+        val blank = ProviderSelection(providerId = "exa-openrouter")
+
+        assertEquals(
+            DEFAULT_EXA_OPENROUTER_MODEL,
+            blank.withSupportedModel(ProviderPipeline.FOOD_RESEARCH).model,
+        )
+        val chosen = ProviderSelection(providerId = "exa-openrouter", model = "openai/gpt-6-luna")
+        assertSame(chosen, chosen.withSupportedModel(ProviderPipeline.FOOD_RESEARCH))
+    }
+
+    @Test
     fun `research keeps the searching model while other pipelines get the fast one`() {
         val retired = ProviderSelection(providerId = "openrouter", model = RETIRED_OPENROUTER_MODEL)
 

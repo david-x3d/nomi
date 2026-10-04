@@ -290,6 +290,7 @@ internal fun NavGraphBuilder.detailDestinations(
             onCalorieEstimateBiasChanged = viewModel::setCalorieEstimateBias,
             onAiRequestTimeoutDisabledChanged = viewModel::setAiRequestTimeoutDisabled,
             onExaFullPageTextChanged = viewModel::setExaFullPageText,
+            onCompareModels = { navController.navigate(Routes.MODEL_COMPARE) },
             onDebug = { navController.navigate(Routes.DEVELOPER) },
             onBack = { navController.popBackStack() },
         )
@@ -300,6 +301,24 @@ internal fun NavGraphBuilder.detailDestinations(
             viewModel = viewModel,
             session = providerSession,
             onClose = { navController.popBackStack(Routes.AI, inclusive = false) },
+        )
+    }
+
+    composable(Routes.MODEL_COMPARE) {
+        val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+        val comparison by viewModel.modelComparison.collectAsStateWithLifecycle()
+        val research = preferences.foodResearchProvider
+        ModelComparisonScreen(
+            state = comparison,
+            fullPageText = preferences.exaFullPageText,
+            researchModel = research.model.takeIf { research.usesExaSearch && !research.usesExaGemini },
+            onInputChanged = viewModel::setModelComparisonInput,
+            onToggleModel = viewModel::toggleComparedModel,
+            onCustomModelChanged = viewModel::setCustomComparedModel,
+            onAddCustomModel = viewModel::addCustomComparedModel,
+            onCompare = viewModel::runModelComparison,
+            onUseModel = viewModel::useResearchModel,
+            onBack = { navController.popBackStack() },
         )
     }
 
@@ -340,5 +359,6 @@ internal object Routes {
     const val AI = "ai"
     const val AI_PROVIDER = "ai_provider"
     const val DEVELOPER = "developer"
+    const val MODEL_COMPARE = "model_compare"
     fun food(id: Long) = "food/$id"
 }

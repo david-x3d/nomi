@@ -68,6 +68,7 @@ class OpenAiCompatibleClient(
         schemaName: String,
         schema: JsonObject,
         maxTokens: Int = 4_096,
+        openRouterLimits: OpenRouterRequestLimits? = null,
     ): String = completeResponse(
         config = config,
         credential = credential,
@@ -80,6 +81,7 @@ class OpenAiCompatibleClient(
             jsonSchema = JsonSchemaDefinition(name = schemaName, schema = schema),
         ),
         maxTokens = maxTokens,
+        openRouterLimits = openRouterLimits,
     ).structuredContent()
 
     /**
@@ -158,6 +160,7 @@ class OpenAiCompatibleClient(
         requireWebSearch: Boolean = false,
         forcedResponseFormat: ResponseFormat? = null,
         maxTokens: Int? = null,
+        openRouterLimits: OpenRouterRequestLimits? = null,
     ): ChatCompletionResponse {
         return httpClient.post(config.chatCompletionsUrl()) {
             contentType(ContentType.Application.Json)
@@ -170,6 +173,7 @@ class OpenAiCompatibleClient(
                     requireWebSearch = requireWebSearch,
                     forcedResponseFormat = forcedResponseFormat,
                     maxTokens = maxTokens,
+                    openRouterLimits = openRouterLimits,
                 ),
             )
             timeout {
@@ -224,6 +228,38 @@ internal data class ChatCompletionRequest(
     @SerialName("response_format") val responseFormat: ResponseFormat? = null,
     @SerialName("web_search_options") val webSearchOptions: WebSearchOptions? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
+    /** OpenRouter only: which endpoints may serve the request, including a price ceiling. */
+    val provider: OpenRouterProviderPreferences? = null,
+    /** OpenRouter only: how much the model may think before it answers. */
+    val reasoning: OpenRouterReasoning? = null,
+)
+
+/**
+ * What an OpenRouter request may cost, enforced by OpenRouter rather than trusted to the model.
+ * [maxPromptPrice] and [maxCompletionPrice] are dollars per million tokens; OpenRouter routes
+ * only to endpoints at or under both and refuses the request when there is none.
+ */
+internal data class OpenRouterRequestLimits(
+    val maxPromptPrice: Double,
+    val maxCompletionPrice: Double,
+    val reasoningEffort: String,
+)
+
+@Serializable
+internal data class OpenRouterProviderPreferences(
+    @SerialName("max_price") val maxPrice: OpenRouterMaxPrice,
+    /** Skip endpoints that would ignore the JSON schema instead of honouring it. */
+    @SerialName("require_parameters") val requireParameters: Boolean = true,
+)
+
+@Serializable
+internal data class OpenRouterMaxPrice(val prompt: Double, val completion: Double)
+
+@Serializable
+internal data class OpenRouterReasoning(
+    val effort: String,
+    /** Reasoning is still billed, but it is not sent back: Nomi reads only the answer. */
+    val exclude: Boolean = true,
 )
 
 @Serializable
@@ -376,6 +412,7 @@ internal fun chatCompletionRequest(
     requireWebSearch: Boolean = false,
     forcedResponseFormat: ResponseFormat? = null,
     maxTokens: Int? = null,
+    openRouterLimits: OpenRouterRequestLimits? = null,
 ): ChatCompletionRequest = ChatCompletionRequest(
     model = config.model,
     messages = messages,
@@ -393,7 +430,16 @@ internal fun chatCompletionRequest(
         requireWebSearch && config.kind == AiProviderKind.OPEN_AI
     },
     maxTokens = maxTokens,
+    provider = openRouterLimits?.let { limits ->
+        OpenRouterProviderPreferences(
+            maxPrice = OpenRouterMaxPrice(limits.maxPromptPrice, limits.maxCompletionPrice),
+        )
+    },
+    reasoning = openRouterLimits?.let { OpenRouterReasoning(effort = it.reasoningEffort) },
 ).also {
+    require(openRouterLimits == null || config.kind == AiProviderKind.OPEN_ROUTER) {
+        "OpenRouter request limits only apply to OpenRouter."
+    }
     // OpenAI accepts web_search_options only on its search models and 400s otherwise.
     require(
         !requireWebSearch || config.kind != AiProviderKind.OPEN_AI ||
