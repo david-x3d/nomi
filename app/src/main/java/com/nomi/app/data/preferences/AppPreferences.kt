@@ -193,6 +193,11 @@ data class AppPreferences(
      * Exa billing page text separately and the reading model reading more.
      */
     val exaFullPageText: Boolean = false,
+    /**
+     * The OpenRouter provider slug Exa + OpenRouter asks for first, such as "baseten". Blank
+     * leaves the choice to OpenRouter. Others still serve the request when it is unavailable.
+     */
+    val openRouterPreferredProvider: String = "",
     val healthNutritionSync: HealthNutritionSyncState = HealthNutritionSyncState(),
 )
 

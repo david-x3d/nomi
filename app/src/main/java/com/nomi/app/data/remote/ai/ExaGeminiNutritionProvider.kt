@@ -276,6 +276,8 @@ internal class ProviderTemporarilyUnavailableException(
  */
 internal class OpenRouterNutritionExtractor(
     private val client: OpenAiCompatibleClient,
+    /** The OpenRouter provider slug to ask first, or blank to let OpenRouter choose. */
+    private val preferredProvider: () -> String = { "" },
 ) : GeminiNutritionExtractionGateway {
     override suspend fun extract(
         config: AiProviderConfig,
@@ -298,6 +300,9 @@ internal class OpenRouterNutritionExtractor(
                     maxPromptPrice = OPENROUTER_RESEARCH_MAX_PROMPT_PRICE,
                     maxCompletionPrice = OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE,
                     reasoningEffort = "low",
+                    preferredProviders = listOfNotNull(
+                        preferredProvider().trim().lowercase(Locale.ROOT).takeIf(String::isNotEmpty),
+                    ),
                 ),
             )
         } catch (failure: ResponseException) {

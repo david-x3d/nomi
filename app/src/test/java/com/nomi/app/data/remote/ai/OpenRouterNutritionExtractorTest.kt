@@ -63,6 +63,32 @@ class OpenRouterNutritionExtractorTest {
         assertTrue(body, body.contains("\"reasoning\":{\"effort\":\"low\""))
         // The routed endpoint may not accept a custom temperature.
         assertFalse(body, body.contains("temperature"))
+        // With no preferred provider, OpenRouter picks the endpoint.
+        assertFalse(body, body.contains("\"order\""))
+    }
+
+    @Test
+    fun `a preferred provider is asked first and others stay as fallbacks`() = runBlocking {
+        var body = ""
+        val engine = MockEngine { request ->
+            body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+            respond(
+                """{"choices":[{"message":{"content":"{\"items\":[]}"}}]}""",
+                HttpStatusCode.OK,
+                responseHeaders,
+            )
+        }
+
+        extractor(engine, preferredProvider = " Baseten ").extract(
+            config = config,
+            credential = AiRuntimeCredential.from("openrouter-secret"),
+            systemPrompt = "Return JSON.",
+            userPrompt = "Extract nutrition.",
+        )
+
+        assertTrue(body, body.contains("\"order\":[\"baseten\"]"))
+        assertTrue(body, body.contains("\"max_price\""))
+        assertFalse(body, body.contains("allow_fallbacks"))
     }
 
     @Test
@@ -89,7 +115,10 @@ class OpenRouterNutritionExtractorTest {
         assertEquals(OPENROUTER_RESEARCH_MODEL_REFUSED, error.message)
     }
 
-    private fun extractor(engine: MockEngine): OpenRouterNutritionExtractor {
+    private fun extractor(
+        engine: MockEngine,
+        preferredProvider: String = "",
+    ): OpenRouterNutritionExtractor {
         val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
@@ -102,6 +131,6 @@ class OpenRouterNutritionExtractorTest {
                 expectSuccess = true
             },
         )
-        return OpenRouterNutritionExtractor(client)
+        return OpenRouterNutritionExtractor(client) { preferredProvider }
     }
 }

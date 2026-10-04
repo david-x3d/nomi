@@ -71,6 +71,7 @@ data class SettingsUiState(
     val aiSetupNeeded: Boolean = false,
     val aiRequestTimeoutDisabled: Boolean = false,
     val exaFullPageText: Boolean = false,
+    val openRouterPreferredProvider: String = "",
     val aiDebugEnabled: Boolean = false,
     val reminders: List<ReminderSetting> = listOf(
         ReminderSetting("Breakfast", timeText = "08:00"),
@@ -86,6 +87,9 @@ data class SettingsUiState(
      * passes through. Fallback is left out: it is optional and usually sits on another provider.
      */
     /** Whether any task researches through Exa, the only provider that reads source pages. */
+    val usesExaOpenRouter: Boolean
+        get() = aiProviders.any { it.provider == AiProviderKind.EXA_OPEN_ROUTER }
+
     val usesExaSearch: Boolean
         get() = aiProviders.any {
             it.provider == AiProviderKind.EXA_GEMINI || it.provider == AiProviderKind.EXA_OPEN_ROUTER

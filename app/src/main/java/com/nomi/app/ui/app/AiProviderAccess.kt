@@ -193,7 +193,9 @@ internal class AiProviderAccess(
     ) = ExaGeminiNutritionProvider(
         exaSearch = exaSearch,
         geminiExtractor = if (config.kind == AiProviderKind.EXA_OPEN_ROUTER) {
-            OpenRouterNutritionExtractor(container.openAiClient)
+            OpenRouterNutritionExtractor(container.openAiClient) {
+                preferences.value.openRouterPreferredProvider
+            }
         } else {
             container.exaGeminiClient
         },

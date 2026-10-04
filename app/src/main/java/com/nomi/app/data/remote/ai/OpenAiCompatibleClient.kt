@@ -243,11 +243,15 @@ internal data class OpenRouterRequestLimits(
     val maxPromptPrice: Double,
     val maxCompletionPrice: Double,
     val reasoningEffort: String,
+    /** Provider slugs OpenRouter tries first; the rest stay available as fallbacks. */
+    val preferredProviders: List<String> = emptyList(),
 )
 
 @Serializable
 internal data class OpenRouterProviderPreferences(
     @SerialName("max_price") val maxPrice: OpenRouterMaxPrice,
+    /** Providers to try first, in order. Left out when empty, so OpenRouter picks. */
+    val order: List<String>? = null,
     /** Skip endpoints that would ignore the JSON schema instead of honouring it. */
     @SerialName("require_parameters") val requireParameters: Boolean = true,
 )
@@ -433,6 +437,7 @@ internal fun chatCompletionRequest(
     provider = openRouterLimits?.let { limits ->
         OpenRouterProviderPreferences(
             maxPrice = OpenRouterMaxPrice(limits.maxPromptPrice, limits.maxCompletionPrice),
+            order = limits.preferredProviders.takeIf { it.isNotEmpty() },
         )
     },
     reasoning = openRouterLimits?.let { OpenRouterReasoning(effort = it.reasoningEffort) },

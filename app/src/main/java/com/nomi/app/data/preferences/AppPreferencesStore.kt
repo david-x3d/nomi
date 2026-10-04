@@ -41,6 +41,7 @@ interface AppPreferencesStore {
     suspend fun setGoalsCardStyle(style: GoalsCardStyle)
     suspend fun setAiRequestTimeoutDisabled(disabled: Boolean)
     suspend fun setExaFullPageText(enabled: Boolean)
+    suspend fun setOpenRouterPreferredProvider(slug: String)
     suspend fun setHealthNutritionSync(state: HealthNutritionSyncState)
 }
 
@@ -165,6 +166,10 @@ class DataStoreAppPreferencesStore(
         dataStore.edit { values -> values[Keys.EXA_FULL_PAGE_TEXT] = enabled }
     }
 
+    override suspend fun setOpenRouterPreferredProvider(slug: String) {
+        dataStore.edit { values -> values[Keys.OPENROUTER_PREFERRED_PROVIDER] = slug.trim() }
+    }
+
     override suspend fun setHealthNutritionSync(state: HealthNutritionSyncState) {
         dataStore.edit { values ->
             if (state.isEmpty) {
@@ -234,6 +239,8 @@ class DataStoreAppPreferencesStore(
             aiRequestTimeoutDisabled = values[Keys.AI_REQUEST_TIMEOUT_DISABLED]
                 ?: defaults.aiRequestTimeoutDisabled,
             exaFullPageText = values[Keys.EXA_FULL_PAGE_TEXT] ?: defaults.exaFullPageText,
+            openRouterPreferredProvider = values[Keys.OPENROUTER_PREFERRED_PROVIDER]
+                ?: defaults.openRouterPreferredProvider,
             healthNutritionSync = decode(
                 values[Keys.HEALTH_NUTRITION_SYNC],
                 defaults.healthNutritionSync,
@@ -270,6 +277,7 @@ class DataStoreAppPreferencesStore(
         val GOALS_CARD_STYLE = stringPreferencesKey("appearance.goals_card_style")
         val AI_REQUEST_TIMEOUT_DISABLED = booleanPreferencesKey("ai.request_timeout_disabled")
         val EXA_FULL_PAGE_TEXT = booleanPreferencesKey("ai.exa_full_page_text")
+        val OPENROUTER_PREFERRED_PROVIDER = stringPreferencesKey("ai.openrouter_preferred_provider")
         val HEALTH_NUTRITION_SYNC = stringPreferencesKey("health.nutrition_sync")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {

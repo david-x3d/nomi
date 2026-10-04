@@ -52,6 +52,7 @@ import com.nomi.app.ui.components.NomiInlineError
 import com.nomi.app.ui.components.NomiSecretField
 import com.nomi.app.ui.components.NomiSecureWindow
 import com.nomi.app.ui.components.NomiShapes
+import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiMessage
 import com.nomi.app.ui.localization.nomiString
@@ -95,6 +96,7 @@ fun AiSettingsScreen(
     onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
     onExaFullPageTextChanged: (Boolean) -> Unit,
+    onOpenRouterPreferredProviderChanged: (String) -> Unit,
     onCompareModels: () -> Unit,
     onDebug: () -> Unit,
     onBack: () -> Unit,
@@ -258,6 +260,23 @@ fun AiSettingsScreen(
                         checked = state.exaFullPageText,
                         onCheckedChange = onExaFullPageTextChanged,
                         iconColor = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            }
+            if (state.usesExaOpenRouter) {
+                item(key = "openrouter-provider") {
+                    // Kept locally while typing, so a save echoing back never moves the cursor.
+                    var slug by rememberSaveable { mutableStateOf(state.openRouterPreferredProvider) }
+                    NomiTextField(
+                        value = slug,
+                        onValueChange = {
+                            slug = it
+                            onOpenRouterPreferredProviderChanged(it)
+                        },
+                        label = nomiString("Preferred OpenRouter provider"),
+                        placeholder = "baseten",
+                        supportingText = nomiString("Exa + OpenRouter asks this provider first. If it is unavailable, OpenRouter uses the next one within the price ceiling. Leave blank to let OpenRouter choose."),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
             }

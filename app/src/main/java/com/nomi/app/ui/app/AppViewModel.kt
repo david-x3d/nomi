@@ -2225,6 +2225,10 @@ class AppViewModel(
         viewModelScope.launch { repository.appPreferencesStore.setExaFullPageText(enabled) }
     }
 
+    fun setOpenRouterPreferredProvider(slug: String) {
+        viewModelScope.launch { repository.appPreferencesStore.setOpenRouterPreferredProvider(slug) }
+    }
+
     private val mutableModelComparison = MutableStateFlow(ModelComparisonUiState())
     internal val modelComparison: StateFlow<ModelComparisonUiState> = mutableModelComparison.asStateFlow()
     private var modelComparisonJob: Job? = null

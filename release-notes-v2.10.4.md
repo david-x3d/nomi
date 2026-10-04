@@ -4,6 +4,7 @@
 
 - New food research provider under Settings → AI provider → Provider and model per task → Food research. Exa still finds the sources, and a cheap OpenRouter model reads them instead of Gemini. The default is z-ai/glm-5.3-flash; openai/gpt-6-luna and qwen/qwen3.8-flash are suggested too.
 - It uses your OpenRouter key, so a key already saved for the fallback works without entering it again. The Exa key is shared with Exa + Gemini.
+- Optional preferred provider: under Settings → AI provider → Food research, enter an OpenRouter provider such as "baseten". Nomi then asks that provider first. If it is unavailable, OpenRouter falls back to the next one within the price ceiling.
 - Spending limits: Nomi only uses OpenRouter endpoints that cost at most $1 per million input and $5 per million output tokens. Each answer is capped at 8,000 tokens, and reasoning runs at low effort. If a model has no endpoint under that price, Nomi says so and sends nothing. For a hard spending limit, set a credit limit on the key at OpenRouter.
 
 ### Compare OpenRouter models
