@@ -81,7 +81,7 @@ internal fun ModelComparisonScreen(
                         value = state.input,
                         onValueChange = onInputChanged,
                         label = nomiString("Meal to look up"),
-                        placeholder = nomiString("e.g. Hans im Glück Classic Burger"),
+                        placeholder = nomiString("e.g. Cheeseburger with fries"),
                         enabled = !state.isRunning,
                         modifier = Modifier.fillMaxWidth(),
                     )

@@ -776,12 +776,12 @@ internal val settingsTranslations: Map<String, NomiTranslation> = mapOf(
         it = "Pasto da cercare", nl = "Maaltijd om op te zoeken", pt = "Refeição a pesquisar",
         sq = "Vakti për t’u kërkuar", sv = "Måltid att slå upp", tr = "Aranacak öğün",
     ),
-    "e.g. Hans im Glück Classic Burger" to NomiTranslation(
-        de = "z. B. Hans im Glück Classic Burger", es = "p. ej. Hans im Glück Classic Burger",
-        fr = "p. ex. Hans im Glück Classic Burger", it = "es. Hans im Glück Classic Burger",
-        nl = "bijv. Hans im Glück Classic Burger", pt = "ex.: Hans im Glück Classic Burger",
-        sq = "p.sh. Hans im Glück Classic Burger", sv = "t.ex. Hans im Glück Classic Burger",
-        tr = "ör. Hans im Glück Classic Burger",
+    "e.g. Cheeseburger with fries" to NomiTranslation(
+        de = "z. B. Cheeseburger mit Pommes", es = "p. ej. hamburguesa con queso y patatas fritas",
+        fr = "p. ex. cheeseburger avec frites", it = "es. cheeseburger con patatine",
+        nl = "bijv. cheeseburger met friet", pt = "ex.: cheeseburger com batatas fritas",
+        sq = "p.sh. çizburger me patate të skuqura", sv = "t.ex. cheeseburgare med pommes",
+        tr = "ör. patates kızartmalı çizburger",
     ),
     "Models (up to {0})" to NomiTranslation(
         de = "Modelle (bis zu {0})", es = "Modelos (hasta {0})", fr = "Modèles (jusqu’à {0})",
