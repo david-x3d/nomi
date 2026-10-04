@@ -157,6 +157,7 @@ internal class AiProviderAccess(
         searchProgressSink = onResearchSources,
         debugSink = debug::recordExaGeminiTrace,
         calorieBiasProvider = { preferences.value.calorieEstimateBias },
+        fullPageTextProvider = { preferences.value.exaFullPageText },
     )
 
     private fun providerFor(config: AiProviderConfig, credential: AiRuntimeCredential) =

@@ -187,6 +187,12 @@ data class AppPreferences(
     val goalsCardStyle: GoalsCardStyle = GoalsCardStyle.BARS,
     /** When on, AI requests wait for the provider instead of failing at the built-in limit. */
     val aiRequestTimeoutDisabled: Boolean = false,
+    /**
+     * When on, Exa returns each source page's own text beside its excerpts. Grounding checks
+     * then see the table heading and serving sentence an excerpt can leave out, at the cost of
+     * Exa billing page text separately and Gemini reading more.
+     */
+    val exaFullPageText: Boolean = false,
     val healthNutritionSync: HealthNutritionSyncState = HealthNutritionSyncState(),
 )
 

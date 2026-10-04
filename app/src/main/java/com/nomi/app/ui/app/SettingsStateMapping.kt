@@ -91,6 +91,7 @@ internal fun mapSettings(
         aiProviders = providers,
         aiSetupNeeded = keys.needsAiSetup(),
         aiRequestTimeoutDisabled = prefs.aiRequestTimeoutDisabled,
+        exaFullPageText = prefs.exaFullPageText,
         aiDebugEnabled = prefs.aiDebugEnabled,
         reminders = listOf(
             ReminderSetting("Breakfast", reminders.breakfast.enabled, reminders.breakfast.localTime),

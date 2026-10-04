@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
@@ -92,6 +93,7 @@ fun AiSettingsScreen(
     onProvider: (Int) -> Unit,
     onCalorieEstimateBiasChanged: (CalorieEstimateBias) -> Unit,
     onAiRequestTimeoutDisabledChanged: (Boolean) -> Unit,
+    onExaFullPageTextChanged: (Boolean) -> Unit,
     onDebug: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -242,6 +244,20 @@ fun AiSettingsScreen(
                     bias = state.calorieEstimateBias,
                     onBiasChanged = onCalorieEstimateBiasChanged,
                 )
+            }
+
+            if (state.usesExaSearch) {
+                item { SectionTitle(nomiString("Food research")) }
+                item(key = "full-pages") {
+                    ToggleSetting(
+                        icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null) },
+                        title = nomiString("Read whole source pages"),
+                        supporting = nomiString("Exa gives Gemini each page's full text instead of excerpts. Finds nutrition more reliably, but uses more Exa and Gemini credits."),
+                        checked = state.exaFullPageText,
+                        onCheckedChange = onExaFullPageTextChanged,
+                        iconColor = MaterialTheme.colorScheme.secondary,
+                    )
+                }
             }
 
             item { SectionTitle(nomiString("Troubleshooting")) }

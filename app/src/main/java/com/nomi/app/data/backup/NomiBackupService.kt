@@ -235,6 +235,7 @@ class NomiBackupService(
         preferencesStore.setGoalsCardStyle(value.goalsCardStyle)
         preferencesStore.setAiDebugEnabled(value.aiDebugEnabled)
         preferencesStore.setAiRequestTimeoutDisabled(value.aiRequestTimeoutDisabled)
+        preferencesStore.setExaFullPageText(value.exaFullPageText)
         preferencesStore.setOnboardingDraft(value.onboardingDraft)
         preferencesStore.markOnboardingCompleted(value.onboardingCompleted, clearDraft = false)
     }

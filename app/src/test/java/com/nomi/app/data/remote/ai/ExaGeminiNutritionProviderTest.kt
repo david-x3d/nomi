@@ -442,7 +442,7 @@ class ExaGeminiNutritionProviderTest {
     fun `no usable source rejects before Gemini is called`() {
         var geminiCalled = false
         val provider = ExaGeminiNutritionProvider(
-            exaSearch = ExaNutritionSearchGateway { _, _, _, _ -> ExaSearchResponse() },
+            exaSearch = ExaNutritionSearchGateway { _, _, _, _, _ -> ExaSearchResponse() },
             geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ ->
                 geminiCalled = true
                 GeminiNutritionExtraction()
@@ -617,7 +617,7 @@ class ExaGeminiNutritionProviderTest {
         )
         val calls = mutableListOf<Pair<String, Int>>()
         val provider = ExaGeminiNutritionProvider(
-            exaSearch = ExaNutritionSearchGateway { query, _, _, limit ->
+            exaSearch = ExaNutritionSearchGateway { query, _, _, limit, _ ->
                 calls += query to limit
                 val result = when {
                     "Cheeseburger" in query -> source(
@@ -1254,6 +1254,159 @@ class ExaGeminiNutritionProviderTest {
     }
     // endregion
 
+    // region Hans im Glück: an amount left out, whole pages, and which page's refusal is reported
+    @Test
+    fun `a restaurant burger named without an amount logs one piece of it`() = runBlocking {
+        // "Hans im Glück Classic Burger" came back from interpretation with no unit, and research
+        // refused the correct official reading because "the parsed logged unit is missing".
+        val result = provider(
+            sources = listOf(source(HANS_IM_GLUECK_TITLE, HANS_IM_GLUECK_URL, HANS_IM_GLUECK_PAGE)),
+            extraction = extraction(klassikItem(basisText = "Nährwert & Allergene", servingUnit = "Burger")),
+        ).researchNutrition(klassikIntent(quantity = null, unit = null)).items.single()
+
+        assertEquals(1.0, result.quantity, 0.0)
+        assertEquals("piece", result.unit)
+        assertEquals(681.2, result.calories, 1e-9)
+        assertEquals(36.8, result.proteinGrams, 1e-9)
+        assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+    }
+
+    @Test
+    fun `a food that is not one product logs one serving when no amount was given`() = runBlocking {
+        val result = provider(
+            sources = listOf(source("McDonald's Pommes Nährwerte", "https://mcdonalds.test/pommes", POMMES_TABLE)),
+            extraction = extraction(
+                restaurantItem("Pommes Frites", "McDonald's", 337.0, 3.8, 41.0, 16.6, "exa-1").copy(
+                    sourceServingUnit = "Portion",
+                    sourceServingGramsEquivalent = 114.0,
+                    sourceBasisText = "pro 100 g | pro Portion (114 g)",
+                ),
+            ),
+        ).researchNutrition(
+            ParsedFoodIntent(
+                originalText = "McDonald's Pommes",
+                items = listOf(ParsedFoodItem("Pommes", brand = "McDonald's")),
+            ),
+        ).items.single()
+
+        assertEquals(1.0, result.quantity, 0.0)
+        assertEquals("serving", result.unit)
+        assertEquals(337.0, result.calories, 1e-9)
+    }
+
+    @Test
+    fun `whole page text grounds a quote the excerpt left out`() = runBlocking {
+        // Gemini quoted the summary tile, which the page prints but Exa's excerpt did not carry.
+        var requestedPageText: Boolean? = null
+        val result = provider(
+            sources = listOf(klassikSource(text = HANS_IM_GLUECK_PAGE)),
+            extraction = extraction(klassikItem(basisText = TILE_QUOTE, servingUnit = "Stück")),
+            fullPageText = true,
+            onIncludePageText = { requestedPageText = it },
+        ).researchNutrition(klassikIntent(quantity = 1.0, unit = "Stück")).items.single()
+
+        assertEquals(true, requestedPageText)
+        assertEquals(681.2, result.calories, 1e-9)
+        assertEquals(NutritionVerificationStatus.VERIFIED, result.verificationStatus)
+    }
+
+    @Test
+    fun `without whole pages the excerpt alone cannot ground that quote`() {
+        var requestedPageText: Boolean? = null
+        val error = assertThrows(NutritionResearchException::class.java) {
+            runBlocking {
+                provider(
+                    sources = listOf(klassikSource(text = null)),
+                    extraction = extraction(klassikItem(basisText = TILE_QUOTE, servingUnit = "Stück")),
+                    onIncludePageText = { requestedPageText = it },
+                ).researchNutrition(klassikIntent(quantity = 1.0, unit = "Stück"))
+            }
+        }
+
+        assertEquals(false, requestedPageText)
+        assertEquals(NutritionFailureReason.INVALID_NUTRITION_BASIS, error.reason)
+    }
+
+    @Test
+    fun `the page Gemini read reports the refusal and the other pages follow in the detail`() {
+        // The last page tried used to supply the reason, so an overview page's complaint hid
+        // why the page the numbers came from was refused.
+        val traces = mutableListOf<ExaGeminiDebugTrace>()
+        val error = assertThrows(NutritionResearchException::class.java) {
+            runBlocking {
+                provider(
+                    sources = listOf(
+                        source("Klassik", "https://burger-facts.test/klassik", KLASSIK_EXCERPT),
+                        source(
+                            "Burger overview",
+                            "https://nutrition-db.test/overview",
+                            "Hans im Glück Klassik Burger Nährwerte pro Burger: 540 kcal, Fett 20 g",
+                        ),
+                    ),
+                    extraction = extraction(klassikItem(basisText = "pro Burger", servingUnit = "Stück")),
+                    onTrace = traces::add,
+                ).researchNutrition(klassikIntent(quantity = 1.0, unit = "Stück"))
+            }
+        }
+
+        assertEquals(NutritionFailureReason.INVALID_NUTRITION_BASIS, error.reason)
+        assertTrue(error.detail, error.detail.contains("exa-1: Gemini's nutrition basis text does not occur"))
+        assertTrue(error.detail, error.detail.contains("exa-2: UNSUPPORTED_NUTRITION_VALUES"))
+        // A pass that did not validate keeps the text Gemini was given, for the debug log.
+        val documents = traces.first().documents
+        assertEquals(listOf("exa-1", "exa-2"), documents.map(ExaGeminiDebugDocument::sourceId))
+        assertTrue(documents.first().content.contains("681,2 kcal"))
+    }
+
+    @Test
+    fun `a validated pass keeps no page text in its trace`() = runBlocking {
+        val traces = mutableListOf<ExaGeminiDebugTrace>()
+        provider(
+            sources = listOf(source(HANS_IM_GLUECK_TITLE, HANS_IM_GLUECK_URL, HANS_IM_GLUECK_PAGE)),
+            extraction = extraction(klassikItem(basisText = "Nährwert & Allergene", servingUnit = "Burger")),
+            onTrace = traces::add,
+        ).researchNutrition(klassikIntent(quantity = null, unit = null))
+
+        assertEquals("VALIDATED", traces.single().status)
+        assertTrue(traces.single().documents.isEmpty())
+    }
+
+    private fun klassikIntent(quantity: Double?, unit: String?) = ParsedFoodIntent(
+        originalText = "Hans im Glück Classic Burger",
+        items = listOf(
+            ParsedFoodItem("Klassik Burger", brand = "Hans im Glück", quantity = quantity, unit = unit),
+        ),
+    )
+
+    private fun klassikItem(basisText: String, servingUnit: String) = GeminiNutritionItem(
+        name = "Klassik Burger",
+        brand = "Hans im Glück",
+        calories = 681.2,
+        proteinGrams = 36.8,
+        carbohydrateGrams = 48.5,
+        fatGrams = 37.1,
+        sugarGrams = 8.5,
+        saturatedFatGrams = 12.0,
+        sourceId = "exa-1",
+        sourceProductName = "KLASSIK",
+        sourceServingQuantity = 1.0,
+        sourceServingUnit = servingUnit,
+        nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
+        sourceBasisText = basisText,
+        sourceCountry = "DE",
+        isEstimate = false,
+        confidence = 0.95,
+    )
+
+    /** The official page as Exa returns it: an excerpt of the table, and the page if asked. */
+    private fun klassikSource(text: String?) = ExaSearchResult(
+        title = HANS_IM_GLUECK_TITLE,
+        url = HANS_IM_GLUECK_URL,
+        text = text,
+        highlights = listOf(KLASSIK_EXCERPT),
+    )
+    // endregion
+
     private fun provider(
         sources: List<ExaSearchResult>,
         extraction: GeminiNutritionExtraction,
@@ -1261,9 +1414,13 @@ class ExaGeminiNutritionProviderTest {
         onQuery: (String) -> Unit = {},
         onSources: (List<String>) -> Unit = {},
         beforeExtraction: () -> Unit = {},
+        fullPageText: Boolean = false,
+        onIncludePageText: (Boolean) -> Unit = {},
+        onTrace: (ExaGeminiDebugTrace) -> Unit = {},
     ) = ExaGeminiNutritionProvider(
-        exaSearch = ExaNutritionSearchGateway { query, _, _, _ ->
+        exaSearch = ExaNutritionSearchGateway { query, _, _, _, includePageText ->
             onQuery(query)
+            onIncludePageText(includePageText)
             ExaSearchResponse(requestId = "test", results = sources)
         },
         geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, prompt ->
@@ -1276,6 +1433,8 @@ class ExaGeminiNutritionProviderTest {
         geminiCredential = { credential },
         localeCountryProvider = { localeCountry },
         searchProgressSink = { onSources(it) },
+        debugSink = { onTrace(it) },
+        fullPageTextProvider = { fullPageText },
     )
 
     private fun SuccessCase.intent() = ParsedFoodIntent(
@@ -1373,6 +1532,36 @@ class ExaGeminiNutritionProviderTest {
     )
 
     private companion object {
+        const val HANS_IM_GLUECK_TITLE = "KLASSIK – Der Geschmack bei HANS IM GLÜCK"
+        const val HANS_IM_GLUECK_URL =
+            "https://menu.hansimglueck-burgergrill.de/details/klassik-7324499/info"
+        const val TILE_QUOTE = "681 kcal 37g Proteine 37g Fett 48g Carbs"
+
+        /** The page's nutrition panel as its text reads, tile and table one value per line. */
+        const val HANS_IM_GLUECK_PAGE =
+            "KLASSIK\nunser Hamburger seit 2010 - Salat, Zwiebel, Tomate, Rindfleisch & " +
+                "HANS IM GLÜCK Burgersosse\nKLASSIK\nNährwert & Allergene\nGESAMT\n" +
+                "681\nkcal\n37g\nProteine\n37g\nFett\n48g\nCarbs\n" +
+                "Energie\n681,2 kcal / 2.850 kJ\nFett\n37,1 g\ndavon gesättigte Fettsäuren\n12 g\n" +
+                "Proteine\n36,8 g\nKohlenhydrate\n48,5 g\ndavon Zucker\n8,5 g\nSalz\n3,1 g\n" +
+                "Bei den angegebenen Nährwerten handelt es sich um berechnete und gerundete " +
+                "Durchschnittswerte einer von uns zubereiteten Portionsgröße."
+
+        /** What an excerpt of that page can look like: the table without its tile or heading. */
+        const val KLASSIK_EXCERPT =
+            "HANS IM GLÜCK KLASSIK unser Hamburger seit 2010. Energie 681,2 kcal / 2.850 kJ " +
+                "Fett 37,1 g davon gesättigte Fettsäuren 12 g Proteine 36,8 g " +
+                "Kohlenhydrate 48,5 g davon Zucker 8,5 g Salz 3,1 g"
+
+        const val POMMES_TABLE =
+            "McDonald's Pommes Frites Nährwerte\n" +
+                "| Nährwert | pro 100 g | pro Portion (114 g) |\n" +
+                "| --- | --- | --- |\n" +
+                "| Energie | 296 kcal | 337 kcal |\n" +
+                "| Eiweiß | 3.3 g | 3.8 g |\n" +
+                "| Kohlenhydrate | 36 g | 41 g |\n" +
+                "| Fett | 14.6 g | 16.6 g |"
+
         const val RESTAURANT_TABLE =
             "McDonald's Cheeseburger Nährwerte\n" +
                 "| Nährwert | pro 100 g | pro Portion (119 g) |\n" +

@@ -40,6 +40,7 @@ interface AppPreferencesStore {
     suspend fun setCalorieEstimateBias(bias: CalorieEstimateBias)
     suspend fun setGoalsCardStyle(style: GoalsCardStyle)
     suspend fun setAiRequestTimeoutDisabled(disabled: Boolean)
+    suspend fun setExaFullPageText(enabled: Boolean)
     suspend fun setHealthNutritionSync(state: HealthNutritionSyncState)
 }
 
@@ -160,6 +161,10 @@ class DataStoreAppPreferencesStore(
         dataStore.edit { values -> values[Keys.AI_REQUEST_TIMEOUT_DISABLED] = disabled }
     }
 
+    override suspend fun setExaFullPageText(enabled: Boolean) {
+        dataStore.edit { values -> values[Keys.EXA_FULL_PAGE_TEXT] = enabled }
+    }
+
     override suspend fun setHealthNutritionSync(state: HealthNutritionSyncState) {
         dataStore.edit { values ->
             if (state.isEmpty) {
@@ -228,6 +233,7 @@ class DataStoreAppPreferencesStore(
                 ?: defaults.goalsCardStyle,
             aiRequestTimeoutDisabled = values[Keys.AI_REQUEST_TIMEOUT_DISABLED]
                 ?: defaults.aiRequestTimeoutDisabled,
+            exaFullPageText = values[Keys.EXA_FULL_PAGE_TEXT] ?: defaults.exaFullPageText,
             healthNutritionSync = decode(
                 values[Keys.HEALTH_NUTRITION_SYNC],
                 defaults.healthNutritionSync,
@@ -263,6 +269,7 @@ class DataStoreAppPreferencesStore(
         val CALORIE_ESTIMATE_BIAS = stringPreferencesKey("nutrition.calorie_estimate_bias")
         val GOALS_CARD_STYLE = stringPreferencesKey("appearance.goals_card_style")
         val AI_REQUEST_TIMEOUT_DISABLED = booleanPreferencesKey("ai.request_timeout_disabled")
+        val EXA_FULL_PAGE_TEXT = booleanPreferencesKey("ai.exa_full_page_text")
         val HEALTH_NUTRITION_SYNC = stringPreferencesKey("health.nutrition_sync")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {

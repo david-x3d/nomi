@@ -33,6 +33,8 @@ class ExaGeminiHttpClientTest {
             assertEquals("exa-secret", request.headers["x-api-key"])
             val body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
             assertTrue(body.contains("\"numResults\":4"))
+            // Page text is billed on its own and only asked for when the setting is on.
+            assertFalse(body, body.contains("\"text\""))
             if (requests == 1) {
                 respond("{\"error\":\"temporarily unavailable\"}", HttpStatusCode.ServiceUnavailable, responseHeaders)
             } else {
@@ -49,6 +51,7 @@ class ExaGeminiHttpClientTest {
                 credential = AiRuntimeCredential.from("exa-secret"),
                 timeoutMillis = 5_000,
                 resultLimit = 4,
+                includePageText = false,
             )
 
             assertEquals("request-1", response.requestId)
@@ -56,6 +59,32 @@ class ExaGeminiHttpClientTest {
         }
         assertEquals(2, requests)
         assertEquals(listOf(750L), delays)
+    }
+
+    @Test
+    fun `whole pages ask Exa for each page's text beside its excerpts`() = runBlocking {
+        var body = ""
+        val engine = MockEngine { request ->
+            body = (request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
+            respond(
+                """{"results":[{"title":"Label","url":"https://example.com/label","text":"Energie 100 kcal","highlights":["100 kcal"]}]}""",
+                HttpStatusCode.OK,
+                responseHeaders,
+            )
+        }
+        val response = client(engine, mutableListOf()).use { client ->
+            client.search(
+                query = "test nutrition",
+                credential = AiRuntimeCredential.from("exa-secret"),
+                timeoutMillis = 5_000,
+                resultLimit = 4,
+                includePageText = true,
+            )
+        }
+
+        assertTrue(body, body.contains("\"text\":{\"maxCharacters\":10000}"))
+        assertTrue(body, body.contains("\"highlights\":{"))
+        assertEquals("Energie 100 kcal", response.results.single().text)
     }
 
     @Test

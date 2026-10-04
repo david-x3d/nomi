@@ -74,6 +74,8 @@ internal fun interface ExaNutritionSearchGateway {
         credential: AiRuntimeCredential,
         timeoutMillis: Long,
         resultLimit: Int,
+        /** Also return each page's own text, not only the excerpts Exa picks for the query. */
+        includePageText: Boolean,
     ): ExaSearchResponse
 }
 
@@ -108,6 +110,7 @@ internal class ExaGeminiHttpClient(
         credential: AiRuntimeCredential,
         timeoutMillis: Long,
         resultLimit: Int,
+        includePageText: Boolean,
     ): ExaSearchResponse {
         val response = withTransientHttpRetry("Exa") {
             httpClient.post("$EXA_API_ENDPOINT/search") {
@@ -119,6 +122,7 @@ internal class ExaGeminiHttpClient(
                         numResults = resultLimit,
                         contents = ExaContentsRequest(
                             highlights = ExaHighlightsRequest(query = query),
+                            text = ExaTextRequest().takeIf { includePageText },
                         ),
                     ),
                 )
@@ -277,6 +281,8 @@ internal class ExaGeminiNutritionProvider(
     private val searchProgressSink: suspend (List<String>) -> Unit = {},
     private val debugSink: suspend (ExaGeminiDebugTrace) -> Unit = {},
     private val calorieBiasProvider: () -> CalorieEstimateBias = { CalorieEstimateBias.NONE },
+    /** The "Read whole source pages" setting: Exa returns each page's text beside its excerpts. */
+    private val fullPageTextProvider: () -> Boolean = { false },
 ) : NutritionResearchProvider {
 
     override suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis {
@@ -284,7 +290,7 @@ internal class ExaGeminiNutritionProvider(
         val localeCountry = localeCountryProvider()
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
-        )
+        ).withOneOfEachItemNamedWithoutAmount()
         val resolved = arrayOfNulls<AnalyzedFoodItem>(reconciledIntent.items.size)
 
         val firstPass = runResearchPass(
@@ -387,6 +393,7 @@ internal class ExaGeminiNutritionProvider(
                                 credential = credential,
                                 timeoutMillis = geminiConfig.effectiveTimeoutMillis(),
                                 resultLimit = exaResultsPerItemQuery(searchQueries.size),
+                                includePageText = fullPageTextProvider(),
                             )
                         }
                     }.awaitAll()
@@ -588,6 +595,35 @@ internal fun nutritionSearchQueries(intent: ParsedFoodIntent): List<String> {
 
 internal fun exaResultsPerItemQuery(queryCount: Int): Int = if (queryCount <= 1) 4 else 3
 
+/**
+ * A food named without an amount - "Hans im Glück Classic Burger" - is one of it.
+ *
+ * The interpretation step usually says so itself, but not reliably: the same words came back as
+ * "1 Stück" once and with no unit the next time, and every later step needs a logged unit to
+ * scale against. The OpenAI-compatible path fills the gap from its research answer; this one
+ * settles it before research, so the extraction prompt and the arithmetic see the same amount.
+ * One burger, sandwich, wrap or croissant is a piece, which lets the existing single-product
+ * rules match it to a restaurant portion. Anything else is one serving, never a guessed weight.
+ */
+internal fun ParsedFoodIntent.withOneOfEachItemNamedWithoutAmount(): ParsedFoodIntent =
+    copy(items = items.map(ParsedFoodItem::withOneWhenNoAmountWasGiven))
+
+private fun ParsedFoodItem.withOneWhenNoAmountWasGiven(): ParsedFoodItem {
+    val loggedUnit = unit?.trim()?.takeIf(String::isNotBlank)
+    return when {
+        loggedUnit == null -> copy(quantity = quantity ?: 1.0, unit = unitForOneUnstatedItem())
+        quantity == null && QuantityUnits.isCount(loggedUnit) -> copy(quantity = 1.0)
+        else -> this
+    }
+}
+
+private fun ParsedFoodItem.unitForOneUnstatedItem(): String {
+    val identity = listOfNotNull(brand, name).joinToString(" ").normalizedBasisEvidence()
+    val singleProduct = SINGLE_PRODUCT_FOOD.containsMatchIn(identity) &&
+        !MULTI_ITEM_PRODUCT.containsMatchIn(identity)
+    return if (singleProduct) "piece" else "serving"
+}
+
 private fun ParsedFoodItem.needsWeightPerPieceResearch(): Boolean =
     quantity != null && gramsEquivalent == null && unit?.trim()?.lowercase(Locale.ROOT) in setOf(
         "piece", "pieces", "item", "items", "bar", "bars", "riegel", "stück", "stücke",
@@ -692,12 +728,15 @@ internal data class ExaNutritionDocument(
 private fun ExaSearchResponse.toNutritionDocuments(): List<ExaNutritionDocument> =
     results.mapNotNull { result ->
         val canonicalUrl = canonicalWebUrlOrNull(result.url) ?: return@mapNotNull null
-        val content = (result.highlights + listOfNotNull(result.text))
+        val pageText = result.text?.trim()?.takeIf(String::isNotBlank)
+        val content = (result.highlights + listOfNotNull(pageText))
             .map(String::trim)
             .filter(String::isNotBlank)
             .distinct()
             .joinToString("\n")
-            .take(MAX_EXA_DOCUMENT_CHARS)
+            // Excerpts alone are cut short, but a whole page must not be: the heading and the
+            // serving sentence are exactly what an excerpt leaves out.
+            .take(if (pageText == null) MAX_EXA_DOCUMENT_CHARS else MAX_EXA_FULL_PAGE_DOCUMENT_CHARS)
             .takeIf(String::isNotBlank) ?: return@mapNotNull null
         ExaNutritionDocument(
             sourceId = "",
@@ -708,6 +747,8 @@ private fun ExaSearchResponse.toNutritionDocuments(): List<ExaNutritionDocument>
     }.mapIndexed { index, document -> document.copy(sourceId = "exa-${index + 1}") }
 
 private const val MAX_EXA_DOCUMENT_CHARS = 4_500
+private const val MAX_EXA_PAGE_TEXT_CHARS = 10_000
+private const val MAX_EXA_FULL_PAGE_DOCUMENT_CHARS = 15_000
 
 /**
  * Binds one extracted reading to the retrieved evidence, or offers it as an explicit estimate.
@@ -751,12 +792,15 @@ private fun groundExtractedItem(
             else -> 2
         }
     }
-    var evidenceFailure: NutritionResearchException? = null
+    // Each page keeps the first reason it refused the reading Gemini returned. The last page
+    // tried used to supply the reported reason, so a correct restaurant page was reported by
+    // whatever an overview page tried after it said.
+    val evidenceFailures = linkedMapOf<String, NutritionResearchException>()
     fun groundedIn(reading: GeminiNutritionItem, candidate: ExaNutritionDocument): Boolean = try {
         requireNutritionEvidence(reading, parsed, candidate)
         true
     } catch (failure: NutritionResearchException) {
-        evidenceFailure = failure
+        evidenceFailures.putIfAbsent(candidate.sourceId, failure)
         false
     }
     fun supportingFor(document: ExaNutritionDocument) =
@@ -803,7 +847,7 @@ private fun groundExtractedItem(
     val genericEstimate = !explicitWholeServingEstimate &&
         extracted.qualifiesAsGenericEstimate(parsed, documents)
     if (!explicitWholeServingEstimate && !genericEstimate) {
-        throw evidenceFailure ?: NutritionResearchException(
+        throw evidenceFailures.reportedFailure(primary, candidates) ?: NutritionResearchException(
             reason = NutritionFailureReason.SOURCE_IDENTITY_MISMATCH,
             itemName = parsed.name,
             detail = "No single product-specific source supports the reported nutrition and basis",
@@ -845,6 +889,31 @@ private fun groundExtractedItem(
             nutritionBasis = ResearchNutritionBasis.SOURCE_SERVING,
         )
     }
+}
+
+/**
+ * The refusal of the page Gemini says it read, or failing that of the first page tried, which is
+ * the official brand page when there is one. The other pages' reasons follow in the detail, so
+ * the debug log shows why each page was refused rather than only the one that was reported.
+ */
+private fun Map<String, NutritionResearchException>.reportedFailure(
+    primary: ExaNutritionDocument,
+    candidates: List<ExaNutritionDocument>,
+): NutritionResearchException? {
+    val reportedId = primary.sourceId.takeIf(::containsKey)
+        ?: candidates.map(ExaNutritionDocument::sourceId).firstOrNull(::containsKey)
+        ?: return null
+    val reported = getValue(reportedId)
+    val others = filterKeys { it != reportedId }.entries.joinToString("; ") { (sourceId, failure) ->
+        "$sourceId: ${failure.reason.name} - ${failure.detail}"
+    }
+    return NutritionResearchException(
+        reason = reported.reason,
+        itemName = reported.itemName,
+        itemIndex = reported.itemIndex,
+        detail = "$reportedId: ${reported.detail}" +
+            others.takeIf(String::isNotEmpty)?.let { " (other sources: $it)" }.orEmpty(),
+    )
 }
 
 private fun GeminiNutritionItem.toAnalyzedItem(
@@ -1437,10 +1506,19 @@ internal data class ExaGeminiDebugTrace(
     val failureReason: String? = null,
     /** One entry per item that could not be resolved, so a bad item in a meal is diagnosable. */
     val itemFailures: List<ExaGeminiItemFailure> = emptyList(),
+    /**
+     * The exact text Gemini was given for each source, kept only when a pass did not validate.
+     * Every grounding check reads this text, and without it a refused quote could not be told
+     * apart from a quote the page prints but the excerpt left out.
+     */
+    val documents: List<ExaGeminiDebugDocument> = emptyList(),
 )
 
 @Serializable
 internal data class ExaGeminiDebugSource(val sourceId: String, val title: String, val url: String)
+
+@Serializable
+internal data class ExaGeminiDebugDocument(val sourceId: String, val content: String)
 
 @Serializable
 internal data class ExaGeminiItemFailure(
@@ -1499,6 +1577,11 @@ private fun debugTrace(
     status = status,
     failureReason = failureReason,
     itemFailures = itemFailures,
+    documents = if (status == "VALIDATED") {
+        emptyList()
+    } else {
+        documents.map { ExaGeminiDebugDocument(it.sourceId, it.content) }
+    },
 )
 
 @Serializable
@@ -1510,10 +1593,17 @@ private data class ExaSearchRequest(
 )
 
 @Serializable
-private data class ExaContentsRequest(val highlights: ExaHighlightsRequest)
+private data class ExaContentsRequest(
+    val highlights: ExaHighlightsRequest,
+    /** Absent unless the user turned on whole pages; Exa bills page text on its own. */
+    val text: ExaTextRequest? = null,
+)
 
 @Serializable
 private data class ExaHighlightsRequest(val query: String, val maxCharacters: Int = 4_000)
+
+@Serializable
+private data class ExaTextRequest(val maxCharacters: Int = MAX_EXA_PAGE_TEXT_CHARS)
 
 @Serializable
 private data class ExaSearchApiResponse(

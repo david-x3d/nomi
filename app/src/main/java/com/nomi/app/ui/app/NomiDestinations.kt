@@ -289,6 +289,7 @@ internal fun NavGraphBuilder.detailDestinations(
             },
             onCalorieEstimateBiasChanged = viewModel::setCalorieEstimateBias,
             onAiRequestTimeoutDisabledChanged = viewModel::setAiRequestTimeoutDisabled,
+            onExaFullPageTextChanged = viewModel::setExaFullPageText,
             onDebug = { navController.navigate(Routes.DEVELOPER) },
             onBack = { navController.popBackStack() },
         )

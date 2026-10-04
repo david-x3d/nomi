@@ -2220,6 +2220,10 @@ class AppViewModel(
         }
     }
 
+    fun setExaFullPageText(enabled: Boolean) {
+        viewModelScope.launch { repository.appPreferencesStore.setExaFullPageText(enabled) }
+    }
+
     fun providerEditorState(index: Int): AiProviderEditorState {
         val settings = settingsState.value.aiProviders.getOrNull(index)
             ?: settingsState.value.aiProviders.firstOrNull()

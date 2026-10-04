@@ -303,7 +303,7 @@ class NutritionResearchDiagnosisTest {
     fun `a failed item is retried on its own while resolved items are kept`() = runBlocking {
         var extractionCalls = 0
         val analysis = ExaGeminiNutritionProvider(
-            exaSearch = ExaNutritionSearchGateway { _, _, _, _ ->
+            exaSearch = ExaNutritionSearchGateway { _, _, _, _, _ ->
                 ExaSearchResponse(results = listOf(genericPage, ricePage))
             },
             geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, prompt ->
@@ -476,7 +476,7 @@ class NutritionResearchDiagnosisTest {
         val error = assertThrows(HttpRequestTimeoutException::class.java) {
             runBlocking {
                 ExaGeminiNutritionProvider(
-                    exaSearch = ExaNutritionSearchGateway { _, _, _, _ ->
+                    exaSearch = ExaNutritionSearchGateway { _, _, _, _, _ ->
                         throw HttpRequestTimeoutException("https://api.exa.ai/search", 5_000)
                     },
                     geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ ->
@@ -497,7 +497,7 @@ class NutritionResearchDiagnosisTest {
         assertThrows(HttpRequestTimeoutException::class.java) {
             runBlocking {
                 ExaGeminiNutritionProvider(
-                    exaSearch = ExaNutritionSearchGateway { _, _, _, _ ->
+                    exaSearch = ExaNutritionSearchGateway { _, _, _, _, _ ->
                         ExaSearchResponse(results = listOf(genericPage))
                     },
                     geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ ->
@@ -531,7 +531,7 @@ class NutritionResearchDiagnosisTest {
         sources: List<ExaSearchResult>,
         extraction: GeminiNutritionExtraction,
     ) = ExaGeminiNutritionProvider(
-        exaSearch = ExaNutritionSearchGateway { _, _, _, _ ->
+        exaSearch = ExaNutritionSearchGateway { _, _, _, _, _ ->
             ExaSearchResponse(requestId = "test", results = sources)
         },
         geminiExtractor = GeminiNutritionExtractionGateway { _, _, _, _ -> extraction },

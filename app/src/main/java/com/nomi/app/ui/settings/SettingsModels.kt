@@ -70,6 +70,7 @@ data class SettingsUiState(
     /** True once the key store has been read and logging a meal would fail for want of a key. */
     val aiSetupNeeded: Boolean = false,
     val aiRequestTimeoutDisabled: Boolean = false,
+    val exaFullPageText: Boolean = false,
     val aiDebugEnabled: Boolean = false,
     val reminders: List<ReminderSetting> = listOf(
         ReminderSetting("Breakfast", timeText = "08:00"),
@@ -84,6 +85,10 @@ data class SettingsUiState(
      * Which keys the AI page can ask for outright, read from the four tasks every entry or photo
      * passes through. Fallback is left out: it is optional and usually sits on another provider.
      */
+    /** Whether any task researches through Exa, the only provider that reads source pages. */
+    val usesExaSearch: Boolean
+        get() = aiProviders.any { it.provider == AiProviderKind.EXA_GEMINI }
+
     val aiKeySetup: AiKeySetup
         get() {
             val tasks = aiProviders.take(ESSENTIAL_AI_TASKS)
