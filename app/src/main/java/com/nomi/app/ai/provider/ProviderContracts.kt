@@ -20,9 +20,8 @@ fun interface NutritionResearchProvider {
 /**
  * Answers a meal from model knowledge alone, with no search and no sourcing requirement.
  *
- * Separate from [NutritionResearchProvider] because it trades provenance for latency on purpose:
- * this is what puts a number on screen in a second or two, while research is still running. Its
- * results are always marked as estimates, and research replaces them when it arrives.
+ * Separate from [NutritionResearchProvider] so the application can explicitly choose an estimate
+ * after its research routes fail. Its results are always marked as estimates.
  */
 fun interface NutritionEstimateProvider {
     suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis
@@ -61,4 +60,3 @@ fun interface FoodEditClassificationProvider {
         userEdit: String,
     ): FoodEditClassification
 }
-

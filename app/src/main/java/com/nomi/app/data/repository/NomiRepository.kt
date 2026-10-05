@@ -31,15 +31,15 @@ import com.nomi.app.domain.PortionChangeValidator
 import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
 import com.nomi.app.domain.usecase.canPersistForResearchReuse
 import com.nomi.app.domain.usecase.foodResearchExpiry
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.time.LocalDate
-import java.time.ZoneId
-import java.util.Locale
-import java.util.UUID
 
 data class CompleteOnboardingRequest(
     val profile: UserProfileEntity,
@@ -374,6 +374,20 @@ class NomiRepository(
     suspend fun addLogs(logs: List<FoodLogEntity>): List<Long> {
         logs.forEach(::validateLog)
         return database.withTransaction { logDao.insertLogs(logs.map { it.copy(id = 0) }) }
+    }
+
+    /** A rewrite either replaces the entire old group or leaves it intact. */
+    suspend fun saveLoggingRows(logs: List<FoodLogEntity>, replacedEntryId: Long? = null): List<Long> {
+        require(logs.isNotEmpty()) { "At least one food log is required" }
+        logs.forEach(::validateLog)
+        return database.withTransaction {
+            if (replacedEntryId != null) {
+                check(deleteLogsForUndo(replacedEntryId).isNotEmpty()) {
+                    "The food being rewritten no longer exists"
+                }
+            }
+            logDao.insertLogs(logs.map { it.copy(id = 0) })
+        }
     }
 
     suspend fun updateLog(log: FoodLogEntity): Boolean {

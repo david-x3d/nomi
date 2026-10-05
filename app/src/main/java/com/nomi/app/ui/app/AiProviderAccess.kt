@@ -9,8 +9,8 @@ import com.nomi.app.ai.provider.NutritionResearchProvider
 import com.nomi.app.ai.validation.FoodDisplayName
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
-import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.preferences.ProviderSelection
+import com.nomi.app.data.preferences.providerSelection
 import com.nomi.app.data.remote.ai.ExaGeminiNutritionProvider
 import com.nomi.app.data.remote.ai.ExaNutritionSearchGateway
 import com.nomi.app.data.remote.ai.OpenAiCompatibleProviders
@@ -43,24 +43,40 @@ internal class AiProviderAccess(
     private val preferences: StateFlow<AppPreferences>,
     private val debug: AiDebugRecorder,
     private val scope: CoroutineScope,
-    private val onResearchSources: (List<String>) -> Unit,
 ) {
     private val mutableKeyPresence =
         MutableStateFlow<Map<ProviderPipeline, ProviderKeyPresence>>(emptyMap())
     val keyPresence: StateFlow<Map<ProviderPipeline, ProviderKeyPresence>> =
         mutableKeyPresence.asStateFlow()
 
-    /** Sourced research on the configured provider, with the configured fallback behind it. */
-    suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
-        runWithSmartFallback(
+    /** One policy owns the order: primary research, configured fallback research, then estimate. */
+    suspend fun researchNutrition(
+        intent: ParsedFoodIntent,
+        onResearchSources: suspend (List<String>) -> Unit = {},
+    ): FoodAnalysis {
+        val consulted = linkedSetOf<String>()
+        suspend fun reportSources(sources: List<String>) {
+            consulted.addAll(sources)
+            onResearchSources(consulted.toList())
+        }
+        return runNutritionResearchPolicy(
             primary = {
-                withConfiguredResearchProvider { provider ->
-                    provider.researchNutrition(intent)
+                withConfiguredResearchProvider(onResearchSources = ::reportSources) { provider ->
+                    if (provider is OpenAiCompatibleProviders) {
+                        provider.researchSourcedNutrition(intent, ::reportSources)
+                    } else {
+                        provider.researchNutrition(intent)
+                    }
                 }
             },
             fallback = {
                 withConfiguredSmartFallback { config, key ->
-                    providerFor(config, key).researchNutrition(intent)
+                    providerFor(config, key).researchSourcedNutrition(intent, ::reportSources)
+                }
+            },
+            estimate = {
+                withConfiguredProvider(ProviderPipeline.FOOD_RESEARCH) { config, key ->
+                    providerFor(config, key).estimateNutritionWithSources(intent, consulted.toList())
                 }
             },
             onFallback = { error ->
@@ -70,6 +86,7 @@ internal class AiProviderAccess(
                 debug.recordResearchFallback(status = "FALLBACK_VALIDATED", analysis = analysis)
             },
         ).withCleanDisplayNames()
+    }
 
     /**
      * Every researched item passes through here on its way to the page, so the name that is
@@ -100,6 +117,7 @@ internal class AiProviderAccess(
     }
 
     private suspend fun <T> withConfiguredResearchProvider(
+        onResearchSources: suspend (List<String>) -> Unit,
         block: suspend (NutritionResearchProvider) -> T,
     ): T {
         val prefs = loadedPreferences()
@@ -114,7 +132,7 @@ internal class AiProviderAccess(
             val readerCredential = AiRuntimeCredential.from(readerChars.concatToString())
             container.secretStore.useSecret(exaSecretId()) { exaChars ->
                 val exaCredential = AiRuntimeCredential.from(exaChars.concatToString())
-                block(exaResearchProvider(config, readerCredential, exaCredential))
+                block(exaResearchProvider(config, readerCredential, exaCredential, onResearchSources = onResearchSources))
             } ?: error("Add the Exa API key in Settings first.")
         } ?: error("Add the ${config.kind.readerKeyOwner()} API key in Settings first.")
     }
@@ -174,7 +192,7 @@ internal class AiProviderAccess(
                             readerCredential = readerCredential,
                             exaCredential = exaCredential,
                             exaSearch = sharedSearch,
-                            showsProgress = false,
+
                         ).researchNutrition(intent).withCleanDisplayNames()
                     },
                     onRun = onRun,
@@ -189,7 +207,7 @@ internal class AiProviderAccess(
         readerCredential: AiRuntimeCredential,
         exaCredential: AiRuntimeCredential,
         exaSearch: ExaNutritionSearchGateway = container.exaGeminiClient,
-        showsProgress: Boolean = true,
+        onResearchSources: suspend (List<String>) -> Unit = {},
     ) = ExaGeminiNutritionProvider(
         exaSearch = exaSearch,
         geminiExtractor = if (config.kind == AiProviderKind.EXA_OPEN_ROUTER) {
@@ -200,7 +218,7 @@ internal class AiProviderAccess(
         exaCredential = { exaCredential },
         geminiConfig = config,
         geminiCredential = { readerCredential },
-        searchProgressSink = { sources -> if (showsProgress) onResearchSources(sources) },
+        searchProgressSink = onResearchSources,
         debugSink = debug::recordExaGeminiTrace,
         calorieBiasProvider = { preferences.value.calorieEstimateBias },
         fullPageTextProvider = { preferences.value.exaFullPageText },

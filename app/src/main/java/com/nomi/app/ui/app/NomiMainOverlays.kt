@@ -16,6 +16,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.booleanResource
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nomi.app.R
 import com.nomi.app.ai.model.AnalyzedFoodItem
@@ -312,11 +314,10 @@ private fun Context.openReleasePage(url: String) {
  */
 @Composable
 private fun rememberForcedUpdateAvailability(): UpdateAvailability.Available? {
-    val context = LocalContext.current
-    return remember(context) {
-        if (!context.resources.getBoolean(R.bool.nomi_debug_force_update_dialog)) return@remember null
-        val version = context.getString(R.string.nomi_debug_forced_update_version)
-            .takeIf(String::isNotBlank) ?: return@remember null
+    val enabled = booleanResource(R.bool.nomi_debug_force_update_dialog)
+    val version = stringResource(R.string.nomi_debug_forced_update_version)
+    return remember(enabled, version) {
+        if (!enabled || version.isBlank()) return@remember null
         UpdateAvailability.Available(
             version = version,
             releaseUrl = "https://github.com/david-x3d/nomi/releases/latest",

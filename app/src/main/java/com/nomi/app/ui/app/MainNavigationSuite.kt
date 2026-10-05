@@ -67,10 +67,9 @@ internal fun MainNavigationSuite(
     onToday: () -> Unit,
     onOpenHistory: () -> Unit,
     onFoodClick: (Long) -> Unit,
-    onDeleteFood: (Long) -> Unit,
+    onDeleteFood: (com.nomi.app.ui.today.TodayFoodEntry) -> Unit,
     onDeleteFoodImmediately: (Long) -> Unit,
     onUndoDeleteFood: (Long) -> Unit,
-    onDiscardDeletedFood: (Long) -> Unit,
     onDuplicateFood: (Long) -> Unit,
     onFavoriteFood: (Long) -> Unit,
     onEditFoodAmount: (com.nomi.app.ui.today.TodayFoodEntry) -> Unit,
@@ -197,11 +196,13 @@ internal fun MainNavigationSuite(
                 when (destination) {
                     MainDestination.TODAY -> {
                         val todayState by viewModel.todayState.collectAsStateWithLifecycle()
+                        val pendingDeletions by viewModel.pendingFoodDeletions.collectAsStateWithLifecycle()
                         val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
                         val editedEntryId by viewModel.editedEntryId.collectAsStateWithLifecycle()
                         val aiSetupNeeded by viewModel.aiSetupNeeded.collectAsStateWithLifecycle()
                         NomiNotesTodayScreen(
                             state = todayState,
+                            pendingDeletions = pendingDeletions,
                             loggingState = loggingState,
                             onPreviousDay = onPreviousDay,
                             onNextDay = onNextDay,
@@ -211,7 +212,6 @@ internal fun MainNavigationSuite(
                             onDeleteFood = onDeleteFood,
                             onDeleteFoodImmediately = onDeleteFoodImmediately,
                             onUndoDeleteFood = onUndoDeleteFood,
-                            onDiscardDeletedFood = onDiscardDeletedFood,
                             onDuplicateFood = onDuplicateFood,
                             onFavoriteFood = onFavoriteFood,
                             onEditFoodAmount = onEditFoodAmount,

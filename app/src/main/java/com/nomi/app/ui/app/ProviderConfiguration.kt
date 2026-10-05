@@ -177,13 +177,13 @@ internal suspend fun <T> runWithSmartFallback(
     primary()
 } catch (cancelled: CancellationException) {
     throw cancelled
-} catch (primaryError: Throwable) {
+} catch (primaryError: Exception) {
     onFallback(primaryError)
     try {
         fallback().also { onFallbackSuccess(it) }
     } catch (cancelled: CancellationException) {
         throw cancelled
-    } catch (fallbackError: Throwable) {
+    } catch (fallbackError: Exception) {
         // The configured primary provider's error is the actionable one; a misconfigured
         // fallback must not mask it.
         primaryError.addSuppressed(fallbackError)

@@ -2,8 +2,9 @@ package com.nomi.app.data.remote.ai
 
 import android.util.Base64
 import com.nomi.app.ai.model.AiProviderConfig
-import com.nomi.app.ai.model.AnalyzedFoodItem
+import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
+import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.FoodEditClassification
 import com.nomi.app.ai.model.MenuScanResult
@@ -14,8 +15,8 @@ import com.nomi.app.ai.model.PortionContext
 import com.nomi.app.ai.model.VisionFoodResult
 import com.nomi.app.ai.prompt.AiPrompts
 import com.nomi.app.ai.provider.FoodEditClassificationProvider
-import com.nomi.app.ai.provider.MenuVisionProvider
 import com.nomi.app.ai.provider.FoodParsingProvider
+import com.nomi.app.ai.provider.MenuVisionProvider
 import com.nomi.app.ai.provider.NutritionEstimateProvider
 import com.nomi.app.ai.provider.NutritionLabelProvider
 import com.nomi.app.ai.provider.NutritionResearchProvider
@@ -31,7 +32,6 @@ import com.nomi.app.domain.calculator.CalorieBiasAdjuster
 import java.net.URI
 import java.text.Normalizer
 import java.util.Locale
-import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -73,47 +73,25 @@ class OpenAiCompatibleProviders(
         )
     }
 
-    /**
-     * Sourced research first, a labeled estimate rather than an error second.
-     *
-     * The gates below research are deliberately strict, and every one of them used to end the
-     * user's logging attempt. A person who ate something wants it in their journal, so a refusal
-     * now falls through to an estimate that is plainly marked as one, and only a failure of that
-     * too - no key, no network, no usable answer - surfaces the original research error.
-     */
-    override suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis {
+    /** Research only. The application policy decides when to use another provider or estimate. */
+    override suspend fun researchNutrition(intent: ParsedFoodIntent): FoodAnalysis =
+        researchSourcedNutrition(intent)
+
+    internal suspend fun researchSourcedNutrition(
+        intent: ParsedFoodIntent,
+        onPagesConsulted: suspend (List<String>) -> Unit = {},
+    ): FoodAnalysis {
         val localeCountry = localeCountryProvider()
-        val reconciledIntent = AiResponseValidator.validate(
+        val reconciled = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        // The pages the search surfaced before the result was rejected. They did not supply the
-        // numbers the estimate ends up with, but they are what Nomi read, and throwing them away
-        // is what made a researched-then-estimated entry claim it had no sources at all.
-        val consulted = linkedSetOf<String>()
-        return try {
-            researchNutritionFromSources(reconciledIntent, localeCountry, consulted::addAll)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (researchFailure: Throwable) {
-            try {
-                estimateReconciledNutrition(
-                    reconciledIntent,
-                    localeCountry,
-                    consultedUrls = consulted.toList(),
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (estimateFailure: Throwable) {
-                researchFailure.addSuppressed(estimateFailure)
-                throw researchFailure
-            }
-        }
+        return researchNutritionFromSources(reconciled, localeCountry, onPagesConsulted)
     }
 
     private suspend fun researchNutritionFromSources(
         reconciledIntent: ParsedFoodIntent,
         localeCountry: String?,
-        onPagesConsulted: (List<String>) -> Unit = {},
+        onPagesConsulted: suspend (List<String>) -> Unit = {},
     ): FoodAnalysis {
         suspend fun research(prompt: String): FoodAnalysis {
             val completion = client.completeWebSearchJson(
@@ -175,19 +153,19 @@ class OpenAiCompatibleProviders(
         return SourceIntegrityVerifier.resolve(rejectPlaceholderNutrition(normalized))
     }
 
-    /**
-     * The fast path: one completion, no search, answered from model knowledge.
-     *
-     * This is what the text-logging flow calls first so a meal appears in a second or two
-     * instead of after a web search. It is also what [researchNutrition] falls back to when
-     * sourced research refuses, which is why it is public rather than private to that path.
-     */
-    override suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis {
+    /** A labeled estimate, used only after the application has exhausted research routes. */
+    override suspend fun estimateNutrition(intent: ParsedFoodIntent): FoodAnalysis =
+        estimateNutritionWithSources(intent)
+
+    internal suspend fun estimateNutritionWithSources(
+        intent: ParsedFoodIntent,
+        consultedUrls: List<String> = emptyList(),
+    ): FoodAnalysis {
         val localeCountry = localeCountryProvider()
         val reconciledIntent = AiResponseValidator.validate(
             UserQuantityResolver.reconcileIntent(intent, localeCountry),
         )
-        return estimateReconciledNutrition(reconciledIntent, localeCountry)
+        return estimateReconciledNutrition(reconciledIntent, localeCountry, consultedUrls)
     }
 
     /**
@@ -201,11 +179,22 @@ class OpenAiCompatibleProviders(
         consultedUrls: List<String> = emptyList(),
     ): FoodAnalysis {
         val raw = client.completeJson(
-            config = nutritionConfig,
+            config = nutritionConfig.copy(kind = when (nutritionConfig.kind) {
+                AiProviderKind.EXA_GEMINI -> AiProviderKind.GEMINI
+                AiProviderKind.EXA_OPEN_ROUTER -> AiProviderKind.OPEN_ROUTER
+                else -> nutritionConfig.kind
+            }),
             credential = nutritionCredential(),
             systemPrompt = "You estimate nutrition per 100 g or 100 ml as validated JSON only; " +
                 "Nomi performs all serving arithmetic.",
             userPrompt = AiPrompts.estimateNutrition(reconciledIntent, client.json, localeCountry),
+            openRouterLimits = if (nutritionConfig.kind == AiProviderKind.EXA_OPEN_ROUTER) {
+                OpenRouterRequestLimits(
+                    maxPromptPrice = OPENROUTER_RESEARCH_MAX_PROMPT_PRICE,
+                    maxCompletionPrice = OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE,
+                    reasoningEffort = "low",
+                )
+            } else null,
         )
         val analysis: FoodAnalysis = client.json.decodeFromString(raw)
         // sourceUrl stays null on purpose: no single page published these numbers, and filling

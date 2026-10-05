@@ -1,18 +1,10 @@
 package com.nomi.app.ui.app
 
-
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AnalyzedFoodItem
-import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.MenuDish
-import com.nomi.app.ai.model.ParsedFoodIntent
-import com.nomi.app.ai.model.ParsedFoodItem
-import com.nomi.app.ai.parsing.LocalFoodIntentParser
-import com.nomi.app.ai.validation.ServingNutritionNormalizer
-import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodEntity
@@ -43,17 +35,8 @@ import com.nomi.app.domain.StepCalorieEstimate
 import com.nomi.app.domain.StepCalorieEstimator
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
-import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
 import com.nomi.app.domain.usecase.FoodEditRouter
 import com.nomi.app.domain.usecase.NutritionRoute
-import com.nomi.app.domain.usecase.PortionEditParser
-import com.nomi.app.domain.usecase.RecentFoodAnalysisCache
-import com.nomi.app.domain.usecase.toPortionContext
-import com.nomi.app.ui.capture.BarcodeAmountSupport
-import com.nomi.app.ui.capture.BarcodeAmountUiState
-import com.nomi.app.ui.capture.MenuScanUiState
-import com.nomi.app.ui.capture.menuDishKey
-import com.nomi.app.ui.capture.mergeMenuDishes
 import com.nomi.app.ui.history.HistoryDay
 import com.nomi.app.ui.history.HistorySelection
 import com.nomi.app.ui.history.HistorySelectionAction
@@ -64,11 +47,7 @@ import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryUiState
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.NomiTranslations
-import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.ManualFoodDraft
-import com.nomi.app.ui.logging.PortionEditUiState
-import com.nomi.app.ui.logging.toPhotoMealDescription
-import com.nomi.app.ui.logging.toPhotoParsedItem
 import com.nomi.app.ui.profile.ProfileEdit
 import com.nomi.app.ui.progress.NutritionPoint
 import com.nomi.app.ui.progress.ProgressRange
@@ -89,7 +68,6 @@ import com.nomi.app.ui.today.MealCategory
 import com.nomi.app.ui.today.TodayFoodEntry
 import com.nomi.app.ui.today.TodayUiState
 import com.nomi.app.ui.today.withActivityTargetAdjustment
-import com.nomi.app.ui.today.reeditableText
 import com.nomi.app.update.GitHubReleaseSource
 import com.nomi.app.update.ReleaseVersion
 import com.nomi.app.update.UpdateAvailability
@@ -102,7 +80,6 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.util.UUID
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -117,7 +94,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -187,7 +163,7 @@ class AppViewModel(
 
     private val debug = AiDebugRecorder(container, preferences, viewModelScope)
     private val providers =
-        AiProviderAccess(container, preferences, debug, viewModelScope, ::showResearchSources)
+        AiProviderAccess(container, preferences, debug, viewModelScope)
     private val foodCatalog = LocalFoodCatalog(repository) { recentFoodsSnapshot }
 
     val startState: StateFlow<AppStartState> = repository.profile
@@ -213,7 +189,6 @@ class AppViewModel(
         SharingStarted.WhileSubscribed(5_000),
         null,
     )
-
 
     private val mutableEvents = MutableSharedFlow<AppEvent>(extraBufferCapacity = 8)
     val events = mutableEvents.asSharedFlow()
@@ -272,7 +247,16 @@ class AppViewModel(
     private val selectedDate = MutableStateFlow(today)
     private var dayLogSnapshot: List<FoodLogEntity> = emptyList()
     /** Original wording kept briefly so a freshly saved row can visibly resolve into its label. */
-    private val recentlySavedInputs = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val logging = FoodLoggingCoordinator(
+        repository, foodCatalog, providers, debug, viewModelScope, preferences,
+        destination = { logDestination },
+        defaultMealCategory = ::defaultMealCategory,
+        currentLanguage = ::currentLanguage,
+        inUserLanguage = { inUserLanguage(it) },
+        findBarcodeProduct = container.openFoodFacts::findByBarcode,
+        emitEvent = mutableEvents::emit,
+    )
+    private val recentlySavedInputs = logging.recentlySavedInputs
 
     // Declared before the flows that read it: a property initialiser running earlier would see
     // null and take the whole view model down at construction.
@@ -346,7 +330,6 @@ class AppViewModel(
         SharingStarted.WhileSubscribed(5_000),
         emptyList(),
     )
-
 
     private val historyQuery = MutableStateFlow("")
     private val historyDate = MutableStateFlow(today)
@@ -485,46 +468,20 @@ class AppViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
-    private val mutableLoggingState = MutableStateFlow<FoodLoggingUiState>(FoodLoggingUiState.Input())
-    val loggingState = mutableLoggingState.asStateFlow()
-    private val recentFoodAnalysisCache = RecentFoodAnalysisCache()
-    private var analysisJob: Job? = null
-    private var analysisRequestId = 0L
-    private var loggingSaveInProgress = false
+    val loggingState = logging.loggingState
+    val barcodeAmountState = logging.barcodeAmountState
+    val menuScanState = logging.menuScanState
+    val portionEditState = logging.portionEditState
+    val editedEntryId = logging.editedEntryId
 
-    /**
-     * Pages the running research actually opened, as the provider reports them.
-     *
-     * These are what the spinner shows as site icons. They used to exist only for that
-     * animation and were dropped on save, so an entry the provider had clearly researched could
-     * still end up claiming it had no sources. Written from the provider's callback thread and
-     * read once the request it belongs to has won, hence volatile.
-     */
-    @Volatile
-    private var consultedResearchUrls: List<String> = emptyList()
-
-    private val mutableBarcodeAmountState = MutableStateFlow<BarcodeAmountUiState?>(null)
-    val barcodeAmountState = mutableBarcodeAmountState.asStateFlow()
-    private var lastLoggingText = ""
-    private var barcodeLookupRequestId = 0L
-    private val mutableMenuScanState = MutableStateFlow(MenuScanUiState())
-    val menuScanState = mutableMenuScanState.asStateFlow()
-    private var menuScanRequestId = 0L
-    private var pendingMenuDishes: List<MenuDish> = emptyList()
-    private var pendingMenuLoggingText: String? = null
-    private val mutablePortionEditState = MutableStateFlow<PortionEditUiState?>(null)
-    val portionEditState = mutablePortionEditState.asStateFlow()
     private val mutableLoggedAmountEditState = MutableStateFlow<LoggedAmountEditUiState?>(null)
     val loggedAmountEditState = mutableLoggedAmountEditState.asStateFlow()
     private var loggedAmountEditEntry: TodayFoodEntry? = null
-    /** The logged entry currently being rewritten as text on the page, if any. */
-    private val mutableEditedEntryId = MutableStateFlow<Long?>(null)
-    val editedEntryId = mutableEditedEntryId.asStateFlow()
-    private var portionEditIndex: Int? = null
-    private val pendingDeletedLogs = PendingDeletedLogStore()
-    private val earlyUndoDeleteRequests = mutableSetOf<Long>()
-    private val earlyDiscardDeleteRequests = mutableSetOf<Long>()
-
+    private val foodDeletions = FoodDeletionController(
+        viewModelScope, repository::deleteLogsForUndo, repository::restoreDeletedLogs,
+        onFailure = { error -> mutableEvents.emit(AppEvent.Message(error.safeAiMessage())) },
+    )
+    val pendingFoodDeletions = foodDeletions.pending
 
     init {
         // Handles the day changing while the app is on screen. The wait runs on uptime, which
@@ -627,924 +584,44 @@ class AppViewModel(
     fun setHistoryDate(value: LocalDate) { historyDate.value = value.coerceAtMost(today) }
     fun setProgressRange(value: ProgressRange) { progressRange.value = value }
 
-    fun beginLogging(method: AddFoodMethod, initialText: String = "") {
-        cancelAnalysis()
-        // A new entry is not a rewrite of the row that happened to be open. Leaving this set made
-        // the next saved food - dictated, photographed or scanned - delete that row.
-        mutableEditedEntryId.value = null
-        pendingMenuDishes = emptyList()
-        pendingMenuLoggingText = null
-        barcodeLookupRequestId += 1
-        mutableBarcodeAmountState.value = null
-        val category = defaultMealCategory()
-        mutableLoggingState.value = when (method) {
-            AddFoodMethod.TYPE, AddFoodMethod.VOICE -> FoodLoggingUiState.Input(initialText, category)
-            else -> FoodLoggingUiState.Input("", category)
-        }
-        lastLoggingText = initialText
-    }
+    fun beginLogging(method: AddFoodMethod, initialText: String = "") = logging.beginLogging(method, initialText)
+    fun updateLoggingText(value: String) = logging.updateLoggingText(value)
+    fun editLoggingText() = logging.editLoggingText()
+    fun dismissLoggingDraft() = logging.dismissLoggingDraft()
+    fun editEntryTextInline(entry: TodayFoodEntry) = logging.editEntryTextInline(entry)
+    fun updateLoggingMealCategory(category: MealCategory) = logging.updateLoggingMealCategory(category)
+    fun showManualLogging(prefillName: String = logging.lastLoggingText) = logging.showManualLogging(prefillName)
+    fun updateManualDraft(value: ManualFoodDraft) = logging.updateManualDraft(value)
+    fun updatePreviewItem(index: Int, item: AnalyzedFoodItem) = logging.updatePreviewItem(index, item)
+    fun beginMenuScan() = logging.beginMenuScan()
+    fun updateMenuSearch(query: String) = logging.updateMenuSearch(query)
+    fun scanMenuPage(bytes: ByteArray, mediaType: String) = logging.scanMenuPage(bytes, mediaType)
+    fun toggleMenuDish(dish: MenuDish) = logging.toggleMenuDish(dish)
+    fun selectMenuDishes() = logging.selectMenuDishes()
+    fun removePreviewItem(index: Int) = logging.removePreviewItem(index)
+    fun beginPortionEdit(index: Int) = logging.beginPortionEdit(index)
+    fun updatePortionCorrection(correction: String) = logging.updatePortionCorrection(correction)
+    fun dismissPortionEdit() = logging.dismissPortionEdit()
+    fun interpretPortionCorrection() = logging.interpretPortionCorrection()
+    fun researchEditedItem() = logging.researchEditedItem()
+    fun applyPortionCorrection() = logging.applyPortionCorrection()
+    fun analyzeText() = logging.analyzeText()
+    fun retryAnalysis() = logging.retryAnalysis()
+    fun analyzeNutritionLabel(bytes: ByteArray, mediaType: String) = logging.analyzeNutritionLabel(bytes, mediaType)
+    fun analyzePhoto(bytes: ByteArray, mediaType: String) = logging.analyzePhoto(bytes, mediaType)
+    fun updatePhotoDescription(description: String) = logging.updatePhotoDescription(description)
+    fun updatePhotoPlace(place: String) = logging.updatePhotoPlace(place)
+    fun confirmPhotoDescription() = logging.confirmPhotoDescription()
+    fun lookupBarcode(barcode: String) = logging.lookupBarcode(barcode)
+    fun updateBarcodeAmount(value: String) = logging.updateBarcodeAmount(value)
+    fun updateBarcodeUnit(unit: String) = logging.updateBarcodeUnit(unit)
+    fun confirmBarcodeAmount() = logging.confirmBarcodeAmount()
+    fun cancelBarcodeAmount() = logging.cancelBarcodeAmount()
+    fun confirmLogging() = logging.confirmLogging()
 
-    fun updateLoggingText(value: String) {
-        if (value != pendingMenuLoggingText) {
-            pendingMenuDishes = emptyList()
-            pendingMenuLoggingText = null
-        }
-        lastLoggingText = value
-        val current = mutableLoggingState.value
-        if (current is FoodLoggingUiState.Input) mutableLoggingState.value = current.copy(text = value)
-    }
+    private suspend fun interpret(text: String) = logging.interpret(text)
+    private fun editRouter() = logging.editRouter()
 
-    fun editLoggingText() {
-        cancelAnalysis()
-        val category = when (val current = mutableLoggingState.value) {
-            is FoodLoggingUiState.Input -> current.mealCategory
-            is FoodLoggingUiState.Preview -> current.mealCategory
-            is FoodLoggingUiState.Manual -> current.draft.mealCategory
-            else -> defaultMealCategory()
-        }
-        mutableLoggingState.value = FoodLoggingUiState.Input(lastLoggingText, category)
-    }
-
-    fun dismissLoggingDraft() {
-        cancelAnalysis()
-        pendingMenuDishes = emptyList()
-        pendingMenuLoggingText = null
-        barcodeLookupRequestId += 1
-        mutableBarcodeAmountState.value = null
-        lastLoggingText = ""
-        dismissPortionEdit()
-        mutableEditedEntryId.value = null
-        mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
-    }
-
-    /**
-     * Reopens a logged entry as text on the page.
-     *
-     * The old entry is kept until the rewritten one is confirmed, so a failed or abandoned
-     * re-research can never leave the day short of a meal. Rewriting the text always re-runs
-     * research: keeping the previous calories under different words is exactly the mismatch
-     * between text and numbers this app exists to prevent.
-     */
-    fun editEntryTextInline(entry: TodayFoodEntry) {
-        if (entry.id <= 0) return
-        cancelAnalysis()
-        val text = entry.reeditableText()
-        lastLoggingText = text
-        mutableEditedEntryId.value = entry.id
-        mutableLoggingState.value = FoodLoggingUiState.Input(text, entry.mealCategory)
-    }
-
-    fun updateLoggingMealCategory(category: MealCategory) {
-        mutableLoggingState.value = when (val current = mutableLoggingState.value) {
-            is FoodLoggingUiState.Input -> current.copy(mealCategory = category)
-            is FoodLoggingUiState.Preview -> current.copy(mealCategory = category)
-            is FoodLoggingUiState.Manual -> current.copy(draft = current.draft.copy(mealCategory = category))
-            else -> current
-        }
-    }
-
-    fun showManualLogging(prefillName: String = lastLoggingText) {
-        val category = when (val current = mutableLoggingState.value) {
-            is FoodLoggingUiState.Input -> current.mealCategory
-            is FoodLoggingUiState.Preview -> current.mealCategory
-            else -> defaultMealCategory()
-        }
-        mutableLoggingState.value = FoodLoggingUiState.Manual(
-            ManualFoodDraft(name = prefillName, amount = "100", unit = "g", mealCategory = category),
-        )
-    }
-
-    fun updateManualDraft(value: ManualFoodDraft) {
-        mutableLoggingState.value = FoodLoggingUiState.Manual(value)
-    }
-
-    fun updatePreviewItem(index: Int, item: AnalyzedFoodItem) {
-        val current = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
-        if (index !in current.analysis.items.indices) return
-        val updated = current.analysis.items.toMutableList().apply { this[index] = item }
-        mutableLoggingState.value = current.copy(
-            analysis = current.analysis.copy(items = updated),
-        )
-    }
-
-    fun beginMenuScan() {
-        menuScanRequestId += 1
-        mutableMenuScanState.value = MenuScanUiState()
-    }
-
-    fun updateMenuSearch(query: String) {
-        mutableMenuScanState.value = mutableMenuScanState.value.copy(query = query.take(200))
-    }
-
-    fun scanMenuPage(bytes: ByteArray, mediaType: String) {
-        if (bytes.isEmpty()) return
-        val requestId = ++menuScanRequestId
-        val before = mutableMenuScanState.value
-        mutableMenuScanState.value = before.copy(isProcessing = true, errorMessage = null)
-        viewModelScope.launch {
-            runCatching {
-                providers.withProvider(ProviderPipeline.VISION) { it.scanMenu(bytes, mediaType) }
-            }.onSuccess { result ->
-                if (requestId != menuScanRequestId) return@onSuccess
-                val current = mutableMenuScanState.value
-                mutableMenuScanState.value = current.copy(
-                    restaurantName = current.restaurantName
-                        ?: result.restaurantName?.trim()?.takeIf(String::isNotBlank),
-                    items = mergeMenuDishes(current.items, result.items),
-                    pageCount = current.pageCount + 1,
-                    isProcessing = false,
-                    errorMessage = null,
-                    notes = (current.notes + result.notes).distinct().takeLast(20),
-                )
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                if (requestId != menuScanRequestId) return@onFailure
-                mutableMenuScanState.value = mutableMenuScanState.value.copy(
-                    isProcessing = false,
-                    errorMessage = inUserLanguage("Nomi couldn't read that menu page. Add a clearer photo."),
-                )
-            }
-        }.invokeOnCompletion { bytes.fill(0) }
-    }
-
-    fun toggleMenuDish(dish: MenuDish) {
-        val key = menuDishKey(dish)
-        val selected = mutableMenuScanState.value.selectedDishKeys
-        mutableMenuScanState.value = mutableMenuScanState.value.copy(
-            selectedDishKeys = if (key in selected) selected - key else selected + key,
-        )
-    }
-
-    fun selectMenuDishes() {
-        val state = mutableMenuScanState.value
-        val dishes = state.items.filter { menuDishKey(it) in state.selectedDishKeys }
-        if (dishes.isEmpty()) return
-        val restaurant = state.restaurantName
-        val text = buildString {
-            restaurant?.takeIf(String::isNotBlank)?.let { append("At ").append(it.trim()).append(": ") }
-            dishes.forEachIndexed { index, dish ->
-                if (index > 0) append("; ")
-                append("1 serving ").append(dish.name.trim())
-                dish.number?.takeIf(String::isNotBlank)?.let {
-                    append(" (menu number ").append(it.trim()).append(')')
-                }
-                dish.description?.takeIf(String::isNotBlank)?.let {
-                    append(". Menu description: ").append(it.trim())
-                }
-                dish.quantityText?.takeIf(String::isNotBlank)?.let {
-                    append(". Printed serving: ").append(it.trim())
-                }
-            }
-        }.take(MAX_MENU_LOGGING_TEXT_CHARS)
-        beginLogging(AddFoodMethod.TYPE, text)
-        pendingMenuDishes = dishes
-        pendingMenuLoggingText = text
-        analyzeText()
-    }
-
-    /** Removes one component from a detected meal before it is saved. */
-    fun removePreviewItem(index: Int) {
-        val current = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
-        if (index !in current.analysis.items.indices) return
-        val updated = current.analysis.items.toMutableList().apply { removeAt(index) }
-        if (updated.isEmpty()) {
-            // Keep the preview actionable; the user can still edit the original meal text or
-            // dismiss the draft instead of reaching an empty meal that cannot be saved.
-            return
-        }
-        mutableLoggingState.value = current.copy(
-            analysis = current.analysis.copy(items = updated),
-        )
-    }
-
-    fun beginPortionEdit(index: Int) {
-        val preview = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
-        val item = preview.analysis.items.getOrNull(index) ?: return
-        portionEditIndex = index
-        mutablePortionEditState.value = PortionEditUiState(current = item.toPortionContext())
-    }
-
-    fun updatePortionCorrection(correction: String) {
-        mutablePortionEditState.value = mutablePortionEditState.value?.copy(
-            correction = correction.take(500),
-            proposed = null,
-            scaledItem = null,
-            needsResearch = false,
-            researchReason = null,
-            errorMessage = null,
-        )
-    }
-
-    fun dismissPortionEdit() {
-        portionEditIndex = null
-        mutablePortionEditState.value = null
-    }
-
-    /**
-     * Decides what a correction actually asks for, and answers it as cheaply as it can.
-     *
-     * Three tiers, in increasing cost. Most corrections are arithmetic phrased in English
-     * ("half", "2x", "200 g"), and those never leave the device. Wording the local parser will
-     * not guess at goes to the cheap classifier. Only a correction that genuinely changes the
-     * food reaches the research model, which is the expensive one this whole path exists to
-     * avoid calling.
-     */
-    fun interpretPortionCorrection() {
-        val edit = mutablePortionEditState.value ?: return
-        val index = portionEditIndex ?: return
-        if (edit.correction.isBlank() || edit.isProcessing) return
-        val item = currentPreviewItem(index) ?: return
-
-        // Shown only while a model is actually being consulted. A locally parsed edit resolves
-        // within this call and never flashes a spinner.
-        val willAskModel = PortionEditParser.parseOrNull(edit.correction) == null
-        if (willAskModel) {
-            mutablePortionEditState.value = edit.copy(
-                isProcessing = true,
-                proposed = null,
-                scaledItem = null,
-                needsResearch = false,
-                errorMessage = null,
-            )
-        }
-        viewModelScope.launch {
-            runCatching { editRouter().route(item, edit.correction) }
-                .onSuccess { decision ->
-                    if (portionEditIndex != index) return@onSuccess
-                    when (decision) {
-                        is FoodEditRouter.Decision.Scale -> {
-                            debug.recordRoute(
-                                route = NutritionRoute.PORTION_SCALE,
-                                decision = decision.decidedBy,
-                                detail = decision.classification?.reason?.takeIf(String::isNotBlank)
-                                    ?: decision.result.description,
-                                confidence = decision.classification?.confidence,
-                            )
-                            mutablePortionEditState.value = edit.copy(
-                                isProcessing = false,
-                                proposed = decision.result.toPortionAdjustment(),
-                                scaledItem = decision.result.item,
-                                needsResearch = false,
-                                errorMessage = null,
-                            )
-                        }
-
-                        is FoodEditRouter.Decision.Research -> {
-                            mutablePortionEditState.value = edit.copy(
-                                isProcessing = false,
-                                needsResearch = true,
-                                researchReason = decision.reason,
-                            )
-                        }
-                    }
-                }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    mutablePortionEditState.value = edit.copy(
-                        isProcessing = false,
-                        errorMessage = error.safeAiMessage(),
-                    )
-                }
-        }
-    }
-
-    /**
-     * Turns a sentence into foods and amounts: on the phone when it is plain enough, through the
-     * interpretation model otherwise, and with spellings repaired against the user's own log.
-     */
-    private suspend fun interpret(text: String): ParsedFoodIntent = foodCatalog.withKnownSpellings(
-        LocalFoodIntentParser.parseOrNull(text)
-            ?: providers.withProvider(ProviderPipeline.FOOD_INTERPRETATION) { it.parseFood(text) },
-    )
-
-    /** Binds the routing rules to this app's configured cheap classifier. */
-    private fun editRouter() = FoodEditRouter { context, correction ->
-        providers.withProvider(ProviderPipeline.PORTION_CHANGE) { it.classifyEdit(context, correction) }
-    }
-
-    /**
-     * Researches an edit that changed the food itself, carrying the original entry's context.
-     *
-     * The restaurant, product name, and logged amount are still true unless the edit says
-     * otherwise, and throwing them away would make the second search worse than the first —
-     * "actually it was tuna" alone loses the fact that it came from a particular chain.
-     */
-    fun researchEditedItem() {
-        val index = portionEditIndex ?: return
-        val edit = mutablePortionEditState.value ?: return
-        if (edit.isProcessing) return
-        val item = currentPreviewItem(index) ?: return
-        val preview = mutableLoggingState.value as? FoodLoggingUiState.Preview ?: return
-        val correction = edit.correction.trim()
-        if (correction.isBlank()) return
-
-        mutablePortionEditState.value = edit.copy(isProcessing = true, errorMessage = null)
-        viewModelScope.launch {
-            runCatching {
-                val request = buildString {
-                    append(item.name)
-                    item.brand?.takeIf(String::isNotBlank)?.let { append(" from ").append(it) }
-                    append(", ").append(item.quantity.cleanNumber()).append(' ').append(item.unit)
-                    append(". Correction: ").append(correction)
-                }
-                val parsed = interpret(request)
-                // Known context survives the edit unless the correction replaced it.
-                val intent = parsed.copy(
-                    originalText = request,
-                    items = parsed.items.map { parsedItem ->
-                        parsedItem.copy(
-                            brand = parsedItem.brand ?: item.brand,
-                            quantity = parsedItem.quantity ?: item.quantity,
-                            unit = parsedItem.unit ?: item.unit,
-                        )
-                    },
-                )
-                providers.researchNutrition(intent)
-            }.onSuccess { analysis ->
-                if (portionEditIndex != index) return@onSuccess
-                debug.recordRoute(
-                    route = NutritionRoute.CONTENT_RERESEARCH,
-                    decision = NutritionRoute.Decision.CLASSIFIER,
-                    detail = edit.researchReason ?: "The edit changed the food itself",
-                )
-                val replacement = analysis.items.firstOrNull()
-                if (replacement == null) {
-                    mutablePortionEditState.value = edit.copy(
-                        isProcessing = false,
-                        errorMessage = inUserLanguage("Nomi couldn't find nutrition for that change. Try again."),
-                    )
-                    return@onSuccess
-                }
-                val updated = preview.analysis.items.toMutableList().apply {
-                    this[index] = replacement
-                    // A correction naming several foods replaces the one row it started from
-                    // and appends the rest, rather than silently dropping them.
-                    addAll(index + 1, analysis.items.drop(1))
-                }
-                mutableLoggingState.value = preview.copy(
-                    analysis = preview.analysis.copy(items = updated),
-                )
-                dismissPortionEdit()
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                mutablePortionEditState.value = edit.copy(
-                    isProcessing = false,
-                    errorMessage = error.safeAiMessage(),
-                )
-            }
-        }
-    }
-
-    private fun currentPreviewItem(index: Int): AnalyzedFoodItem? =
-        (mutableLoggingState.value as? FoodLoggingUiState.Preview)?.analysis?.items?.getOrNull(index)
-
-    /**
-     * Saves the result that was already computed deterministically when the change was read.
-     *
-     * Nothing is recalculated here: the preview the user approved and the row that gets stored
-     * are the same value.
-     */
-    fun applyPortionCorrection() {
-        val index = portionEditIndex ?: return
-        val edit = mutablePortionEditState.value ?: return
-        val updated = edit.scaledItem ?: return
-        updatePreviewItem(index, updated)
-        dismissPortionEdit()
-    }
-
-    fun analyzeText() {
-        val current = mutableLoggingState.value as? FoodLoggingUiState.Input ?: return
-        val text = current.text.trim()
-        if (text.isBlank()) return
-        val menuDishes = pendingMenuDishes.takeIf { pendingMenuLoggingText == text && it.isNotEmpty() }
-        lastLoggingText = text
-        val cacheKey = foodAnalysisCacheKey(text)
-        recentFoodAnalysisCache.get(cacheKey)?.takeIf { menuDishes == null }?.let { analysis ->
-            debug.recordCachedNutritionTrace("5-minute exact-input cache", analysis)
-            saveTextAnalysisAutomatically(analysis, current.mealCategory, text)
-            return
-        }
-
-        analysisJob?.cancel()
-        val requestId = ++analysisRequestId
-        // A new lookup must not inherit the pages the previous one opened.
-        consultedResearchUrls = emptyList()
-        // Claim the input synchronously so repeated taps cannot launch duplicate provider calls.
-        mutableLoggingState.value = FoodLoggingUiState.Processing(
-            AiProcessingStage.UNDERSTANDING_MEAL,
-            originalText = text,
-        )
-        val job = viewModelScope.launch {
-            val intent = runCatching {
-                interpret(text).let { parsed ->
-                    menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) } ?: parsed
-                }
-            }.getOrElse { error ->
-                if (error is CancellationException) throw error
-                if (requestId == analysisRequestId) {
-                    mutableLoggingState.value = FoodLoggingUiState.Error(
-                        error.safeAiMessage(),
-                        canRetry = true,
-                        originalText = text,
-                    )
-                }
-                return@launch
-            }
-
-            if (menuDishes == null) {
-                repository.cachedFoodResearch(cacheKey)?.let { cached ->
-                    if (requestId == analysisRequestId) {
-                        debug.recordRoute(
-                            route = NutritionRoute.NEW_RESEARCH,
-                            decision = NutritionRoute.Decision.LOCAL,
-                            detail = "Validated 21-day food research cache hit",
-                        )
-                        debug.recordCachedNutritionTrace("21-day validated research cache", cached)
-                        saveTextAnalysisAutomatically(cached, current.mealCategory, text)
-                    }
-                    return@launch
-                }
-            }
-
-            foodCatalog.cachedAnalysis(intent)?.let { cached ->
-                if (requestId == analysisRequestId) {
-                    debug.recordCachedNutritionTrace("per-100-g local food cache", cached)
-                    saveTextAnalysisAutomatically(cached, current.mealCategory, text)
-                }
-                return@launch
-            }
-
-            // Keep one owner for the whole lookup. A quick estimate used to be saveable before
-            // research silently replaced its calories, making the day total change afterwards.
-            mutableLoggingState.value = FoodLoggingUiState.Processing(
-                AiProcessingStage.FINDING_NUTRITION,
-                originalText = text,
-            )
-            runCatching { providers.researchNutrition(intent) }
-                .onSuccess { analysis ->
-                    if (requestId != analysisRequestId) return@onSuccess
-                    recentFoodAnalysisCache.put(cacheKey, analysis)
-                    if (menuDishes == null) {
-                        repository.cacheFoodResearch(cacheKey, analysis)
-                    }
-                    // Persist trusted gram-based results as soon as research succeeds. This
-                    // means a retry, app restart, or abandoned preview can reuse the nutrition
-                    // without another Exa/Gemini request; estimates and size-only portions are
-                    // intentionally skipped by cacheAnalyzedFood's provenance/weight checks.
-                    analysis.items.forEach { item ->
-                        runCatching { foodCatalog.cache(item) }
-                    }
-                    debug.recordRoute(
-                        route = NutritionRoute.NEW_RESEARCH,
-                        decision = NutritionRoute.Decision.DIRECT,
-                        detail = "New food entry researched before preview",
-                    )
-                    saveTextAnalysisAutomatically(
-                        analysis,
-                        current.mealCategory,
-                        text,
-                        consultedUrls = consultedResearchUrls,
-                    )
-                }
-                .onFailure { error ->
-                    if (error is CancellationException) throw error
-                    if (requestId != analysisRequestId) return@onFailure
-                    mutableLoggingState.value = FoodLoggingUiState.Error(
-                        researchFailureMessage(error, currentLanguage()),
-                        canRetry = true,
-                        originalText = text,
-                    )
-                }
-        }
-        analysisJob = job
-        job.invokeOnCompletion {
-            if (analysisJob === job) analysisJob = null
-        }
-    }
-
-    /**
-     * Typed and dictated meals become journal rows as soon as their researched nutrition is
-     * ready. Photos and manual entries still use their dedicated correction steps.
-     */
-    private fun saveTextAnalysisAutomatically(
-        analysis: FoodAnalysis,
-        category: MealCategory,
-        originalText: String,
-        consultedUrls: List<String> = emptyList(),
-    ) {
-        if (loggingSaveInProgress) return
-        loggingSaveInProgress = true
-        mutableLoggingState.value = FoodLoggingUiState.Processing(
-            AiProcessingStage.FINDING_NUTRITION,
-            originalText = originalText,
-        )
-        val revealGroupId = UUID.randomUUID().toString()
-        recentlySavedInputs.update { current -> current + (revealGroupId to originalText) }
-        viewModelScope.launch {
-            try {
-                runCatching {
-                    val grouped = analysis.items.size > 1
-                    // Keep every researched product as its own immutable log row. The Today
-                    // page groups rows with the same entryGroupId into one menu summary, so the
-                    // total stays compact without throwing away the per-product nutrition.
-                    val validated = ServingNutritionNormalizer.validateBeforeSave(analysis)
-                    val logs = validated.items.map { item ->
-                        val foodId = if (grouped) null else foodCatalog.cache(item)
-                        item.toLog(category, "ai", logDestination, consultedUrls, originalText).copy(
-                            foodId = foodId,
-                            entryGroupId = revealGroupId,
-                        )
-                    }
-                    repository.addLogs(logs)
-                }.onSuccess {
-                    // The rewritten entry exists now, so the one it replaces can go.
-                    mutableEditedEntryId.value?.let { replaced ->
-                        mutableEditedEntryId.value = null
-                        runCatching { repository.deleteLogsForUndo(replaced) }
-                    }
-                    lastLoggingText = ""
-                    dismissPortionEdit()
-                    mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
-                    mutableEvents.emit(AppEvent.FoodSaved)
-                    // The UI has enough time to finish its longer shimmer, then this transient
-                    // wording is discarded so old rows never replay the effect.
-                    viewModelScope.launch {
-                        delay(1_600L)
-                        recentlySavedInputs.update { current -> current - revealGroupId }
-                    }
-                }.onFailure { error ->
-                    recentlySavedInputs.update { current -> current - revealGroupId }
-                    mutableLoggingState.value = FoodLoggingUiState.Error(
-                        message = error.safeAiMessage(),
-                        canRetry = true,
-                        originalText = originalText,
-                    )
-                }
-            } finally {
-                loggingSaveInProgress = false
-            }
-        }
-    }
-
-    fun retryAnalysis() {
-        editLoggingText()
-        analyzeText()
-    }
-
-    /**
-     * Reads a photographed nutrition table.
-     *
-     * This is the only logging path that never researches anything: the values are printed on
-     * the package in the user's hand, so there is nothing to look up, cross-check, or estimate.
-     * That also makes it the answer for the products the web knows badly - regional, store,
-     * and foreign brands - where research is slowest and least certain.
-     *
-     * A label gives nutrition per 100 g/ml or per serving, never the amount eaten, so it ends
-     * where a scanned barcode ends: in the amount sheet, which then scales it exactly as it
-     * scales any other source serving.
-     */
-    fun analyzeNutritionLabel(bytes: ByteArray, mediaType: String) {
-        cancelAnalysis()
-        mutableEditedEntryId.value = null
-        val requestId = ++barcodeLookupRequestId
-        val category = defaultMealCategory()
-        mutableBarcodeAmountState.value = null
-        viewModelScope.launch {
-            mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.FINDING_NUTRITION)
-            runCatching {
-                val reading = providers.withProvider(ProviderPipeline.VISION) {
-                    it.readNutritionLabel(bytes, mediaType)
-                }
-                val sourceItem = reading.toAnalyzedItem(currentLanguage())
-                foodCatalog.cache(sourceItem)
-                BarcodeAmountUiState(
-                    sourceItem = sourceItem,
-                    amount = BarcodeAmountSupport.initialSuggestion(
-                        reading.servingLabel,
-                        sourceItem.unit,
-                    ).amount,
-                    unit = BarcodeAmountSupport.initialSuggestion(
-                        reading.servingLabel,
-                        sourceItem.unit,
-                    ).unit,
-                    compatibleUnits = BarcodeAmountSupport.compatibleUnits(sourceItem.unit),
-                    mealCategory = category,
-                    servingLabel = reading.servingLabel,
-                )
-            }.onSuccess { amountState ->
-                if (requestId != barcodeLookupRequestId) return@onSuccess
-                mutableLoggingState.value = FoodLoggingUiState.Input("", category)
-                updateBarcodeAmountState(amountState)
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                if (requestId != barcodeLookupRequestId) return@onFailure
-                mutableLoggingState.value = FoodLoggingUiState.Error(
-                    error.safeAiMessage(),
-                    canRetry = false,
-                )
-            }
-        }
-    }
-
-    /**
-     * Recognizes a photo and stops there, handing the description back for review.
-     *
-     * Research is the expensive half in both money and seconds, so it does not start until the
-     * user has agreed the photo was read correctly. Recognition mistakes are cheap to fix as
-     * words and expensive to fix as nutrition.
-     */
-    fun analyzePhoto(bytes: ByteArray, mediaType: String) {
-        analysisJob?.cancel()
-        mutableEditedEntryId.value = null
-        val requestId = ++analysisRequestId
-        val job = viewModelScope.launch {
-            val category = defaultMealCategory()
-            runCatching {
-                mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.UNDERSTANDING_MEAL)
-                providers.withProvider(ProviderPipeline.VISION) { it.identifyFood(bytes, mediaType) }
-            }.onSuccess { vision ->
-                if (requestId != analysisRequestId) return@onSuccess
-                val recognized = vision.items.map { it.toPhotoParsedItem() }
-                val description = recognized.toPhotoMealDescription()
-                debug.recordRoute(
-                    route = NutritionRoute.PHOTO_DESCRIPTION,
-                    decision = NutritionRoute.Decision.DIRECT,
-                    detail = "Photo described by the vision model; no nutrition looked up yet",
-                )
-                lastLoggingText = description
-                mutableLoggingState.value = FoodLoggingUiState.PhotoReview(
-                    description = description,
-                    recognizedDescription = description,
-                    recognizedItems = recognized,
-                    mealCategory = category,
-                    notes = (vision.notes + vision.items.mapNotNull { item ->
-                        item.weightEstimationBasis?.takeIf(String::isNotBlank)?.let { "${item.name}: $it" }
-                    }).distinct(),
-                )
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                if (requestId != analysisRequestId) return@onFailure
-                mutableLoggingState.value = FoodLoggingUiState.Error(error.safeAiMessage(), canRetry = false)
-            }
-        }
-        analysisJob = job
-        job.invokeOnCompletion {
-            bytes.fill(0)
-            if (analysisJob === job) analysisJob = null
-        }
-    }
-
-    fun updatePhotoDescription(description: String) {
-        val current = mutableLoggingState.value as? FoodLoggingUiState.PhotoReview ?: return
-        mutableLoggingState.value = current.copy(description = description.take(MAX_PHOTO_DESCRIPTION_CHARS))
-    }
-
-    fun updatePhotoPlace(place: String) {
-        val current = mutableLoggingState.value as? FoodLoggingUiState.PhotoReview ?: return
-        mutableLoggingState.value = current.copy(place = place.take(MAX_PHOTO_PLACE_CHARS))
-    }
-
-    /**
-     * Researches the reviewed description.
-     *
-     * An untouched description still carries the vision model's portion and weight estimates, so
-     * those are kept. An edited one no longer describes the same foods, so it re-enters through
-     * the ordinary text path and is parsed like anything the user types.
-     */
-    fun confirmPhotoDescription() {
-        val review = mutableLoggingState.value as? FoodLoggingUiState.PhotoReview ?: return
-        val description = review.description.trim()
-        if (description.isBlank()) return
-
-        analysisJob?.cancel()
-        val requestId = ++analysisRequestId
-        // A new lookup must not inherit the pages the previous one opened.
-        consultedResearchUrls = emptyList()
-        val place = review.place.trim().takeIf(String::isNotBlank)
-        lastLoggingText = description
-        mutableLoggingState.value = FoodLoggingUiState.Processing(
-            AiProcessingStage.UNDERSTANDING_MEAL,
-            originalText = description,
-        )
-        val job = viewModelScope.launch {
-            runCatching {
-                val items = if (review.isEdited || review.recognizedItems.isEmpty()) {
-                    interpret(description).items
-                } else {
-                    review.recognizedItems
-                }
-                val intent = ParsedFoodIntent(
-                    originalText = description,
-                    // A named place is the brand of everything on the plate, which is what points
-                    // research at that chain's published nutrition instead of a generic recipe.
-                    items = items.map { item ->
-                        if (place == null) item else item.copy(brand = item.brand ?: place)
-                    },
-                )
-                mutableLoggingState.value = FoodLoggingUiState.Processing(
-                    AiProcessingStage.FINDING_NUTRITION,
-                    originalText = description,
-                    sourceUrls = listOfNotNull(preferences.value.foodResearchProvider.website()),
-                )
-                providers.researchNutrition(intent).let { analysis ->
-                    // Keep the visual portion caveat even when nutrition came from an exact table.
-                    analysis.copy(items = analysis.items.mapIndexed { index, item ->
-                        item.copy(assumptions = (item.assumptions +
-                            intent.items.getOrNull(index)?.assumptions.orEmpty()).distinct())
-                    })
-                }.also {
-                    debug.recordRoute(
-                        route = NutritionRoute.NEW_RESEARCH,
-                        decision = NutritionRoute.Decision.DIRECT,
-                        detail = "Reviewed photo description researched on the web",
-                    )
-                }
-            }.onSuccess { analysis ->
-                if (requestId != analysisRequestId) return@onSuccess
-                // A photo lands on the page as the same preview a typed meal produces, so the
-                // entry reads as if it had been written and "change wording" starts from something.
-                val describedFoods = analysis.items.joinToString(", ", transform = AnalyzedFoodItem::name)
-                lastLoggingText = describedFoods
-                mutableLoggingState.value = FoodLoggingUiState.Preview(
-                    analysis,
-                    review.mealCategory,
-                    originalText = describedFoods,
-                )
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                if (requestId != analysisRequestId) return@onFailure
-                mutableLoggingState.value = FoodLoggingUiState.Error(
-                    error.safeAiMessage(),
-                    canRetry = false,
-                    originalText = description,
-                )
-            }
-        }
-        analysisJob = job
-        job.invokeOnCompletion {
-            if (analysisJob === job) analysisJob = null
-        }
-    }
-
-    fun lookupBarcode(barcode: String) {
-        cancelAnalysis()
-        mutableEditedEntryId.value = null
-        val requestId = ++barcodeLookupRequestId
-        val category = defaultMealCategory()
-        mutableBarcodeAmountState.value = null
-        viewModelScope.launch {
-            mutableLoggingState.value = FoodLoggingUiState.Processing(AiProcessingStage.FINDING_NUTRITION)
-            runCatching {
-                val cached = repository.foodByBarcode(barcode)
-                var servingLabel: String? = null
-                val analyzedItem = if (cached != null && !cached.isEstimated) {
-                    cached.toAnalyzedItem("Local barcode cache")
-                } else {
-                    val product = container.openFoodFacts.findByBarcode(barcode)
-                    servingLabel = product?.servingSize
-                    product?.toAnalyzedItemOrNull()
-                        ?: cached?.toAnalyzedItem("Local barcode estimate")
-                        ?: run {
-                            val label = product?.name?.takeIf { it.isNotBlank() }
-                                ?: "Product with barcode $barcode"
-                            val basisUnit = product?.nutritionBasisUnit ?: "g"
-                            providers.researchNutrition(
-                                ParsedFoodIntent(
-                                    originalText = "Barcode lookup",
-                                    items = listOf(
-                                        ParsedFoodItem(
-                                            name = label,
-                                            brand = product?.brand,
-                                            quantity = 100.0,
-                                            unit = basisUnit,
-                                            gramsEquivalent = 100.0.takeIf { basisUnit == "g" },
-                                        ),
-                                    ),
-                                ),
-                            ).items.single()
-                        }
-                }
-                foodCatalog.cache(analyzedItem, barcode)
-                val sourceItem = analyzedItem.asBarcodeSourceServing()
-                val suggestion = BarcodeAmountSupport.initialSuggestion(servingLabel, sourceItem.unit)
-                BarcodeAmountUiState(
-                    barcode = barcode,
-                    sourceItem = sourceItem,
-                    amount = suggestion.amount,
-                    unit = suggestion.unit,
-                    compatibleUnits = BarcodeAmountSupport.compatibleUnits(sourceItem.unit),
-                    mealCategory = category,
-                    servingLabel = servingLabel,
-                )
-            }.onSuccess { amountState ->
-                if (requestId != barcodeLookupRequestId) return@onSuccess
-                updateBarcodeAmountState(amountState)
-            }.onFailure { error ->
-                if (requestId != barcodeLookupRequestId) return@onFailure
-                mutableLoggingState.value = FoodLoggingUiState.Error(error.safeAiMessage(), canRetry = false)
-            }
-        }
-    }
-
-    fun updateBarcodeAmount(value: String) {
-        val current = mutableBarcodeAmountState.value ?: return
-        updateBarcodeAmountState(
-            current.copy(
-                amount = BarcodeAmountSupport.sanitizeAmount(value),
-                errorMessage = null,
-            ),
-        )
-    }
-
-    fun updateBarcodeUnit(unit: String) {
-        val current = mutableBarcodeAmountState.value ?: return
-        if (unit !in current.compatibleUnits) return
-        updateBarcodeAmountState(current.copy(unit = unit, errorMessage = null))
-    }
-
-    fun confirmBarcodeAmount() {
-        val current = mutableBarcodeAmountState.value ?: return
-        val quantity = current.parsedAmount ?: run {
-            mutableBarcodeAmountState.value = current.copy(
-                errorMessage = inUserLanguage("Enter an amount greater than zero"),
-            )
-            return
-        }
-        runCatching {
-            ServingNutritionNormalizer.normalizeSourceServingTo(
-                sourceServingItem = current.sourceItem,
-                loggedQuantity = quantity,
-                loggedUnit = current.unit,
-                loggedGramsEquivalent = BarcodeAmountSupport.gramsEquivalent(quantity, current.unit),
-            )
-        }.onSuccess { item ->
-            val description = BarcodeAmountSupport.description(current.amount, current.unit, item.name)
-            lastLoggingText = description
-            mutableBarcodeAmountState.value = null
-            mutableLoggingState.value = FoodLoggingUiState.Preview(
-                analysis = FoodAnalysis(listOf(item), overallConfidence = item.confidence),
-                mealCategory = current.mealCategory,
-                originalText = description,
-            )
-        }.onFailure { error ->
-            mutableBarcodeAmountState.value = current.copy(errorMessage = error.safeAiMessage())
-        }
-    }
-
-    fun cancelBarcodeAmount() {
-        mutableBarcodeAmountState.value = null
-        dismissLoggingDraft()
-    }
-
-    private fun updateBarcodeAmountState(state: BarcodeAmountUiState) {
-        mutableBarcodeAmountState.value = state
-        lastLoggingText = BarcodeAmountSupport.description(state.amount, state.unit, state.sourceItem.name)
-        mutableLoggingState.value = FoodLoggingUiState.Input(lastLoggingText, state.mealCategory)
-    }
-
-    fun confirmLogging() {
-        if (loggingSaveInProgress) return
-        val current = mutableLoggingState.value
-        if (current !is FoodLoggingUiState.Preview && current !is FoodLoggingUiState.Manual) return
-        loggingSaveInProgress = true
-        viewModelScope.launch {
-            try {
-                runCatching {
-                    when (current) {
-                        is FoodLoggingUiState.Preview -> {
-                            val validated = ServingNutritionNormalizer.validateBeforeSave(current.analysis)
-                            val logs = validated.items.map { item ->
-                                item.toLog(current.mealCategory, "ai", logDestination, consultedResearchUrls)
-                                    .copy(foodId = foodCatalog.cache(item))
-                            }
-                            repository.addLogs(logs)
-                        }
-                        is FoodLoggingUiState.Manual -> {
-                            require(current.draft.isValid)
-                            val log = current.draft.toLog(logDestination)
-                            repository.addLog(log.copy(foodId = foodCatalog.cache(log)))
-                        }
-                        else -> error("Unsupported logging state")
-                    }
-                }.onSuccess {
-                    // The rewritten entry exists now, so the one it replaces can go.
-                    mutableEditedEntryId.value?.let { replaced ->
-                        mutableEditedEntryId.value = null
-                        runCatching { repository.deleteLogsForUndo(replaced) }
-                    }
-                    lastLoggingText = ""
-                    dismissPortionEdit()
-                    mutableBarcodeAmountState.value = null
-                    mutableLoggingState.value = FoodLoggingUiState.Input("", defaultMealCategory())
-                    mutableEvents.emit(AppEvent.FoodSaved)
-                }.onFailure { error ->
-                    mutableEvents.emit(AppEvent.Message(error.safeAiMessage()))
-                }
-            } finally {
-                loggingSaveInProgress = false
-            }
-        }
-    }
     /**
      * Resolves one logged entry for the detail screen straight from the database.
      *
@@ -1802,62 +879,9 @@ class AppViewModel(
         }
     }
 
-    /** Starts the Today-row delete while retaining an exact database snapshot for inline Undo. */
-    fun deleteFoodLogForUndo(id: Long) {
-        if (id <= 0 || pendingDeletedLogs.peek(id) != null) return
-        viewModelScope.launch {
-            runCatching {
-                repository.deleteLogsForUndo(id)
-                    .takeIf(List<FoodLogEntity>::isNotEmpty)
-                    ?: error("That food is no longer available")
-            }.onSuccess { snapshots ->
-                if (earlyDiscardDeleteRequests.remove(id)) {
-                    earlyUndoDeleteRequests.remove(id)
-                    return@onSuccess
-                }
-                pendingDeletedLogs.remember(snapshots)
-                if (earlyUndoDeleteRequests.remove(id)) restoreDeletedFoodLog(id)
-            }.onFailure { error ->
-                earlyUndoDeleteRequests.remove(id)
-                earlyDiscardDeleteRequests.remove(id)
-                mutableEvents.emit(
-                    AppEvent.Message(error.message ?: inUserLanguage("Nomi couldn't delete that food.")),
-                )
-            }
-        }
-    }
+    fun deleteFoodLogForUndo(entry: TodayFoodEntry) = foodDeletions.request(entry, selectedDate.value)
+    fun undoDeletedFoodLog(id: Long) = foodDeletions.undo(id)
 
-    /** Handles both normal Undo and the tiny race where Undo is tapped before Room returns. */
-    fun undoDeletedFoodLog(id: Long) {
-        if (pendingDeletedLogs.peek(id) == null) {
-            if (id > 0 && id !in earlyDiscardDeleteRequests) earlyUndoDeleteRequests += id
-            return
-        }
-        restoreDeletedFoodLog(id)
-    }
-
-    /** Closes the short Undo window without showing a transient confirmation banner. */
-    fun discardDeletedFoodLog(id: Long) {
-        earlyUndoDeleteRequests.remove(id)
-        if (pendingDeletedLogs.peek(id) == null) earlyDiscardDeleteRequests += id
-        else pendingDeletedLogs.discard(id)
-    }
-
-    private fun restoreDeletedFoodLog(id: Long) {
-        val snapshots = pendingDeletedLogs.takeAll(id) ?: return
-        viewModelScope.launch {
-            runCatching {
-                check(repository.restoreDeletedLogs(snapshots)) {
-                    "The deleted food could not be restored"
-                }
-            }.onFailure { error ->
-                pendingDeletedLogs.remember(snapshots)
-                mutableEvents.emit(
-                    AppEvent.Message(error.message ?: inUserLanguage("Nomi couldn't restore that food.")),
-                )
-            }
-        }
-    }
     /**
      * Saves the rows a History selection picked, and nothing else.
      *
@@ -1915,7 +939,6 @@ class AppViewModel(
             }
         }
     }
-
 
     fun duplicateFoodLog(id: Long) {
         viewModelScope.launch {
@@ -2164,7 +1187,7 @@ class AppViewModel(
         viewModelScope.launch {
             repository.appPreferencesStore.setCalorieEstimateBias(bias)
             // Cached analyses were biased under the previous setting.
-            recentFoodAnalysisCache.clear()
+            logging.clearCache()
         }
     }
 
@@ -2340,7 +1363,7 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { providers.save(pipelineAt(index), state) }
                 .onSuccess {
-                    recentFoodAnalysisCache.clear()
+                    logging.clearCache()
                     refreshProviderAndHealthStatus()
                     onResult(true, "Provider saved")
                 }
@@ -2356,7 +1379,7 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { providers.removeStoredKeys(pipelineAt(index), state) }
                 .onSuccess { removed ->
-                    recentFoodAnalysisCache.clear()
+                    logging.clearCache()
                     refreshProviderAndHealthStatus()
                     onResult(
                         true,
@@ -2380,7 +1403,7 @@ class AppViewModel(
         viewModelScope.launch {
             runCatching { providers.connectKeys(key, searchKey) }
                 .onSuccess {
-                    recentFoodAnalysisCache.clear()
+                    logging.clearCache()
                     providers.refreshKeyPresence()
                     onResult(true, "Connection successful", null)
                 }
@@ -2433,39 +1456,6 @@ class AppViewModel(
 
     fun healthConnectPermissionsChanged() = healthSync.request()
 
-    private fun cancelAnalysis() {
-        analysisRequestId += 1
-        analysisJob?.cancel()
-        analysisJob = null
-        // The pages belong to the lookup that opened them. A label photo or a cached barcode has
-        // no pages of its own and used to be saved citing the previous meal's research.
-        consultedResearchUrls = emptyList()
-    }
-
-    private fun foodAnalysisCacheKey(text: String): FoodAnalysisCacheKey {
-        val prefs = preferences.value
-        return FoodAnalysisCacheKey.create(
-            input = text,
-            localeCountry = Locale.getDefault().country,
-            interpretationProviderIdentity = prefs.foodInterpretationProvider.cacheIdentity(),
-            researchProviderIdentity = prefs.foodResearchProvider.cacheIdentity() + "\u001e" +
-                prefs.smartFallbackProvider.cacheIdentity(),
-        )
-    }
-
-    private fun showResearchSources(sourceUrls: List<String>) {
-        // Kept whatever the stage is: the save needs the full list, while the spinner only wants
-        // it while it is on screen.
-        consultedResearchUrls = sourceUrls.distinct()
-        val current = mutableLoggingState.value
-        if (current !is FoodLoggingUiState.Processing ||
-            current.stage != AiProcessingStage.FINDING_NUTRITION
-        ) return
-        mutableLoggingState.value = current.copy(
-            sourceUrls = sourceUrls.distinct().take(3),
-        )
-    }
-
     /**
      * The composable [nomiString] needs a composition, but a few strings are written into saved
      * data from here. They read the same catalogue so a translated log does not sprout English
@@ -2482,8 +1472,3 @@ class AppViewModel(
             ?: NomiLanguage.matching(Locale.getDefault())
 
 }
-
-/** Room for a described plate without room for a pasted document. */
-private const val MAX_PHOTO_DESCRIPTION_CHARS = 1_000
-private const val MAX_PHOTO_PLACE_CHARS = 120
-private const val MAX_MENU_LOGGING_TEXT_CHARS = 1_500

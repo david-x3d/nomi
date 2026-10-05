@@ -2,13 +2,10 @@ package com.nomi.app.ui.today
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -39,20 +36,17 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Article
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Key
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -63,18 +57,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -85,15 +74,13 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
-import com.nomi.app.ui.capture.BarcodeCaptureScreen
-import com.nomi.app.ui.capture.PhotoCaptureScreen
 import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.capture.rememberInlineDictation
 import com.nomi.app.ui.components.NomiFox
 import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.components.hairlineOnPitchBlack
-import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.feedback.nomiPress
+import com.nomi.app.ui.feedback.rememberNomiHaptics
 import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
@@ -105,7 +92,6 @@ import com.nomi.app.ui.theme.nomiPageMotionSpec
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.launch
 
 /**
  * A notes-first Today experience. The adaptive navigation suite remains owned by the caller;
@@ -116,15 +102,15 @@ import kotlinx.coroutines.launch
 fun NomiNotesTodayScreen(
     state: TodayUiState,
     loggingState: FoodLoggingUiState,
+    pendingDeletions: Map<Long, PendingFoodDeletion> = emptyMap(),
     onPreviousDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
     onOpenHistory: () -> Unit = {},
     onFoodClick: (Long) -> Unit,
-    onDeleteFood: (Long) -> Unit = {},
+    onDeleteFood: (TodayFoodEntry) -> Unit = {},
     onDeleteFoodImmediately: (Long) -> Unit = {},
     onUndoDeleteFood: (Long) -> Unit = {},
-    onDiscardDeletedFood: (Long) -> Unit = {},
     onDuplicateFood: (Long) -> Unit = {},
     onFavoriteFood: (Long) -> Unit = {},
     onEditFoodAmount: (TodayFoodEntry) -> Unit = {},
@@ -152,50 +138,11 @@ fun NomiNotesTodayScreen(
     // Dictation stays on this page: the row at the bottom becomes the microphone rather than
     // handing the page over to a screen whose only job is to listen.
     val dictation = rememberInlineDictation(onTranscription = onVoiceTranscription)
-    var inlineCaptureSubject by rememberSaveable { mutableStateOf<PhotoCaptureSubject?>(null) }
-    var showInlineBarcode by rememberSaveable { mutableStateOf(false) }
     var showGoals by rememberSaveable { mutableStateOf(false) }
-    var composerOpen by rememberSaveable { mutableStateOf(false) }
-    // Where the line was touched, so the caret opens in that word instead of at the end.
-    var caretInEditedEntry by rememberSaveable { mutableStateOf(0) }
     val listState = rememberLazyListState()
-    val context = LocalContext.current
-    val currentOnInlinePhotoSelected by rememberUpdatedState(onInlinePhotoSelected)
-    val photoPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri ->
-        uri?.let { selected ->
-            val mimeType = context.contentResolver.getType(selected) ?: "image/*"
-            currentOnInlinePhotoSelected(selected, mimeType, PhotoCaptureSubject.MEAL)
-        }
-    }
-    val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    // The composer is the last row on the page, so focusing it scrolls the day out of sight.
-    // Where the page was standing at that moment is kept here and put back on send, because
-    // sending a meal is the end of writing it, not a reason to be left at the bottom.
-    var positionBeforeComposing by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    val composer = rememberTodayComposerState(listState)
+    val capture = rememberTodayCaptureState(onInlinePhotoSelected, composer, listState)
 
-    /** Ends writing: no caret, no keyboard, and the page back where the user left it. */
-    fun closeComposer() {
-        composerOpen = false
-        keyboard?.hide()
-        focusManager.clearFocus(force = true)
-    }
-
-    LaunchedEffect(composerOpen) {
-        if (composerOpen) {
-            if (positionBeforeComposing == null) {
-                positionBeforeComposing =
-                    listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-            }
-        } else {
-            positionBeforeComposing?.let { (index, offset) ->
-                positionBeforeComposing = null
-                runCatching { listState.scrollToItem(index, offset) }
-            }
-        }
-    }
     val loggingDescription = when (loggingState) {
         is FoodLoggingUiState.Input -> loggingState.text
         is FoodLoggingUiState.Processing -> loggingState.originalText
@@ -207,21 +154,7 @@ fun NomiNotesTodayScreen(
     val itemSpatialSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>()
     val itemFadeSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     val contentSizeSpec = MaterialTheme.motionScheme.fastSpatialSpec<IntSize>()
-    val pendingDeletedFoods = remember { mutableStateMapOf<Long, PendingDeletedFood>() }
-
-    val liveEntryIds = remember(state.entries) {
-        state.entries.mapTo(mutableSetOf(), TodayFoodEntry::id)
-    }
-    LaunchedEffect(liveEntryIds) {
-        pendingDeletedFoods.keys.toList().forEach { id ->
-            val pending = pendingDeletedFoods[id] ?: return@forEach
-            if (id !in liveEntryIds && !pending.removalObserved) {
-                pendingDeletedFoods[id] = pending.copy(removalObserved = true)
-            } else if (id in liveEntryIds && pending.undoRequested && pending.removalObserved) {
-                pendingDeletedFoods.remove(id)
-            }
-        }
-    }
+    val pendingDeletedFoods = pendingDeletions.filterValues { it.date == state.date }
     // The fox reads the app's state, never the user's day: there is no mood for eating too
     // much or too little, because a mascot with an opinion about a number is one you stop
     // opening the app to avoid.
@@ -237,23 +170,7 @@ fun NomiNotesTodayScreen(
     }
     // Back means "forget what I just said" while the bar is listening, not "leave the day".
     BackHandler(enabled = dictation.isActive) { dictation.cancel() }
-    BackHandler(enabled = inlineCaptureSubject != null || showInlineBarcode) {
-        inlineCaptureSubject = null
-        showInlineBarcode = false
-    }
-
-    LaunchedEffect(inlineCaptureSubject, showInlineBarcode) {
-        if (inlineCaptureSubject != null || showInlineBarcode) {
-            // Reaching for the camera ends writing: the caret is dropped and the page is not
-            // put back where composing found it, because the viewfinder is what should be
-            // looked at now. Whatever was typed is kept and waits below the camera.
-            composerOpen = false
-            positionBeforeComposing = null
-            listState.animateScrollToItem(1)
-        }
-    }
-
-    val pendingEntries = pendingDeletedFoods.values.map(PendingDeletedFood::entry)
+    val pendingEntries = pendingDeletedFoods.values.map(PendingFoodDeletion::entry)
     val displayedEntries = remember(state.entries, pendingEntries) {
         (state.entries + pendingEntries)
             .distinctBy(TodayFoodEntry::id)
@@ -277,7 +194,7 @@ fun NomiNotesTodayScreen(
         },
         bottomBar = {
             AnimatedVisibility(
-                visible = inlineCaptureSubject == null && !showInlineBarcode,
+                visible = capture.subject == null && !capture.showBarcode,
                 enter = fadeIn(nomiFadeMotionSpec()) + expandVertically(
                     animationSpec = nomiLayoutMotionSpec(),
                     expandFrom = Alignment.Bottom,
@@ -302,20 +219,18 @@ fun NomiNotesTodayScreen(
                         onCameraMethod = { method ->
                             haptics.selected()
                             when (method) {
-                                AddFoodMethod.PHOTO -> inlineCaptureSubject = PhotoCaptureSubject.MEAL
+                                AddFoodMethod.PHOTO -> capture.subject = PhotoCaptureSubject.MEAL
                                 AddFoodMethod.MENU -> {
                                     onQuickMethod(method)
-                                    inlineCaptureSubject = PhotoCaptureSubject.MENU
+                                    capture.subject = PhotoCaptureSubject.MENU
                                 }
-                                AddFoodMethod.BARCODE -> showInlineBarcode = true
+                                AddFoodMethod.BARCODE -> capture.showBarcode = true
                                 else -> onQuickMethod(method)
                             }
                         },
                         onChoosePhoto = {
                             haptics.selected()
-                            photoPicker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                            )
+                            capture.pickPhoto()
                         },
                         onLibraryMethod = { method ->
                             haptics.selected()
@@ -342,7 +257,7 @@ fun NomiNotesTodayScreen(
                             onDismissDraft()
                         } else {
                             haptics.selected()
-                            composerOpen = true
+                            composer.isOpen = true
                         }
                     },
                 ),
@@ -379,7 +294,7 @@ fun NomiNotesTodayScreen(
 
                 item(key = "inline-camera") {
                     AnimatedVisibility(
-                        visible = inlineCaptureSubject != null || showInlineBarcode,
+                        visible = capture.subject != null || capture.showBarcode,
                         enter = fadeIn(nomiFadeMotionSpec()) + expandVertically(
                             animationSpec = nomiLayoutMotionSpec(),
                             expandFrom = Alignment.Top,
@@ -389,65 +304,7 @@ fun NomiNotesTodayScreen(
                             shrinkTowards = Alignment.Top,
                         ),
                     ) {
-                        if (showInlineBarcode) {
-                            BarcodeCaptureScreen(
-                                inline = true,
-                                onBack = { showInlineBarcode = false },
-                                onBarcodeDetected = { barcode ->
-                                    showInlineBarcode = false
-                                    onInlineBarcodeDetected(barcode)
-                                },
-                                onManualEntry = {
-                                    showInlineBarcode = false
-                                    onQuickMethod(AddFoodMethod.TYPE)
-                                },
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            )
-                        } else inlineCaptureSubject?.let { subject ->
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                if (subject != PhotoCaptureSubject.MENU) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        FilterChip(
-                                            selected = subject == PhotoCaptureSubject.MEAL,
-                                            onClick = { inlineCaptureSubject = PhotoCaptureSubject.MEAL },
-                                            label = { Text(nomiString("Photo")) },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.CameraAlt, contentDescription = null)
-                                            },
-                                        )
-                                        FilterChip(
-                                            selected = subject == PhotoCaptureSubject.NUTRITION_LABEL,
-                                            onClick = {
-                                                inlineCaptureSubject = PhotoCaptureSubject.NUTRITION_LABEL
-                                            },
-                                            label = { Text(nomiString("Nutrition label")) },
-                                            leadingIcon = {
-                                                Icon(Icons.Default.Article, contentDescription = null)
-                                            },
-                                        )
-                                    }
-                                }
-                                PhotoCaptureScreen(
-                                    subject = subject,
-                                    inline = true,
-                                    onBack = { inlineCaptureSubject = null },
-                                    onPhotoSelected = { uri, mimeType ->
-                                        inlineCaptureSubject = null
-                                        onInlinePhotoSelected(uri, mimeType, subject)
-                                    },
-                                    onManualEntry = {
-                                        inlineCaptureSubject = null
-                                        onQuickMethod(AddFoodMethod.TYPE)
-                                    },
-                                )
-                            }
-                        }
+                        InlineTodayCapture(capture, onQuickMethod, onInlinePhotoSelected, onInlineBarcodeDetected)
                     }
                 }
 
@@ -496,61 +353,14 @@ fun NomiNotesTodayScreen(
                             fadeOutSpec = itemFadeSpec,
                         ),
                     ) {
-                        val pending = pendingDeletedFoods[entry.id]
-                        val editingThisEntry = entry.id == editedEntryId &&
-                            loggingState is FoodLoggingUiState.Input
-                        when {
-                            // The row becomes the line you write on, so a rewrite happens
-                            // where the entry already sits.
-                            editingThisEntry -> InlineComposerCanvas(
-                                text = loggingState.text,
-                                autoFocus = true,
-                                fillsPage = false,
-                                initialCaret = caretInEditedEntry,
-                                onTextChanged = onTextChanged,
-                                onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
-                                onEmptied = {
-                                    haptics.removed()
-                                    onDismissDraft()
-                                    onDeleteFoodImmediately(entry.id)
-                                },
-                            )
-                            pending == null -> SwipeToDeleteFoodRow(
-                                entry = entry,
-                                onOpenDetails = {
-                                    haptics.selected()
-                                    onFoodClick(entry.id)
-                                },
-                                onEditText = { caret ->
-                                    haptics.selected()
-                                    caretInEditedEntry = caret
-                                    onEditEntryText(entry)
-                                },
-                                onDelete = {
-                                    haptics.removed()
-                                    pendingDeletedFoods[entry.id] = PendingDeletedFood(entry)
-                                    onDeleteFood(entry.id)
-                                },
-                                onDuplicate = { onDuplicateFood(entry.id) },
-                                onFavorite = { onFavoriteFood(entry.id) },
-                                onEditAmount = { onEditFoodAmount(entry) },
-                            )
-                            pending.undoRequested -> RestoringFoodRow(entry)
-                            else -> InlineDeletedFoodRow(
-                                entry = entry,
-                                onUndo = {
-                                    haptics.confirmed()
-                                    pendingDeletedFoods[entry.id] = pending.copy(undoRequested = true)
-                                    onUndoDeleteFood(entry.id)
-                                },
-                                onTimeout = {
-                                    if (pendingDeletedFoods[entry.id]?.undoRequested == false) {
-                                        pendingDeletedFoods.remove(entry.id)
-                                        onDiscardDeletedFood(entry.id)
-                                    }
-                                },
-                            )
-                        }
+                        TodayEntryRow(
+                            entry, pendingDeletedFoods[entry.id], editedEntryId, loggingState, composer.caret,
+                            onCaretChanged = { composer.caret = it },
+                            onCloseComposer = composer::close,
+                            onTextChanged, onAnalyze, onDismissDraft, onDeleteFoodImmediately,
+                            onFoodClick, onEditEntryText, onDeleteFood, onDuplicateFood, onFavoriteFood,
+                            onEditFoodAmount, onUndoDeleteFood,
+                        )
                     }
                 }
 
@@ -568,9 +378,9 @@ fun NomiNotesTodayScreen(
                             // While a logged row is being rewritten it owns the caret, so the
                             // page must not offer a second empty line at the bottom.
                             suppressComposer = editedEntryId != null,
-                            composerFocused = composerOpen,
+                            composerFocused = composer.isOpen,
                             onTextChanged = onTextChanged,
-                            onAnalyze = { haptics.sent(); closeComposer(); onAnalyze() },
+                            onAnalyze = { haptics.sent(); composer.close(); onAnalyze() },
                             onConfirm = { haptics.confirmed(); onConfirm() },
                             onRetry = onRetry,
                             onPhotoDescriptionChanged = onPhotoDescriptionChanged,

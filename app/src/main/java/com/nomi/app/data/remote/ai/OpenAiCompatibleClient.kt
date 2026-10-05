@@ -9,14 +9,16 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.header
 import io.ktor.client.request.post
-import io.ktor.client.plugins.timeout
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import java.net.URI
+import java.util.Locale
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -28,8 +30,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.net.URI
-import java.util.Locale
 
 class OpenAiCompatibleClient(
     val json: Json = Json {
@@ -50,7 +50,15 @@ class OpenAiCompatibleClient(
         credential: AiRuntimeCredential,
         systemPrompt: String,
         userPrompt: String,
-    ): String = complete(
+    ): String = completeJson(config, credential, systemPrompt, userPrompt, openRouterLimits = null)
+
+    internal suspend fun completeJson(
+        config: AiProviderConfig,
+        credential: AiRuntimeCredential,
+        systemPrompt: String,
+        userPrompt: String,
+        openRouterLimits: OpenRouterRequestLimits?,
+    ): String = completeResponse(
         config = config,
         credential = credential,
         messages = listOf(
@@ -58,7 +66,8 @@ class OpenAiCompatibleClient(
             ChatMessage("user", JsonPrimitive(userPrompt)),
         ),
         maxTokens = 4_096,
-    )
+        openRouterLimits = openRouterLimits,
+    ).structuredContent()
 
     internal suspend fun completeStructuredJson(
         config: AiProviderConfig,

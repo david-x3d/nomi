@@ -77,21 +77,6 @@ import kotlinx.coroutines.launch
  * undo window a deleted row keeps its place for.
  */
 
-/**
- * How long a deleted row stays on the page offering to come back.
- *
- * The row still occupies its place while it waits, so the page does not settle until it goes:
- * a long window reads as the list being stuck rather than as a generous offer. Two seconds
- * still catch an accidental swipe without holding the deleted line on screen for long.
- */
-private const val UNDO_WINDOW_MILLIS = 2_000L
-
-internal data class PendingDeletedFood(
-    val entry: TodayFoodEntry,
-    val undoRequested: Boolean = false,
-    val removalObserved: Boolean = false,
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SwipeToDeleteFoodRow(
@@ -206,12 +191,7 @@ internal fun SwipeToDeleteFoodRow(
 internal fun InlineDeletedFoodRow(
     entry: TodayFoodEntry,
     onUndo: () -> Unit,
-    onTimeout: () -> Unit,
 ) {
-    LaunchedEffect(entry.id) {
-        delay(UNDO_WINDOW_MILLIS)
-        onTimeout()
-    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()

@@ -269,7 +269,6 @@ private fun NomiMain(
                     onDeleteFood = viewModel::deleteFoodLogForUndo,
                     onDeleteFoodImmediately = viewModel::deleteFoodLog,
                     onUndoDeleteFood = viewModel::undoDeletedFoodLog,
-                    onDiscardDeletedFood = viewModel::discardDeletedFoodLog,
                     onDuplicateFood = viewModel::duplicateFoodLog,
                     onFavoriteFood = viewModel::favoriteFoodLog,
                     onEditFoodAmount = viewModel::startLoggedAmountEdit,
