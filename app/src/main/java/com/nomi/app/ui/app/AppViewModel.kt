@@ -196,6 +196,9 @@ class AppViewModel(
     private val mutableLauncherShortcut = MutableStateFlow<LauncherShortcut?>(null)
     val launcherShortcut = mutableLauncherShortcut.asStateFlow()
 
+    private val mutableSharedContent = MutableStateFlow<SharedContent?>(null)
+    val sharedContent = mutableSharedContent.asStateFlow()
+
     /**
      * A newer published release, if one was found on the latest app start.
      *
@@ -240,6 +243,7 @@ class AppViewModel(
     }
 
     private var pendingLauncherShortcut: LauncherShortcut? = null
+    private var pendingSharedContent: SharedContent? = null
 
     private val mutableOnboardingSaving = MutableStateFlow(false)
     val onboardingSaving = mutableOnboardingSaving.asStateFlow()
@@ -513,10 +517,31 @@ class AppViewModel(
     }
 
     fun onMainVisible() {
-        val shortcut = pendingLauncherShortcut ?: return
         if (startState.value != AppStartState.Main) return
-        pendingLauncherShortcut = null
-        applyLauncherShortcut(shortcut)
+        pendingLauncherShortcut?.let { shortcut ->
+            pendingLauncherShortcut = null
+            applyLauncherShortcut(shortcut)
+        }
+        pendingSharedContent?.let { content ->
+            pendingSharedContent = null
+            mutableSharedContent.value = content
+        }
+    }
+
+    /**
+     * Holds a share until the main screen exists. A share can arrive during onboarding or before
+     * the profile has loaded, and handing it to a page that is not there would drop it.
+     */
+    fun openSharedContent(content: SharedContent) {
+        if (startState.value != AppStartState.Main) {
+            pendingSharedContent = content
+            return
+        }
+        mutableSharedContent.value = content
+    }
+
+    fun clearSharedContent() {
+        mutableSharedContent.value = null
     }
 
     fun openLauncherShortcut(shortcut: LauncherShortcut) {

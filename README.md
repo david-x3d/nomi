@@ -60,6 +60,8 @@
 - 🌍 Use the app in ten languages with metric and US customary quantities.
 - 🔐 Keep nutrition history local, with API keys protected by Android Keystore-backed encryption.
 - 📤 Export a JSON diary of each day's foods, calories, protein and carbs, or a restoreable backup without API keys.
+- 📤 Send text or photos to Nomi from any app with the Android share sheet.
+- ⌚ Use Nomi on a Wear OS watch: see what is left today, dictate a meal, log favorites with a tap, and add a tile or a watch-face complication.
 - 📲 Share a day with another Nomi by holding the two phones together. Long-press a food, tick the foods to send, then tap the phones back to back. No pairing, no account, no server.
 
 ## 🌍 Languages
@@ -100,6 +102,8 @@ API keys are stored on the device, excluded from app backups, and never committe
 3. Allow installation from your browser or file manager when Android asks.
 4. Install the APK, then configure your own AI provider keys.
 
+For the watch, download `Nomi-…-wear-release.apk` from the same release and install it on the watch with `adb install` over Wi-Fi debugging or a sideloading app such as Wear Installer. The watch app works only together with Nomi on the paired phone.
+
 GitHub releases are the official distribution channel for this repository. Verify the SHA-256 digest shown by GitHub when integrity matters.
 
 ## 🎨 Design
@@ -124,6 +128,7 @@ Nomi is a native Jetpack Compose app built with Material 3 Expressive. It suppor
 | Build | JDK 17 and Android SDK 37 |
 | AI features | Your own supported provider API key(s) |
 | Tap to share | NFC on both phones, and the receiving phone unlocked with Nomi open |
+| Watch app | Wear OS 3 or newer, paired with a phone that has Nomi and Google Play services |
 
 ## 🏗️ Build from source
 
@@ -139,7 +144,7 @@ macOS or Linux:
 ./gradlew :app:assembleDebug
 ```
 
-The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Build the Wear OS app with `:wear:assembleDebug`; it is written to `wear/build/outputs/apk/debug/wear-debug.apk`.
 
 Run unit tests with:
 

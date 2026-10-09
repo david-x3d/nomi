@@ -102,8 +102,12 @@ internal fun MainNavigationSuite(
     onExport: () -> Unit,
     onExportDiary: () -> Unit,
     onImport: () -> Unit,
+    showTodayRequest: Int = 0,
 ) {
     var selected by rememberSaveable { mutableStateOf(MainDestination.TODAY) }
+    LaunchedEffect(showTodayRequest) {
+        if (showTodayRequest > 0) selected = MainDestination.TODAY
+    }
     val haptics = rememberNomiHaptics()
     val destinationStateHolder = rememberSaveableStateHolder()
     val destinationSpatialSpec = nomiPageMotionSpec<IntOffset>()

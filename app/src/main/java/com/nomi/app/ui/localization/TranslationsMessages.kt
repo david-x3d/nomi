@@ -117,6 +117,12 @@ internal val messageTranslations: Map<String, NomiTranslation> = mapOf(
     "Enter a valid weight." to NomiTranslation(
         de = "Gib ein gültiges Gewicht ein.", es = "Introduce un peso válido.", fr = "Saisis un poids valide.", it = "Inserisci un peso valido.", nl = "Voer een geldig gewicht in.", pt = "Introduz um peso válido.", sq = "Vendos një peshë të vlefshme.", sv = "Ange en giltig vikt.", tr = "Geçerli bir kilo gir.",
     ),
+    "Finish setting up Nomi on your phone first." to NomiTranslation(
+        de = "Richte Nomi zuerst auf deinem Handy ein.", es = "Primero termina de configurar Nomi en tu móvil.", fr = "Termine d’abord de configurer Nomi sur ton téléphone.", it = "Prima completa la configurazione di Nomi sul telefono.", nl = "Stel Nomi eerst in op je telefoon.", pt = "Termina primeiro de configurar a Nomi no telemóvel.", sq = "Përfundo fillimisht konfigurimin e Nomi në telefon.", sv = "Gör klart inställningen av Nomi i telefonen först.", tr = "Önce telefonunda Nomi kurulumunu tamamla.",
+    ),
+    "Nomi took too long to log that. Try again on your phone." to NomiTranslation(
+        de = "Nomi hat zu lange gebraucht, um das zu erfassen. Versuch es auf deinem Handy erneut.", es = "Nomi tardó demasiado en registrarlo. Inténtalo de nuevo en tu móvil.", fr = "Nomi a mis trop de temps à l’enregistrer. Réessaie sur ton téléphone.", it = "Nomi ha impiegato troppo a registrarlo. Riprova sul telefono.", nl = "Nomi deed er te lang over om dat vast te leggen. Probeer het opnieuw op je telefoon.", pt = "A Nomi demorou demasiado a registar isso. Tenta novamente no telemóvel.", sq = "Nomi zgjati shumë për ta regjistruar. Provo sërish në telefon.", sv = "Nomi tog för lång tid på sig att logga det. Försök igen i telefonen.", tr = "Nomi bunu kaydetmekte çok uzun sürdü. Telefonunda tekrar dene.",
+    ),
     "Nomi couldn't add that item." to NomiTranslation(
         de = "Nomi konnte diesen Eintrag nicht hinzufügen.", es = "Nomi no pudo añadir ese elemento.", fr = "Nomi n’a pas pu ajouter cet élément.", it = "Nomi non è riuscito ad aggiungere l’elemento.", nl = "Nomi kon dat item niet toevoegen.", pt = "A Nomi não conseguiu adicionar esse item.", sq = "Nomi nuk mundi ta shtonte atë artikull.", sv = "Nomi kunde inte lägga till posten.", tr = "Nomi bu öğeyi ekleyemedi.",
     ),

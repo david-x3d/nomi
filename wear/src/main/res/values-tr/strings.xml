@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Bugün</string>
+    <string name="kcal_left">kcal kaldı</string>
+    <string name="kcal_over">kcal fazla</string>
+    <string name="kcal_eaten">kcal yenildi</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Protein</string>
+    <string name="macro_carbs">Karbonhidrat</string>
+    <string name="macro_fat">Yağ</string>
+    <string name="log_meal">Öğün kaydet</string>
+    <string name="log_short">Kaydet</string>
+    <string name="open">Aç</string>
+    <string name="quick_add">Favoriler</string>
+    <string name="quick_add_empty">Buraya eklemek için telefonundaki Nomi’de bir besini favorilere ekle ya da bir öğünü kaydet.</string>
+    <string name="voice_prompt">Ne yedin?</string>
+    <string name="not_connected">Saatini bağlamak için telefonunda Nomi’yi aç.</string>
+    <string name="not_set_up">Telefonunda Nomi kurulumunu tamamla.</string>
+    <string name="try_again">Tekrar dene</string>
+    <string name="waiting">Telefonunda kaydediliyor…</string>
+    <string name="phone_unreachable">Telefona ulaşılamıyor</string>
+    <string name="logged">Kaydedildi</string>
+    <string name="logged_kcal">+%1$s kcal kaydedildi</string>
+    <string name="log_failed">Kaydedilmedi</string>
+    <string name="complication_label">Kalan kalori</string>
+    <string name="tile_label">Bugünkü kaloriler</string>
+</resources>

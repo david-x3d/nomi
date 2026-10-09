@@ -14,6 +14,7 @@ import com.nomi.app.ui.NomiApp
 import com.nomi.app.ui.app.AppStartState
 import com.nomi.app.ui.app.AppViewModel
 import com.nomi.app.ui.app.LauncherShortcut
+import com.nomi.app.ui.app.sharedContentFrom
 import com.nomi.app.ui.display.DisplayModeSpec
 import com.nomi.app.ui.display.fastestModeIdForCurrentResolution
 
@@ -31,7 +32,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             NomiApp(container = container, viewModel = viewModel)
         }
-        consumeLaunchIntent(intent)
+        // A recreated activity is handed its original intent again. Consuming it a second time
+        // would put a shared meal back into the composer, or send a shared photo to the provider
+        // again, after every rotation.
+        if (savedInstanceState == null) consumeLaunchIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -48,7 +52,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun consumeLaunchIntent(intent: Intent?) {
-        val shortcut = when (intent?.action) {
+        // Reopening Nomi from Recents replays the intent the task started with.
+        if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        sharedContentFrom(intent)?.let {
+            viewModel.openSharedContent(it)
+            return
+        }
+        val shortcut = when (intent.action) {
             ACTION_CAPTURE_PHOTO -> LauncherShortcut.PHOTO
             ACTION_SCAN_MENU -> LauncherShortcut.MENU
             else -> null

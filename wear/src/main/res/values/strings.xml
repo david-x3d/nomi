@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Nomi</string>
+    <string name="today">Today</string>
+    <string name="kcal_left">kcal left</string>
+    <string name="kcal_over">kcal over</string>
+    <string name="kcal_eaten">kcal eaten</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Protein</string>
+    <string name="macro_carbs">Carbs</string>
+    <string name="macro_fat">Fat</string>
+    <string name="log_meal">Log a meal</string>
+    <string name="log_short">Log</string>
+    <string name="open">Open</string>
+    <string name="quick_add">Favorites</string>
+    <string name="quick_add_empty">Star a food or save a meal in Nomi on your phone to add it here.</string>
+    <string name="voice_prompt">What did you eat?</string>
+    <string name="not_connected">Open Nomi on your phone to connect your watch.</string>
+    <string name="not_set_up">Finish setting up Nomi on your phone.</string>
+    <string name="try_again">Try again</string>
+    <string name="waiting">Logging on your phone…</string>
+    <string name="phone_unreachable">Phone not reachable</string>
+    <string name="logged">Logged</string>
+    <string name="logged_kcal">+%1$s kcal logged</string>
+    <string name="log_failed">Not logged</string>
+    <string name="complication_label">Calories left</string>
+    <string name="tile_label">Calories today</string>
+    <string name="grams_of_target" translatable="false">%1$s / %2$s g</string>
+    <string name="grams" translatable="false">%1$s g</string>
+    <string name="kcal_value" translatable="false">%1$s kcal</string>
+</resources>

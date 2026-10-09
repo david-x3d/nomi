@@ -112,7 +112,7 @@ object NomiWidgetUpdater {
         for (id in ids) block(id)
     }
 
-    private suspend fun loadSnapshot(appContext: Context): NomiWidgetSnapshot {
+    internal suspend fun loadSnapshot(appContext: Context): NomiWidgetSnapshot {
         val repository = (appContext as NomiApplication).container.repository
         val profile = runCatching { repository.profile.first() }.getOrNull()
         if (profile?.onboardingCompleted != true) return NomiWidgetSnapshot.EMPTY

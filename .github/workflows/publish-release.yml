@@ -1,12 +1,12 @@
-# Publishes a release from an APK that was already built and signed elsewhere.
+# Publishes a release from APKs that were already built and signed elsewhere.
 #
-# The signing key never comes to GitHub. Whoever builds the release pushes the signed APK to a
-# branch named release-assets-<tag> (holding only Nomi-<tag>-release.apk, or that file split
-# into Nomi-<tag>-release.apk.part-NN plus Nomi-<tag>-release.apk.sha256) and then pushes the
-# tag - or, where tags cannot be pushed, starts this workflow by hand with the tag name, and the
-# release creates the tag on the commit the workflow ran on. This job attaches that APK to a
-# release titled from release-notes-<tag>.md and removes the asset branch again, so the APK does
-# not stay in the repository.
+# The signing key never comes to GitHub. Whoever builds the release pushes the signed APKs to a
+# branch named release-assets-<tag> - Nomi-<tag>-release.apk and, from v2.11.0 on, the Wear OS app
+# as Nomi-<tag>-wear-release.apk, either of which may instead be split into <name>.part-NN plus
+# <name>.sha256 - and then pushes the tag. Where tags cannot be pushed, they start this workflow
+# by hand with the tag name instead, and the release creates the tag on the commit the workflow
+# ran on. This job attaches the APKs to a release titled from release-notes-<tag>.md and removes
+# the asset branch again, so the APKs do not stay in the repository.
 name: Publish release
 
 on:
@@ -29,23 +29,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch the signed APK
+      - name: Fetch the signed APKs
         run: |
           git fetch --depth=1 origin "release-assets-${TAG}"
-          APK="Nomi-${TAG}-release.apk"
-          if git cat-file -e "FETCH_HEAD:${APK}" 2>/dev/null; then
-            git show "FETCH_HEAD:${APK}" > "$APK"
-          else
-            # A slow or lossy uplink cannot push the whole APK in one piece, so the branch may
-            # hold it as numbered parts instead, pushed one small commit at a time, next to
-            # the checksum the joined file has to match.
-            : > "$APK"
-            for part in $(git ls-tree --name-only FETCH_HEAD | grep -F "${APK}.part-" | sort); do
-              git show "FETCH_HEAD:${part}" >> "$APK"
-            done
-            git show "FETCH_HEAD:${APK}.sha256" | sha256sum --check --strict -
+          # Each APK is either one file or, when a slow or lossy uplink cannot push it in one
+          # piece, numbered parts pushed one small commit at a time next to the checksum the
+          # joined file has to match.
+          fetch_apk() {
+            APK="$1"
+            if git cat-file -e "FETCH_HEAD:${APK}" 2>/dev/null; then
+              git show "FETCH_HEAD:${APK}" > "$APK"
+            else
+              : > "$APK"
+              for part in $(git ls-tree --name-only FETCH_HEAD | grep -F "${APK}.part-" | sort); do
+                git show "FETCH_HEAD:${part}" >> "$APK"
+              done
+              git show "FETCH_HEAD:${APK}.sha256" | sha256sum --check --strict -
+            fi
+            ls -l "$APK"
+          }
+          fetch_apk "Nomi-${TAG}-release.apk"
+          # The Wear OS app ships next to the phone app from v2.11.0 on; older tags have none.
+          WEAR="Nomi-${TAG}-wear-release.apk"
+          if git ls-tree --name-only FETCH_HEAD | grep -qF "$WEAR"; then
+            fetch_apk "$WEAR"
           fi
-          ls -l "$APK"
 
       - name: Create the release
         env:
@@ -56,7 +64,9 @@ jobs:
           HEADING="$(grep -m1 '^### ' "$NOTES" | sed 's/^### //')"
           TITLE="Nomi ${TAG}${HEADING:+ — $HEADING}"
           # A pushed tag already exists; a manual run creates it on the commit this run checked out.
-          gh release create "$TAG" "Nomi-${TAG}-release.apk" \
+          ASSETS=("Nomi-${TAG}-release.apk")
+          if [ -f "Nomi-${TAG}-wear-release.apk" ]; then ASSETS+=("Nomi-${TAG}-wear-release.apk"); fi
+          gh release create "$TAG" "${ASSETS[@]}" \
             --title "$TITLE" \
             --notes-file "$NOTES" \
             --target "$GITHUB_SHA"

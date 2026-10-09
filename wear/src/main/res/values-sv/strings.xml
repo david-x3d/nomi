@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Idag</string>
+    <string name="kcal_left">kcal kvar</string>
+    <string name="kcal_over">kcal över</string>
+    <string name="kcal_eaten">kcal ätna</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Protein</string>
+    <string name="macro_carbs">Kolhydrater</string>
+    <string name="macro_fat">Fett</string>
+    <string name="log_meal">Logga en måltid</string>
+    <string name="log_short">Logga</string>
+    <string name="open">Öppna</string>
+    <string name="quick_add">Favoriter</string>
+    <string name="quick_add_empty">Stjärnmärk ett livsmedel eller spara en måltid i Nomi i telefonen för att lägga till den här.</string>
+    <string name="voice_prompt">Vad åt du?</string>
+    <string name="not_connected">Öppna Nomi i telefonen för att ansluta klockan.</string>
+    <string name="not_set_up">Gör klart inställningen av Nomi i telefonen.</string>
+    <string name="try_again">Försök igen</string>
+    <string name="waiting">Loggar i telefonen…</string>
+    <string name="phone_unreachable">Telefonen kan inte nås</string>
+    <string name="logged">Loggat</string>
+    <string name="logged_kcal">+%1$s kcal loggat</string>
+    <string name="log_failed">Inte loggat</string>
+    <string name="complication_label">Kalorier kvar</string>
+    <string name="tile_label">Kalorier idag</string>
+</resources>

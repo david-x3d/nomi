@@ -13,8 +13,8 @@ android {
         applicationId = "com.nomi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 141
-        versionName = "2.10.6"
+        versionCode = providers.gradleProperty("nomi.versionCode").get().toInt()
+        versionName = providers.gradleProperty("nomi.versionName").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -152,6 +152,8 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode)
     implementation(libs.androidx.health.connect)
+    implementation(libs.play.services.wearable)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.ktor3)

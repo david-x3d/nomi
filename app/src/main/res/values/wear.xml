@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- Lets Nomi on a watch find the phone that logs its meals. -->
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>nomi_phone</item>
+    </string-array>
+</resources>

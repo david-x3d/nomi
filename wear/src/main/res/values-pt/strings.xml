@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Hoje</string>
+    <string name="kcal_left">kcal restantes</string>
+    <string name="kcal_over">kcal a mais</string>
+    <string name="kcal_eaten">kcal ingeridas</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Proteínas</string>
+    <string name="macro_carbs">Hidratos</string>
+    <string name="macro_fat">Gorduras</string>
+    <string name="log_meal">Registar refeição</string>
+    <string name="log_short">Registar</string>
+    <string name="open">Abrir</string>
+    <string name="quick_add">Favoritos</string>
+    <string name="quick_add_empty">Marca um alimento como favorito ou guarda uma refeição na Nomi no telemóvel para o adicionares aqui.</string>
+    <string name="voice_prompt">O que comeste?</string>
+    <string name="not_connected">Abre a Nomi no telemóvel para ligar o relógio.</string>
+    <string name="not_set_up">Termina de configurar a Nomi no telemóvel.</string>
+    <string name="try_again">Tentar novamente</string>
+    <string name="waiting">A registar no telemóvel…</string>
+    <string name="phone_unreachable">Telemóvel inacessível</string>
+    <string name="logged">Registado</string>
+    <string name="logged_kcal">+%1$s kcal registadas</string>
+    <string name="log_failed">Não registado</string>
+    <string name="complication_label">Calorias restantes</string>
+    <string name="tile_label">Calorias de hoje</string>
+</resources>

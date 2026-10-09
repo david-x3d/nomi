@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Oggi</string>
+    <string name="kcal_left">kcal rimaste</string>
+    <string name="kcal_over">kcal in eccesso</string>
+    <string name="kcal_eaten">kcal mangiate</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Proteine</string>
+    <string name="macro_carbs">Carboidrati</string>
+    <string name="macro_fat">Grassi</string>
+    <string name="log_meal">Registra un pasto</string>
+    <string name="log_short">Registra</string>
+    <string name="open">Apri</string>
+    <string name="quick_add">Preferiti</string>
+    <string name="quick_add_empty">Aggiungi un alimento ai preferiti o salva un pasto in Nomi sul telefono per trovarlo qui.</string>
+    <string name="voice_prompt">Cosa hai mangiato?</string>
+    <string name="not_connected">Apri Nomi sul telefono per collegare l’orologio.</string>
+    <string name="not_set_up">Completa la configurazione di Nomi sul telefono.</string>
+    <string name="try_again">Riprova</string>
+    <string name="waiting">Registrazione sul telefono…</string>
+    <string name="phone_unreachable">Telefono non raggiungibile</string>
+    <string name="logged">Registrato</string>
+    <string name="logged_kcal">+%1$s kcal registrate</string>
+    <string name="log_failed">Non registrato</string>
+    <string name="complication_label">Calorie rimaste</string>
+    <string name="tile_label">Calorie di oggi</string>
+</resources>

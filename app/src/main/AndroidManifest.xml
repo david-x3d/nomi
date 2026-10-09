@@ -59,6 +59,16 @@
                 <action android:name="com.nomi.app.action.SCAN_MENU" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!--
+                Send to Nomi: shared text waits in the Today composer until the user sends it, and a
+                shared image goes into the photo flow, which stops at its review step before saving.
+            -->
+            <intent-filter android:label="@string/share_target_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -116,6 +126,23 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!--
+            Nomi on a Wear OS watch logs through the phone. The watch sends a meal in words or a
+            quick-add entry, and this service logs it with the phone's providers and database.
+            Play services binds it only for messages from the same app id and signature.
+        -->
+        <service
+            android:name=".integration.wear.WearMessageService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/nomi/"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
 
         <!-- Home-screen widgets. -->
         <receiver

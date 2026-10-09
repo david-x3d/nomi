@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -239,6 +240,24 @@ private fun NomiMain(
         }
     }
 
+    // Bumped for each share so the navigation suite brings the Today page forward, where the
+    // composer and the photo review live, whichever tab was open.
+    var showTodayRequest by remember { mutableIntStateOf(0) }
+    val sharedContent by viewModel.sharedContent.collectAsStateWithLifecycle()
+    LaunchedEffect(sharedContent) {
+        val content = sharedContent ?: return@LaunchedEffect
+        viewModel.clearSharedContent()
+        navController.popBackStack(Routes.HOME, inclusive = false)
+        viewModel.selectToday()
+        showTodayRequest++
+        when (content) {
+            is SharedContent.Text -> viewModel.beginLogging(AddFoodMethod.TYPE, content.text)
+            is SharedContent.Image -> images.load(content.uri) { prepared ->
+                viewModel.analyzePhoto(prepared.bytes, prepared.mediaType)
+            }
+        }
+    }
+
     Box(modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -261,6 +280,7 @@ private fun NomiMain(
             composable(Routes.HOME) {
                 MainNavigationSuite(
                     viewModel = viewModel,
+                    showTodayRequest = showTodayRequest,
                     onPreviousDay = viewModel::previousDay,
                     onNextDay = viewModel::nextDay,
                     onToday = viewModel::selectToday,

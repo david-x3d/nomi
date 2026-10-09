@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Sot</string>
+    <string name="kcal_left">kcal të mbetura</string>
+    <string name="kcal_over">kcal më shumë</string>
+    <string name="kcal_eaten">kcal të ngrëna</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Proteina</string>
+    <string name="macro_carbs">Karbohidrate</string>
+    <string name="macro_fat">Yndyrna</string>
+    <string name="log_meal">Regjistro vakt</string>
+    <string name="log_short">Regjistro</string>
+    <string name="open">Hap</string>
+    <string name="quick_add">Të preferuarat</string>
+    <string name="quick_add_empty">Shëno një ushqim si të preferuar ose ruaj një vakt në Nomi në telefon për ta shtuar këtu.</string>
+    <string name="voice_prompt">Çfarë hëngre?</string>
+    <string name="not_connected">Hap Nomi në telefon për të lidhur orën.</string>
+    <string name="not_set_up">Përfundo konfigurimin e Nomi në telefon.</string>
+    <string name="try_again">Provo sërish</string>
+    <string name="waiting">Po regjistrohet në telefon…</string>
+    <string name="phone_unreachable">Telefoni nuk arrihet</string>
+    <string name="logged">U regjistrua</string>
+    <string name="logged_kcal">+%1$s kcal u regjistruan</string>
+    <string name="log_failed">Nuk u regjistrua</string>
+    <string name="complication_label">Kalori të mbetura</string>
+    <string name="tile_label">Kaloritë e sotme</string>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today">Vandaag</string>
+    <string name="kcal_left">kcal over</string>
+    <string name="kcal_over">kcal te veel</string>
+    <string name="kcal_eaten">kcal gegeten</string>
+    <string name="kcal_short">kcal</string>
+    <string name="macro_protein">Eiwitten</string>
+    <string name="macro_carbs">Koolhydraten</string>
+    <string name="macro_fat">Vetten</string>
+    <string name="log_meal">Maaltijd vastleggen</string>
+    <string name="log_short">Vastleggen</string>
+    <string name="open">Openen</string>
+    <string name="quick_add">Favorieten</string>
+    <string name="quick_add_empty">Markeer een product of bewaar een maaltijd in Nomi op je telefoon om die hier toe te voegen.</string>
+    <string name="voice_prompt">Wat heb je gegeten?</string>
+    <string name="not_connected">Open Nomi op je telefoon om je horloge te koppelen.</string>
+    <string name="not_set_up">Stel Nomi op je telefoon verder in.</string>
+    <string name="try_again">Opnieuw proberen</string>
+    <string name="waiting">Wordt vastgelegd op je telefoon…</string>
+    <string name="phone_unreachable">Telefoon niet bereikbaar</string>
+    <string name="logged">Vastgelegd</string>
+    <string name="logged_kcal">+%1$s kcal vastgelegd</string>
+    <string name="log_failed">Niet vastgelegd</string>
+    <string name="complication_label">Calorieën over</string>
+    <string name="tile_label">Calorieën vandaag</string>
+</resources>

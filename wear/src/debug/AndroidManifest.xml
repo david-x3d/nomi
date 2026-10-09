@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!--
+            Debug builds only: lets an emulator without a paired phone show a logged day.
+            adb shell am broadcast -n com.nomi.app/com.nomi.wear.DebugSeedReceiver
+        -->
+        <receiver
+            android:name=".DebugSeedReceiver"
+            android:exported="true" />
+    </application>
+</manifest>
