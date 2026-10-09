@@ -289,7 +289,6 @@ private fun MacroRow(label: String, grams: Double, target: Double?, color: Color
                 progress = { WatchToday.progress(grams, target) },
                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                 colors = ProgressIndicatorDefaults.colors(indicatorColor = color),
-                strokeWidth = 4.dp,
             )
         }
     }

@@ -1,5 +1,12 @@
 # Changelog
 
+## Nomi v2.11.1 — 2026-10-09
+
+### Wear OS stability and sharper launcher icon
+
+- Fixed a crash when the watch displays synced nutrition targets, including while the phone app is closed. Macro progress bars now use the supported Wear OS stroke width.
+- Added density-specific, filtered launcher artwork for a sharper fox icon on the watch.
+
 ## Nomi v2.11.0 — 2026-10-09
 
 ### Send to Nomi and Nomi on Wear OS

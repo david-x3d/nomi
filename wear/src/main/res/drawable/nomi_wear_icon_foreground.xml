@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Density-specific, prefiltered launcher artwork keeps the fox sharp at watch icon sizes. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/nomi_wear_icon_foreground"
+    android:gravity="fill"
+    android:filter="true"
+    android:antialias="true" />
