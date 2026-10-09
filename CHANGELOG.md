@@ -6,6 +6,7 @@
 
 - Fixed a crash when the watch displays synced nutrition targets, including while the phone app is closed. Macro progress bars now use the supported Wear OS stroke width.
 - Added density-specific, filtered launcher artwork for a sharper fox icon on the watch.
+- Refreshed the v2.11.1 APKs as build 144: enabled R8 optimization for the watch, removed per-frame card morphing, reused number formatters and added stable favorite row keys to reduce scrolling and touch overhead.
 
 ## Nomi v2.11.0 — 2026-10-09
 

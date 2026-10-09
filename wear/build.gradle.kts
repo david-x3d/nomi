@@ -29,8 +29,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Compose's scrolling and touch paths need R8 optimization on watch CPUs.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
             signingConfig = signingConfigs.getByName("localRelease").also {
                 require(it.storeFile?.exists() == true) {
                     "Release signing key is missing: ${it.storeFile?.absolutePath}. " +

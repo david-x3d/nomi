@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,11 +47,8 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.SuccessConfirmationDialog
-import androidx.wear.compose.material3.SurfaceTransformation
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.confirmationDialogCurvedText
-import androidx.wear.compose.material3.lazy.rememberTransformationSpec
-import androidx.wear.compose.material3.lazy.transformedHeight
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
@@ -118,7 +116,6 @@ private fun TodayScreen(
     onRefresh: () -> Unit,
 ) {
     val listState = rememberTransformingLazyColumnState()
-    val transformationSpec = rememberTransformationSpec()
     val prompt = stringResource(R.string.voice_prompt)
     val voiceInput = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val data = result.data ?: return@rememberLauncherForActivityResult
@@ -164,8 +161,7 @@ private fun TodayScreen(
         TransformingLazyColumn(state = listState, contentPadding = contentPadding) {
             item {
                 ListHeader(
-                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                    transformation = SurfaceTransformation(transformationSpec),
+                    modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.today)) }
             }
             when {
@@ -184,8 +180,7 @@ private fun TodayScreen(
                     item {
                         FilledTonalButton(
                             onClick = onRefresh,
-                            modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                            transformation = SurfaceTransformation(transformationSpec),
+                            modifier = Modifier.fillMaxWidth(),
                             icon = { Icon(painterResource(R.drawable.ic_refresh), contentDescription = null) },
                             label = { Text(stringResource(R.string.try_again)) },
                         )
@@ -208,15 +203,13 @@ private fun TodayScreen(
                     item { CalorieSummary(ready) }
                     item {
                         Card(
-                            modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                            transformation = SurfaceTransformation(transformationSpec),
+                            modifier = Modifier.fillMaxWidth(),
                         ) { Macros(ready) }
                     }
                     item {
                         FilledTonalButton(
                             onClick = onOpenQuickAdd,
-                            modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                            transformation = SurfaceTransformation(transformationSpec),
+                            modifier = Modifier.fillMaxWidth(),
                             icon = { Icon(painterResource(R.drawable.ic_star), contentDescription = null) },
                             label = { Text(stringResource(R.string.quick_add)) },
                         )
@@ -297,14 +290,12 @@ private fun MacroRow(label: String, grams: Double, target: Double?, color: Color
 @Composable
 private fun QuickAddScreen(items: List<QuickItem>, onSelect: (QuickItem) -> Unit) {
     val listState = rememberTransformingLazyColumnState()
-    val transformationSpec = rememberTransformationSpec()
     val number = integerFormat()
     ScreenScaffold(scrollState = listState) { contentPadding ->
         TransformingLazyColumn(state = listState, contentPadding = contentPadding) {
             item {
                 ListHeader(
-                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                    transformation = SurfaceTransformation(transformationSpec),
+                    modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.quick_add)) }
             }
             if (items.isEmpty()) {
@@ -317,13 +308,12 @@ private fun QuickAddScreen(items: List<QuickItem>, onSelect: (QuickItem) -> Unit
                     )
                 }
             }
-            items(items.size) { index ->
+            items(items.size, key = { index -> "${items[index].kind}:${items[index].id}" }) { index ->
                 val item = items[index]
                 val kcal = stringResource(R.string.kcal_value, number.format(item.caloriesKcal.roundToInt()))
                 Button(
                     onClick = { onSelect(item) },
-                    modifier = Modifier.fillMaxWidth().transformedHeight(this, transformationSpec),
-                    transformation = SurfaceTransformation(transformationSpec),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.filledTonalButtonColors(),
                     icon = {
                         Icon(
@@ -386,4 +376,7 @@ private fun StatusDialogs(status: LogStatus, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun integerFormat(): NumberFormat = NumberFormat.getIntegerInstance(LocalConfiguration.current.locales[0])
+private fun integerFormat(): NumberFormat {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(locale) { NumberFormat.getIntegerInstance(locale) }
+}
