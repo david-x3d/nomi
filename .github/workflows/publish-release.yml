@@ -27,9 +27,24 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      # Creating the release by hand (workflow_dispatch) also creates the tag, which starts this
+      # workflow a second time through the tag push - after the asset branch is already gone. That
+      # second run has nothing left to publish, so it stops here instead of failing.
+      - name: Skip if the release already exists
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.existing.outputs.skip != 'true'
 
       - name: Fetch the signed APKs
+        if: steps.existing.outputs.skip != 'true'
         run: |
           git fetch --depth=1 origin "release-assets-${TAG}"
           # Each APK is either one file or, when a slow or lossy uplink cannot push it in one
@@ -56,6 +71,7 @@ jobs:
           fi
 
       - name: Create the release
+        if: steps.existing.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -72,4 +88,5 @@ jobs:
             --target "$GITHUB_SHA"
 
       - name: Remove the asset branch
+        if: steps.existing.outputs.skip != 'true'
         run: git push origin --delete "release-assets-${TAG}"
