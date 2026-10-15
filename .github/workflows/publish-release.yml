@@ -5,7 +5,7 @@
 # as Nomi-<tag>-wear-release.apk, either of which may instead be split into <name>.part-NN plus
 # <name>.sha256 - and then pushes the tag. Where tags cannot be pushed, they start this workflow
 # by hand with the tag name instead, and the release creates the tag on the commit the workflow
-# ran on. This job attaches the APKs to a release titled from release-notes-<tag>.md and removes
+# ran on. This job attaches the APKs to a release titled from docs/release-notes/release-notes-<tag>.md and removes
 # the asset branch again, so the APKs do not stay in the repository.
 name: Publish release
 
@@ -75,7 +75,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="release-notes-${TAG}.md"
+          NOTES="docs/release-notes/release-notes-${TAG}.md"
           # "Nomi v2.9.0 — <first section heading>", the way earlier releases were titled.
           HEADING="$(grep -m1 '^### ' "$NOTES" | sed 's/^### //')"
           TITLE="Nomi ${TAG}${HEADING:+ — $HEADING}"
