@@ -20,7 +20,9 @@ import kotlinx.serialization.json.Json
 class OpenFoodFactsClient(
     private val httpClient: HttpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true; explicitNulls = false })
+            // Open Food Facts sometimes sends a number as a quoted string; a strict parser failed
+            // the whole product over one such field and the barcode then looked unknown.
+            json(Json { ignoreUnknownKeys = true; explicitNulls = false; isLenient = true })
         }
         // Open Food Facts asks every client to identify itself, and throttles or refuses the
         // generic default agent. Not doing so showed up as products quietly "not found".
@@ -38,9 +40,12 @@ class OpenFoodFactsClient(
             connectTimeoutMillis = 8_000
         }
         // 5xx and 429 are worth one more go; a 404 is a legitimate "no such product" and retrying
-        // it only makes the user wait longer for the same answer.
+        // it only makes the user wait longer for the same answer. retryOnServerErrors covers
+        // only 5xx, so a throttled request has to be named explicitly.
         install(HttpRequestRetry) {
-            retryOnServerErrors(maxRetries = 2)
+            retryIf(maxRetries = 2) { _, response ->
+                response.status.value in 500..599 || response.status == HttpStatusCode.TooManyRequests
+            }
             exponentialDelay()
         }
         expectSuccess = true
@@ -119,14 +124,18 @@ private data class OpenFoodFactsProduct(
             imageUrl = imageUrl,
             servingSize = servingSize,
             nutritionBasisUnit = if (productQuantityUnit.equals("ml", ignoreCase = true)) "ml" else "g",
-            caloriesPer100g = nutriments.caloriesPer100g,
+            caloriesPer100g = nutriments.caloriesPer100g
+                ?: nutriments.energyKjPer100g?.div(KJ_PER_KCAL),
             proteinPer100g = nutriments.proteinPer100g,
             carbohydratesPer100g = nutriments.carbohydratesPer100g,
             fatPer100g = nutriments.fatPer100g,
             fiberPer100g = nutriments.fiberPer100g,
             sugarPer100g = nutriments.sugarPer100g,
             saturatedFatPer100g = nutriments.saturatedFatPer100g,
-            sodiumMilligramsPer100g = nutriments.sodiumGramsPer100g?.times(1_000.0),
+            sodiumMilligramsPer100g = (
+                nutriments.sodiumGramsPer100g
+                    ?: nutriments.saltGramsPer100g?.div(SALT_PER_SODIUM)
+                )?.times(1_000.0),
             sourceUrl = "https://world.openfoodfacts.org/product/$barcode",
         )
     }
@@ -135,6 +144,8 @@ private data class OpenFoodFactsProduct(
 @Serializable
 private data class Nutriments(
     @SerialName("energy-kcal_100g") val caloriesPer100g: Double? = null,
+    // Some products carry only the kJ figure; `energy_100g` is always kJ on Open Food Facts.
+    @SerialName("energy_100g") val energyKjPer100g: Double? = null,
     @SerialName("proteins_100g") val proteinPer100g: Double? = null,
     @SerialName("carbohydrates_100g") val carbohydratesPer100g: Double? = null,
     @SerialName("fat_100g") val fatPer100g: Double? = null,
@@ -142,4 +153,9 @@ private data class Nutriments(
     @SerialName("sugars_100g") val sugarPer100g: Double? = null,
     @SerialName("saturated-fat_100g") val saturatedFatPer100g: Double? = null,
     @SerialName("sodium_100g") val sodiumGramsPer100g: Double? = null,
+    // Label salt is sodium * 2.5, so a product listing only salt still yields sodium.
+    @SerialName("salt_100g") val saltGramsPer100g: Double? = null,
 )
+
+private const val KJ_PER_KCAL = 4.184
+private const val SALT_PER_SODIUM = 2.5

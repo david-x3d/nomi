@@ -1,5 +1,14 @@
 # Changelog
 
+## Nomi v2.11.2 — 2026-10-15
+
+### More reliable barcode scanning
+
+- Barcode products that list their energy only in kilojoules now show calories, converted from kJ to kcal.
+- Products that list only salt now show sodium, converted from the salt value.
+- A throttled Open Food Facts request (HTTP 429) is retried instead of showing an error.
+- One malformed number in a product's data, such as a quoted value, no longer makes the whole product look unknown.
+
 ## Nomi v2.11.1 — 2026-10-09
 
 ### Wear OS stability and sharper launcher icon
