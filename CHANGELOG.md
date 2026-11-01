@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Dark and themed launcher icon
+
+- The launcher icon now has a dark background in dark mode, so it matches "dark icons" modes such as ColorOS.
+- The launcher icon now includes a monochrome layer for themed icons (Android 13+).
+
 ## Nomi v2.11.2 — 2026-10-15
 
 ### More reliable barcode scanning
