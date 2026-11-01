@@ -4,8 +4,7 @@
 
 ### Dark and themed launcher icon
 
-- The launcher icon now has a dark background in dark mode, so it matches "dark icons" modes such as ColorOS.
-- The launcher icon now includes a monochrome layer for themed icons (Android 13+).
+- In dark mode the launcher icon gets a dark background while the dog keeps its colors, matching "dark icons" modes such as ColorOS.
 
 ## Nomi v2.11.2 — 2026-10-15
 

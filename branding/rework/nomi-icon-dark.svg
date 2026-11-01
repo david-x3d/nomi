@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="dbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E2522"/><stop offset="1" stop-color="#171211"/></linearGradient>
+    <linearGradient id="dbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2A2D"/><stop offset="1" stop-color="#161618"/></linearGradient>
     <linearGradient id="dfur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFA54D"/><stop offset="1" stop-color="#F0661A"/></linearGradient>
     <clipPath id="dhead"><ellipse cx="256" cy="292" rx="152" ry="128"/></clipPath>
   </defs>
