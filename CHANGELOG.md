@@ -1,5 +1,14 @@
 # Changelog
 
+## Nomi v2.11.3 — 2026-11-03
+
+### More reliable Wear OS day and sync updates
+
+- The open watch screen now checks the date every minute, clearing yesterday's nutrition totals after midnight even without a new phone update.
+- Fixed a startup race that could miss a phone update while the watch was loading its initial snapshot.
+- Removing the synced day now clears the watch screen instead of leaving stale totals visible.
+
+
 ## Nomi v2.11.2 — 2026-10-15
 
 ### More reliable barcode scanning

@@ -4,13 +4,14 @@ import android.content.Context
 import android.util.Log
 import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataMap
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
@@ -38,17 +39,21 @@ class PhoneConnection(context: Context) {
 
     /** Today, now and after every change the phone publishes. */
     fun today(): Flow<WatchToday?> = callbackFlow {
-        trySend(loadToday())
         val listener = DataClient.OnDataChangedListener { events ->
-            events.filter { it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path == WearContract.TODAY_PATH }
-                .forEach { event ->
-                    trySend(WatchToday.fromDataMap(DataMapItem.fromDataItem(event.dataItem).dataMap))
+            try {
+                if (events.any { it.dataItem.uri.path == WearContract.TODAY_PATH }) {
+                    trySend(Unit)
                 }
-            events.release()
+            } finally {
+                events.release()
+            }
         }
-        dataClient.addListener(listener)
+        // Subscribe before reading: otherwise a phone update between the read and listener
+        // registration is lost. Reload on deletion too, so a removed snapshot clears the UI.
+        dataClient.addListener(listener).await()
+        trySend(Unit)
         awaitClose { dataClient.removeListener(listener) }
-    }
+    }.conflate().map { loadToday() }
 
     /** Answers to [logText] and [logQuick], while someone is listening. */
     fun results(): Flow<LogResult> = callbackFlow {

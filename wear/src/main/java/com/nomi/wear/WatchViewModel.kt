@@ -3,7 +3,6 @@ package com.nomi.wear
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import java.time.LocalDate
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +33,8 @@ class WatchViewModel(application: Application) : AndroidViewModel(application) {
     private val phone = PhoneConnection(application)
 
     val today: StateFlow<TodayState> = phone.today()
-        .map { today -> today?.let { TodayState.Ready(it.asOf(LocalDate.now())) } ?: TodayState.NotConnected }
+        .withDayRollover()
+        .map { today -> today?.let { TodayState.Ready(it) } ?: TodayState.NotConnected }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayState.Loading)
 
     private val mutableStatus = MutableStateFlow<LogStatus>(LogStatus.Idle)
