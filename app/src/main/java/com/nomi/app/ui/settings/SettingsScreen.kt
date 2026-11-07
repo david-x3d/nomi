@@ -121,8 +121,8 @@ fun SettingsScreen(
                     )
                 }
             }
-            item { SectionTitle(nomiString("You")) }
-            item {
+            settingsGroup(title = { nomiString("You") }, key = "you", rows = listOf(
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
                     title = nomiString("Profile & goal"),
@@ -130,8 +130,8 @@ fun SettingsScreen(
                     onClick = onProfile,
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.RestaurantMenu, contentDescription = null) },
                     title = nomiString("Nutrition plan"),
@@ -143,8 +143,8 @@ fun SettingsScreen(
                     onClick = onNutrition,
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Science, contentDescription = null) },
                     title = nomiString("Micronutrients"),
@@ -158,11 +158,10 @@ fun SettingsScreen(
                     onClick = onMicronutrients,
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
-            }
-            // One row for everything AI. The provider of each task, the estimate bias, the
-            // timeout and the debug log are all a page down, where the people who want them look.
-            item { SectionTitle(nomiString("AI")) }
-            item {
+                },
+            ))
+            settingsGroup(title = { nomiString("AI") }, key = "ai", rows = listOf(
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.AutoAwesome, contentDescription = null) },
                     title = nomiString("AI provider"),
@@ -175,9 +174,10 @@ fun SettingsScreen(
                     onClick = onAi,
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
-            }
-            item { SectionTitle(nomiString("Appearance & units")) }
-            item {
+                },
+            ))
+            settingsGroup(title = { nomiString("Appearance & units") }, key = "appearance", rows = listOf(
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.ColorLens, contentDescription = null) },
                     title = nomiString("Theme"),
@@ -185,8 +185,8 @@ fun SettingsScreen(
                     onClick = { picker = SettingPicker.Theme },
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
-            }
-            item {
+                },
+                {
                 ToggleSetting(
                     icon = { Icon(Icons.Default.Wallpaper, contentDescription = null) },
                     title = nomiString("Dynamic colors"),
@@ -195,8 +195,8 @@ fun SettingsScreen(
                     onCheckedChange = onDynamicColorChanged,
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Translate, contentDescription = null) },
                     title = nomiString("Language"),
@@ -206,8 +206,8 @@ fun SettingsScreen(
                     onClick = { picker = SettingPicker.Language },
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Straighten, contentDescription = null) },
                     title = nomiString("Units"),
@@ -215,8 +215,8 @@ fun SettingsScreen(
                     onClick = { picker = SettingPicker.Units },
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.DonutLarge, contentDescription = null) },
                     title = nomiString("Goals view"),
@@ -224,9 +224,10 @@ fun SettingsScreen(
                     onClick = { picker = SettingPicker.GoalsStyle },
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
-            }
-            item { SectionTitle(nomiString("Health & activity")) }
-            item {
+                },
+            ))
+            settingsGroup(title = { nomiString("Health & activity") }, key = "health", rows = listOf(
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.HealthAndSafety, contentDescription = null) },
                     title = "Health Connect",
@@ -244,8 +245,8 @@ fun SettingsScreen(
                     onClick = onHealthConnect,
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
-            }
-            item {
+                },
+                {
                 ToggleSetting(
                     icon = { Icon(Icons.Default.CloudSync, contentDescription = null) },
                     title = nomiString("Adjust target from activity"),
@@ -254,10 +255,10 @@ fun SettingsScreen(
                     onCheckedChange = onActivityTargetAdjustmentChanged,
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
-            }
-            item { SectionTitle(nomiString("Reminders")) }
-            state.reminders.forEachIndexed { index, reminder ->
-                item(key = "reminder-$index") {
+                },
+            ))
+            settingsGroup(title = { nomiString("Reminders") }, key = "reminders", rows = state.reminders.mapIndexed { index, reminder ->
+                val row: @Composable () -> Unit = {
                     ToggleSetting(
                         icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
                         title = reminder.name.localizedReminderName(),
@@ -270,9 +271,10 @@ fun SettingsScreen(
                         iconColor = MaterialTheme.colorScheme.tertiary,
                     )
                 }
-            }
-            item { SectionTitle(nomiString("Your data")) }
-            item {
+                row
+            })
+            settingsGroup(title = { nomiString("Your data") }, key = "data", rows = listOf(
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Description, contentDescription = null) },
                     title = nomiString("Export diary"),
@@ -280,8 +282,8 @@ fun SettingsScreen(
                     onClick = onExportDiary,
                     iconColor = MaterialTheme.colorScheme.tertiary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Upload, contentDescription = null) },
                     title = nomiString("Export backup"),
@@ -289,8 +291,8 @@ fun SettingsScreen(
                     onClick = onExport,
                     iconColor = MaterialTheme.colorScheme.secondary,
                 )
-            }
-            item {
+                },
+                {
                 SettingsLink(
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
                     title = nomiString("Import backup"),
@@ -298,7 +300,8 @@ fun SettingsScreen(
                     onClick = onImport,
                     iconColor = MaterialTheme.colorScheme.primary,
                 )
-            }
+                },
+            ))
             item {
                 Text(
                     "Nomi ${state.appVersion}",

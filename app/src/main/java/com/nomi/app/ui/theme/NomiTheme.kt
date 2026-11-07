@@ -6,7 +6,15 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.unit.dp
+import com.nomi.app.R
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -20,6 +28,14 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+
+private val NomiShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(20.dp),
+    large = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(36.dp),
+)
 
 private val NomiLightColors = lightColorScheme(
     primary = Color(0xFFA84000),
@@ -105,7 +121,29 @@ private val NomiDarkColors = darkColorScheme(
  * slightly tighter display tracking. That makes headings feel intentional without changing how
  * much room screens and buttons occupy.
  */
-private val NomiTypography = Typography().let { baseline ->
+@OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
+private fun outfit(weight: Int) = Font(
+    R.font.outfit,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
+)
+
+/** Outfit, the display face Wisp uses. Glyphs it lacks fall back to the system font. */
+val NomiOutfit = FontFamily(outfit(400), outfit(500), outfit(600), outfit(700))
+
+private val NomiTypography = Typography().let { base ->
+    fun TextStyle.o() = copy(fontFamily = NomiOutfit)
+    Typography(
+        displayLarge = base.displayLarge.o(), displayMedium = base.displayMedium.o(),
+        displaySmall = base.displaySmall.o(), headlineLarge = base.headlineLarge.o(),
+        headlineMedium = base.headlineMedium.o(), headlineSmall = base.headlineSmall.o(),
+        titleLarge = base.titleLarge.o(), titleMedium = base.titleMedium.o(),
+        titleSmall = base.titleSmall.o(), bodyLarge = base.bodyLarge.o(),
+        bodyMedium = base.bodyMedium.o(), bodySmall = base.bodySmall.o(),
+        labelLarge = base.labelLarge.o(), labelMedium = base.labelMedium.o(),
+        labelSmall = base.labelSmall.o(),
+    )
+}.let { baseline ->
     baseline.copy(
         displayLarge = baseline.displayLarge.copy(
             fontWeight = FontWeight.Bold,
@@ -236,6 +274,7 @@ fun NomiTheme(
             // Standard motion settles without the bounce of the expressive spring scheme. This
             // keeps sheets, controls, and destination changes responsive on lower-end devices.
             motionScheme = MotionScheme.standard(),
+            shapes = NomiShapes,
             content = content,
         )
     }

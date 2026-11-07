@@ -1,6 +1,13 @@
 package com.nomi.app.ui.settings
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Shape
+import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,11 +17,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -28,28 +38,66 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.nomi.app.ui.components.NomiCardShadowElevation
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
-import com.nomi.app.ui.components.nomiCardTonalElevation
 import com.nomi.app.ui.feedback.nomiPress
 import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.localization.nomiString
-import com.nomi.app.ui.theme.nomiPageContainerColor
 
 /*
  * The rows and the page frame every settings screen is built from. Settings and the pages under it
  * share them, so a sub-page reads as the same place one level down rather than as another app.
  */
 
-internal val SettingsRowShape = RoundedCornerShape(22.dp)
+internal val SettingsRowShape = RoundedCornerShape(26.dp)
+
+private val GroupOuterRadius = 26.dp
+private val GroupInnerRadius = 6.dp
+
+/** Shape the next settings tile is cut to; rows inside a [settingsGroup] get joined corners. */
+internal val LocalSettingsTileShape = compositionLocalOf<Shape> { SettingsRowShape }
 
 /** The canvas Settings and every page under it sit on. */
 @Composable
-internal fun settingsPageColor(): Color = nomiPageContainerColor(
-    accent = MaterialTheme.colorScheme.tertiaryContainer,
-    strength = 0.09f,
-)
+internal fun settingsPageColor(): Color =
+    if (LocalPitchBlackSurfaces.current) {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
+
+@Composable
+private fun settingsTileColor(): Color =
+    if (LocalPitchBlackSurfaces.current) nomiCardContainerColor() else MaterialTheme.colorScheme.surfaceBright
+
+/**
+ * A titled group of rows drawn as separate tiles: large outer corners, small inner ones, a thin
+ * gap between them. Each row lambda is a composable that calls SettingsLink, ToggleSetting etc.
+ */
+internal fun LazyListScope.settingsGroup(
+    title: (@Composable () -> String)? = null,
+    key: String,
+    rows: List<@Composable () -> Unit>,
+) {
+    if (title != null) {
+        item(key = "h-$key") { SectionTitle(title()) }
+    } else {
+        item(key = "h-$key") { Spacer(Modifier.height(12.dp)) }
+    }
+    rows.forEachIndexed { index, row ->
+        item(key = "$key-$index") {
+            val first = index == 0
+            val last = index == rows.lastIndex
+            val shape = RoundedCornerShape(
+                topStart = if (first) GroupOuterRadius else GroupInnerRadius,
+                topEnd = if (first) GroupOuterRadius else GroupInnerRadius,
+                bottomStart = if (last) GroupOuterRadius else GroupInnerRadius,
+                bottomEnd = if (last) GroupOuterRadius else GroupInnerRadius,
+            )
+            CompositionLocalProvider(LocalSettingsTileShape provides shape) { row() }
+        }
+    }
+}
 
 /** A page reached from Settings: the same canvas, a title and the way back. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +117,7 @@ internal fun SettingsSubpageScaffold(
             TopAppBar(
                 title = { Text(title) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    FilledTonalIconButton(onClick = onBack, modifier = Modifier.padding(start = 8.dp)) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = nomiString("Back"),
@@ -92,9 +140,9 @@ internal fun SectionTitle(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier
-            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 6.dp)
+            .padding(start = 36.dp, end = 24.dp, top = 22.dp, bottom = 8.dp)
             .semantics { heading() },
     )
 }
@@ -110,7 +158,7 @@ internal fun SettingsLink(
     supportingColor: Color = Color.Unspecified,
 ) {
     SettingSurface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 3.dp),
         onClick = onClick,
         enabled = enabled,
     ) {
@@ -141,7 +189,7 @@ internal fun ToggleSetting(
     iconColor: Color = Color.Unspecified,
 ) {
     SettingSurface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 3.dp),
         onClick = { onClick?.invoke() ?: onCheckedChange(!checked) },
     ) {
         ListItem(
@@ -181,11 +229,9 @@ internal fun SettingsCard(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = SettingsRowShape,
-        color = nomiCardContainerColor(),
-        tonalElevation = nomiCardTonalElevation(),
-        shadowElevation = NomiCardShadowElevation,
+        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 3.dp),
+        shape = LocalSettingsTileShape.current,
+        color = settingsTileColor(),
         border = nomiCardBorder(),
         content = content,
     )
@@ -204,29 +250,41 @@ private fun SettingSurface(
         enabled = enabled,
         interactionSource = press.interactionSource,
         modifier = modifier.nomiPress(press),
-        shape = SettingsRowShape,
-        color = nomiCardContainerColor(),
-        tonalElevation = nomiCardTonalElevation(),
-        shadowElevation = NomiCardShadowElevation,
+        shape = LocalSettingsTileShape.current,
+        color = settingsTileColor(),
         border = nomiCardBorder(),
         content = content,
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val BadgeShapes = listOf(
+    MaterialShapes.Cookie4Sided,
+    MaterialShapes.Cookie9Sided,
+    MaterialShapes.Clover4Leaf,
+    MaterialShapes.Flower,
+    MaterialShapes.SoftBurst,
+)
+
+/** A tonal badge in a Material shape; known accents use their container pair like Wisp does. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SettingsIconTile(
     color: Color,
     icon: @Composable () -> Unit,
 ) {
-    Surface(
-        shape = RoundedCornerShape(13.dp),
-        color = color.copy(alpha = 0.14f),
-        contentColor = color,
-    ) {
-        Box(
-            modifier = Modifier.padding(10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
+    val scheme = MaterialTheme.colorScheme
+    val (bg, fg) = when (color) {
+        scheme.primary -> scheme.primaryContainer to scheme.onPrimaryContainer
+        scheme.secondary -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        scheme.tertiary -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+        scheme.error -> scheme.errorContainer to scheme.onErrorContainer
+        else -> color.copy(alpha = 0.16f) to color
+    }
+    // The accent colour picks the shape, so the same kind of row always gets the same badge.
+    val shape = BadgeShapes[(color.value.toLong().hashCode() and 0x7fffffff) % BadgeShapes.size]
+    Surface(shape = shape.toShape(), color = bg, contentColor = fg) {
+        Box(modifier = Modifier.padding(11.dp), contentAlignment = Alignment.Center) {
             icon()
         }
     }
