@@ -44,6 +44,7 @@ internal class FoodLoggingCoordinator(
     private val inUserLanguage: (String) -> String,
     private val findBarcodeProduct: suspend (String) -> BarcodeProduct?,
     private val emitEvent: suspend (AppEvent) -> Unit,
+    private val externalGroupId: String? = null,
 ) {
     val recentlySavedInputs = MutableStateFlow<Map<String, String>>(emptyMap())
     private val draft = LoggingDraft()
@@ -320,6 +321,7 @@ internal class FoodLoggingCoordinator(
         replacedEntryId = request?.replacedEntryId ?: draft.mutableEditedEntryId.value,
         sourceUrls = sources.toList(),
         originalText = text,
+        groupId = externalGroupId ?: java.util.UUID.randomUUID().toString(),
     )
 
     private fun saveDraft(

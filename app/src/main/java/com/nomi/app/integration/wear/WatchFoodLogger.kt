@@ -45,16 +45,18 @@ internal data class WatchLogResult(val ok: Boolean, val message: String, val add
 internal class WatchFoodLogger(private val container: AppContainer) {
     private val repository get() = container.repository
 
-    suspend fun logText(text: String): WatchLogResult {
+    suspend fun logText(text: String, requestId: String? = null): WatchLogResult {
         val language = language()
         if (!isSetUp()) return failure("Finish setting up Nomi on your phone first.", language)
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
         val before = caloriesOn(today)
-        val outcome = withTimeoutOrNull(TEXT_TIMEOUT_MILLIS) { runCoordinator(text.trim(), today, zone, language) }
+        val outcome = withTimeoutOrNull(TEXT_TIMEOUT_MILLIS) { runCoordinator(text.trim(), today, zone, language, requestId) }
             ?: return failure("Nomi took too long to log that. Try again on your phone.", language)
         return outcome.errorMessage?.let { WatchLogResult(ok = false, message = it) }
-            ?: WatchLogResult(ok = true, message = "", addedKcal = (caloriesOn(today) - before).coerceAtLeast(0.0))
+            ?: WatchLogResult(ok = true, message = "", addedKcal = if (requestId != null)
+                repository.logsByEntryGroup(requestId).sumOf { it.nutritionSnapshot.caloriesKcal }
+            else (caloriesOn(today) - before).coerceAtLeast(0.0))
     }
 
     suspend fun logQuick(kind: String, id: Long): WatchLogResult {
@@ -92,6 +94,7 @@ internal class WatchFoodLogger(private val container: AppContainer) {
         today: LocalDate,
         zone: ZoneId,
         language: NomiLanguage,
+        requestId: String? = null,
     ): Outcome = coroutineScope {
         val scope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext[kotlinx.coroutines.Job]))
         try {
@@ -113,6 +116,7 @@ internal class WatchFoodLogger(private val container: AppContainer) {
                 inUserLanguage = { NomiTranslations.translate(it, language) },
                 findBarcodeProduct = container.openFoodFacts::findByBarcode,
                 emitEvent = { event -> if (event == AppEvent.FoodSaved) saved.complete(Unit) },
+                externalGroupId = requestId,
             )
             val failed = scope.async {
                 coordinator.loggingState.filterIsInstance<FoodLoggingUiState.Error>().first()

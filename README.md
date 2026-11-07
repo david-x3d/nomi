@@ -64,6 +64,21 @@
 - ⌚ Use Nomi on a Wear OS watch: see what is left today, dictate a meal, log favorites with a tap, and add a tile or a watch-face complication.
 - 📲 Share a day with another Nomi by holding the two phones together. Long-press a food, tick the foods to send, then tap the phones back to back. No pairing, no account, no server.
 
+## Wisp background food logging
+
+With **Nomi 2.12.1+** and **Wisp 1.1.0+**, say “Log 200 grams of rice and two eggs in Nomi.”
+Wisp logs the meal without opening Nomi, then speaks the saved calories and remaining
+daily budget and shows a Material 3 nutrition card. Nutrition is researched and saved
+by Nomi using its configured providers, local foods and normal logging pipeline.
+Your Google key in Wisp does not replace Nomi's research-provider setup.
+
+Nomi returns the actual saved meal calories and current diary totals. Remaining
+calories include the optional step-based target adjustment; an exceeded budget is
+shown as over target. If no plan is set, Wisp shows the meal calories without inventing
+a daily budget. The local IPC endpoint accepts only the installed Wisp package,
+exports no database or API keys, and reuses request IDs to avoid duplicate entries.
+If a request is interrupted with an uncertain result, check the diary before retrying.
+
 ## 🌍 Languages
 
 Nomi's interface is fully translated into ten languages. On first launch it follows your system language and falls back to English; you can switch at any time in **Settings → Language**, where each language is listed under its own name.

@@ -28,7 +28,9 @@
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
+        <package android:name="dev.davidx3d.wisp" />
     </queries>
+
 
 
     <application
@@ -43,6 +45,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Nomi.Starting"
         android:usesCleartextTraffic="false">
+
+        <provider
+            android:name=".integration.assistant.AssistantFoodProvider"
+            android:authorities="com.nomi.app.assistant"
+            android:exported="true" />
 
         <activity
             android:name=".MainActivity"

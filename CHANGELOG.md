@@ -1,3 +1,8 @@
+## 2.12.1
+
+- Support Wisp background food logging and return saved calories and the remaining daily budget.
+- Add caller validation and request deduplication for the local assistant endpoint.
+
 # Changelog
 
 ## Nomi v2.12.0 — 2026-11-07
