@@ -2,14 +2,16 @@
 
 <img src="app/src/main/res/drawable-nodpi/nomi_logo.png" alt="Nomi — fox logo" width="220" />
 
-### A fast Nutrition journal for Android
+# Nomi
+
+A fast nutrition journal for Android
 
 [![Latest release](https://img.shields.io/github/v/release/david-x3d/nomi?label=release&color=6750A4&style=for-the-badge)](https://github.com/david-x3d/nomi/releases/latest)
 [![GitHub repository](https://img.shields.io/badge/GitHub-david--x3d%2Fnomi-181717?logo=github&logoColor=white&style=for-the-badge)](https://github.com/david-x3d/nomi)
-[![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#requirements)
+[![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white&style=for-the-badge)](#-requirements)
 [![10 languages](https://img.shields.io/badge/languages-10-0A7EA4?style=for-the-badge)](#-languages)
 [![Kotlin](https://img.shields.io/badge/Kotlin-native-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
-[![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#design)
+[![Material 3 Expressive](https://img.shields.io/badge/Material_3-Expressive-6750A4?logo=materialdesign&logoColor=white&style=for-the-badge)](#-design)
 [![License PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-FF6F00?style=for-the-badge)](LICENSE)
 [![Noncommercial](https://img.shields.io/badge/use-noncommercial%20only-C62828?style=for-the-badge)](LICENSE)
 
