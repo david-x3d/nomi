@@ -63,4 +63,22 @@ class LocalFoodIntentParserTest {
             assertNull("Expected provider fallback for: $input", LocalFoodIntentParser.parseOrNull(input))
         }
     }
+
+    @Test
+    fun `a list where every food opens with its own amount is parsed locally`() {
+        val intent = LocalFoodIntentParser.parseOrNull("2 Eier, 100 g Haferflocken und 1,5 l Wasser")!!
+
+        assertEquals(listOf("Eier", "Haferflocken", "Wasser"), intent.items.map { it.name })
+        assertEquals(listOf(2.0, 100.0, 1.5), intent.items.map { it.quantity })
+        // The deterministic reconciliation every research path runs must keep those amounts.
+        val reconciled = com.nomi.app.ai.validation.UserQuantityResolver.reconcileIntent(intent, "DE")
+        assertEquals(listOf(2.0, 100.0, 1.5), reconciled.items.map { it.userQuantity })
+    }
+
+    @Test
+    fun `a list with an entry that has no amount still uses the provider parser`() {
+        listOf("200 g Fish and Chips", "2 Eier und Toast", "100 g Nudeln mit Sauce, 1 Apfel").forEach { input ->
+            assertNull("Expected provider fallback for: $input", LocalFoodIntentParser.parseOrNull(input))
+        }
+    }
 }

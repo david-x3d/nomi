@@ -3,6 +3,7 @@ package com.nomi.app.data.remote.ai
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
 import io.ktor.client.plugins.HttpTimeoutConfig
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -491,4 +492,100 @@ class OpenAiCompatibleClientTest {
         },
         model = model,
     )
+
+    @Test
+    fun `reasoning printed ahead of the answer is not mistaken for it`() {
+        assertEquals(
+            """{"ok":true}""",
+            extractJsonDocument("<think>maybe {\"ok\":false}?</think>\n```json\n{\"ok\":true}\n```"),
+        )
+    }
+
+    @Test
+    fun `an answer delivered as a list of text parts is read`() {
+        val payload = """{"choices":[{"message":{"content":[{"type":"text","text":"{\"ok\":true}"}]}}]}"""
+
+        assertEquals("""{"ok":true}""", decodeChatCompletionPayload(OpenAiCompatibleClient().json, payload))
+    }
+
+    @Test
+    fun `null for a list and a quoted number do not make an answer unreadable`() {
+        val intent: com.nomi.app.ai.model.ParsedFoodIntent = OpenAiCompatibleClient().json.decodeFromString(
+            """{"originalText":"2 Eier","items":[{"name":"Eier","quantity":"2","unit":"piece","assumptions":null}]}""",
+        )
+
+        assertEquals(2.0, intent.items.single().quantity!!, 0.0)
+        assertEquals(emptyList<String>(), intent.items.single().assumptions)
+    }
+
+    @Test
+    fun `an unreadable answer is asked for once more and no further`() = kotlinx.coroutines.runBlocking {
+        var calls = 0
+        val answer = retryingUnreadableAnswer {
+            calls += 1
+            if (calls == 1) throw kotlinx.serialization.SerializationException("cut off") else "ok"
+        }
+        assertEquals("ok", answer)
+        assertEquals(2, calls)
+
+        calls = 0
+        val failure = runCatching {
+            retryingUnreadableAnswer<String> {
+                calls += 1
+                throw UnreadableProviderAnswerException("The AI provider returned no structured content")
+            }
+        }.exceptionOrNull()
+        assertEquals(2, calls)
+        assertEquals(true, failure is UnreadableProviderAnswerException)
+
+        calls = 0
+        runCatching { retryingUnreadableAnswer<String> { calls += 1; throw java.io.IOException("offline") } }
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun `gemini 2_5 flash extraction runs without thinking and gemini 3 with little`() {
+        assertEquals(GeminiThinkingConfig(thinkingBudget = 0), geminiThinkingConfig("gemini-2.5-flash"))
+        assertEquals(GeminiThinkingConfig(thinkingLevel = "LOW"), geminiThinkingConfig("gemini-3.5-flash"))
+        assertEquals(null, geminiThinkingConfig("gemini-2.5-pro"))
+    }
+
+    @Test
+    fun `a chosen reasoning level is sent in each provider's own spelling`() {
+        val messages = listOf(ChatMessage("user", JsonPrimitive("hi")))
+        fun body(kind: AiProviderKind, model: String, effort: com.nomi.app.ai.model.AiReasoningEffort) =
+            Json { explicitNulls = false }.encodeToString(
+                chatCompletionRequest(
+                    AiProviderConfig(kind, "https://example.com/v1", model, reasoningEffort = effort),
+                    messages,
+                ),
+            )
+        val high = com.nomi.app.ai.model.AiReasoningEffort.HIGH
+        val off = com.nomi.app.ai.model.AiReasoningEffort.OFF
+
+        val openRouter = body(AiProviderKind.OPEN_ROUTER, "google/gemini-3.5-flash-lite", high)
+        assertTrue(openRouter, openRouter.contains("\"reasoning\":{\"effort\":\"high\""))
+        assertFalse(openRouter, openRouter.contains("reasoning_effort"))
+
+        val gemini = body(AiProviderKind.GEMINI, "gemini-2.5-flash-lite", off)
+        assertTrue(gemini, gemini.contains("\"reasoning_effort\":\"none\""))
+
+        // Sonar's search models reject the field, and the default sends nothing anywhere.
+        assertFalse(body(AiProviderKind.PERPLEXITY, "sonar", high).contains("reasoning"))
+        assertFalse(
+            body(AiProviderKind.OPEN_AI, "gpt-4o", com.nomi.app.ai.model.AiReasoningEffort.DEFAULT)
+                .contains("reasoning"),
+        )
+    }
+
+    @Test
+    fun `a chosen reasoning level overrides the gemini thinking defaults`() {
+        val medium = com.nomi.app.ai.model.AiReasoningEffort.MEDIUM
+        assertEquals(GeminiThinkingConfig(thinkingBudget = 8_192), geminiThinkingConfig("gemini-2.5-flash", medium))
+        assertEquals(GeminiThinkingConfig(thinkingLevel = "MEDIUM"), geminiThinkingConfig("gemini-3.5-flash", medium))
+        assertEquals(
+            GeminiThinkingConfig(thinkingLevel = "MINIMAL"),
+            geminiThinkingConfig("gemini-3.5-flash", com.nomi.app.ai.model.AiReasoningEffort.OFF),
+        )
+    }
 }

@@ -2,6 +2,7 @@ package com.nomi.app.data.remote.ai
 
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.ai.model.AiReasoningEffort
 import com.nomi.app.ai.model.AiRuntimeCredential
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
@@ -103,7 +104,10 @@ internal fun interface GeminiNutritionExtractionGateway {
 internal class ExaGeminiHttpClient(
     val json: Json = Json {
         ignoreUnknownKeys = true
-        isLenient = false
+        // Models hand back null for an empty list and quote the odd number; neither is a reason
+        // to lose the entry.
+        isLenient = true
+        coerceInputValues = true
         explicitNulls = false
         encodeDefaults = true
     },
@@ -160,7 +164,7 @@ internal class ExaGeminiHttpClient(
         credential: AiRuntimeCredential,
         systemPrompt: String,
         userPrompt: String,
-    ): GeminiNutritionExtraction {
+    ): GeminiNutritionExtraction = retryingUnreadableAnswer {
         val content = generateStructuredJson(
             config = config,
             credential = credential,
@@ -168,7 +172,7 @@ internal class ExaGeminiHttpClient(
             userPrompt = userPrompt,
             responseJsonSchema = GEMINI_NUTRITION_EXTRACTION_SCHEMA,
         )
-        return json.decodeFromString(extractJsonDocument(content))
+        json.decodeFromString(extractJsonDocument(content))
     }
 
     internal suspend fun generateStructuredJson(
@@ -196,9 +200,7 @@ internal class ExaGeminiHttpClient(
                                 // Extraction is a grounded field-mapping task. Gemini 3.5 Flash
                                 // defaults to medium thinking, which adds latency and billed
                                 // thinking tokens without improving Nomi's deterministic math.
-                                thinkingConfig = GeminiThinkingConfig().takeIf {
-                                    model.startsWith("gemini-3", ignoreCase = true)
-                                },
+                                thinkingConfig = geminiThinkingConfig(model, config.reasoningEffort),
                             ),
                         ),
                     )
@@ -280,7 +282,7 @@ internal class OpenRouterNutritionExtractor(
         credential: AiRuntimeCredential,
         systemPrompt: String,
         userPrompt: String,
-    ): GeminiNutritionExtraction {
+    ): GeminiNutritionExtraction = retryingUnreadableAnswer {
         val content = try {
             client.completeStructuredJson(
                 // OpenRouter's own rules apply to the request: no custom temperature, since the
@@ -307,7 +309,7 @@ internal class OpenRouterNutritionExtractor(
             }
             throw failure
         }
-        return client.json.decodeFromString(extractJsonDocument(content))
+        client.json.decodeFromString(extractJsonDocument(content))
     }
 }
 
@@ -975,9 +977,43 @@ private data class GeminiGenerationConfig(
 )
 
 @Serializable
-private data class GeminiThinkingConfig(
-    val thinkingLevel: String = "LOW",
+internal data class GeminiThinkingConfig(
+    val thinkingLevel: String? = null,
+    val thinkingBudget: Int? = null,
 )
+
+/**
+ * How much a Gemini model may think before it maps retrieved text onto the schema.
+ *
+ * Gemini 3 takes a level and cannot switch thinking off. Gemini 2.5 Flash takes a token budget and
+ * thinks dynamically unless told otherwise, which is seconds of waiting on every lookup for
+ * arithmetic Nomi does itself; a budget of zero turns it off. Other models keep their default,
+ * because 2.5 Pro rejects a zero budget.
+ */
+internal fun geminiThinkingConfig(
+    model: String,
+    /** The level picked in Settings; [AiReasoningEffort.DEFAULT] keeps the choices above. */
+    effort: AiReasoningEffort = AiReasoningEffort.DEFAULT,
+): GeminiThinkingConfig? {
+    val id = model.trim().lowercase(Locale.ROOT)
+    val takesLevel = id.startsWith("gemini-3")
+    return when (effort) {
+        AiReasoningEffort.DEFAULT -> when {
+            takesLevel -> GeminiThinkingConfig(thinkingLevel = "LOW")
+            id.startsWith("gemini-2.5-flash") -> GeminiThinkingConfig(thinkingBudget = 0)
+            else -> null
+        }
+        // Gemini 3 has no "off"; minimal is as little as it will think.
+        AiReasoningEffort.OFF ->
+            if (takesLevel) GeminiThinkingConfig(thinkingLevel = "MINIMAL") else GeminiThinkingConfig(thinkingBudget = 0)
+        AiReasoningEffort.LOW ->
+            if (takesLevel) GeminiThinkingConfig(thinkingLevel = "LOW") else GeminiThinkingConfig(thinkingBudget = 1_024)
+        AiReasoningEffort.MEDIUM ->
+            if (takesLevel) GeminiThinkingConfig(thinkingLevel = "MEDIUM") else GeminiThinkingConfig(thinkingBudget = 8_192)
+        AiReasoningEffort.HIGH ->
+            if (takesLevel) GeminiThinkingConfig(thinkingLevel = "HIGH") else GeminiThinkingConfig(thinkingBudget = 24_576)
+    }
+}
 
 @Serializable
 private data class GeminiGenerateContentResponse(

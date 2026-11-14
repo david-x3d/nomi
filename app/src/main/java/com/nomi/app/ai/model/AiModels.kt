@@ -33,7 +33,30 @@ data class AiProviderConfig(
     val extraHeaders: Map<String, String> = emptyMap(),
     /** OpenRouter only: provider slugs to try first; the others stay available as fallbacks. */
     val openRouterProviderOrder: List<String> = emptyList(),
+    /** How much the model may think first. [AiReasoningEffort.DEFAULT] sends nothing of its own. */
+    val reasoningEffort: AiReasoningEffort = AiReasoningEffort.DEFAULT,
 )
+
+/**
+ * The reasoning setting each AI task carries.
+ *
+ * [DEFAULT] leaves the request as Nomi would send it anyway, so nothing changes for a model that
+ * rejects the parameter. Every other level is passed on in the provider's own vocabulary.
+ */
+@Serializable
+enum class AiReasoningEffort(val wireValue: String?) {
+    DEFAULT(null),
+    OFF("none"),
+    LOW("low"),
+    MEDIUM("medium"),
+    HIGH("high"),
+    ;
+
+    companion object {
+        fun fromStored(value: String?): AiReasoningEffort =
+            entries.firstOrNull { it.name.equals(value?.trim(), ignoreCase = true) } ?: DEFAULT
+    }
+}
 
 /** Holds a credential without putting it in generated data-class toString/copy output. */
 class AiRuntimeCredential private constructor(private val value: String) {

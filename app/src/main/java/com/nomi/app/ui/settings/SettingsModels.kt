@@ -1,6 +1,7 @@
 package com.nomi.app.ui.settings
 
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.ai.model.AiReasoningEffort
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.domain.Micronutrient
@@ -27,6 +28,7 @@ data class AiProviderSetting(
     val hasPrimaryApiKey: Boolean = hasApiKey,
     val hasSearchApiKey: Boolean = false,
     val connectionStatus: String? = null,
+    val reasoning: AiReasoningEffort = AiReasoningEffort.DEFAULT,
 )
 
 data class ReminderSetting(

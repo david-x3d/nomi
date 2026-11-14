@@ -1,6 +1,8 @@
 package com.nomi.app.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -17,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -33,11 +36,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.ai.model.AiReasoningEffort
+import com.nomi.app.ui.components.NomiMenu
+import com.nomi.app.ui.components.NomiMenuItem
 import com.nomi.app.data.preferences.DEFAULT_EXA_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_MODEL
 import com.nomi.app.data.preferences.DEFAULT_OPENROUTER_RESEARCH_MODEL
@@ -67,6 +74,7 @@ data class AiProviderEditorState(
     val isSaving: Boolean = false,
     val isRemovingKey: Boolean = false,
     val errorMessage: String? = null,
+    val reasoning: AiReasoningEffort = AiReasoningEffort.DEFAULT,
 )
 
 /**
@@ -239,6 +247,14 @@ fun AiProviderEditorScreen(
                 }
             }
 
+            ReasoningDropdown(
+                selected = state.reasoning,
+                enabled = !busy,
+                onSelected = {
+                    onStateChanged(state.copy(reasoning = it, testResult = null, errorMessage = null))
+                },
+            )
+
             val keyName = when {
                 usesExaGemini || state.provider == AiProviderKind.GEMINI -> nomiString("Google Gemini API key")
                 usesExaOpenRouter -> nomiString("OpenRouter API key")
@@ -337,6 +353,64 @@ fun AiProviderEditorScreen(
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+/**
+ * How much the task's model thinks before answering, as a field that opens a menu.
+ *
+ * The field is read-only and sits under a transparent click target, because a read-only text
+ * field still takes focus and raises the keyboard when it is tapped directly.
+ */
+@Composable
+private fun ReasoningDropdown(
+    selected: AiReasoningEffort,
+    enabled: Boolean,
+    onSelected: (AiReasoningEffort) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val label = nomiString("Reasoning")
+    Box {
+        NomiTextField(
+            value = selected.localizedName(),
+            onValueChange = {},
+            label = label,
+            readOnly = true,
+            enabled = enabled,
+            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+            supportingText = nomiString(
+                "How much the model thinks before it answers. More is slower and costs more; " +
+                    "not every model accepts every level.",
+            ),
+        )
+        Box(
+            Modifier
+                .matchParentSize()
+                .clickable(enabled = enabled, onClickLabel = label, role = Role.DropdownList) {
+                    expanded = true
+                },
+        )
+        NomiMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            AiReasoningEffort.entries.forEach { effort ->
+                NomiMenuItem(
+                    text = effort.localizedName(),
+                    selected = effort == selected,
+                    onClick = {
+                        expanded = false
+                        onSelected(effort)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AiReasoningEffort.localizedName(): String = when (this) {
+    AiReasoningEffort.DEFAULT -> nomiString("Default")
+    AiReasoningEffort.OFF -> nomiString("Off")
+    AiReasoningEffort.LOW -> nomiString("Low")
+    AiReasoningEffort.MEDIUM -> nomiString("Medium")
+    AiReasoningEffort.HIGH -> nomiString("High")
 }
 
 @Composable

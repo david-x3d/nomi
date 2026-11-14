@@ -16,6 +16,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.MicronutrientPreferences
 import com.nomi.app.data.preferences.MicronutrientSetting
+import com.nomi.app.ai.model.AiReasoningEffort
 import com.nomi.app.data.preferences.ProviderSelection
 
 internal fun AppPreferences.toBackup(): BackupPreferencesV1 = BackupPreferencesV1(
@@ -58,13 +59,20 @@ internal fun BackupMicronutrientsV1.toPreferences(): MicronutrientPreferences =
     )
 
 private fun ProviderSelection.toBackup(): BackupProviderSelectionV1 =
-    BackupProviderSelectionV1(providerId = providerId, model = model, endpoint = endpoint)
+    BackupProviderSelectionV1(
+        providerId = providerId,
+        model = model,
+        endpoint = endpoint,
+        reasoningEffort = reasoningEffort,
+    )
 
 internal fun BackupProviderSelectionV1.toPreference(): ProviderSelection = ProviderSelection(
     providerId = providerId,
     model = model,
     endpoint = endpoint,
     advancedParametersJson = null,
+    reasoningEffort = AiReasoningEffort.fromStored(reasoningEffort)
+        .takeIf { it != AiReasoningEffort.DEFAULT }?.name,
 )
 
 internal fun NutritionValues.toBackup(): BackupNutritionValuesV1 = BackupNutritionValuesV1(

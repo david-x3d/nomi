@@ -1360,7 +1360,11 @@ class AppViewModel(
         viewModelScope.launch {
             repository.appPreferencesStore.setProvider(
                 ProviderPipeline.FOOD_RESEARCH,
-                ProviderSelection(providerId = "exa-openrouter", model = model),
+                ProviderSelection(
+                    providerId = "exa-openrouter",
+                    model = model,
+                    reasoningEffort = preferences.value.foodResearchProvider.reasoningEffort,
+                ),
             )
             providers.refreshKeyPresence()
         }
@@ -1377,6 +1381,7 @@ class AppViewModel(
             endpoint = settings.endpoint,
             hasStoredApiKey = settings.hasPrimaryApiKey,
             hasStoredSearchApiKey = settings.hasSearchApiKey,
+            reasoning = settings.reasoning,
         )
     }
 

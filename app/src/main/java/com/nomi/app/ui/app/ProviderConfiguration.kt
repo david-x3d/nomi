@@ -2,6 +2,7 @@ package com.nomi.app.ui.app
 
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
+import com.nomi.app.ai.model.AiReasoningEffort
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.data.preferences.ProviderPipeline
@@ -27,6 +28,7 @@ internal fun AiProviderEditorState.toProviderSelection(
     providerId = provider.toProviderId(),
     model = model.trim(),
     endpoint = endpoint.asHttpsEndpoint(),
+    reasoningEffort = reasoning.takeIf { it != AiReasoningEffort.DEFAULT }?.name,
 ).withSupportedModel(pipeline)
 
 
@@ -68,7 +70,13 @@ internal fun ProviderSelection.toRuntimeConfig(
     } else {
         emptyList()
     }
-    val defaults = AiProviderConfig(kind, resolvedEndpoint(), model.trim(), openRouterProviderOrder = order)
+    val defaults = AiProviderConfig(
+        kind = kind,
+        endpoint = resolvedEndpoint(),
+        model = model.trim(),
+        openRouterProviderOrder = order,
+        reasoningEffort = AiReasoningEffort.fromStored(reasoningEffort),
+    )
     return if (timeoutDisabled) defaults.copy(timeoutMillis = null) else defaults
 }
 
@@ -77,7 +85,9 @@ internal fun ProviderSelection.cacheIdentity(): String = listOf(
     model.trim(),
     runCatching { resolvedEndpoint() }.getOrElse { endpoint.orEmpty().trim() },
     advancedParametersJson.orEmpty().trim(),
-).joinToString(separator = "\u001f")
+) // Appended only when set, so the entries cached before the setting existed stay valid.
+    .plus(listOfNotNull(AiReasoningEffort.fromStored(reasoningEffort).wireValue))
+    .joinToString(separator = "\u001f")
 
 internal fun String.toProviderKind(): AiProviderKind = when (lowercase(Locale.ROOT)) {
     "perplexity" -> AiProviderKind.PERPLEXITY

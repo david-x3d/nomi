@@ -62,6 +62,8 @@ data class ProviderSelection(
     val model: String = "",
     val endpoint: String? = null,
     val advancedParametersJson: String? = null,
+    /** An [com.nomi.app.ai.model.AiReasoningEffort] name; absent means the provider default. */
+    val reasoningEffort: String? = null,
 )
 
 @Serializable

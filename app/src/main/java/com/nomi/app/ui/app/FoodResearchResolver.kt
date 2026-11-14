@@ -29,16 +29,8 @@ internal class FoodResearchResolver(
     ): FoodAnalysis {
         if (menuDishes == null) {
             recent.get(key)?.let { return cached("5-minute exact-input cache", it) }
-        }
-        val intent = try {
-            val parsed = interpret(text)
-            menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) } ?: parsed
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            throw FoodInterpretationException(error)
-        }
-        if (menuDishes == null) {
+            // Both caches are keyed on the typed text alone, so a repeated entry is answered
+            // before the interpretation model is asked anything.
             repository.cachedFoodResearch(key)?.let {
                 debug.recordRoute(
                     route = NutritionRoute.NEW_RESEARCH,
@@ -47,6 +39,14 @@ internal class FoodResearchResolver(
                 )
                 return cached("21-day validated research cache", it)
             }
+        }
+        val intent = try {
+            val parsed = interpret(text)
+            menuDishes?.let { UserQuantityResolver.applyMenuQuantities(it, parsed) } ?: parsed
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            throw FoodInterpretationException(error)
         }
         catalog.cachedAnalysis(intent)?.let { return cached("per-100-g local food cache", it) }
         onResearch()

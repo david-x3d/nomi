@@ -59,6 +59,7 @@ internal fun mapSettings(
             hasPrimaryApiKey = keys[pipeline]?.primary == true,
             hasSearchApiKey = keys[pipeline]?.search == true &&
                 selected.usesExaSearch,
+            reasoning = com.nomi.app.ai.model.AiReasoningEffort.fromStored(selected.reasoningEffort),
         )
     }
     val reminders = prefs.reminders

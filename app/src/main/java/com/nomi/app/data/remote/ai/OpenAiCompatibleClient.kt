@@ -17,7 +17,10 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import com.nomi.app.ai.validation.AiValidationException
 import java.net.URI
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.SerializationException
 import java.util.Locale
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -34,7 +37,10 @@ import kotlinx.serialization.json.put
 class OpenAiCompatibleClient(
     val json: Json = Json {
         ignoreUnknownKeys = true
-        isLenient = false
+        // Models hand back null for an empty list and quote the odd number; neither is a reason
+        // to lose the entry.
+        isLenient = true
+        coerceInputValues = true
         explicitNulls = false
         encodeDefaults = true
     },
@@ -241,6 +247,8 @@ internal data class ChatCompletionRequest(
     val provider: OpenRouterProviderPreferences? = null,
     /** OpenRouter only: how much the model may think before it answers. */
     val reasoning: OpenRouterReasoning? = null,
+    /** Everyone else's spelling of the same setting; sent only when the user chose a level. */
+    @SerialName("reasoning_effort") val reasoningEffort: String? = null,
 )
 
 /**
@@ -281,7 +289,11 @@ internal data class OpenRouterResponsesResearchRequest(
     val tools: List<OpenRouterServerTool>,
     @SerialName("max_tool_calls") val maxToolCalls: Int,
     val provider: OpenRouterProviderPreferences? = null,
+    val reasoning: OpenRouterResponsesReasoning? = null,
 )
+
+@Serializable
+internal data class OpenRouterResponsesReasoning(val effort: String)
 
 @Serializable
 internal data class ChatMessage(
@@ -342,7 +354,8 @@ private data class ChatChoice(val message: AssistantMessage)
 
 @Serializable
 private data class AssistantMessage(
-    val content: JsonPrimitive? = null,
+    /** A string from most providers; a list of typed parts from some compatible ones. */
+    val content: JsonElement? = null,
     val annotations: List<MessageAnnotation>? = null,
 )
 
@@ -443,7 +456,10 @@ internal fun chatCompletionRequest(
     },
     maxTokens = maxTokens,
     provider = config.openRouterProviderPreferences(openRouterLimits),
-    reasoning = openRouterLimits?.let { OpenRouterReasoning(effort = it.reasoningEffort) },
+    // The level chosen in Settings wins over the low effort research asks for by itself.
+    reasoning = (config.chosenReasoningEffort().takeIf { config.kind == AiProviderKind.OPEN_ROUTER }
+        ?: openRouterLimits?.reasoningEffort)?.let { OpenRouterReasoning(effort = it) },
+    reasoningEffort = config.chosenReasoningEffort().takeIf { config.takesReasoningEffortField() },
 ).also {
     require(openRouterLimits == null || config.kind == AiProviderKind.OPEN_ROUTER) {
         "OpenRouter request limits only apply to OpenRouter."
@@ -477,7 +493,21 @@ internal fun openRouterResponsesResearchRequest(
         tools = openRouterResearchTools(),
         maxToolCalls = 15,
         provider = config.openRouterProviderPreferences(limits = null),
+        reasoning = config.chosenReasoningEffort()?.let(::OpenRouterResponsesReasoning),
     )
+}
+
+/** The level picked in Settings in wire form, or null when the provider default applies. */
+internal fun AiProviderConfig.chosenReasoningEffort(): String? = reasoningEffort.wireValue
+
+/**
+ * Whether the plain `reasoning_effort` field may be sent. OpenRouter has its own `reasoning`
+ * object, and Sonar's search models reject the field; only Perplexity's deep research takes it.
+ */
+private fun AiProviderConfig.takesReasoningEffortField(): Boolean = when (kind) {
+    AiProviderKind.OPEN_ROUTER, AiProviderKind.EXA_OPEN_ROUTER -> false
+    AiProviderKind.PERPLEXITY -> model.contains("deep-research", ignoreCase = true)
+    else -> true
 }
 
 /**
@@ -628,10 +658,47 @@ internal fun decodeOpenRouterResponsesResearchPayload(
     .responsesWebCompletion(providerName = "OpenRouter", requiresFetchedBrandedSource = true)
 
 private fun ChatCompletionResponse.structuredContent(): String {
-    val raw = choices.firstOrNull()?.message?.content?.content
-        ?: throw IllegalStateException("The AI provider returned no structured content")
+    val raw = choices.firstOrNull()?.message?.content?.answerText()?.takeIf(String::isNotBlank)
+        ?: throw UnreadableProviderAnswerException("The AI provider returned no structured content")
     return extractJsonDocument(raw)
 }
+
+private fun JsonElement.answerText(): String? = when (this) {
+    is JsonPrimitive -> content.takeIf { isString }
+    is JsonArray -> filterIsInstance<JsonObject>()
+        .filter { part ->
+            val type = (part["type"] as? JsonPrimitive)?.content
+            type == null || type == "text" || type == "output_text"
+        }
+        .mapNotNull { part -> (part["text"] as? JsonPrimitive)?.takeIf(JsonPrimitive::isString)?.content }
+        .joinToString("\n")
+    else -> null
+}
+
+/** An answer with nothing in it to decode. The message keeps the wording failure texts match on. */
+internal class UnreadableProviderAnswerException(message: String) : IllegalStateException(message)
+
+/**
+ * Asks once more when an answer could not be read.
+ *
+ * A model that returned cut-off JSON, an empty message or a field of the wrong shape nearly always
+ * answers properly the second time, so the user is only told about it when it happens twice.
+ */
+internal suspend fun <T> retryingUnreadableAnswer(request: suspend () -> T): T = try {
+    request()
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (error: Exception) {
+    if (!error.isUnreadableAnswer()) throw error
+    request()
+}
+
+private fun Throwable.isUnreadableAnswer(): Boolean =
+    this is SerializationException ||
+        this is UnreadableProviderAnswerException ||
+        (this is AiValidationException && message?.contains("no structured", ignoreCase = true) == true)
+
+private val THINKING_BLOCK = Regex("(?is)<think(?:ing)?>.*?</think(?:ing)?>")
 
 /** Decodes the same response envelope used by Ktor; kept internal for provider fixture tests. */
 internal fun decodeChatCompletionPayload(json: Json, payload: String): String =
@@ -643,7 +710,8 @@ internal fun decodeChatCompletionPayload(json: Json, payload: String): String =
  * perform the strict schema validation.
  */
 internal fun extractJsonDocument(raw: String): String {
-    val content = raw.trim().removePrefix("\uFEFF")
+    // Reasoning some models print ahead of the answer can hold braces of its own.
+    val content = raw.replace(THINKING_BLOCK, "").trim().removePrefix("\uFEFF")
     val start = content.indexOf('{')
     if (start < 0) return content
 

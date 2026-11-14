@@ -308,6 +308,7 @@ internal class AiProviderAccess(
             endpoint = runCatching { selection.toRuntimeConfig().endpoint }
                 .getOrElse { selection.endpoint.orEmpty() },
             model = selection.model,
+            reasoning = com.nomi.app.ai.model.AiReasoningEffort.fromStored(selection.reasoningEffort),
         )
     }
 

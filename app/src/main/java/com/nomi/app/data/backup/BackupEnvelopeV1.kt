@@ -98,6 +98,7 @@ data class BackupProviderSelectionV1(
     val model: String,
     /** Endpoint only; URI user-info, query parameters, and fragments are rejected as secret-prone. */
     val endpoint: String? = null,
+    val reasoningEffort: String? = null,
 )
 
 @Serializable

@@ -46,6 +46,7 @@ object LocalFoodIntentParser {
 
         parseExplicitAmount(text)?.let { return it }
         UserQuantityResolver.parseCountIntentOrNull(text)?.let { return it }
+        parseAmountList(text)?.let { return it }
         if (unsafeCharacters.containsMatchIn(text)) return null
 
         val tokens = text.split(' ')
@@ -95,6 +96,28 @@ object LocalFoodIntentParser {
             ),
         )
     }
+
+    /**
+     * A plain list in which every entry opens with its own number, such as
+     * `2 Eier, 100 g Haferflocken und 1 Banane`, needs no model to take apart.
+     *
+     * The leading number is what makes the split safe: "Fish and Chips" or "Nudeln mit Soße" has
+     * no number after the joining word, so it still goes to the interpretation provider.
+     */
+    private fun parseAmountList(text: String): ParsedFoodIntent? {
+        val segments = text.split(listSeparator).map(String::trim)
+        if (segments.size < 2 || segments.any { !it.firstOrNull().isAsciiDigit() }) return null
+        val items = segments.map { segment ->
+            (parseExplicitAmount(segment) ?: UserQuantityResolver.parseCountIntentOrNull(segment))
+                ?.items?.singleOrNull() ?: return null
+        }
+        return ParsedFoodIntent(originalText = text, items = items)
+    }
+
+    /** A comma between two digits is a decimal comma and never separates foods. */
+    private val listSeparator = Regex("""(?iu)\s*(?:(?<!\d),|,(?!\d)|;|\+)\s*|\s+(?:und|and|plus)\s+""")
+
+    private fun Char?.isAsciiDigit(): Boolean = this != null && this in '0'..'9'
 
     private fun String.isGenericSpoon(): Boolean = lowercase(Locale.ROOT)
         .replace('\u00f6', 'o')

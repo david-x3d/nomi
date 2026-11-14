@@ -60,13 +60,16 @@ class OpenAiCompatibleProviders(
 
     override suspend fun parseFood(text: String): ParsedFoodIntent {
         require(text.isNotBlank()) { "Enter what you ate first" }
-        val raw = client.completeJson(
-            config = parsingConfig,
-            credential = parsingCredential(),
-            systemPrompt = "You are Nomi's structured multilingual food parser.",
-            userPrompt = AiPrompts.parseFood(text),
-        )
-        val providerIntent: ParsedFoodIntent = client.json.decodeFromString(raw)
+        val providerIntent: ParsedFoodIntent = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeJson(
+                    config = parsingConfig,
+                    credential = parsingCredential(),
+                    systemPrompt = "You are Nomi's structured multilingual food parser.",
+                    userPrompt = AiPrompts.parseFood(text),
+                ),
+            )
+        }
         AiResponseValidator.validate(providerIntent)
         return AiResponseValidator.validate(
             UserQuantityResolver.reconcileParsedIntent(text, providerIntent, localeCountryProvider()),
@@ -93,7 +96,7 @@ class OpenAiCompatibleProviders(
         localeCountry: String?,
         onPagesConsulted: suspend (List<String>) -> Unit = {},
     ): FoodAnalysis {
-        suspend fun research(prompt: String): FoodAnalysis {
+        suspend fun research(prompt: String): FoodAnalysis = retryingUnreadableAnswer {
             val completion = client.completeWebSearchJson(
                 config = nutritionConfig,
                 credential = nutritionCredential(),
@@ -112,7 +115,7 @@ class OpenAiCompatibleProviders(
                 fetchedUrls = completion.fetchedUrls,
                 requiresFetchedBrandedSource = completion.requiresFetchedBrandedSource,
             )
-            return UserQuantityResolver.reconcileAnalysis(
+            UserQuantityResolver.reconcileAnalysis(
                 reconciledIntent,
                 withCalorieBias(groundedAnalysis),
             )
@@ -178,25 +181,28 @@ class OpenAiCompatibleProviders(
         localeCountry: String?,
         consultedUrls: List<String> = emptyList(),
     ): FoodAnalysis {
-        val raw = client.completeJson(
-            config = nutritionConfig.copy(kind = when (nutritionConfig.kind) {
-                AiProviderKind.EXA_GEMINI -> AiProviderKind.GEMINI
-                AiProviderKind.EXA_OPEN_ROUTER -> AiProviderKind.OPEN_ROUTER
-                else -> nutritionConfig.kind
-            }),
-            credential = nutritionCredential(),
-            systemPrompt = "You estimate nutrition per 100 g or 100 ml as validated JSON only; " +
-                "Nomi performs all serving arithmetic.",
-            userPrompt = AiPrompts.estimateNutrition(reconciledIntent, client.json, localeCountry),
-            openRouterLimits = if (nutritionConfig.kind == AiProviderKind.EXA_OPEN_ROUTER) {
-                OpenRouterRequestLimits(
-                    maxPromptPrice = OPENROUTER_RESEARCH_MAX_PROMPT_PRICE,
-                    maxCompletionPrice = OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE,
-                    reasoningEffort = "low",
-                )
-            } else null,
-        )
-        val analysis: FoodAnalysis = client.json.decodeFromString(raw)
+        val analysis: FoodAnalysis = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeJson(
+                    config = nutritionConfig.copy(kind = when (nutritionConfig.kind) {
+                        AiProviderKind.EXA_GEMINI -> AiProviderKind.GEMINI
+                        AiProviderKind.EXA_OPEN_ROUTER -> AiProviderKind.OPEN_ROUTER
+                        else -> nutritionConfig.kind
+                    }),
+                    credential = nutritionCredential(),
+                    systemPrompt = "You estimate nutrition per 100 g or 100 ml as validated JSON only; " +
+                        "Nomi performs all serving arithmetic.",
+                    userPrompt = AiPrompts.estimateNutrition(reconciledIntent, client.json, localeCountry),
+                    openRouterLimits = if (nutritionConfig.kind == AiProviderKind.EXA_OPEN_ROUTER) {
+                        OpenRouterRequestLimits(
+                            maxPromptPrice = OPENROUTER_RESEARCH_MAX_PROMPT_PRICE,
+                            maxCompletionPrice = OPENROUTER_RESEARCH_MAX_COMPLETION_PRICE,
+                            reasoningEffort = "low",
+                        )
+                    } else null,
+                ),
+            )
+        }
         // sourceUrl stays null on purpose: no single page published these numbers, and filling
         // it would let SourceIntegrityVerifier read the estimate as a cited result. The pages
         // the search had already reached ride along as supporting citations, capped at the
@@ -244,13 +250,16 @@ class OpenAiCompatibleProviders(
         userCorrection: String,
     ): PortionAdjustment {
         require(userCorrection.isNotBlank()) { "Describe what should change" }
-        val raw = client.completeJson(
-            config = portionConfig,
-            credential = portionCredential(),
-            systemPrompt = "You interpret portion corrections and never do nutrition arithmetic.",
-            userPrompt = AiPrompts.adjustPortion(current, userCorrection, client.json),
-        )
-        val adjustment: PortionAdjustment = client.json.decodeFromString(raw)
+        val adjustment: PortionAdjustment = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeJson(
+                    config = portionConfig,
+                    credential = portionCredential(),
+                    systemPrompt = "You interpret portion corrections and never do nutrition arithmetic.",
+                    userPrompt = AiPrompts.adjustPortion(current, userCorrection, client.json),
+                ),
+            )
+        }
         return AiResponseValidator.validate(current, adjustment)
     }
 
@@ -263,13 +272,16 @@ class OpenAiCompatibleProviders(
         userEdit: String,
     ): FoodEditClassification {
         require(userEdit.isNotBlank()) { "Describe what should change" }
-        val raw = client.completeJson(
-            config = portionConfig,
-            credential = portionCredential(),
-            systemPrompt = "You route food corrections and never produce nutrition values.",
-            userPrompt = AiPrompts.classifyFoodEdit(current, userEdit, client.json),
-        )
-        val classification: FoodEditClassification = client.json.decodeFromString(raw)
+        val classification: FoodEditClassification = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeJson(
+                    config = portionConfig,
+                    credential = portionCredential(),
+                    systemPrompt = "You route food corrections and never produce nutrition values.",
+                    userPrompt = AiPrompts.classifyFoodEdit(current, userEdit, client.json),
+                ),
+            )
+        }
         return AiResponseValidator.validate(classification)
     }
 
@@ -278,42 +290,50 @@ class OpenAiCompatibleProviders(
         mediaType: String,
     ): NutritionLabelReading {
         require(imageBytes.isNotEmpty()) { "The selected image is empty" }
-        val raw = client.completeVisionJson(
-            config = visionConfig,
-            credential = visionCredential(),
-            prompt = AiPrompts.readNutritionLabel(),
-            base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
-            mediaType = mediaType,
-        )
-        throwIfLabelUnreadable(client.json, raw)
-        val reading: NutritionLabelReading = client.json.decodeFromString(raw)
+        val reading: NutritionLabelReading = retryingUnreadableAnswer {
+            val raw = client.completeVisionJson(
+                config = visionConfig,
+                credential = visionCredential(),
+                prompt = AiPrompts.readNutritionLabel(),
+                base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
+                mediaType = mediaType,
+            )
+            throwIfLabelUnreadable(client.json, raw)
+            client.json.decodeFromString(raw)
+        }
         return AiResponseValidator.validate(reading)
     }
 
     override suspend fun identifyFood(imageBytes: ByteArray, mediaType: String): VisionFoodResult {
         require(imageBytes.isNotEmpty()) { "The selected image is empty" }
-        val raw = client.completeVisionJson(
-            config = visionConfig,
-            credential = visionCredential(),
-            prompt = AiPrompts.identifyFoodFromPhoto(),
-            base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
-            mediaType = mediaType,
-        )
-        val visionResult: VisionFoodResult = client.json.decodeFromString(raw)
+        val visionResult: VisionFoodResult = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeVisionJson(
+                    config = visionConfig,
+                    credential = visionCredential(),
+                    prompt = AiPrompts.identifyFoodFromPhoto(),
+                    base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
+                    mediaType = mediaType,
+                ),
+            )
+        }
         return AiResponseValidator.validate(visionResult)
     }
 
     override suspend fun scanMenu(imageBytes: ByteArray, mediaType: String): MenuScanResult {
         require(imageBytes.isNotEmpty()) { "The selected image is empty" }
-        val raw = client.completeVisionJson(
-            config = visionConfig,
-            credential = visionCredential(),
-            prompt = AiPrompts.readRestaurantMenu(),
-            base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
-            mediaType = mediaType,
-            maxTokens = 8_192,
-        )
-        val result: MenuScanResult = client.json.decodeFromString(raw)
+        val result: MenuScanResult = retryingUnreadableAnswer {
+            client.json.decodeFromString(
+                client.completeVisionJson(
+                    config = visionConfig,
+                    credential = visionCredential(),
+                    prompt = AiPrompts.readRestaurantMenu(),
+                    base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP),
+                    mediaType = mediaType,
+                    maxTokens = 8_192,
+                ),
+            )
+        }
         return AiResponseValidator.validate(result)
     }
 }

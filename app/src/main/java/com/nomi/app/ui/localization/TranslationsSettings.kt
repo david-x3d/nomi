@@ -398,6 +398,37 @@ internal val settingsTranslations: Map<String, NomiTranslation> = mapOf(
         de = "Modell", es = "Modelo", fr = "Modèle", it = "Modello", nl = "Model",
         pt = "Modelo", sq = "Modeli", sv = "Modell", tr = "Model",
     ),
+    "Reasoning" to NomiTranslation(
+        de = "Reasoning", es = "Razonamiento", fr = "Raisonnement", it = "Ragionamento",
+        nl = "Redeneren", pt = "Raciocínio", sq = "Arsyetimi", sv = "Resonemang", tr = "Akıl yürütme",
+    ),
+    "How much the model thinks before it answers. More is slower and costs more; not every model accepts every level." to NomiTranslation(
+        de = "Wie viel das Modell nachdenkt, bevor es antwortet. Mehr ist langsamer und teurer; nicht jedes Modell akzeptiert jede Stufe.",
+        es = "Cuánto piensa el modelo antes de responder. Más es más lento y más caro; no todos los modelos aceptan todos los niveles.",
+        fr = "À quel point le modèle réfléchit avant de répondre. Plus, c’est plus lent et plus cher ; tous les modèles n’acceptent pas tous les niveaux.",
+        it = "Quanto il modello riflette prima di rispondere. Di più è più lento e costa di più; non tutti i modelli accettano ogni livello.",
+        nl = "Hoeveel het model nadenkt voordat het antwoordt. Meer is trager en duurder; niet elk model accepteert elk niveau.",
+        pt = "Quanto o modelo pensa antes de responder. Mais é mais lento e mais caro; nem todos os modelos aceitam todos os níveis.",
+        sq = "Sa mendon modeli para se të përgjigjet. Më shumë është më e ngadaltë dhe kushton më shumë; jo çdo model pranon çdo nivel.",
+        sv = "Hur mycket modellen tänker innan den svarar. Mer är långsammare och dyrare; alla modeller godtar inte alla nivåer.",
+        tr = "Modelin yanıtlamadan önce ne kadar düşündüğü. Fazlası daha yavaş ve daha pahalıdır; her model her düzeyi kabul etmez.",
+    ),
+    "Default" to NomiTranslation(
+        de = "Standard", es = "Predeterminado", fr = "Par défaut", it = "Predefinito", nl = "Standaard",
+        pt = "Padrão", sq = "Parazgjedhur", sv = "Standard", tr = "Varsayılan",
+    ),
+    "Off" to NomiTranslation(
+        de = "Aus", es = "Desactivado", fr = "Désactivé", it = "Disattivato", nl = "Uit",
+        pt = "Desligado", sq = "Fikur", sv = "Av", tr = "Kapalı",
+    ),
+    "Medium" to NomiTranslation(
+        de = "Mittel", es = "Medio", fr = "Moyen", it = "Medio", nl = "Gemiddeld",
+        pt = "Médio", sq = "Mesatar", sv = "Medel", tr = "Orta",
+    ),
+    "High" to NomiTranslation(
+        de = "Hoch", es = "Alto", fr = "Élevé", it = "Alto", nl = "Hoog",
+        pt = "Alto", sq = "I lartë", sv = "Hög", tr = "Yüksek",
+    ),
     "API key" to NomiTranslation(
         de = "API-Schlüssel", es = "Clave de API", fr = "Clé d’API", it = "Chiave API",
         nl = "API-sleutel", pt = "Chave de API", sq = "Çelësi API", sv = "API-nyckel",
