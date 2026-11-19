@@ -2,6 +2,7 @@ package com.nomi.app.di
 
 import android.content.Context
 import com.nomi.app.BuildConfig
+import com.nomi.app.ai.usage.AiUsageRecorder
 import com.nomi.app.data.backup.NomiBackupService
 import com.nomi.app.data.export.NomiDiaryExportService
 import com.nomi.app.data.local.NomiDatabase
@@ -13,6 +14,7 @@ import com.nomi.app.data.repository.NomiRepository
 import com.nomi.app.data.security.AndroidKeystoreSecureSecretStore
 import com.nomi.app.data.security.SecureSecretStore
 import com.nomi.app.integration.health.HealthConnectManager
+import com.nomi.app.integration.logging.PendingLoggingManager
 import com.nomi.app.integration.notifications.ReminderScheduler
 
 /** Small process-wide dependency graph. Nomi keeps construction explicit and testable. */
@@ -22,14 +24,22 @@ class AppContainer(context: Context) {
     val database: NomiDatabase by lazy { NomiDatabase.getInstance(appContext) }
     val preferencesStore by lazy { DataStoreAppPreferencesStore(appContext) }
     val repository: NomiRepository by lazy { NomiRepository(database, preferencesStore) }
+    val usageRecorder: AiUsageRecorder by lazy { AiUsageRecorder(repository) }
     val secretStore: SecureSecretStore by lazy { AndroidKeystoreSecureSecretStore(appContext) }
     val healthConnect: HealthConnectManager by lazy { HealthConnectManager(appContext) }
-    val openAiClient: OpenAiCompatibleClient by lazy { OpenAiCompatibleClient() }
-    internal val exaGeminiClient: ExaGeminiHttpClient by lazy { ExaGeminiHttpClient() }
+    val openAiClient: OpenAiCompatibleClient by lazy {
+        OpenAiCompatibleClient(onUsageRecorded = usageRecorder::record)
+    }
+    internal val exaGeminiClient: ExaGeminiHttpClient by lazy {
+        ExaGeminiHttpClient(onUsageRecorded = usageRecorder::record)
+    }
     val openFoodFacts: OpenFoodFactsClient by lazy { OpenFoodFactsClient() }
     val backupService: NomiBackupService by lazy { NomiBackupService(database, preferencesStore, BuildConfig.VERSION_NAME) }
     val diaryExportService: NomiDiaryExportService by lazy {
         NomiDiaryExportService(database, BuildConfig.VERSION_NAME)
     }
     val reminderScheduler: ReminderScheduler by lazy { ReminderScheduler(appContext) }
+    val pendingLoggingManager: PendingLoggingManager by lazy {
+        PendingLoggingManager(appContext, this)
+    }
 }

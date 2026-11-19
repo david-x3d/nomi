@@ -19,5 +19,6 @@ class NomiApplication : Application() {
         // date/time broadcasts and APPWIDGET_UPDATE cover every other case.
         NomiWidgetUpdater.install(this, applicationScope)
         WearDataPublisher.install(this, applicationScope)
+        container.pendingLoggingManager.install()
     }
 }

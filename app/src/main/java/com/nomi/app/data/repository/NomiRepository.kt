@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.data.local.NomiDatabase
 import com.nomi.app.data.local.entity.AiDebugEventEntity
+import com.nomi.app.data.local.entity.AiUsageEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
@@ -14,6 +15,7 @@ import com.nomi.app.data.local.entity.FoodServingEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.data.local.entity.NutritionSourceEntity
 import com.nomi.app.data.local.entity.NutritionValues
+import com.nomi.app.data.local.entity.PendingFoodLogEntity
 import com.nomi.app.data.local.entity.SavedMealEntity
 import com.nomi.app.data.local.entity.SavedMealItemEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
@@ -132,6 +134,8 @@ class NomiRepository(
     private val mealDao = database.savedMealDao()
     private val weightDao = database.weightDao()
     private val debugDao = database.aiDebugEventDao()
+    private val usageDao = database.aiUsageEventDao()
+    private val pendingLogDao = database.pendingFoodLogDao()
     private val researchCacheJson = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -708,6 +712,64 @@ class NomiRepository(
 
     suspend fun pruneAiDebugEvents(cutoffEpochMillis: Long): Int =
         debugDao.deleteOlderThan(cutoffEpochMillis)
+
+    suspend fun recordAiUsageEvent(event: AiUsageEventEntity): Long =
+        usageDao.insert(event.copy(id = 0))
+
+    fun aiUsageEvents(sinceEpochMillis: Long? = null): Flow<List<AiUsageEventEntity>> =
+        if (sinceEpochMillis == null) {
+            usageDao.observeAll()
+        } else {
+            usageDao.observeSince(sinceEpochMillis)
+        }
+
+    suspend fun clearAiUsageEvents(): Int = usageDao.clear()
+
+    val allPendingFoodLogs: Flow<List<PendingFoodLogEntity>> = pendingLogDao.observeAll()
+
+    fun pendingFoodLogs(localDate: String): Flow<List<PendingFoodLogEntity>> {
+        validateLocalDate(localDate)
+        return pendingLogDao.observeForDate(localDate)
+    }
+
+    suspend fun enqueuePendingFoodLog(entry: PendingFoodLogEntity): Long {
+        validateLocalDate(entry.localDate)
+        require(entry.inputText.isNotBlank()) { "A meal description is required" }
+        return pendingLogDao.insert(entry.copy(id = 0))
+    }
+
+    suspend fun pendingFoodLogsByStatuses(statuses: List<String>): List<PendingFoodLogEntity> =
+        pendingLogDao.listByStatuses(statuses)
+
+    suspend fun pendingFoodLogById(id: Long): PendingFoodLogEntity? = pendingLogDao.getById(id)
+
+    suspend fun updatePendingFoodLogState(
+        id: Long,
+        status: String,
+        stageLabel: String?,
+        errorMessage: String?,
+        attemptCount: Int,
+        updatedAtEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean = pendingLogDao.updateState(
+        id = id,
+        status = status,
+        stageLabel = stageLabel,
+        errorMessage = errorMessage,
+        attemptCount = attemptCount,
+        updatedAtEpochMillis = updatedAtEpochMillis,
+    ) == 1
+
+    suspend fun updatePendingFoodLogStage(
+        id: Long,
+        stageLabel: String?,
+        updatedAtEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean = pendingLogDao.updateStage(
+        id = id,
+        stageLabel = stageLabel,
+        updatedAtEpochMillis = updatedAtEpochMillis,
+    ) == 1
+
+    suspend fun deletePendingFoodLog(id: Long): Boolean = pendingLogDao.deleteById(id) == 1
 
     private fun validateProfile(profile: UserProfileEntity) {
         LocalDate.parse(profile.dateOfBirth)

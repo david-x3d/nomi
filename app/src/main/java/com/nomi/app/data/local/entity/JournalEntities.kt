@@ -183,3 +183,54 @@ data class AiDebugEventEntity(
     @ColumnInfo(name = "safe_message") val safeMessage: String? = null,
     @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
 )
+
+/**
+ * Tracks every AI call, cache hit, and local-parser shortcut so the user can inspect token counts,
+ * cache savings, and estimated spend per provider/model without ever storing credentials or prompts.
+ */
+@Entity(
+    tableName = "ai_usage_events",
+    indices = [
+        Index(value = ["created_at_epoch_millis"]),
+        Index(value = ["resolution_kind", "created_at_epoch_millis"]),
+        Index(value = ["provider_id", "model"]),
+    ],
+)
+data class AiUsageEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val pipeline: String,
+    @ColumnInfo(name = "resolution_kind") val resolutionKind: String,
+    @ColumnInfo(name = "provider_id") val providerId: String,
+    val model: String,
+    @ColumnInfo(name = "prompt_tokens") val promptTokens: Int = 0,
+    @ColumnInfo(name = "completion_tokens") val completionTokens: Int = 0,
+    @ColumnInfo(name = "thoughts_tokens") val thoughtsTokens: Int = 0,
+    @ColumnInfo(name = "exa_searches") val exaSearches: Int = 0,
+    @ColumnInfo(name = "estimated_cost_usd") val estimatedCostUsd: Double = 0.0,
+    @ColumnInfo(name = "cost_source") val costSource: String = "FREE",
+    @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
+)
+
+/**
+ * Persistent queue entry for meals submitted while offline or processed in the background so
+ * leaving or closing the app never drops an in-flight lookup.
+ */
+@Entity(
+    tableName = "pending_food_logs",
+    indices = [
+        Index(value = ["local_date", "created_at_epoch_millis"]),
+        Index(value = ["status", "created_at_epoch_millis"]),
+    ],
+)
+data class PendingFoodLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "local_date") val localDate: String,
+    @ColumnInfo(name = "input_text") val inputText: String,
+    @ColumnInfo(name = "input_method") val inputMethod: String,
+    val status: String,
+    @ColumnInfo(name = "stage_label") val stageLabel: String? = null,
+    @ColumnInfo(name = "error_message") val errorMessage: String? = null,
+    @ColumnInfo(name = "attempt_count") val attemptCount: Int = 0,
+    @ColumnInfo(name = "created_at_epoch_millis") val createdAtEpochMillis: Long,
+    @ColumnInfo(name = "updated_at_epoch_millis") val updatedAtEpochMillis: Long,
+)

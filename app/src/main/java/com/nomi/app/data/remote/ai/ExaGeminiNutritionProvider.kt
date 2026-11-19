@@ -11,6 +11,8 @@ import com.nomi.app.ai.model.ParsedFoodItem
 import com.nomi.app.ai.model.QuantityUnits
 import com.nomi.app.ai.model.ResearchNutritionBasis
 import com.nomi.app.ai.provider.NutritionResearchProvider
+import com.nomi.app.ai.usage.AiUsageResolutionKind
+import com.nomi.app.ai.usage.AiUsageSample
 import com.nomi.app.ai.validation.AiResponseValidator
 import com.nomi.app.ai.validation.AiValidationException
 import com.nomi.app.ai.validation.NutritionFailureReason
@@ -117,6 +119,7 @@ internal class ExaGeminiHttpClient(
         expectSuccess = true
     },
     private val retryDelay: suspend (Long) -> Unit = { delay(it) },
+    private val onUsageRecorded: ((AiUsageSample) -> Unit)? = null,
 ) : ExaNutritionSearchGateway, GeminiNutritionExtractionGateway, AutoCloseable {
 
     override suspend fun search(
@@ -146,6 +149,16 @@ internal class ExaGeminiHttpClient(
                 }
             }.body<ExaSearchApiResponse>()
         }
+        onUsageRecorded?.invoke(
+            AiUsageSample(
+                pipeline = "FOOD_RESEARCH",
+                resolutionKind = AiUsageResolutionKind.AI_CALL,
+                providerId = "exa",
+                model = "exa-search",
+                exaSearches = 1,
+                reportedCostUsd = response.costDollars?.total,
+            ),
+        )
         return ExaSearchResponse(
             requestId = response.requestId,
             results = response.results.map { result ->
@@ -211,14 +224,25 @@ internal class ExaGeminiHttpClient(
                 }.body<GeminiGenerateContentResponse>()
             }
         }
-        val response = try {
-            generate(config.model)
+        val (usedModel, response) = try {
+            config.model to generate(config.model)
         } catch (failure: ProviderTemporarilyUnavailableException) {
             if (!config.model.equals(PREVIOUS_GEMINI_NUTRITION_MODEL, ignoreCase = true)) {
                 throw failure
             }
-            generate(DEFAULT_GEMINI_NUTRITION_MODEL)
+            DEFAULT_GEMINI_NUTRITION_MODEL to generate(DEFAULT_GEMINI_NUTRITION_MODEL)
         }
+        onUsageRecorded?.invoke(
+            AiUsageSample(
+                pipeline = "FOOD_RESEARCH",
+                resolutionKind = AiUsageResolutionKind.AI_CALL,
+                providerId = "gemini",
+                model = usedModel,
+                promptTokens = response.usageMetadata?.promptTokenCount ?: 0,
+                completionTokens = response.usageMetadata?.candidatesTokenCount ?: 0,
+                thoughtsTokens = response.usageMetadata?.thoughtsTokenCount ?: 0,
+            ),
+        )
         return response.candidates.firstOrNull()
             ?.content?.parts.orEmpty()
             .mapNotNull(GeminiPart::text)
@@ -946,6 +970,12 @@ private data class ExaTextRequest(val maxCharacters: Int = MAX_EXA_PAGE_TEXT_CHA
 private data class ExaSearchApiResponse(
     val requestId: String? = null,
     val results: List<ExaSearchApiResult> = emptyList(),
+    val costDollars: ExaCostDollars? = null,
+)
+
+@Serializable
+private data class ExaCostDollars(
+    val total: Double? = null,
 )
 
 @Serializable
@@ -1018,6 +1048,15 @@ internal fun geminiThinkingConfig(
 @Serializable
 private data class GeminiGenerateContentResponse(
     val candidates: List<GeminiCandidate> = emptyList(),
+    val usageMetadata: GeminiUsageMetadata? = null,
+)
+
+@Serializable
+private data class GeminiUsageMetadata(
+    val promptTokenCount: Int? = null,
+    val candidatesTokenCount: Int? = null,
+    val thoughtsTokenCount: Int? = null,
+    val totalTokenCount: Int? = null,
 )
 
 @Serializable

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -98,6 +99,8 @@ fun AiSettingsScreen(
     onExaFullPageTextChanged: (Boolean) -> Unit,
     onOpenRouterPreferredProviderChanged: (String) -> Unit,
     onCompareModels: () -> Unit,
+    onUsage: () -> Unit,
+    usageSummaryText: String,
     onDebug: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -270,6 +273,15 @@ fun AiSettingsScreen(
                     supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
                     onClick = onCompareModels,
                     iconColor = MaterialTheme.colorScheme.secondary,
+                )
+            }
+            item(key = "usage-cost") {
+                SettingsLink(
+                    icon = { Icon(Icons.Default.Payments, contentDescription = null) },
+                    title = nomiString("Usage & cost"),
+                    supporting = usageSummaryText,
+                    onClick = onUsage,
+                    iconColor = MaterialTheme.colorScheme.primary,
                 )
             }
 

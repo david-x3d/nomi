@@ -87,6 +87,7 @@ import com.nomi.app.domain.Micronutrient
 import com.nomi.app.ui.components.NomiIcons
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.NomiSheetHeader
+import com.nomi.app.ui.components.NomiTonalBackButton
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.components.WebsiteFaviconUrl
 import com.nomi.app.ui.components.nomiCardBorder
@@ -133,12 +134,11 @@ fun NomiFoodDetailScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = nomiString("Close nutrition details"),
-                        )
-                    }
+                    NomiTonalBackButton(
+                        onClick = onBack,
+                        icon = Icons.Default.Close,
+                        contentDescription = nomiString("Close nutrition details"),
+                    )
                 },
                 actions = {
                     IconButton(

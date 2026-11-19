@@ -6,6 +6,7 @@ import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ai.model.ParsedFoodIntent
 import com.nomi.app.ai.parsing.LocalFoodIntentParser
+import com.nomi.app.ai.usage.AiUsageRecorder
 import com.nomi.app.data.preferences.AppPreferences
 import com.nomi.app.data.preferences.ProviderPipeline
 import com.nomi.app.data.remote.openfoodfacts.BarcodeProduct
@@ -45,6 +46,7 @@ internal class FoodLoggingCoordinator(
     private val findBarcodeProduct: suspend (String) -> BarcodeProduct?,
     private val emitEvent: suspend (AppEvent) -> Unit,
     private val externalGroupId: String? = null,
+    private val usage: AiUsageRecorder? = null,
 ) {
     val recentlySavedInputs = MutableStateFlow<Map<String, String>>(emptyMap())
     private val draft = LoggingDraft()
@@ -208,8 +210,9 @@ internal class FoodLoggingCoordinator(
      * interpretation model otherwise, and with spellings repaired against the user's own log.
      */
     suspend fun interpret(text: String): ParsedFoodIntent = foodCatalog.withKnownSpellings(
-        LocalFoodIntentParser.parseOrNull(text)
-            ?: providers.withProvider(ProviderPipeline.FOOD_INTERPRETATION) { it.parseFood(text) },
+        LocalFoodIntentParser.parseOrNull(text)?.also {
+            usage?.recordLocalParse("FOOD_INTERPRETATION", "local-intent-parser")
+        } ?: providers.withProvider(ProviderPipeline.FOOD_INTERPRETATION) { it.parseFood(text) },
     )
 
     /** Binds the routing rules to this app's configured cheap classifier. */
@@ -235,7 +238,26 @@ internal class FoodLoggingCoordinator(
     fun researchEditedItem() = portions.researchEditedItem()
     fun applyPortionCorrection() = portions.applyPortionCorrection()
 
-    private val resolver = FoodResearchResolver(repository, foodCatalog, recentFoodAnalysisCache, debug, ::interpret)
+    private val resolver = FoodResearchResolver(repository, foodCatalog, recentFoodAnalysisCache, debug, ::interpret, usage)
+
+    /**
+     * Resolves [text] strictly from local caches and saves it immediately if found.
+     * Returns `true` when handled locally with zero network calls.
+     */
+    suspend fun tryResolveAndSaveLocally(text: String, method: AddFoodMethod): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return false
+        val key = foodAnalysisCacheKey(trimmed)
+        val local = resolver.resolveLocalOnly(trimmed, key) ?: return false
+        draft.destination = destination()
+        draft.lastLoggingText = trimmed
+        val request = beginRequest()
+        saveTextAnalysisAutomatically(local, defaultMealCategory(), trimmed, emptyList(), request)
+        return true
+    }
+
+    fun hasPendingMenuFor(text: String): Boolean =
+        pendingMenuLoggingText == text.trim() && pendingMenuDishes.isNotEmpty()
 
     fun analyzeText() {
         val current = draft.mutableLoggingState.value as? FoodLoggingUiState.Input ?: return

@@ -3,6 +3,8 @@ package com.nomi.app.data.remote.ai
 import com.nomi.app.ai.model.AiProviderConfig
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AiRuntimeCredential
+import com.nomi.app.ai.usage.AiUsageResolutionKind
+import com.nomi.app.ai.usage.AiUsageSample
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -49,6 +51,7 @@ class OpenAiCompatibleClient(
         install(HttpTimeout)
         expectSuccess = true
     },
+    private val onUsageRecorded: ((AiUsageSample) -> Unit)? = null,
 ) : AutoCloseable {
 
     suspend fun completeJson(
@@ -177,7 +180,7 @@ class OpenAiCompatibleClient(
         maxTokens: Int? = null,
         openRouterLimits: OpenRouterRequestLimits? = null,
     ): ChatCompletionResponse {
-        return httpClient.post(config.chatCompletionsUrl()) {
+        val response = httpClient.post(config.chatCompletionsUrl()) {
             contentType(ContentType.Application.Json)
             bearerAuth(credential.revealForRequest())
             config.extraHeaders.forEach { (name, value) -> header(name, value) }
@@ -196,6 +199,24 @@ class OpenAiCompatibleClient(
                 socketTimeoutMillis = config.effectiveTimeoutMillis()
             }
         }.body<ChatCompletionResponse>()
+        val pipeline = when {
+            messages.any { it.content is JsonArray } -> "VISION"
+            requireWebSearch -> "FOOD_RESEARCH"
+            forcedResponseFormat != null -> "FOOD_RESEARCH"
+            else -> "FOOD_INTERPRETATION"
+        }
+        onUsageRecorded?.invoke(
+            AiUsageSample(
+                pipeline = pipeline,
+                resolutionKind = AiUsageResolutionKind.AI_CALL,
+                providerId = config.kind.name.lowercase(Locale.ROOT),
+                model = config.model,
+                promptTokens = response.usage?.promptTokens ?: 0,
+                completionTokens = response.usage?.completionTokens ?: 0,
+                reportedCostUsd = response.usage?.cost,
+            ),
+        )
+        return response
     }
 
     private suspend fun completeOpenRouterResponsesResearch(
@@ -205,7 +226,7 @@ class OpenAiCompatibleClient(
         userPrompt: String,
     ): WebSearchCompletion {
         val endpoint = config.endpoint.trimEnd('/') + "/responses"
-        return httpClient.post(endpoint) {
+        val body = httpClient.post(endpoint) {
             contentType(ContentType.Application.Json)
             bearerAuth(credential.revealForRequest())
             config.extraHeaders.forEach { (name, value) -> header(name, value) }
@@ -216,7 +237,20 @@ class OpenAiCompatibleClient(
                 requestTimeoutMillis = config.effectiveTimeoutMillis()
                 socketTimeoutMillis = config.effectiveTimeoutMillis()
             }
-        }.body<JsonObject>().responsesWebCompletion(
+        }.body<JsonObject>()
+        val usage = body["usage"] as? JsonObject
+        onUsageRecorded?.invoke(
+            AiUsageSample(
+                pipeline = "FOOD_RESEARCH",
+                resolutionKind = AiUsageResolutionKind.AI_CALL,
+                providerId = config.kind.name.lowercase(Locale.ROOT),
+                model = config.model,
+                promptTokens = (usage?.get("input_tokens") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+                completionTokens = (usage?.get("output_tokens") as? JsonPrimitive)?.content?.toIntOrNull() ?: 0,
+                reportedCostUsd = (usage?.get("cost") as? JsonPrimitive)?.content?.toDoubleOrNull(),
+            ),
+        )
+        return body.responsesWebCompletion(
             providerName = "OpenRouter",
             requiresFetchedBrandedSource = true,
         )
@@ -347,6 +381,15 @@ private data class ChatCompletionResponse(
     val choices: List<ChatChoice> = emptyList(),
     val citations: List<String>? = null,
     @SerialName("search_results") val searchResults: List<SearchResult>? = null,
+    val usage: ChatUsage? = null,
+)
+
+@Serializable
+private data class ChatUsage(
+    @SerialName("prompt_tokens") val promptTokens: Int? = null,
+    @SerialName("completion_tokens") val completionTokens: Int? = null,
+    @SerialName("total_tokens") val totalTokens: Int? = null,
+    val cost: Double? = null,
 )
 
 @Serializable

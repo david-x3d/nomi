@@ -43,6 +43,8 @@ interface AppPreferencesStore {
     suspend fun setExaFullPageText(enabled: Boolean)
     suspend fun setOpenRouterPreferredProvider(slug: String)
     suspend fun setHealthNutritionSync(state: HealthNutritionSyncState)
+    suspend fun setAdaptiveTdee(state: AdaptiveTdeePreferences)
+    suspend fun setAiUsage(state: AiUsagePreferences)
 }
 
 class DataStoreAppPreferencesStore(
@@ -180,6 +182,14 @@ class DataStoreAppPreferencesStore(
         }
     }
 
+    override suspend fun setAdaptiveTdee(state: AdaptiveTdeePreferences) {
+        dataStore.edit { values -> values[Keys.ADAPTIVE_TDEE] = json.encodeToString(state) }
+    }
+
+    override suspend fun setAiUsage(state: AiUsagePreferences) {
+        dataStore.edit { values -> values[Keys.AI_USAGE] = json.encodeToString(state) }
+    }
+
     private fun decodePreferences(values: Preferences): AppPreferences {
         val defaults = AppPreferences()
         val legacyProviders = usesLegacyProviderDefaults(values[Keys.PROVIDER_DEFAULTS])
@@ -245,6 +255,14 @@ class DataStoreAppPreferencesStore(
                 values[Keys.HEALTH_NUTRITION_SYNC],
                 defaults.healthNutritionSync,
             ),
+            adaptiveTdee = decode(
+                values[Keys.ADAPTIVE_TDEE],
+                defaults.adaptiveTdee,
+            ),
+            aiUsage = decode(
+                values[Keys.AI_USAGE],
+                defaults.aiUsage,
+            ),
         )
     }
 
@@ -279,6 +297,8 @@ class DataStoreAppPreferencesStore(
         val EXA_FULL_PAGE_TEXT = booleanPreferencesKey("ai.exa_full_page_text")
         val OPENROUTER_PREFERRED_PROVIDER = stringPreferencesKey("ai.openrouter_preferred_provider")
         val HEALTH_NUTRITION_SYNC = stringPreferencesKey("health.nutrition_sync")
+        val ADAPTIVE_TDEE = stringPreferencesKey("nutrition.adaptive_tdee")
+        val AI_USAGE = stringPreferencesKey("ai.usage")
 
         fun provider(pipeline: ProviderPipeline) = when (pipeline) {
             ProviderPipeline.FOOD_RESEARCH -> FOOD_RESEARCH_PROVIDER

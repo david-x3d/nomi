@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -76,6 +77,7 @@ import com.nomi.app.ui.components.NomiFoxMood
 import com.nomi.app.ui.components.NomiMenu
 import com.nomi.app.ui.components.NomiMenuItem
 import com.nomi.app.ui.components.NomiTextField
+import com.nomi.app.ui.components.NomiTonalBackButton
 import com.nomi.app.ui.components.hairlineOnPitchBlack
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
@@ -147,26 +149,26 @@ fun HistoryScreen(
                 // two different intentions and should not share a gesture.
                 title = { Text(nomiString(selection?.action?.titleKey() ?: "History")) },
                 navigationIcon = {
-                    IconButton(
+                    NomiTonalBackButton(
                         onClick = { if (selection != null) onCancelSelection() else onBack() },
-                    ) {
-                        Icon(
-                            imageVector = if (selection != null) {
-                                Icons.Default.Close
-                            } else {
-                                Icons.AutoMirrored.Filled.ArrowBack
-                            },
-                            contentDescription = nomiString(
-                                if (selection != null) "Cancel selection" else "Back",
-                            ),
-                        )
-                    }
+                        icon = if (selection != null) {
+                            Icons.Default.Close
+                        } else {
+                            Icons.AutoMirrored.Filled.ArrowBack
+                        },
+                        contentDescription = nomiString(
+                            if (selection != null) "Cancel selection" else "Back",
+                        ),
+                    )
                 },
                 actions = {
                     // Browsing keeps only the date picker up here. A day's own actions live with the
                     // day, so History reads as a browser rather than a control panel.
                     if (selection == null) {
-                        IconButton(onClick = { showDatePicker = true }) {
+                        FilledTonalIconButton(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.padding(end = 8.dp),
+                        ) {
                             Icon(
                                 Icons.Default.CalendarMonth,
                                 contentDescription = nomiString("Choose date"),

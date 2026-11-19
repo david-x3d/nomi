@@ -1,3 +1,10 @@
+## 2.14.0
+
+- **AI usage & cost tracker:** New **Usage & cost** dashboard under **Settings → AI provider** with 7-day, 30-day, and all-time views, estimated spend, cache/local savings ring, token & Exa search breakdown, per-model and per-task charts, Exa \$10 free starter credit tracking (with out-of-pocket calculation), and automatic historical backfill from pre-update food logs.
+- **Adaptive TDEE & weekly calorie check-in:** New **Adaptive TDEE** card on **Progress** that smooths weigh-ins with an EWMA trend, compares real expenditure against the formula baseline, and offers gentle weekly calorie & macro check-ins bounded by safety floors.
+- **Offline logging queue & exit-safe background processing:** Meals submitted on Today are persisted immediately and processed in the background so leaving or closing Nomi never cancels an in-flight lookup. Meals logged while offline stay queued on Today and log automatically once connectivity returns.
+- **Material 3 Expressive polish across the app:** Unified expressive `MaterialShapes` icon badges, tonal back/action buttons, and grouped tonal tiles across Progress, Food Library, History, Goals Sheet, and Nutrition Details.
+
 ## 2.13.0
 
 - Add a **Reasoning** dropdown to every AI task in Settings (food research, food interpretation, portion changes, photo recognition and fallback): Default, Off, Low, Medium or High. Default sends nothing extra, so models that reject the setting keep working.

@@ -31,6 +31,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.MonitorWeight
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -62,7 +66,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nomi.app.domain.UnitFormatter
+import com.nomi.app.ui.components.ExpressiveBadgeStyle
 import com.nomi.app.ui.components.NomiCard
+import com.nomi.app.ui.components.NomiExpressiveBadge
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiString
@@ -72,6 +78,7 @@ import com.nomi.app.ui.theme.nomiPageContainerColor
 import com.nomi.app.ui.theme.nomiPageMotionSpec
 import com.nomi.app.ui.theme.nomiProgressMotionSpec
 import com.nomi.app.ui.today.formatted
+import com.nomi.app.domain.calculator.AdaptiveTdeeEstimate
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -82,6 +89,8 @@ fun ProgressScreen(
     metric: Boolean,
     onRangeChanged: (ProgressRange) -> Unit,
     onAddWeight: () -> Unit,
+    onApplyAdaptiveCheckIn: (AdaptiveTdeeEstimate.Ready) -> Unit = {},
+    onDismissAdaptiveCheckIn: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // The title collapses into the bar as you read down, which is what gives a Material screen
@@ -156,6 +165,15 @@ fun ProgressScreen(
                             onAddWeight = onAddWeight,
                             modifier = Modifier.padding(horizontal = 16.dp),
                         )
+                        animatedState.adaptiveTdee?.let { estimate ->
+                            AdaptiveTdeeCard(
+                                estimate = estimate,
+                                metric = metric,
+                                onApplyCheckIn = onApplyAdaptiveCheckIn,
+                                onDismissCheckIn = onDismissAdaptiveCheckIn,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
+                        }
                         ConsistencySection(animatedState, Modifier.padding(horizontal = 16.dp))
                         AnimatedVisibility(
                             visible = animatedState.nutrition.isNotEmpty(),
@@ -216,11 +234,25 @@ private fun StreakCard(state: ProgressUiState, modifier: Modifier = Modifier) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(
-                    text = nomiString("Streak"),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    NomiExpressiveBadge(
+                        icon = Icons.Default.LocalFireDepartment,
+                        style = ExpressiveBadgeStyle.SOFT_BURST,
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        padding = 8.dp,
+                        iconSize = 18.dp,
+                    )
+                    Text(
+                        text = nomiString("Streak"),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
                 AnimatedContent(
                     targetState = milestone.streakDays,
                     transitionSpec = {
@@ -320,11 +352,25 @@ private fun WeightSection(
             verticalAlignment = Alignment.Top,
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = nomiString("Weight"),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    NomiExpressiveBadge(
+                        icon = Icons.Default.MonitorWeight,
+                        style = ExpressiveBadgeStyle.FLOWER,
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        padding = 8.dp,
+                        iconSize = 18.dp,
+                    )
+                    Text(
+                        text = nomiString("Weight"),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
                 AnimatedContent(
                     targetState = state.weights.lastOrNull()?.kilograms,
                     transitionSpec = {
@@ -532,12 +578,20 @@ private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modi
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            NomiExpressiveBadge(
+                icon = Icons.Default.CalendarToday,
+                style = ExpressiveBadgeStyle.CLOVER_4,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                padding = 9.dp,
+                iconSize = 18.dp,
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = nomiString("Consistency"),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 )
                 Text(
                     text = nomiFormat(
@@ -545,7 +599,7 @@ private fun ConsistencySection(state: ProgressUiState, modifier: Modifier = Modi
                         state.loggingDays,
                         state.totalDays,
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -586,18 +640,31 @@ private fun NutritionAverages(state: ProgressUiState, modifier: Modifier = Modif
         ),
         spacing = 16.dp,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = nomiString("Daily averages"),
-                style = MaterialTheme.typography.titleMedium,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NomiExpressiveBadge(
+                icon = Icons.Default.Restaurant,
+                style = ExpressiveBadgeStyle.COOKIE_4,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                padding = 9.dp,
+                iconSize = 18.dp,
             )
-            Text(
-                // Says what the numbers below are an average of, which is the part a bare
-                // four-row list never told the reader.
-                text = nomiFormat("Averaged over {0} logged days", state.nutrition.size),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = nomiString("Daily averages"),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+                Text(
+                    // Says what the numbers below are an average of, which is the part a bare
+                    // four-row list never told the reader.
+                    text = nomiFormat("Averaged over {0} logged days", state.nutrition.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         ProgressStat(
             label = nomiString("Calories"),

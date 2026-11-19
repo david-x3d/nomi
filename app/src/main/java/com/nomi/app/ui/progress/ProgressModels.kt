@@ -1,5 +1,6 @@
 package com.nomi.app.ui.progress
 
+import com.nomi.app.domain.calculator.AdaptiveTdeeEstimate
 import java.time.LocalDate
 
 enum class ProgressRange(val label: String) {
@@ -44,6 +45,8 @@ data class ProgressUiState(
     val streakDays: Int = 0,
     /** The longest run of consecutive logged days ever, from the whole log like [streakDays]. */
     val longestStreakDays: Int = 0,
+    /** 28-day adaptive expenditure estimate and weekly calorie check-in status. */
+    val adaptiveTdee: AdaptiveTdeeEstimate? = null,
 ) {
     /** The milestone view of [streakDays]; derived so no caller can hold a stale copy. */
     val milestone: StreakMilestone get() = streakMilestone(streakDays)

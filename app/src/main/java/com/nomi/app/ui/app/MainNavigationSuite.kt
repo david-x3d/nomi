@@ -204,6 +204,8 @@ internal fun MainNavigationSuite(
                         val loggingState by viewModel.loggingState.collectAsStateWithLifecycle()
                         val editedEntryId by viewModel.editedEntryId.collectAsStateWithLifecycle()
                         val aiSetupNeeded by viewModel.aiSetupNeeded.collectAsStateWithLifecycle()
+                        val pendingFoodLogs by viewModel.pendingFoodLogs.collectAsStateWithLifecycle()
+                        val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
                         NomiNotesTodayScreen(
                             state = todayState,
                             pendingDeletions = pendingDeletions,
@@ -237,6 +239,12 @@ internal fun MainNavigationSuite(
                             onConfirmPhotoDescription = viewModel::confirmPhotoDescription,
                             aiSetupNeeded = aiSetupNeeded,
                             onOpenAiSettings = { haptics.selected(); onAiSettings() },
+                            pendingFoodLogs = pendingFoodLogs,
+                            isOnline = isOnline,
+                            onRetryPending = { haptics.toggled(); viewModel.retryPendingFoodLog(it) },
+                            onRetryAllOffline = { haptics.toggled(); viewModel.retryAllOfflineFoodLogs() },
+                            onEditPending = { haptics.selected(); viewModel.editPendingFoodLog(it) },
+                            onCancelPending = { haptics.toggled(); viewModel.cancelPendingFoodLog(it) },
                         )
                     }
                     MainDestination.PROGRESS -> {
@@ -247,6 +255,14 @@ internal fun MainNavigationSuite(
                             metric = preferences.weightUnit == WeightUnitPreference.KILOGRAMS,
                             onRangeChanged = { haptics.toggled(); onProgressRange(it) },
                             onAddWeight = { haptics.selected(); onAddWeight() },
+                            onApplyAdaptiveCheckIn = {
+                                haptics.confirmed()
+                                viewModel.applyAdaptiveTdeeCheckIn(it)
+                            },
+                            onDismissAdaptiveCheckIn = {
+                                haptics.toggled()
+                                viewModel.dismissAdaptiveTdeeCheckIn()
+                            },
                         )
                     }
                     MainDestination.SETTINGS -> {

@@ -74,6 +74,8 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.FoodAnalysis
+import com.nomi.app.data.local.entity.PendingFoodLogEntity
+import com.nomi.app.integration.logging.PendingLoggingStatus
 import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.capture.rememberInlineDictation
 import com.nomi.app.ui.components.NomiFox
@@ -132,6 +134,12 @@ fun NomiNotesTodayScreen(
     onConfirmPhotoDescription: () -> Unit = {},
     aiSetupNeeded: Boolean = false,
     onOpenAiSettings: () -> Unit = {},
+    pendingFoodLogs: List<PendingFoodLogEntity> = emptyList(),
+    isOnline: Boolean = true,
+    onRetryPending: (Long) -> Unit = {},
+    onRetryAllOffline: () -> Unit = {},
+    onEditPending: (PendingFoodLogEntity) -> Unit = {},
+    onCancelPending: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val haptics = rememberNomiHaptics()
@@ -158,10 +166,13 @@ fun NomiNotesTodayScreen(
     // The fox reads the app's state, never the user's day: there is no mood for eating too
     // much or too little, because a mascot with an opinion about a number is one you stop
     // opening the app to avoid.
+    val hasBackgroundProcessing = pendingFoodLogs.any { it.status == PendingLoggingStatus.PROCESSING }
+    val hasFailedPending = pendingFoodLogs.any { it.status == PendingLoggingStatus.FAILED }
+    val queuedOfflineCount = pendingFoodLogs.count { it.status == PendingLoggingStatus.QUEUED_OFFLINE }
     val foxMood = when {
-        loggingState is FoodLoggingUiState.Error -> NomiFoxMood.CONCERNED
-        loggingState is FoodLoggingUiState.Processing || state.isLoading -> NomiFoxMood.CURIOUS
-        state.entries.isEmpty() -> NomiFoxMood.RESTING
+        loggingState is FoodLoggingUiState.Error || hasFailedPending -> NomiFoxMood.CONCERNED
+        loggingState is FoodLoggingUiState.Processing || state.isLoading || hasBackgroundProcessing -> NomiFoxMood.CURIOUS
+        state.entries.isEmpty() && pendingFoodLogs.isEmpty() -> NomiFoxMood.RESTING
         else -> NomiFoxMood.SETTLED
     }
     // A failed meal is worth one buzz, not one per recomposition.
@@ -330,9 +341,18 @@ fun NomiNotesTodayScreen(
                 }
 
                 val entries = displayedEntries
+                item(key = "offline-queue-banner") {
+                    OfflineQueueBanner(
+                        isOnline = isOnline,
+                        queuedCount = queuedOfflineCount,
+                        onRetryAll = onRetryAllOffline,
+                    )
+                }
                 item(key = "empty") {
                     AnimatedVisibility(
-                        visible = entries.isEmpty() && loggingState is FoodLoggingUiState.Input,
+                        visible = entries.isEmpty() &&
+                            pendingFoodLogs.isEmpty() &&
+                            loggingState is FoodLoggingUiState.Input,
                         enter = expandVertically(
                             animationSpec = contentSizeSpec,
                             expandFrom = Alignment.Top,
@@ -360,6 +380,26 @@ fun NomiNotesTodayScreen(
                             onTextChanged, onAnalyze, onDismissDraft, onDeleteFoodImmediately,
                             onFoodClick, onEditEntryText, onDeleteFood, onDuplicateFood, onFavoriteFood,
                             onEditFoodAmount, onUndoDeleteFood,
+                        )
+                    }
+                }
+
+                items(pendingFoodLogs, key = { "pending-${it.id}" }) { pending ->
+                    Box(
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = itemFadeSpec,
+                            placementSpec = itemSpatialSpec,
+                            fadeOutSpec = itemFadeSpec,
+                        ),
+                    ) {
+                        PendingMealCard(
+                            entry = pending,
+                            onRetry = onRetryPending,
+                            onEdit = { entry ->
+                                onEditPending(entry)
+                                composer.isOpen = true
+                            },
+                            onCancel = onCancelPending,
                         )
                     }
                 }

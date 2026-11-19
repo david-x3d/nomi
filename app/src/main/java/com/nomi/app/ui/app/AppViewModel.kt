@@ -5,11 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.nomi.app.ai.model.AiProviderKind
 import com.nomi.app.ai.model.AnalyzedFoodItem
 import com.nomi.app.ai.model.MenuDish
+import com.nomi.app.ai.usage.AiCostEstimator
+import com.nomi.app.ai.usage.AiUsageRange
+import com.nomi.app.ai.usage.AiUsageSummary
 import com.nomi.app.data.local.entity.AiDebugEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodEntity
 import com.nomi.app.data.local.entity.FoodLogEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
+import com.nomi.app.data.local.entity.PendingFoodLogEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
 import com.nomi.app.data.local.entity.WeightEntryEntity
 import com.nomi.app.data.local.model.FavoriteFoodWithCatalog
@@ -33,6 +37,8 @@ import com.nomi.app.data.share.ShareEnvelopeV1
 import com.nomi.app.di.AppContainer
 import com.nomi.app.domain.StepCalorieEstimate
 import com.nomi.app.domain.StepCalorieEstimator
+import com.nomi.app.domain.calculator.AdaptiveTdeeCalculator
+import com.nomi.app.domain.calculator.AdaptiveTdeeEstimate
 import com.nomi.app.domain.model.NutritionPlan
 import com.nomi.app.domain.model.OnboardingDraft
 import com.nomi.app.domain.usecase.FoodEditRouter
@@ -47,6 +53,7 @@ import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryUiState
 import com.nomi.app.ui.localization.NomiLanguage
 import com.nomi.app.ui.localization.NomiTranslations
+import com.nomi.app.ui.logging.FoodLoggingUiState
 import com.nomi.app.ui.logging.ManualFoodDraft
 import com.nomi.app.ui.profile.ProfileEdit
 import com.nomi.app.ui.progress.NutritionPoint
@@ -259,8 +266,43 @@ class AppViewModel(
         inUserLanguage = { inUserLanguage(it) },
         findBarcodeProduct = container.openFoodFacts::findByBarcode,
         emitEvent = mutableEvents::emit,
+        usage = container.usageRecorder,
     )
     private val recentlySavedInputs = logging.recentlySavedInputs
+
+    val isOnline: StateFlow<Boolean> = container.pendingLoggingManager.isOnline
+
+    val pendingFoodLogs: StateFlow<List<PendingFoodLogEntity>> = selectedDate
+        .flatMapLatest { date -> repository.pendingFoodLogs(date.toString()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val mutableAiUsageRange = MutableStateFlow(AiUsageRange.THIRTY_DAYS)
+    val aiUsageRange: StateFlow<AiUsageRange> = mutableAiUsageRange.asStateFlow()
+
+    val aiUsageSummary: StateFlow<AiUsageSummary> = mutableAiUsageRange
+        .flatMapLatest { range ->
+            val since = range.days?.let { System.currentTimeMillis() - it * 86_400_000L }
+            repository.aiUsageEvents(since).map(AiCostEstimator::summarize)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AiUsageSummary())
+
+    val aiUsageMonthlySummary: StateFlow<AiUsageSummary> = repository
+        .aiUsageEvents(System.currentTimeMillis() - 30L * 86_400_000L)
+        .map(AiCostEstimator::summarize)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AiUsageSummary())
+
+    val allTimeExaCostUsd: StateFlow<Double> = repository
+        .aiUsageEvents(null)
+        .map { events ->
+            events.sumOf { event ->
+                if (event.providerId.equals("exa", ignoreCase = true) || event.exaSearches > 0) {
+                    event.estimatedCostUsd.coerceAtLeast(0.0)
+                } else {
+                    0.0
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
     // Declared before the flows that read it: a property initialiser running earlier would see
     // null and take the whole view model down at construction.
@@ -390,6 +432,26 @@ class AppViewModel(
             emptyList(),
         )
 
+    private val adaptiveTdeeEstimate: Flow<AdaptiveTdeeEstimate> = currentDay.flatMapLatest { day ->
+        val windowStart = day.minusDays(AdaptiveTdeeCalculator.WINDOW_DAYS - 1)
+        combine(
+            repository.profile,
+            repository.currentPlan,
+            repository.weights(windowStart.toString(), day.toString()),
+            repository.nutritionHistory(windowStart.toString(), day.toString()),
+            repository.preferences,
+        ) { profile, plan, weights, nutrition, prefs ->
+            AdaptiveTdeeCalculator.evaluate(
+                today = day,
+                profile = profile,
+                plan = plan,
+                weights = weights,
+                nutrition = nutrition,
+                preferences = prefs.adaptiveTdee,
+            )
+        }
+    }
+
     val progressState: StateFlow<ProgressUiState> = combine(progressRange, currentDay, ::Pair).flatMapLatest { (range, day) ->
         val totalDays = range.dayCount()
         val start = day.minusDays((totalDays - 1).toLong())
@@ -398,7 +460,8 @@ class AppViewModel(
             repository.nutritionHistory(start.toString(), day.toString()),
             repository.profile,
             loggedDates,
-        ) { weights, nutrition, profile, dates ->
+            adaptiveTdeeEstimate,
+        ) { weights, nutrition, profile, dates, adaptiveTdee ->
             ProgressUiState(
                 range = range,
                 weights = weights.map { WeightPoint(LocalDate.parse(it.localDate), it.weightKg) },
@@ -421,6 +484,7 @@ class AppViewModel(
                     longestLoggingStreakDays(dates, day),
                     loggingStreakDays(dates, day),
                 ),
+                adaptiveTdee = adaptiveTdee,
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProgressUiState())
@@ -630,7 +694,116 @@ class AppViewModel(
     fun interpretPortionCorrection() = logging.interpretPortionCorrection()
     fun researchEditedItem() = logging.researchEditedItem()
     fun applyPortionCorrection() = logging.applyPortionCorrection()
-    fun analyzeText() = logging.analyzeText()
+    fun analyzeText() {
+        val current = logging.loggingState.value as? FoodLoggingUiState.Input
+        val text = current?.text?.trim().orEmpty()
+        // New typed/dictated entries go through the persistent offline/background queue so leaving
+        // or closing Nomi never cancels processing, and offline entries auto-log on reconnect.
+        if (current != null &&
+            text.isNotBlank() &&
+            logging.editedEntryId.value == null &&
+            !logging.hasPendingMenuFor(text)
+        ) {
+            val method = AddFoodMethod.TYPE
+            val targetDate = selectedDate.value
+            logging.dismissLoggingDraft()
+            viewModelScope.launch {
+                val handledLocally = runCatching {
+                    logging.tryResolveAndSaveLocally(text, method)
+                }.getOrDefault(false)
+                if (!handledLocally) {
+                    container.pendingLoggingManager.submit(text, method, targetDate)
+                }
+            }
+            return
+        }
+        logging.analyzeText()
+    }
+
+    fun retryPendingFoodLog(id: Long) = container.pendingLoggingManager.retry(id)
+    fun retryAllOfflineFoodLogs() = container.pendingLoggingManager.retryAllOffline()
+    fun cancelPendingFoodLog(id: Long) = container.pendingLoggingManager.cancel(id)
+    fun editPendingFoodLog(entry: PendingFoodLogEntity) {
+        container.pendingLoggingManager.cancel(entry.id)
+        val method = AddFoodMethod.entries.firstOrNull { it.name == entry.inputMethod } ?: AddFoodMethod.TYPE
+        logging.beginLogging(method, entry.inputText)
+    }
+
+    fun setAiUsageRange(range: AiUsageRange) {
+        mutableAiUsageRange.value = range
+    }
+
+    fun setExaFreeTierEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            container.preferencesStore.setAiUsage(
+                preferences.value.aiUsage.copy(exaFreeTierEnabled = enabled),
+            )
+        }
+    }
+
+    fun setExaFreeCreditUsd(amountUsd: Double) {
+        val clamped = amountUsd.coerceIn(0.0, 1_000.0)
+        viewModelScope.launch {
+            container.preferencesStore.setAiUsage(
+                preferences.value.aiUsage.copy(exaFreeCreditUsd = clamped),
+            )
+        }
+    }
+
+    fun clearAiUsageHistory() {
+        viewModelScope.launch {
+            repository.clearAiUsageEvents()
+            mutableEvents.emit(AppEvent.Message(inUserLanguage("Usage history cleared.")))
+        }
+    }
+
+    fun applyAdaptiveTdeeCheckIn(estimate: AdaptiveTdeeEstimate.Ready) {
+        val plan = currentPlan.value ?: return
+        viewModelScope.launch {
+            runCatching {
+                repository.saveNewPlan(
+                    plan.copy(
+                        id = 0,
+                        version = 0,
+                        effectiveFromLocalDate = today.toString(),
+                        maintenanceKcal = estimate.estimatedTdeeKcal.toDouble(),
+                        calorieTargetKcal = estimate.suggestedTargetKcal.toDouble(),
+                        proteinTargetGrams = estimate.suggestedMacros.proteinGrams.toDouble(),
+                        carbohydrateTargetGrams = estimate.suggestedMacros.carbohydrateGrams.toDouble(),
+                        fatTargetGrams = estimate.suggestedMacros.fatGrams.toDouble(),
+                        calorieTargetCustom = false,
+                        proteinTargetCustom = false,
+                        carbohydrateTargetCustom = false,
+                        fatTargetCustom = false,
+                        changeReason = "adaptive_tdee_checkin",
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+                container.preferencesStore.setAdaptiveTdee(
+                    preferences.value.adaptiveTdee.copy(
+                        lastCheckInDate = today.toString(),
+                        lastDismissedDate = null,
+                    ),
+                )
+            }.onSuccess {
+                mutableEvents.emit(
+                    AppEvent.Message(inUserLanguage("Weekly calorie check-in applied.")),
+                )
+            }.onFailure {
+                mutableEvents.emit(
+                    AppEvent.Message(inUserLanguage("Nomi couldn't apply the calorie check-in.")),
+                )
+            }
+        }
+    }
+
+    fun dismissAdaptiveTdeeCheckIn() {
+        viewModelScope.launch {
+            container.preferencesStore.setAdaptiveTdee(
+                preferences.value.adaptiveTdee.copy(lastDismissedDate = today.toString()),
+            )
+        }
+    }
     fun retryAnalysis() = logging.retryAnalysis()
     fun analyzeNutritionLabel(bytes: ByteArray, mediaType: String) = logging.analyzeNutritionLabel(bytes, mediaType)
     fun analyzePhoto(bytes: ByteArray, mediaType: String) = logging.analyzePhoto(bytes, mediaType)

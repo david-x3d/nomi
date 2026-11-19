@@ -35,6 +35,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nomi.app.data.preferences.GoalsCardStyle
+import com.nomi.app.ui.components.ExpressiveBadgeStyle
+import com.nomi.app.ui.components.NomiExpressiveBadge
 import com.nomi.app.ui.components.NomiSheet
 import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.localization.nomiFormat
@@ -102,15 +104,14 @@ private fun GoalsSheetHeader() {
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            Box(modifier = Modifier.size(50.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Flag, contentDescription = null, modifier = Modifier.size(26.dp))
-            }
-        }
+        NomiExpressiveBadge(
+            icon = Icons.Default.Flag,
+            style = ExpressiveBadgeStyle.COOKIE_9,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            padding = 12.dp,
+            iconSize = 24.dp,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
                 text = nomiString("Goals"),

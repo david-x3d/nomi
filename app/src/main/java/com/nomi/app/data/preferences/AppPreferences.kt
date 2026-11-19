@@ -157,6 +157,22 @@ data class PersistedOnboardingDraft(
 )
 
 @Serializable
+data class AdaptiveTdeePreferences(
+    val enabled: Boolean = true,
+    /** ISO local date (`YYYY-MM-DD`) of the last applied weekly calorie check-in. */
+    val lastCheckInDate: String? = null,
+    /** ISO local date (`YYYY-MM-DD`) when the user chose "Keep current" on a check-in. */
+    val lastDismissedDate: String? = null,
+)
+
+@Serializable
+data class AiUsagePreferences(
+    /** Exa includes free starter credits (default $10) before billing begins. */
+    val exaFreeTierEnabled: Boolean = true,
+    val exaFreeCreditUsd: Double = 10.0,
+)
+
+@Serializable
 data class AppPreferences(
     val theme: ThemePreference = ThemePreference.SYSTEM,
     val dynamicColorEnabled: Boolean = false,
@@ -201,6 +217,8 @@ data class AppPreferences(
      */
     val openRouterPreferredProvider: String = "",
     val healthNutritionSync: HealthNutritionSyncState = HealthNutritionSyncState(),
+    val adaptiveTdee: AdaptiveTdeePreferences = AdaptiveTdeePreferences(),
+    val aiUsage: AiUsagePreferences = AiUsagePreferences(),
 )
 
 /**

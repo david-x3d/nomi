@@ -22,6 +22,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.nomi.app.ai.usage.AiCostEstimator
 import com.nomi.app.data.preferences.enabledMicronutrients
 import com.nomi.app.ui.capture.BarcodeCaptureScreen
 import com.nomi.app.ui.capture.MenuScanScreen
@@ -30,13 +31,17 @@ import com.nomi.app.ui.capture.PhotoCaptureSubject
 import com.nomi.app.ui.history.HistoryScreen
 import com.nomi.app.ui.library.LibraryItemKind
 import com.nomi.app.ui.library.LibraryScreen
+import com.nomi.app.ui.localization.nomiFormat
+import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.profile.MicronutrientSettingsScreen
 import com.nomi.app.ui.profile.NutritionPlanSettingsScreen
 import com.nomi.app.ui.profile.ProfileSettingsScreen
 import com.nomi.app.ui.settings.AiKeyEntryState
 import com.nomi.app.ui.settings.AiKeyField
 import com.nomi.app.ui.settings.AiSettingsScreen
+import com.nomi.app.ui.settings.AiUsageScreen
 import com.nomi.app.ui.today.AddFoodMethod
+import kotlin.math.roundToInt
 
 /**
  * The camera-backed ways of adding food: a plate, a nutrition label, a restaurant menu and a
@@ -256,9 +261,26 @@ internal fun NavGraphBuilder.detailDestinations(
 
     composable(Routes.AI) {
         val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
+        val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+        val monthlyUsage by viewModel.aiUsageMonthlySummary.collectAsStateWithLifecycle()
+        val allTimeExaCost by viewModel.allTimeExaCostUsd.collectAsStateWithLifecycle()
         // The key being typed is held here and nowhere else: not in saved state, and not past
         // the moment it is stored.
         var keyEntry by remember { mutableStateOf(AiKeyEntryState()) }
+        val monthlyOutOfPocket = monthlyUsage.outOfPocketCostUsd(
+            exaFreeTierEnabled = preferences.aiUsage.exaFreeTierEnabled,
+            exaFreeCreditUsd = preferences.aiUsage.exaFreeCreditUsd,
+            allTimeExaCostUsd = allTimeExaCost,
+        )
+        val usageSupporting = if (monthlyUsage.totalEvents == 0) {
+            nomiString("Track token counts, cache savings, and estimated spend")
+        } else {
+            nomiFormat(
+                "{0} in 30d · {1}% free via cache/local",
+                AiCostEstimator.formatUsd(monthlyOutOfPocket),
+                (monthlyUsage.freeResolutionRate * 100f).roundToInt(),
+            )
+        }
         AiSettingsScreen(
             state = settingsState,
             keyEntry = keyEntry,
@@ -292,7 +314,26 @@ internal fun NavGraphBuilder.detailDestinations(
             onExaFullPageTextChanged = viewModel::setExaFullPageText,
             onOpenRouterPreferredProviderChanged = viewModel::setOpenRouterPreferredProvider,
             onCompareModels = { navController.navigate(Routes.MODEL_COMPARE) },
+            onUsage = { navController.navigate(Routes.AI_USAGE) },
+            usageSummaryText = usageSupporting,
             onDebug = { navController.navigate(Routes.DEVELOPER) },
+            onBack = { navController.popBackStack() },
+        )
+    }
+
+    composable(Routes.AI_USAGE) {
+        val range by viewModel.aiUsageRange.collectAsStateWithLifecycle()
+        val summary by viewModel.aiUsageSummary.collectAsStateWithLifecycle()
+        val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+        val allTimeExaCost by viewModel.allTimeExaCostUsd.collectAsStateWithLifecycle()
+        AiUsageScreen(
+            range = range,
+            summary = summary,
+            usagePreferences = preferences.aiUsage,
+            allTimeExaCostUsd = allTimeExaCost,
+            onRangeChanged = viewModel::setAiUsageRange,
+            onExaFreeTierEnabledChanged = viewModel::setExaFreeTierEnabled,
+            onClearHistory = viewModel::clearAiUsageHistory,
             onBack = { navController.popBackStack() },
         )
     }
@@ -359,6 +400,7 @@ internal object Routes {
     const val HEALTH = "health"
     const val AI = "ai"
     const val AI_PROVIDER = "ai_provider"
+    const val AI_USAGE = "ai_usage"
     const val DEVELOPER = "developer"
     const val MODEL_COMPARE = "model_compare"
     fun food(id: Long) = "food/$id"

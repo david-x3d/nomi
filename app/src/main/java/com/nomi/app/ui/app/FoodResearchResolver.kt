@@ -3,6 +3,8 @@ package com.nomi.app.ui.app
 import com.nomi.app.ai.model.FoodAnalysis
 import com.nomi.app.ai.model.MenuDish
 import com.nomi.app.ai.model.ParsedFoodIntent
+import com.nomi.app.ai.parsing.LocalFoodIntentParser
+import com.nomi.app.ai.usage.AiUsageRecorder
 import com.nomi.app.ai.validation.UserQuantityResolver
 import com.nomi.app.data.repository.NomiRepository
 import com.nomi.app.domain.usecase.FoodAnalysisCacheKey
@@ -19,7 +21,24 @@ internal class FoodResearchResolver(
     private val recent: RecentFoodAnalysisCache,
     private val debug: AiDebugRecorder,
     private val interpret: suspend (String) -> ParsedFoodIntent,
+    private val usage: AiUsageRecorder? = null,
 ) {
+    /**
+     * Attempts to resolve a text entry strictly from on-device caches (5-minute cache, 21-day
+     * research cache, or local intent parser + local per-100g food catalog) with zero network.
+     */
+    suspend fun resolveLocalOnly(
+        text: String,
+        key: FoodAnalysisCacheKey,
+    ): FoodAnalysis? {
+        recent.get(key)?.let { return cached("5-minute exact-input cache", it) }
+        repository.cachedFoodResearch(key)?.let { return cached("21-day validated research cache", it) }
+        val localIntent = LocalFoodIntentParser.parseOrNull(text) ?: return null
+        return catalog.cachedAnalysis(localIntent)?.let {
+            usage?.recordLocalParse("FOOD_INTERPRETATION", "local-intent-parser")
+            cached("per-100-g local food cache", it)
+        }
+    }
     suspend fun resolve(
         text: String,
         menuDishes: List<MenuDish>?,
@@ -72,6 +91,7 @@ internal class FoodResearchResolver(
 
     private fun cached(source: String, analysis: FoodAnalysis): FoodAnalysis {
         debug.recordCachedNutritionTrace(source, analysis)
+        usage?.recordCacheHit("FOOD_RESEARCH", source)
         return analysis
     }
 }

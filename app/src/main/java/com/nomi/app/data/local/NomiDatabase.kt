@@ -7,12 +7,15 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.nomi.app.data.local.dao.AiDebugEventDao
+import com.nomi.app.data.local.dao.AiUsageEventDao
 import com.nomi.app.data.local.dao.FoodCatalogDao
 import com.nomi.app.data.local.dao.FoodLogDao
+import com.nomi.app.data.local.dao.PendingFoodLogDao
 import com.nomi.app.data.local.dao.ProfilePlanDao
 import com.nomi.app.data.local.dao.SavedMealDao
 import com.nomi.app.data.local.dao.WeightDao
 import com.nomi.app.data.local.entity.AiDebugEventEntity
+import com.nomi.app.data.local.entity.AiUsageEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
@@ -21,6 +24,7 @@ import com.nomi.app.data.local.entity.FoodResearchCacheEntity
 import com.nomi.app.data.local.entity.FoodServingEntity
 import com.nomi.app.data.local.entity.NutritionPlanEntity
 import com.nomi.app.data.local.entity.NutritionSourceEntity
+import com.nomi.app.data.local.entity.PendingFoodLogEntity
 import com.nomi.app.data.local.entity.SavedMealEntity
 import com.nomi.app.data.local.entity.SavedMealItemEntity
 import com.nomi.app.data.local.entity.UserProfileEntity
@@ -41,8 +45,10 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         WeightEntryEntity::class,
         AiDebugEventEntity::class,
         FoodResearchCacheEntity::class,
+        AiUsageEventEntity::class,
+        PendingFoodLogEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -52,6 +58,8 @@ abstract class NomiDatabase : RoomDatabase() {
     abstract fun savedMealDao(): SavedMealDao
     abstract fun weightDao(): WeightDao
     abstract fun aiDebugEventDao(): AiDebugEventDao
+    abstract fun aiUsageEventDao(): AiUsageEventDao
+    abstract fun pendingFoodLogDao(): PendingFoodLogDao
 
     companion object {
         private const val DATABASE_NAME = "nomi.db"
@@ -134,6 +142,149 @@ abstract class NomiDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds local AI usage/cost tracking and the persistent offline/background logging queue. */
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `ai_usage_events` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `pipeline` TEXT NOT NULL,
+                        `resolution_kind` TEXT NOT NULL,
+                        `provider_id` TEXT NOT NULL,
+                        `model` TEXT NOT NULL,
+                        `prompt_tokens` INTEGER NOT NULL,
+                        `completion_tokens` INTEGER NOT NULL,
+                        `thoughts_tokens` INTEGER NOT NULL,
+                        `exa_searches` INTEGER NOT NULL,
+                        `estimated_cost_usd` REAL NOT NULL,
+                        `cost_source` TEXT NOT NULL,
+                        `created_at_epoch_millis` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ai_usage_events_created_at_epoch_millis` " +
+                        "ON `ai_usage_events` (`created_at_epoch_millis`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ai_usage_events_resolution_kind_created_at_epoch_millis` " +
+                        "ON `ai_usage_events` (`resolution_kind`, `created_at_epoch_millis`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ai_usage_events_provider_id_model` " +
+                        "ON `ai_usage_events` (`provider_id`, `model`)",
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pending_food_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `local_date` TEXT NOT NULL,
+                        `input_text` TEXT NOT NULL,
+                        `input_method` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `stage_label` TEXT,
+                        `error_message` TEXT,
+                        `attempt_count` INTEGER NOT NULL,
+                        `created_at_epoch_millis` INTEGER NOT NULL,
+                        `updated_at_epoch_millis` INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_pending_food_logs_local_date_created_at_epoch_millis` " +
+                        "ON `pending_food_logs` (`local_date`, `created_at_epoch_millis`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_pending_food_logs_status_created_at_epoch_millis` " +
+                        "ON `pending_food_logs` (`status`, `created_at_epoch_millis`)",
+                )
+
+                // Backfill estimated historical usage & costs from pre-update food_logs so
+                // 7-day, 30-day, and all-time Usage & Cost views reflect prior activity immediately.
+                // 1) Exa search calls for AI-researched meals (grouped by meal entry_group_id)
+                db.execSQL(
+                    """
+                    INSERT INTO `ai_usage_events` (
+                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                    )
+                    SELECT
+                        'FOOD_RESEARCH', 'AI_CALL', 'exa', 'exa-search',
+                        0, 0, 0, 1,
+                        0.005, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                    FROM `food_logs`
+                    WHERE `input_method` IN ('TYPE', 'VOICE', 'PHOTO', 'MENU')
+                      AND COALESCE(`source_snapshot_kind`, '') NOT IN ('LOCAL_CATALOG', 'USER_MANUAL', 'BARCODE', 'OPEN_FOOD_FACTS')
+                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                    """.trimIndent(),
+                )
+                // 2) Model extraction calls for AI-researched meals
+                db.execSQL(
+                    """
+                    INSERT INTO `ai_usage_events` (
+                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                    )
+                    SELECT
+                        'FOOD_RESEARCH', 'AI_CALL',
+                        CASE
+                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openrouter%' THEN 'openrouter'
+                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openai%' THEN 'openai'
+                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%perplexity%'
+                              OR LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%sonar%' THEN 'perplexity'
+                            ELSE 'gemini'
+                        END,
+                        'pre-update-estimate',
+                        3200, 580, 0, 0,
+                        0.00055, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                    FROM `food_logs`
+                    WHERE `input_method` IN ('TYPE', 'VOICE', 'PHOTO', 'MENU')
+                      AND COALESCE(`source_snapshot_kind`, '') NOT IN ('LOCAL_CATALOG', 'USER_MANUAL', 'BARCODE', 'OPEN_FOOD_FACTS')
+                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                    """.trimIndent(),
+                )
+                // 3) Vision calls for photo, nutrition label, and menu scans
+                db.execSQL(
+                    """
+                    INSERT INTO `ai_usage_events` (
+                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                    )
+                    SELECT
+                        'VISION', 'AI_CALL', 'gemini', 'pre-update-vision',
+                        5400, 640, 0, 0,
+                        0.0024, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                    FROM `food_logs`
+                    WHERE `input_method` IN ('PHOTO', 'LABEL', 'MENU')
+                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                    """.trimIndent(),
+                )
+                // 4) Free local/cached/reused meals
+                db.execSQL(
+                    """
+                    INSERT INTO `ai_usage_events` (
+                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                    )
+                    SELECT
+                        'FOOD_RESEARCH', 'CACHE_HIT', 'cache', 'pre-update-reused',
+                        0, 0, 0, 0,
+                        0.0, 'FREE', MIN(`created_at_epoch_millis`)
+                    FROM `food_logs`
+                    WHERE `input_method` IN ('RECENT', 'FAVORITES', 'SAVED_MEALS', 'BARCODE')
+                       OR COALESCE(`source_snapshot_kind`, '') IN ('LOCAL_CATALOG', 'BARCODE', 'OPEN_FOOD_FACTS')
+                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                    """.trimIndent(),
+                )
+            }
+        }
+
         /** Creates an independent database instance, primarily useful for tests and tools. */
         fun create(context: Context, name: String = DATABASE_NAME): NomiDatabase =
             Room.databaseBuilder(
@@ -147,6 +298,7 @@ abstract class NomiDatabase : RoomDatabase() {
                 MIGRATION_4_5,
                 MIGRATION_5_6,
                 MIGRATION_6_7,
+                MIGRATION_7_8,
             ).build()
 
         /**

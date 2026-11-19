@@ -1,58 +1,73 @@
 package com.nomi.app.ui.library
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nomi.app.ui.components.ExpressiveBadgeStyle
+import com.nomi.app.ui.components.NomiCard
+import com.nomi.app.ui.components.NomiExpressiveBadge
+import com.nomi.app.ui.components.NomiTonalBackButton
+import com.nomi.app.ui.components.expressiveGroupedTileShape
+import com.nomi.app.ui.components.nomiCardBorder
+import com.nomi.app.ui.components.nomiCardContainerColor
+import com.nomi.app.ui.feedback.nomiPress
 import com.nomi.app.ui.feedback.rememberNomiHaptics
+import com.nomi.app.ui.feedback.rememberNomiPressFeedback
 import com.nomi.app.ui.localization.nomiString
+import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.theme.nomiPageContainerColor
 import kotlin.math.roundToInt
 
@@ -102,14 +117,7 @@ fun LibraryScreen(
         topBar = {
             TopAppBar(
                 title = { Text(nomiString("Food library")) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = nomiString("Back"),
-                        )
-                    }
-                },
+                navigationIcon = { NomiTonalBackButton(onClick = onBack) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = pageContainerColor,
                     scrolledContainerColor = pageContainerColor,
@@ -118,17 +126,16 @@ fun LibraryScreen(
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().background(pageContainerColor),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(pageContainerColor),
             contentPadding = padding,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             item {
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 8.dp,
-                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(LibraryItemKind.entries) { kind ->
@@ -143,25 +150,51 @@ fun LibraryScreen(
             }
             if (items.isEmpty()) {
                 item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp).animateItem(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    NomiCard(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .animateItem(),
+                        spacing = 12.dp,
                     ) {
-                        Text(selected.localizedEmptyTitle(), style = MaterialTheme.typography.titleLarge)
-                        Text(selected.localizedEmptyBody(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        ) {
+                            NomiExpressiveBadge(
+                                icon = selected.icon,
+                                style = selected.badgeStyle(),
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                padding = 12.dp,
+                                iconSize = 22.dp,
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    selected.localizedEmptyTitle(),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                                Text(
+                                    selected.localizedEmptyBody(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             } else {
-                items(items, key = { "${it.kind}-${it.id}" }) { item ->
+                itemsIndexed(items, key = { _, it -> "${it.kind}-${it.id}" }) { index, item ->
                     LibraryRow(
                         item = item,
+                        shape = expressiveGroupedTileShape(index, items.size),
                         pending = pendingDeletions[item.key],
                         onAdd = { onAdd(item) },
                         onDelete = { onDelete(item) },
                         onUndo = { onUndoDelete(item) },
-                        modifier = Modifier.animateItem(),
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .animateItem(),
                     )
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp))
                 }
             }
             item { Spacer(Modifier.height(24.dp)) }
@@ -173,6 +206,7 @@ fun LibraryScreen(
 @Composable
 private fun LibraryRow(
     item: LibraryItem,
+    shape: Shape,
     pending: Boolean?,
     onAdd: () -> Unit,
     onDelete: () -> Unit,
@@ -181,14 +215,23 @@ private fun LibraryRow(
 ) {
     val haptics = rememberNomiHaptics()
     val deleteLabel = nomiString("Delete")
+    val tileColor = if (LocalPitchBlackSurfaces.current) {
+        nomiCardContainerColor()
+    } else {
+        MaterialTheme.colorScheme.surfaceBright
+    }
+
     if (pending != null) {
         Surface(
             modifier = modifier.fillMaxWidth(),
+            shape = shape,
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
         ) {
             Row(
-                Modifier.heightIn(min = 72.dp).padding(horizontal = 20.dp),
+                Modifier
+                    .heightIn(min = 72.dp)
+                    .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -201,27 +244,79 @@ private fun LibraryRow(
         }
         return
     }
+
+    val (badgeBg, badgeFg) = when (item.kind) {
+        LibraryItemKind.RECENT ->
+            MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer
+        LibraryItemKind.FAVORITE ->
+            MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+        LibraryItemKind.SAVED_MEAL ->
+            MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+    }
+    val press = rememberNomiPressFeedback(pressedScale = 0.985f)
     val content: @Composable () -> Unit = {
-        ListItem(
-            headlineContent = { Text(item.title) },
-            supportingContent = { Text(item.subtitle) },
-            leadingContent = { Icon(item.kind.icon, contentDescription = null) },
-            trailingContent = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${item.calories.roundToInt()} kcal")
-                    Icon(Icons.Default.Add, contentDescription = null)
-                }
-            },
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onAdd).semantics {
-                if (item.kind != LibraryItemKind.RECENT) {
-                    customActions = listOf(CustomAccessibilityAction(deleteLabel) {
-                        haptics.removed()
-                        onDelete()
-                        true
-                    })
-                }
-            },
-        )
+        Surface(
+            onClick = onAdd,
+            interactionSource = press.interactionSource,
+            shape = shape,
+            color = tileColor,
+            border = nomiCardBorder(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .nomiPress(press)
+                .semantics {
+                    if (item.kind != LibraryItemKind.RECENT) {
+                        customActions = listOf(
+                            CustomAccessibilityAction(deleteLabel) {
+                                haptics.removed()
+                                onDelete()
+                                true
+                            },
+                        )
+                    }
+                },
+        ) {
+            ListItem(
+                headlineContent = {
+                    Text(item.title, style = MaterialTheme.typography.titleMedium)
+                },
+                supportingContent = { Text(item.subtitle) },
+                leadingContent = {
+                    NomiExpressiveBadge(
+                        icon = item.kind.icon,
+                        style = item.kind.badgeStyle(),
+                        containerColor = badgeBg,
+                        contentColor = badgeFg,
+                        padding = 10.dp,
+                        iconSize = 19.dp,
+                    )
+                },
+                trailingContent = {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                "${item.calories.roundToInt()} kcal",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            )
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            )
+        }
     }
     if (item.kind == LibraryItemKind.RECENT) {
         Box(modifier) { content() }
@@ -233,7 +328,9 @@ private fun LibraryRow(
                 haptics.removed()
                 onDelete()
                 true
-            } else false
+            } else {
+                false
+            }
         },
         positionalThreshold = { it * 0.32f },
     )
@@ -241,30 +338,41 @@ private fun LibraryRow(
     LaunchedEffect(armed) { if (armed) haptics.deleteArmed() }
     SwipeToDismissBox(
         state = dismissState,
-        modifier = modifier,
+        modifier = modifier.clip(shape),
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
         backgroundContent = {
             Row(
-                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.errorContainer)
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.errorContainer)
                     .padding(horizontal = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
             ) {
                 Text(deleteLabel, color = MaterialTheme.colorScheme.onErrorContainer)
-                Icon(Icons.Default.Delete, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                )
             }
         },
     ) { content() }
 }
 
+private fun LibraryItemKind.badgeStyle(): ExpressiveBadgeStyle = when (this) {
+    LibraryItemKind.RECENT -> ExpressiveBadgeStyle.CLOVER_4
+    LibraryItemKind.FAVORITE -> ExpressiveBadgeStyle.SOFT_BURST
+    LibraryItemKind.SAVED_MEAL -> ExpressiveBadgeStyle.COOKIE_9
+}
+
 @Composable
 private fun LibraryItemKind.localizedLabel(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("Recent")
-        LibraryItemKind.FAVORITE -> nomiString("Favorites")
-        LibraryItemKind.SAVED_MEAL -> nomiString("Saved meals")
-    }
+    LibraryItemKind.RECENT -> nomiString("Recent")
+    LibraryItemKind.FAVORITE -> nomiString("Favorites")
+    LibraryItemKind.SAVED_MEAL -> nomiString("Saved meals")
+}
 
 private val LibraryItemKind.icon: ImageVector
     get() = when (this) {
@@ -275,14 +383,14 @@ private val LibraryItemKind.icon: ImageVector
 
 @Composable
 private fun LibraryItemKind.localizedEmptyTitle(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("No recent foods yet")
-        LibraryItemKind.FAVORITE -> nomiString("No favorites yet")
-        LibraryItemKind.SAVED_MEAL -> nomiString("No saved meals yet")
-    }
+    LibraryItemKind.RECENT -> nomiString("No recent foods yet")
+    LibraryItemKind.FAVORITE -> nomiString("No favorites yet")
+    LibraryItemKind.SAVED_MEAL -> nomiString("No saved meals yet")
+}
 
 @Composable
 private fun LibraryItemKind.localizedEmptyBody(): String = when (this) {
-        LibraryItemKind.RECENT -> nomiString("Foods you log will be easy to reuse here.")
-        LibraryItemKind.FAVORITE -> nomiString("Mark a food as a favorite from its details.")
-        LibraryItemKind.SAVED_MEAL -> nomiString("Save a group of logged foods to add it again in one tap.")
-    }
+    LibraryItemKind.RECENT -> nomiString("Foods you log will be easy to reuse here.")
+    LibraryItemKind.FAVORITE -> nomiString("Mark a food as a favorite from its details.")
+    LibraryItemKind.SAVED_MEAL -> nomiString("Save a group of logged foods to add it again in one tap.")
+}
