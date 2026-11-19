@@ -13,6 +13,7 @@ import com.nomi.app.domain.MacroTargets
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 enum class AdaptiveTdeeConfidence {
@@ -130,17 +131,47 @@ object AdaptiveTdeeCalculator {
             )
         }
 
-        // Compute EWMA trend weight across the observed weigh-ins.
+        // Compute time-aware EWMA trend weights at both endpoints so a single water-retention
+        // spike on the first weigh-in cannot skew the start weight, and irregular gaps between
+        // weigh-ins decay proportionally to elapsed days.
         val weightDates = dailyWeights.keys.toList()
-        var ewma = dailyWeights.getValue(weightDates.first())
-        val trendStartKg = ewma
+        var forwardEwma = dailyWeights.getValue(weightDates.first())
         for (index in 1 until weightDates.size) {
+            val deltaDays = ChronoUnit.DAYS.between(weightDates[index - 1], weightDates[index])
+                .coerceAtLeast(1L)
+                .toDouble()
+            val alpha = 1.0 - (1.0 - EWMA_ALPHA).pow(deltaDays)
             val reading = dailyWeights.getValue(weightDates[index])
-            ewma = EWMA_ALPHA * reading + (1.0 - EWMA_ALPHA) * ewma
+            forwardEwma = alpha * reading + (1.0 - alpha) * forwardEwma
         }
-        val trendEndKg = ewma
+        val trendEndKg = forwardEwma
 
-        val averageIntake = completeNutrition.map { it.second }.average()
+        var backwardEwma = dailyWeights.getValue(weightDates.last())
+        for (index in weightDates.lastIndex - 1 downTo 0) {
+            val deltaDays = ChronoUnit.DAYS.between(weightDates[index], weightDates[index + 1])
+                .coerceAtLeast(1L)
+                .toDouble()
+            val alpha = 1.0 - (1.0 - EWMA_ALPHA).pow(deltaDays)
+            val reading = dailyWeights.getValue(weightDates[index])
+            backwardEwma = alpha * reading + (1.0 - alpha) * backwardEwma
+        }
+        val trendStartKg = backwardEwma
+
+        // Prefer intake days aligned to the observed weight span so calories and weight change
+        // describe the same period; fall back to the full 28-day window if the span has too few
+        // logged days.
+        val firstWeightDate = weightDates.first()
+        val lastWeightDate = weightDates.last()
+        val spanAlignedNutrition = completeNutrition.filter { (date, _) ->
+            !date.isBefore(firstWeightDate) && !date.isAfter(lastWeightDate)
+        }
+        val intakeSample = if (spanAlignedNutrition.size >= REQUIRED_LOGGED_DAYS) {
+            spanAlignedNutrition
+        } else {
+            completeNutrition
+        }
+
+        val averageIntake = intakeSample.map { it.second }.average()
         val weightDeltaKg = trendEndKg - trendStartKg
         val dailyEnergyImbalanceKcal = (weightDeltaKg * EnergyCalculator.KCAL_PER_KILOGRAM) / spanDays.toDouble()
         val rawEstimatedTdee = averageIntake - dailyEnergyImbalanceKcal

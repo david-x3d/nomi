@@ -1,3 +1,12 @@
+## 2.14.3
+
+- **Offline & background logging queue reliability:** Added exponential backoff and a max retry limit for transient network failures while online (preventing tight retry loops), added a persisted `JobService` (`PendingQueueJobService`) so offline-queued meals still drain automatically after Android process death, handled non-auto-saved preview states in headless queue runs, and computed completion notification calories from newly added log IDs instead of whole-day deltas.
+- **Adaptive TDEE accuracy:** Switched to bidirectional, time-aware EWMA trend endpoints so a single early weigh-in spike no longer skews TDEE and irregular weigh-in gaps decay accurately by elapsed days, and aligned the calorie intake average to the observed weight span.
+- **Complete backups:** Included Adaptive TDEE preferences, AI usage preferences, advanced AI toggles (`openRouterPreferredProvider`, `exaFullPageText`, `aiRequestTimeoutDisabled`), and `ai_usage_events` in backup export/restore while keeping older backups fully backward-compatible.
+- **Swipe-to-duplicate on Today:** Swiping a logged food row right now duplicates it with haptic feedback and snaps back cleanly, alongside swipe-left to delete.
+- **Settings-consistent card styling on Nutrition details:** Unified `NomiFoodDetailScreen` and `CalorieOriginSection` onto the flat `surfaceBright` (`26 dp` outer / `6 dp` inner grouped corners) tile style and tonal page canvas used in Settings.
+- **Performance optimizations:** Cached `NumberFormat` and `DateTimeFormatter` instances in `QuantityDisplayFormatter`, `CalorieOriginSection`, `NomiFoodDetailScreen`, and `AiUsageScreen`, precompiled hot-path regular expressions, moved AI usage and Adaptive TDEE aggregations onto `Dispatchers.Default`, and replaced full-table Exa cost summation with a direct SQL `SUM` query.
+
 ## 2.14.2
 
 - **Fixed historical AI usage backfill (`NomiDatabase` v8 -> v9, `MIGRATION_8_9`):** Pre-update food logs (`input_method = 'ai'`, `recent`, `favorite`, `saved_meal`, `copied_*`, `shared`, Open Food Facts/library cache, and localized nutrition label photos) are now accurately backfilled without double-counting live events.

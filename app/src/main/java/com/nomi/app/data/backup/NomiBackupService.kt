@@ -210,6 +210,11 @@ class NomiBackupService(
         preferencesStore.setMicronutrients(value.micronutrients.toPreferences())
         preferencesStore.setCalorieEstimateBias(value.calorieEstimateBias)
         preferencesStore.setGoalsCardStyle(value.goalsCardStyle)
+        preferencesStore.setAiRequestTimeoutDisabled(value.aiRequestTimeoutDisabled)
+        preferencesStore.setExaFullPageText(value.exaFullPageText)
+        preferencesStore.setOpenRouterPreferredProvider(value.openRouterPreferredProvider)
+        preferencesStore.setAdaptiveTdee(value.adaptiveTdee)
+        preferencesStore.setAiUsage(value.aiUsage)
         preferencesStore.setOnboardingDraft(null)
         preferencesStore.markOnboardingCompleted(value.onboardingCompleted, clearDraft = true)
     }
@@ -237,6 +242,8 @@ class NomiBackupService(
         preferencesStore.setAiRequestTimeoutDisabled(value.aiRequestTimeoutDisabled)
         preferencesStore.setExaFullPageText(value.exaFullPageText)
         preferencesStore.setOpenRouterPreferredProvider(value.openRouterPreferredProvider)
+        preferencesStore.setAdaptiveTdee(value.adaptiveTdee)
+        preferencesStore.setAiUsage(value.aiUsage)
         preferencesStore.setOnboardingDraft(value.onboardingDraft)
         preferencesStore.markOnboardingCompleted(value.onboardingCompleted, clearDraft = false)
     }

@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,6 +127,8 @@ class PendingLoggingManager(
         )
         if (online) {
             triggerDrain()
+        } else {
+            PendingQueueJobService.scheduleWhenConnected(appContext)
         }
         return id
     }
@@ -139,10 +142,12 @@ class PendingLoggingManager(
                 status = if (online) PendingLoggingStatus.PROCESSING else PendingLoggingStatus.QUEUED_OFFLINE,
                 stageLabel = if (online) "UNDERSTANDING_MEAL" else null,
                 errorMessage = null,
-                attemptCount = entry.attemptCount,
+                attemptCount = 0,
             )
             if (online) {
                 triggerDrain()
+            } else {
+                PendingQueueJobService.scheduleWhenConnected(appContext)
             }
         }
     }
@@ -187,11 +192,31 @@ class PendingLoggingManager(
                             attemptCount = item.attemptCount,
                         )
                     }
+                    val remaining = repository.pendingFoodLogsByStatuses(
+                        listOf(PendingLoggingStatus.QUEUED_OFFLINE),
+                    )
+                    if (remaining.isNotEmpty()) {
+                        PendingQueueJobService.scheduleWhenConnected(appContext)
+                    }
                     break
                 }
                 val next = repository.pendingFoodLogsByStatuses(
                     listOf(PendingLoggingStatus.PROCESSING, PendingLoggingStatus.QUEUED_OFFLINE),
-                ).firstOrNull() ?: break
+                ).firstOrNull()
+                if (next == null) {
+                    PendingQueueJobService.cancel(appContext)
+                    break
+                }
+
+                // Apply exponential backoff before retrying an item that already failed once while online.
+                if (next.attemptCount > 0) {
+                    val backoffMs = retryBackoffMillis(next.attemptCount)
+                    delay(backoffMs)
+                    if (!refreshOnlineState()) {
+                        PendingQueueJobService.scheduleWhenConnected(appContext)
+                        break
+                    }
+                }
 
                 _activeProcessingCount.value = 1
                 BackgroundFoodLoggingService.updateProgress(appContext, next.inputText)
@@ -223,7 +248,9 @@ class PendingLoggingManager(
         val method = AddFoodMethod.entries.firstOrNull { it.name == entry.inputMethod } ?: AddFoodMethod.TYPE
         val language = NomiLanguage.fromTag(repository.preferences.first().languageTag)
             ?: NomiLanguage.matching(Locale.getDefault())
-        val beforeKcal = runCatching { repository.dayTotals(date.toString()).first().caloriesKcal }.getOrDefault(0.0)
+        val beforeLogIds = runCatching {
+            repository.dayLogs(date.toString()).first().mapTo(HashSet()) { it.id }
+        }.getOrDefault(emptySet())
 
         val result = try {
             withTimeoutOrNull(ENTRY_TIMEOUT_MILLIS) {
@@ -254,9 +281,13 @@ class PendingLoggingManager(
         when (result) {
             Outcome.Saved -> {
                 repository.deletePendingFoodLog(entry.id)
-                val afterKcal = runCatching { repository.dayTotals(date.toString()).first().caloriesKcal }
-                    .getOrDefault(beforeKcal)
-                val addedKcal = (afterKcal - beforeKcal).coerceAtLeast(0.0).toInt()
+                val addedKcal = runCatching {
+                    repository.dayLogs(date.toString()).first()
+                        .filter { it.id !in beforeLogIds }
+                        .sumOf { it.nutritionSnapshot.caloriesKcal }
+                        .coerceAtLeast(0.0)
+                        .toInt()
+                }.getOrDefault(0)
                 BackgroundFoodLoggingService.notifyCompleted(
                     context = appContext,
                     mealText = entry.inputText,
@@ -264,7 +295,17 @@ class PendingLoggingManager(
                 )
             }
             is Outcome.Error -> {
-                if (result.isNetwork || !refreshOnlineState()) {
+                val stillOnline = refreshOnlineState()
+                if (!stillOnline) {
+                    repository.updatePendingFoodLogState(
+                        id = entry.id,
+                        status = PendingLoggingStatus.QUEUED_OFFLINE,
+                        stageLabel = null,
+                        errorMessage = null,
+                        attemptCount = 0,
+                    )
+                    PendingQueueJobService.scheduleWhenConnected(appContext)
+                } else if (result.isNetwork && nextAttempt < MAX_ONLINE_NETWORK_RETRIES) {
                     repository.updatePendingFoodLogState(
                         id = entry.id,
                         status = PendingLoggingStatus.QUEUED_OFFLINE,
@@ -321,10 +362,22 @@ class PendingLoggingManager(
                 usage = container.usageRecorder,
             )
             // Stream live AI processing stage into Room so Today UI reflects progress seamlessly.
+            // If the coordinator ever settles on Preview without auto-saving, confirm it once
+            // rather than stalling until the 3-minute timeout expires.
+            var previewConfirmed = false
             val stageCollector = workerScope.launch {
                 coordinator.loggingState.collect { uiState ->
-                    if (uiState is FoodLoggingUiState.Processing) {
-                        repository.updatePendingFoodLogStage(entryId, uiState.stage.name)
+                    when (uiState) {
+                        is FoodLoggingUiState.Processing -> {
+                            repository.updatePendingFoodLogStage(entryId, uiState.stage.name)
+                        }
+                        is FoodLoggingUiState.Preview -> {
+                            if (!previewConfirmed) {
+                                previewConfirmed = true
+                                coordinator.confirmLogging()
+                            }
+                        }
+                        else -> Unit
                     }
                 }
             }
@@ -454,5 +507,12 @@ class PendingLoggingManager(
 
     private companion object {
         const val ENTRY_TIMEOUT_MILLIS = 180_000L
+        const val MAX_ONLINE_NETWORK_RETRIES = 3
+
+        fun retryBackoffMillis(attemptCount: Int): Long = when (attemptCount) {
+            1 -> 2_000L
+            2 -> 5_000L
+            else -> 15_000L
+        }
     }
 }

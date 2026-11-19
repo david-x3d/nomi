@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -89,47 +90,71 @@ internal fun SwipeToDeleteFoodRow(
     onEditAmount: () -> Unit,
 ) {
     val deleteLabel = nomiFormat("Delete {0}", entry.name)
+    val duplicateLabel = nomiString("Duplicate")
     val detailsLabel = nomiFormat("Nutrition for {0}", entry.name)
     val editLabel = nomiFormat("Rewrite {0}", entry.name)
     val haptics = rememberNomiHaptics()
     var deleteRequested by remember(entry.id) { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart && !deleteRequested) {
-                deleteRequested = true
-                onDelete()
-                true
-            } else {
-                false
+            when (value) {
+                SwipeToDismissBoxValue.EndToStart -> {
+                    if (!deleteRequested) {
+                        deleteRequested = true
+                        onDelete()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                SwipeToDismissBoxValue.StartToEnd -> {
+                    haptics.confirmed()
+                    onDuplicate()
+                    false
+                }
+                SwipeToDismissBoxValue.Settled -> false
             }
         },
         positionalThreshold = { distance -> distance * 0.32f },
     )
-    val armed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+    val armedDelete = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart
+    val armedDuplicate = dismissState.targetValue == SwipeToDismissBoxValue.StartToEnd
+    val armed = armedDelete || armedDuplicate
     val revealScale by animateFloatAsState(
         targetValue = if (armed) 1f else 0.82f,
         animationSpec = tween(durationMillis = 180),
-        label = "Delete reveal",
+        label = "Swipe reveal",
     )
-    // The moment letting go would delete the row is felt, so the swipe has a point of no
-    // return you can find without watching it.
+    // The moment letting go would trigger the action is felt, so the swipe has a clear
+    // threshold you can find without watching it.
     LaunchedEffect(armed) {
         if (armed) haptics.deleteArmed()
     }
 
     SwipeToDismissBox(
         state = dismissState,
-        enableDismissFromStartToEnd = false,
+        enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = true,
         backgroundContent = {
+            val isDuplicate = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+            val containerColor = if (isDuplicate) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.errorContainer
+            }
+            val contentColor = if (isDuplicate) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onErrorContainer
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp, vertical = 5.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.errorContainer)
+                    .background(containerColor)
                     .padding(horizontal = 24.dp),
-                contentAlignment = Alignment.CenterEnd,
+                contentAlignment = if (isDuplicate) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
                 Row(
                     modifier = Modifier.graphicsLayer {
@@ -139,17 +164,31 @@ internal fun SwipeToDeleteFoodRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        text = nomiString("Delete"),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                    )
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onErrorContainer,
-                    )
+                    if (isDuplicate) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            tint = contentColor,
+                        )
+                        Text(
+                            text = duplicateLabel,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = contentColor,
+                        )
+                    } else {
+                        Text(
+                            text = nomiString("Delete"),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = contentColor,
+                        )
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = contentColor,
+                        )
+                    }
                 }
             }
         },
@@ -161,6 +200,10 @@ internal fun SwipeToDeleteFoodRow(
                 },
                 CustomAccessibilityAction(label = detailsLabel) {
                     onOpenDetails()
+                    true
+                },
+                CustomAccessibilityAction(label = duplicateLabel) {
+                    onDuplicate()
                     true
                 },
                 CustomAccessibilityAction(label = deleteLabel) {

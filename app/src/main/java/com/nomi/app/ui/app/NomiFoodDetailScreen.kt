@@ -90,9 +90,11 @@ import com.nomi.app.ui.components.NomiSheetHeader
 import com.nomi.app.ui.components.NomiTonalBackButton
 import com.nomi.app.ui.components.WebsiteFavicon
 import com.nomi.app.ui.components.WebsiteFaviconUrl
+import com.nomi.app.ui.components.expressiveGroupedTileShape
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
 import com.nomi.app.ui.components.nomiCardElevation
+import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.components.nomiCardShape
 import com.nomi.app.ui.format.quantityDisplay
 import com.nomi.app.ui.localization.nomiFormat
@@ -385,22 +387,23 @@ private fun LoadingNutrition(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun detailTileColor(): Color =
+    if (LocalPitchBlackSurfaces.current) nomiCardContainerColor() else MaterialTheme.colorScheme.surfaceBright
+
+@Composable
 private fun NutritionContent(
     entry: TodayFoodEntry,
     enabledMicronutrients: List<Micronutrient>,
     onEditAmount: () -> Unit,
     contentPadding: PaddingValues,
 ) {
-    val backdrop = Brush.verticalGradient(
-        listOf(
-            MaterialTheme.colorScheme.surface,
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.10f),
-            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.07f),
-            MaterialTheme.colorScheme.surface,
-        ),
-    )
+    val pageColor = if (LocalPitchBlackSurfaces.current) {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
     LazyColumn(
-        modifier = Modifier.fillMaxSize().background(backdrop),
+        modifier = Modifier.fillMaxSize().background(pageColor),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
@@ -471,8 +474,11 @@ private fun EntryHeading(entry: TodayFoodEntry) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val timeFormatter = remember(locale) {
+            DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale)
+        }
         Text(
-            text = "$quantityText  •  ${entry.time.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale))}",
+            text = "$quantityText  •  ${entry.time.format(timeFormatter)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -485,14 +491,11 @@ private fun NutritionSummaryCard(
     enabledMicronutrients: List<Micronutrient>,
 ) {
     val metrics = nutritionMetrics(entry, enabledMicronutrients)
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = nomiCardShape(),
-        colors = CardDefaults.cardColors(
-            containerColor = nomiCardContainerColor(),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        elevation = nomiCardElevation(),
+        shape = nomiCardShape(26.dp),
+        color = detailTileColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = nomiCardBorder(),
     ) {
         Column(
@@ -680,15 +683,16 @@ private fun GroupedItemsCard(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        entry.groupItems.forEach { item ->
-            var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = nomiCardShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-                elevation = nomiCardElevation(),
-                border = nomiCardBorder(),
-            ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            entry.groupItems.forEachIndexed { index, item ->
+                var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = expressiveGroupedTileShape(index, entry.groupItems.size),
+                    color = detailTileColor(),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    border = nomiCardBorder(),
+                ) {
                 Column {
                     Row(
                         modifier = Modifier
@@ -750,6 +754,7 @@ private fun GroupedItemsCard(
                 }
             }
         }
+        }
     }
 }
 
@@ -791,14 +796,11 @@ private fun ItemAndSourceCard(
             nomiString("Manually logged")
         }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth(),
-        shape = nomiCardShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = nomiCardContainerColor(),
-        ),
-        elevation = nomiCardElevation(),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = nomiCardShape(26.dp),
+        color = detailTileColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         border = nomiCardBorder(),
     ) {
         Column {
@@ -993,13 +995,11 @@ private fun EstimateExplanationCard(entry: TodayFoodEntry, onEditAmount: () -> U
                 .padding(start = 4.dp)
                 .semantics { heading() },
         )
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = nomiCardShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = nomiCardContainerColor(),
-            ),
-            elevation = nomiCardElevation(),
+            shape = nomiCardShape(26.dp),
+            color = detailTileColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             border = nomiCardBorder(),
         ) {
             Column(
@@ -1251,11 +1251,11 @@ private fun ReferencesCard(entry: TodayFoodEntry) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp),
         )
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = nomiCardShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-            elevation = nomiCardElevation(),
+            shape = nomiCardShape(26.dp),
+            color = detailTileColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             border = nomiCardBorder(),
         ) {
             Column {
@@ -1339,11 +1339,11 @@ private fun NoReferencesCard(isEstimated: Boolean) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp),
         )
-        Card(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = nomiCardShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-            elevation = nomiCardElevation(),
+            shape = nomiCardShape(26.dp),
+            color = detailTileColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             border = nomiCardBorder(),
         ) {
             Row(

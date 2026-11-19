@@ -54,7 +54,7 @@ internal class LocalFoodCatalog(
             val unit = requested.unit?.takeIf(String::isNotBlank) ?: return null
             val normalizedName = requested.name.trim()
                 .lowercase(Locale.ROOT)
-                .replace(Regex("\\s+"), " ")
+                .replace(LOCAL_CATALOG_WHITESPACE, " ")
             val normalizedBrand = requested.brand?.trim()?.lowercase(Locale.ROOT)
             val food = recentFoods().firstOrNull {
                 it.normalizedName == normalizedName &&
@@ -105,7 +105,7 @@ internal class LocalFoodCatalog(
     suspend fun cache(item: AnalyzedFoodItem, barcode: String? = null): Long? {
         val grams = item.gramsEquivalent ?: item.quantity.takeIf { item.unit.equals("g", true) } ?: return null
         if (!grams.isFinite() || grams <= 0.0) return null
-        val normalized = item.name.trim().lowercase(Locale.ROOT).replace(Regex("\\s+"), " ")
+        val normalized = item.name.trim().lowercase(Locale.ROOT).replace(LOCAL_CATALOG_WHITESPACE, " ")
         val normalizedBrand = item.brand?.trim()?.lowercase(Locale.ROOT)
         val existing = barcode?.let { repository.foodByBarcode(it) }
             ?: recentFoods().firstOrNull {
@@ -158,3 +158,5 @@ internal class LocalFoodCatalog(
         )
     }
 }
+
+private val LOCAL_CATALOG_WHITESPACE = Regex("\\s+")

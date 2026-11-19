@@ -322,18 +322,28 @@ object QuantityDisplayFormatter {
         else -> null
     }
 
+    private val WHITESPACE_REGEX = Regex("\\s+")
+    private val numberFormatCache = ThreadLocal.withInitial {
+        HashMap<Pair<Locale, Int>, NumberFormat>()
+    }
+
     private fun normalizeUnit(unit: String): String = unit
         .trim()
         .lowercase(Locale.ROOT)
         .replace('.', ' ')
-        .replace(Regex("\\s+"), " ")
+        .replace(WHITESPACE_REGEX, " ")
 
-    private fun formatNumber(value: Double, locale: Locale, maximumFractionDigits: Int): String =
-        NumberFormat.getNumberInstance(locale).apply {
-            isGroupingUsed = true
-            minimumFractionDigits = 0
-            this.maximumFractionDigits = maximumFractionDigits
-        }.format(value)
+    private fun formatNumber(value: Double, locale: Locale, maximumFractionDigits: Int): String {
+        val key = locale to maximumFractionDigits
+        val formatter = numberFormatCache.get()!!.getOrPut(key) {
+            NumberFormat.getNumberInstance(locale).apply {
+                isGroupingUsed = true
+                minimumFractionDigits = 0
+                this.maximumFractionDigits = maximumFractionDigits
+            }
+        }
+        return formatter.format(value)
+    }
 
     private fun isNearlyWhole(value: Double): Boolean = abs(value - value.roundToLong()) <= EPSILON
 

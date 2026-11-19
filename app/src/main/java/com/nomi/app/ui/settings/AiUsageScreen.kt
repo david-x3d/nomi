@@ -893,10 +893,15 @@ private fun RecentUsageEventTile(event: AiUsageRecentEvent) {
     }
 }
 
+private val usageTimestampFormatters = java.util.concurrent.ConcurrentHashMap<Locale, DateTimeFormatter>()
+
 private fun formatUsageTimestamp(epochMillis: Long): String {
     if (epochMillis <= 0L) return ""
-    val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
-        .withLocale(Locale.getDefault())
+    val locale = Locale.getDefault()
+    val formatter = usageTimestampFormatters.getOrPut(locale) {
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+            .withLocale(locale)
+    }
     return Instant.ofEpochMilli(epochMillis)
         .atZone(ZoneId.systemDefault())
         .format(formatter)

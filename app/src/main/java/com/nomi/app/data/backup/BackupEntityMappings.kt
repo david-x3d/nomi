@@ -1,5 +1,6 @@
 package com.nomi.app.data.backup
 
+import com.nomi.app.data.local.entity.AiUsageEventEntity
 import com.nomi.app.data.local.entity.FavoriteFoodEntity
 import com.nomi.app.data.local.entity.FoodAliasEntity
 import com.nomi.app.data.local.entity.FoodEntity
@@ -45,6 +46,11 @@ internal fun AppPreferences.toBackup(): BackupPreferencesV1 = BackupPreferencesV
     calorieEstimateBias = calorieEstimateBias,
     goalsCardStyle = goalsCardStyle,
     smartFallbackProvider = smartFallbackProvider.toBackup(),
+    aiRequestTimeoutDisabled = aiRequestTimeoutDisabled,
+    exaFullPageText = exaFullPageText,
+    openRouterPreferredProvider = openRouterPreferredProvider,
+    adaptiveTdee = adaptiveTdee,
+    aiUsage = aiUsage,
 )
 
 internal fun BackupMicronutrientsV1.toPreferences(): MicronutrientPreferences =
@@ -295,4 +301,19 @@ internal fun BackupWeightEntryV1.toEntity(): WeightEntryEntity = WeightEntryEnti
     externalId = externalId,
     createdAtEpochMillis = createdAtEpochMillis,
     updatedAtEpochMillis = updatedAtEpochMillis,
+)
+
+internal fun BackupAiUsageEventV1.toEntity(): AiUsageEventEntity = AiUsageEventEntity(
+    id = id,
+    pipeline = pipeline,
+    resolutionKind = resolutionKind,
+    providerId = providerId,
+    model = model,
+    promptTokens = promptTokens,
+    completionTokens = completionTokens,
+    thoughtsTokens = thoughtsTokens,
+    exaSearches = exaSearches,
+    estimatedCostUsd = estimatedCostUsd,
+    costSource = costSource,
+    createdAtEpochMillis = createdAtEpochMillis,
 )

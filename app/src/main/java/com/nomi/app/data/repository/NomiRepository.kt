@@ -723,6 +723,8 @@ class NomiRepository(
             usageDao.observeSince(sinceEpochMillis)
         }
 
+    fun allTimeExaCostUsd(): Flow<Double> = usageDao.observeAllTimeExaCostUsd()
+
     suspend fun clearAiUsageEvents(): Int = usageDao.clear()
 
     val allPendingFoodLogs: Flow<List<PendingFoodLogEntity>> = pendingLogDao.observeAll()

@@ -46,8 +46,8 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ui.components.WebsiteFaviconUrl
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.components.nomiCardContainerColor
-import com.nomi.app.ui.components.nomiCardElevation
 import com.nomi.app.ui.components.nomiCardShape
+import com.nomi.app.ui.theme.LocalPitchBlackSurfaces
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiLocale
 import com.nomi.app.ui.localization.nomiMessage
@@ -78,11 +78,16 @@ internal fun CalorieOriginSection(entry: TodayFoodEntry) {
                 .padding(start = 4.dp)
                 .semantics { heading() },
         )
-        Card(
+        val tileColor = if (LocalPitchBlackSurfaces.current) {
+            nomiCardContainerColor()
+        } else {
+            MaterialTheme.colorScheme.surfaceBright
+        }
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = nomiCardShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = nomiCardContainerColor()),
-            elevation = nomiCardElevation(),
+            shape = nomiCardShape(26.dp),
+            color = tileColor,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             border = nomiCardBorder(),
         ) {
             Column(
@@ -638,5 +643,13 @@ private fun formatAmount(value: Double, locale: Locale): String =
     if (value == value.roundToInt().toDouble()) value.roundToInt().toString()
     else String.format(locale, "%.1f", value)
 
-private fun formatPercent(share: Double, locale: Locale): String =
-    NumberFormat.getPercentInstance(locale).apply { maximumFractionDigits = 0 }.format(share)
+private val percentFormatterCache = ThreadLocal.withInitial {
+    HashMap<Locale, NumberFormat>()
+}
+
+private fun formatPercent(share: Double, locale: Locale): String {
+    val formatter = percentFormatterCache.get()!!.getOrPut(locale) {
+        NumberFormat.getPercentInstance(locale).apply { maximumFractionDigits = 0 }
+    }
+    return formatter.format(share)
+}

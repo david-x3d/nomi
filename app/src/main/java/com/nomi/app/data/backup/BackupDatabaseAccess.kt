@@ -24,6 +24,7 @@ internal suspend fun NomiDatabase.readBackupPayload(
         savedMeals = queryRows("saved_meals") { readSavedMeal() },
         savedMealItems = queryRows("saved_meal_items") { readSavedMealItem() },
         weightEntries = queryRows("weight_entries") { readWeightEntry() },
+        aiUsageEvents = queryRows("ai_usage_events") { readAiUsageEvent() },
     )
 }
 
@@ -43,6 +44,7 @@ internal suspend fun NomiDatabase.replaceWith(payload: BackupPayloadV1) {
         // Children first. Debug events are transient and are cleared, never imported.
         listOf(
             "ai_debug_events",
+            "ai_usage_events",
             "favorite_foods",
             "saved_meal_items",
             "saved_meals",
@@ -80,6 +82,9 @@ internal suspend fun NomiDatabase.replaceWith(payload: BackupPayloadV1) {
         }
         if (payload.weightEntries.isNotEmpty()) {
             weightDao.upsert(payload.weightEntries.map { it.toEntity() })
+        }
+        if (payload.aiUsageEvents.isNotEmpty()) {
+            aiUsageEventDao().insertAll(payload.aiUsageEvents.map { it.toEntity() })
         }
     }
 }
@@ -278,6 +283,21 @@ private fun Cursor.readSourceSnapshot(prefix: String): BackupNutritionSourceSnap
         retrievedAtEpochMillis = nullableLong(prefix + "retrieved_at_epoch_millis"),
         verifiedAtEpochMillis = nullableLong(prefix + "verified_at_epoch_millis"),
     )
+
+private fun Cursor.readAiUsageEvent(): BackupAiUsageEventV1 = BackupAiUsageEventV1(
+    id = long("id"),
+    pipeline = string("pipeline"),
+    resolutionKind = string("resolution_kind"),
+    providerId = string("provider_id"),
+    model = string("model"),
+    promptTokens = int("prompt_tokens"),
+    completionTokens = int("completion_tokens"),
+    thoughtsTokens = int("thoughts_tokens"),
+    exaSearches = int("exa_searches"),
+    estimatedCostUsd = double("estimated_cost_usd"),
+    costSource = string("cost_source"),
+    createdAtEpochMillis = long("created_at_epoch_millis"),
+)
 
 private fun Cursor.index(column: String): Int = getColumnIndexOrThrow(column)
 private fun Cursor.string(column: String): String = getString(index(column))

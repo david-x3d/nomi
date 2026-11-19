@@ -284,24 +284,19 @@ class AppViewModel(
             val since = range.days?.let { System.currentTimeMillis() - it * 86_400_000L }
             repository.aiUsageEvents(since).map(AiCostEstimator::summarize)
         }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AiUsageSummary())
 
-    val aiUsageMonthlySummary: StateFlow<AiUsageSummary> = repository
-        .aiUsageEvents(System.currentTimeMillis() - 30L * 86_400_000L)
-        .map(AiCostEstimator::summarize)
+    val aiUsageMonthlySummary: StateFlow<AiUsageSummary> = currentDay
+        .flatMapLatest {
+            repository.aiUsageEvents(System.currentTimeMillis() - 30L * 86_400_000L)
+                .map(AiCostEstimator::summarize)
+        }
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AiUsageSummary())
 
     val allTimeExaCostUsd: StateFlow<Double> = repository
-        .aiUsageEvents(null)
-        .map { events ->
-            events.sumOf { event ->
-                if (event.providerId.equals("exa", ignoreCase = true) || event.exaSearches > 0) {
-                    event.estimatedCostUsd.coerceAtLeast(0.0)
-                } else {
-                    0.0
-                }
-            }
-        }
+        .allTimeExaCostUsd()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0.0)
 
     // Declared before the flows that read it: a property initialiser running earlier would see
@@ -450,7 +445,7 @@ class AppViewModel(
                 preferences = prefs.adaptiveTdee,
             )
         }
-    }
+    }.flowOn(Dispatchers.Default)
 
     val progressState: StateFlow<ProgressUiState> = combine(progressRange, currentDay, ::Pair).flatMapLatest { (range, day) ->
         val totalDays = range.dayCount()

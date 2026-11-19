@@ -78,7 +78,7 @@ internal fun FoodAnalysis.asSingleLoggedMeal(language: NomiLanguage): FoodAnalys
 internal fun groupedMealTitle(names: List<String>, language: NomiLanguage): String {
     val cleaned = names.mapNotNull { raw ->
         raw.trim()
-            .replace(Regex("\\s+"), " ")
+            .replace(MEAL_SUMMARY_WHITESPACE, " ")
             .takeIf(String::isNotBlank)
     }
     if (cleaned.isEmpty()) return NomiTranslations.translate("Meal", language)
@@ -108,3 +108,5 @@ internal fun groupedMealTitle(names: List<String>, language: NomiLanguage): Stri
 private fun List<AnalyzedFoodItem>.sumOptional(
     selector: (AnalyzedFoodItem) -> Double?,
 ): Double? = mapNotNull(selector).takeIf(List<Double>::isNotEmpty)?.sum()
+
+private val MEAL_SUMMARY_WHITESPACE = Regex("\\s+")

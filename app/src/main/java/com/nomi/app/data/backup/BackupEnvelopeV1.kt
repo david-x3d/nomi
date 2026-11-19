@@ -1,5 +1,7 @@
 package com.nomi.app.data.backup
 
+import com.nomi.app.data.preferences.AdaptiveTdeePreferences
+import com.nomi.app.data.preferences.AiUsagePreferences
 import com.nomi.app.data.preferences.CalorieEstimateBias
 import com.nomi.app.data.preferences.GoalsCardStyle
 import com.nomi.app.data.preferences.HeightUnitPreference
@@ -43,6 +45,7 @@ data class BackupPayloadV1(
     val savedMeals: List<BackupSavedMealV1>,
     val savedMealItems: List<BackupSavedMealItemV1>,
     val weightEntries: List<BackupWeightEntryV1>,
+    val aiUsageEvents: List<BackupAiUsageEventV1> = emptyList(),
 )
 
 /** Safe settings only: provider credentials and arbitrary advanced JSON are excluded by design. */
@@ -77,6 +80,11 @@ data class BackupPreferencesV1(
         providerId = "openrouter",
         model = "",
     ),
+    val aiRequestTimeoutDisabled: Boolean = false,
+    val exaFullPageText: Boolean = false,
+    val openRouterPreferredProvider: String = "",
+    val adaptiveTdee: AdaptiveTdeePreferences = AdaptiveTdeePreferences(),
+    val aiUsage: AiUsagePreferences = AiUsagePreferences(),
 )
 
 /** The four tracked nutrients and their targets, without the enabled set. */
@@ -306,4 +314,20 @@ data class BackupWeightEntryV1(
     val externalId: String? = null,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+)
+
+@Serializable
+data class BackupAiUsageEventV1(
+    val id: Long,
+    val pipeline: String,
+    val resolutionKind: String,
+    val providerId: String,
+    val model: String,
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val thoughtsTokens: Int = 0,
+    val exaSearches: Int = 0,
+    val estimatedCostUsd: Double = 0.0,
+    val costSource: String = "FREE",
+    val createdAtEpochMillis: Long,
 )
