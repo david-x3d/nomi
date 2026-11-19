@@ -118,34 +118,35 @@ fun AiUsageScreen(
                 }
             }
 
-            item(key = "hero-spend") {
-                AnimatedContent(
-                    targetState = range to summary,
-                    label = "ai-usage-hero",
-                ) { (_, current) ->
-                    UsageHeroCard(
-                        summary = current,
-                        usagePreferences = usagePreferences,
-                        allTimeExaCostUsd = allTimeExaCostUsd,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-            }
-
-            item(key = "exa-free-tier") {
-                ExaFreeTierCard(
-                    usagePreferences = usagePreferences,
-                    allTimeExaCostUsd = allTimeExaCostUsd,
-                    onEnabledChanged = onExaFreeTierEnabledChanged,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
+            settingsGroup(
+                key = "overview",
+                rows = listOf(
+                    {
+                        AnimatedContent(
+                            targetState = range to summary,
+                            label = "ai-usage-hero",
+                        ) { (_, current) ->
+                            UsageHeroCard(
+                                summary = current,
+                                usagePreferences = usagePreferences,
+                                allTimeExaCostUsd = allTimeExaCostUsd,
+                            )
+                        }
+                    },
+                    {
+                        ExaFreeTierCard(
+                            usagePreferences = usagePreferences,
+                            allTimeExaCostUsd = allTimeExaCostUsd,
+                            onEnabledChanged = onExaFreeTierEnabledChanged,
+                        )
+                    },
+                ),
+            )
 
             if (summary.totalEvents == 0) {
                 item(key = "empty-usage") {
-                    UsageEmptyCard(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                    Spacer(Modifier.height(12.dp))
+                    UsageEmptyCard()
                 }
             } else {
                 val tokenRows = buildList<@Composable () -> Unit> {
@@ -306,7 +307,13 @@ private fun UsageHeroCard(
         allTimeExaCostUsd = allTimeExaCostUsd,
     )
 
-    NomiCard(modifier = modifier, spacing = 18.dp) {
+    SettingsCard(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -417,6 +424,7 @@ private fun UsageHeroCard(
                 modifier = Modifier.weight(1f),
             )
         }
+        }
     }
 }
 
@@ -437,7 +445,13 @@ private fun ExaFreeTierCard(
     )
     val estimatedSearchesLeft = (remainingUsd / AiCostEstimator.EXA_SEARCH_DEFAULT_USD).roundToInt()
 
-    NomiCard(modifier = modifier, spacing = 12.dp) {
+    SettingsCard(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -503,6 +517,7 @@ private fun ExaFreeTierCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
         }
     }
 }
@@ -578,8 +593,11 @@ private fun HeroStatColumn(
 
 @Composable
 private fun UsageEmptyCard(modifier: Modifier = Modifier) {
-    NomiCard(modifier = modifier, spacing = 10.dp) {
+    SettingsCard(modifier = modifier) {
         Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {

@@ -128,7 +128,7 @@ private fun ProcessingPendingCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = nomiCardBorder(),
@@ -211,7 +211,7 @@ private fun QueuedOfflineCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = nomiCardBorder(),
@@ -289,7 +289,7 @@ private fun FailedPendingCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(26.dp),
         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
         contentColor = MaterialTheme.colorScheme.onErrorContainer,
         border = nomiCardBorder(),

@@ -1,3 +1,8 @@
+## 2.14.1
+
+- **Settings-consistent card styling:** Updated the **Usage & cost** overview & Exa free tier cards, **AI provider** sections, **Food library**, and Today queue cards to use the same flat `surfaceBright` grouped tiles (`26 dp` outer / `6 dp` inner corners, zero elevation) as the main Settings screen.
+- **Full 10-language localization:** Translated all new Usage & cost, Exa free tier, Adaptive TDEE, and Offline Queue strings into German, Spanish, French, Italian, Dutch, Portuguese, Albanian, Swedish, and Turkish.
+
 ## 2.14.0
 
 - **AI usage & cost tracker:** New **Usage & cost** dashboard under **Settings → AI provider** with 7-day, 30-day, and all-time views, estimated spend, cache/local savings ring, token & Exa search breakdown, per-model and per-task charts, Exa \$10 free starter credit tracking (with out-of-pocket calculation), and automatic historical backfill from pre-update food logs.

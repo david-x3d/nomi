@@ -107,10 +107,11 @@ fun LibraryScreen(
         LibraryItemKind.FAVORITE -> state.favorites
         LibraryItemKind.SAVED_MEAL -> state.savedMeals
     }
-    val pageContainerColor = nomiPageContainerColor(
-        accent = MaterialTheme.colorScheme.secondaryContainer,
-        strength = 0.07f,
-    )
+    val pageContainerColor = if (LocalPitchBlackSurfaces.current) {
+        MaterialTheme.colorScheme.surfaceContainerLowest
+    } else {
+        MaterialTheme.colorScheme.surfaceContainer
+    }
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = pageContainerColor,
@@ -150,13 +151,22 @@ fun LibraryScreen(
             }
             if (items.isEmpty()) {
                 item {
-                    NomiCard(
+                    val emptyTileColor = if (LocalPitchBlackSurfaces.current) {
+                        nomiCardContainerColor()
+                    } else {
+                        MaterialTheme.colorScheme.surfaceBright
+                    }
+                    Surface(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                             .animateItem(),
-                        spacing = 12.dp,
+                        shape = expressiveGroupedTileShape(0, 1),
+                        color = emptyTileColor,
+                        border = nomiCardBorder(),
                     ) {
                         Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {

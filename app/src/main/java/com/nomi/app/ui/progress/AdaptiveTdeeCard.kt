@@ -272,7 +272,7 @@ private fun ReadyAdaptiveTdeeContent(
             ) {
                 Icon(deltaIcon, contentDescription = null, modifier = Modifier.size(15.dp))
                 Text(
-                    text = "$deltaPrefix$delta vs formula",
+                    text = nomiFormat("{0}{1} vs formula", deltaPrefix, delta),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                 )
             }

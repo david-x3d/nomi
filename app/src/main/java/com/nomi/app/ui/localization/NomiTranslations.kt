@@ -52,6 +52,7 @@ internal object NomiTranslations {
         putAll(profileTranslations)
         putAll(shareTranslations)
         putAll(settingsTranslations)
+        putAll(usageAndTdeeTranslations)
         putAll(updateTranslations)
         putAll(detailTranslations)
         putAll(errorTranslations)

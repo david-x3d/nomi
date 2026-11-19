@@ -253,37 +253,43 @@ fun AiSettingsScreen(
                 )
             }
 
-            item { SectionTitle(nomiString("Food research")) }
-            if (state.usesExaSearch) {
-                item(key = "full-pages") {
-                    ToggleSetting(
-                        icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null) },
-                        title = nomiString("Read whole source pages"),
-                        supporting = nomiString("Exa gives the AI each page's full text instead of excerpts. Finds nutrition more reliably, but uses more Exa and AI credits."),
-                        checked = state.exaFullPageText,
-                        onCheckedChange = onExaFullPageTextChanged,
+            val researchRows = buildList<@Composable () -> Unit> {
+                if (state.usesExaSearch) {
+                    add {
+                        ToggleSetting(
+                            icon = { Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null) },
+                            title = nomiString("Read whole source pages"),
+                            supporting = nomiString("Exa gives the AI each page's full text instead of excerpts. Finds nutrition more reliably, but uses more Exa and AI credits."),
+                            checked = state.exaFullPageText,
+                            onCheckedChange = onExaFullPageTextChanged,
+                            iconColor = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                }
+                add {
+                    SettingsLink(
+                        icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
+                        title = nomiString("Compare OpenRouter models"),
+                        supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
+                        onClick = onCompareModels,
                         iconColor = MaterialTheme.colorScheme.secondary,
                     )
                 }
+                add {
+                    SettingsLink(
+                        icon = { Icon(Icons.Default.Payments, contentDescription = null) },
+                        title = nomiString("Usage & cost"),
+                        supporting = usageSummaryText,
+                        onClick = onUsage,
+                        iconColor = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
-            item(key = "compare-models") {
-                SettingsLink(
-                    icon = { Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null) },
-                    title = nomiString("Compare OpenRouter models"),
-                    supporting = nomiString("Look up one meal with up to four models through Exa and pick the best"),
-                    onClick = onCompareModels,
-                    iconColor = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            item(key = "usage-cost") {
-                SettingsLink(
-                    icon = { Icon(Icons.Default.Payments, contentDescription = null) },
-                    title = nomiString("Usage & cost"),
-                    supporting = usageSummaryText,
-                    onClick = onUsage,
-                    iconColor = MaterialTheme.colorScheme.primary,
-                )
-            }
+            settingsGroup(
+                title = { nomiString("Food research") },
+                key = "food-research",
+                rows = researchRows,
+            )
 
             if (state.usesOpenRouter) {
                 item { SectionTitle("OpenRouter") }
@@ -303,26 +309,31 @@ fun AiSettingsScreen(
                     )
                 }
             }
-            item { SectionTitle(nomiString("Troubleshooting")) }
-            item(key = "timeout") {
-                ToggleSetting(
-                    icon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
-                    title = nomiString("Never time out"),
-                    supporting = nomiString("Wait as long as the provider needs instead of giving up after 45 seconds"),
-                    checked = state.aiRequestTimeoutDisabled,
-                    onCheckedChange = onAiRequestTimeoutDisabledChanged,
-                    iconColor = MaterialTheme.colorScheme.secondary,
-                )
-            }
-            item(key = "debug") {
-                SettingsLink(
-                    icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
-                    title = nomiString("AI debug"),
-                    supporting = nomiString("Provider, timing, source and validation — never keys"),
-                    onClick = onDebug,
-                    iconColor = MaterialTheme.colorScheme.tertiary,
-                )
-            }
+            settingsGroup(
+                title = { nomiString("Troubleshooting") },
+                key = "troubleshooting",
+                rows = listOf(
+                    {
+                        ToggleSetting(
+                            icon = { Icon(Icons.Default.HourglassEmpty, contentDescription = null) },
+                            title = nomiString("Never time out"),
+                            supporting = nomiString("Wait as long as the provider needs instead of giving up after 45 seconds"),
+                            checked = state.aiRequestTimeoutDisabled,
+                            onCheckedChange = onAiRequestTimeoutDisabledChanged,
+                            iconColor = MaterialTheme.colorScheme.secondary,
+                        )
+                    },
+                    {
+                        SettingsLink(
+                            icon = { Icon(Icons.Default.BugReport, contentDescription = null) },
+                            title = nomiString("AI debug"),
+                            supporting = nomiString("Provider, timing, source and validation — never keys"),
+                            onClick = onDebug,
+                            iconColor = MaterialTheme.colorScheme.tertiary,
+                        )
+                    },
+                ),
+            )
             item { Spacer(Modifier.height(24.dp)) }
         }
     }
