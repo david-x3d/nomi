@@ -64,6 +64,8 @@ import com.nomi.app.ai.usage.AiCostEstimator
 import com.nomi.app.ai.usage.AiModelUsageRow
 import com.nomi.app.ai.usage.AiTaskUsageRow
 import com.nomi.app.ai.usage.AiUsageRange
+import com.nomi.app.ai.usage.AiUsageRecentEvent
+import com.nomi.app.ai.usage.AiUsageResolutionKind
 import com.nomi.app.ai.usage.AiUsageSummary
 import com.nomi.app.data.preferences.AiUsagePreferences
 import com.nomi.app.ui.components.ExpressiveBadgeStyle
@@ -73,6 +75,10 @@ import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.localization.nomiFormat
 import com.nomi.app.ui.localization.nomiString
 import com.nomi.app.ui.theme.nomiProgressMotionSpec
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -214,6 +220,16 @@ fun AiUsageScreen(
                         key = "tasks",
                         rows = summary.byTask.map { row ->
                             { TaskUsageTile(row) }
+                        },
+                    )
+                }
+
+                if (summary.recentEvents.isNotEmpty()) {
+                    settingsGroup(
+                        title = { nomiString("Recent requests") },
+                        key = "recent-requests",
+                        rows = summary.recentEvents.map { event ->
+                            { RecentUsageEventTile(event) }
                         },
                     )
                 }
@@ -673,7 +689,7 @@ private fun ModelUsageTile(row: AiModelUsageRow) {
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = row.model,
+                            text = localizedModelName(row.model),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -794,6 +810,104 @@ private fun TaskUsageTile(row: AiTaskUsageRow) {
             }
         }
     }
+}
+
+@Composable
+private fun RecentUsageEventTile(event: AiUsageRecentEvent) {
+    val isFree = event.resolutionKind != AiUsageResolutionKind.AI_CALL
+    val iconColor = when (event.resolutionKind) {
+        AiUsageResolutionKind.CACHE_HIT -> MaterialTheme.colorScheme.tertiary
+        AiUsageResolutionKind.LOCAL_PARSE -> MaterialTheme.colorScheme.secondary
+        AiUsageResolutionKind.AI_CALL -> if (event.exaSearches > 0) {
+            MaterialTheme.colorScheme.tertiary
+        } else {
+            MaterialTheme.colorScheme.primary
+        }
+    }
+    val headline = when (event.resolutionKind) {
+        AiUsageResolutionKind.CACHE_HIT -> nomiString("Cache hit")
+        AiUsageResolutionKind.LOCAL_PARSE -> nomiString("Local parse")
+        AiUsageResolutionKind.AI_CALL -> localizedTaskName(event.pipeline)
+    }
+    val modelLabel = localizedModelName(event.model)
+    val supporting = buildString {
+        append(formatUsageTimestamp(event.createdAtEpochMillis))
+        append(" · ")
+        if (isFree) {
+            append(modelLabel)
+        } else {
+            append(event.providerId.replaceFirstChar { it.titlecase(Locale.ROOT) })
+            append(" · ")
+            append(modelLabel)
+            if (event.totalTokens > 0L) {
+                append(" · ")
+                append(AiCostEstimator.formatCompactTokens(event.totalTokens))
+                append(" tok")
+            }
+            if (event.exaSearches > 0) {
+                append(" · ")
+                append(nomiFormat("{0} searches", event.exaSearches))
+            }
+        }
+    }
+    val trailingText = if (isFree) nomiString("Free") else AiCostEstimator.formatUsd(event.costUsd)
+    val trailingColor = if (isFree) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+
+    SettingsCard {
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = headline,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            leadingContent = {
+                SettingsIconTile(iconColor) {
+                    when {
+                        isFree -> Icon(Icons.Default.Bolt, contentDescription = null)
+                        event.exaSearches > 0 -> Icon(Icons.Default.Search, contentDescription = null)
+                        else -> Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                    }
+                }
+            },
+            trailingContent = {
+                Text(
+                    text = trailingText,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = trailingColor,
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        )
+    }
+}
+
+private fun formatUsageTimestamp(epochMillis: Long): String {
+    if (epochMillis <= 0L) return ""
+    val formatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        .withLocale(Locale.getDefault())
+    return Instant.ofEpochMilli(epochMillis)
+        .atZone(ZoneId.systemDefault())
+        .format(formatter)
+}
+
+@Composable
+private fun localizedModelName(model: String): String = when (model) {
+    "pre-update-estimate" -> nomiString("Estimated history")
+    "pre-update-vision" -> nomiString("Vision scan (history)")
+    "pre-update-reused" -> nomiString("Reused locally")
+    else -> model
 }
 
 @Composable

@@ -53,6 +53,22 @@ data class AiTaskUsageRow(
     val share: Float,
 )
 
+data class AiUsageRecentEvent(
+    val id: Long,
+    val pipeline: String,
+    val resolutionKind: AiUsageResolutionKind,
+    val providerId: String,
+    val model: String,
+    val promptTokens: Int,
+    val completionTokens: Int,
+    val thoughtsTokens: Int,
+    val exaSearches: Int,
+    val costUsd: Double,
+    val createdAtEpochMillis: Long,
+) {
+    val totalTokens: Long get() = (promptTokens + completionTokens + thoughtsTokens).toLong().coerceAtLeast(0L)
+}
+
 data class AiUsageSummary(
     val totalEvents: Int = 0,
     val aiCalls: Int = 0,
@@ -68,6 +84,7 @@ data class AiUsageSummary(
     val hasEstimatedCosts: Boolean = false,
     val byModel: List<AiModelUsageRow> = emptyList(),
     val byTask: List<AiTaskUsageRow> = emptyList(),
+    val recentEvents: List<AiUsageRecentEvent> = emptyList(),
 ) {
     val totalTokens: Long get() = promptTokens + completionTokens + thoughtsTokens
     val freeResolutions: Int get() = cacheHits + localParses
@@ -226,6 +243,30 @@ object AiCostEstimator {
             }
             .sortedWith(compareByDescending<AiTaskUsageRow> { it.costUsd }.thenByDescending { it.calls })
 
+        val recentEvents = events
+            .sortedWith(compareByDescending<AiUsageEventEntity> { it.createdAtEpochMillis }.thenByDescending { it.id })
+            .take(30)
+            .map { event ->
+                val kind = when (event.resolutionKind) {
+                    AiUsageResolutionKind.CACHE_HIT.name -> AiUsageResolutionKind.CACHE_HIT
+                    AiUsageResolutionKind.LOCAL_PARSE.name -> AiUsageResolutionKind.LOCAL_PARSE
+                    else -> AiUsageResolutionKind.AI_CALL
+                }
+                AiUsageRecentEvent(
+                    id = event.id,
+                    pipeline = event.pipeline,
+                    resolutionKind = kind,
+                    providerId = event.providerId,
+                    model = event.model,
+                    promptTokens = event.promptTokens.coerceAtLeast(0),
+                    completionTokens = event.completionTokens.coerceAtLeast(0),
+                    thoughtsTokens = event.thoughtsTokens.coerceAtLeast(0),
+                    exaSearches = event.exaSearches.coerceAtLeast(0),
+                    costUsd = event.estimatedCostUsd.coerceAtLeast(0.0),
+                    createdAtEpochMillis = event.createdAtEpochMillis,
+                )
+            }
+
         return AiUsageSummary(
             totalEvents = events.size,
             aiCalls = aiCalls,
@@ -241,6 +282,7 @@ object AiCostEstimator {
             hasEstimatedCosts = hasEstimated,
             byModel = byModel,
             byTask = byTask,
+            recentEvents = recentEvents,
         )
     }
 

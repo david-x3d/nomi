@@ -73,6 +73,41 @@ internal val usageAndTdeeTranslations: Map<String, NomiTranslation> = mapOf(
         it = "Per attività", nl = "Per taak", pt = "Por tarefa",
         sq = "Sipas detyrës", sv = "Per uppgift", tr = "Göreve göre",
     ),
+    "Recent requests" to NomiTranslation(
+        de = "Vorherige Anfragen", es = "Solicitudes recientes", fr = "Requêtes récentes",
+        it = "Richieste recenti", nl = "Recente verzoeken", pt = "Pedidos recentes",
+        sq = "Kërkesat e fundit", sv = "Senaste förfrågningar", tr = "Son istekler",
+    ),
+    "Cache hit" to NomiTranslation(
+        de = "Cache-Treffer", es = "Acierto de caché", fr = "Succès du cache",
+        it = "Trovato in cache", nl = "Cache-hit", pt = "Acerto de cache",
+        sq = "Gjetur në cache", sv = "Cacheträff", tr = "Önbellek isabeti",
+    ),
+    "Local parse" to NomiTranslation(
+        de = "Lokales Parsing", es = "Análisis local", fr = "Analyse locale",
+        it = "Analisi locale", nl = "Lokale verwerking", pt = "Análise local",
+        sq = "Analizë lokale", sv = "Lokal tolkning", tr = "Yerel ayrıştırma",
+    ),
+    "Free" to NomiTranslation(
+        de = "Kostenlos", es = "Gratis", fr = "Gratuit",
+        it = "Gratis", nl = "Gratis", pt = "Grátis",
+        sq = "Falas", sv = "Gratis", tr = "Ücretsiz",
+    ),
+    "Estimated history" to NomiTranslation(
+        de = "Geschätzter Verlauf", es = "Historial estimado", fr = "Historique estimé",
+        it = "Cronologia stimata", nl = "Geschatte geschiedenis", pt = "Histórico estimado",
+        sq = "Historik i vlerësuar", sv = "Beräknad historik", tr = "Tahmini geçmiş",
+    ),
+    "Vision scan (history)" to NomiTranslation(
+        de = "Foto-Scan (Verlauf)", es = "Escaneo visual (historial)", fr = "Scan photo (historique)",
+        it = "Scansione foto (cronologia)", nl = "Fotoscan (geschiedenis)", pt = "Scan de foto (histórico)",
+        sq = "Skanim foto (historik)", sv = "Fotoskanning (historik)", tr = "Fotoğraf taraması (geçmiş)",
+    ),
+    "Reused locally" to NomiTranslation(
+        de = "Lokal wiederverwendet", es = "Reutilizado localmente", fr = "Réutilisé localement",
+        it = "Riutilizzato localmente", nl = "Lokaal hergebruikt", pt = "Reutilizado localmente",
+        sq = "Ripërdorur lokalisht", sv = "Återanvänt lokalt", tr = "Yerel olarak yeniden kullanıldı",
+    ),
     "Clear usage history" to NomiTranslation(
         de = "Nutzungsverlauf löschen", es = "Borrar historial de uso", fr = "Effacer l'historique d'utilisation",
         it = "Cancella cronologia utilizzo", nl = "Gebruiksgeschiedenis wissen", pt = "Limpar histórico de uso",

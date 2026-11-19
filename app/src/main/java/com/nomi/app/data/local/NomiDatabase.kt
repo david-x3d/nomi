@@ -48,7 +48,7 @@ import com.nomi.app.data.local.entity.WeightEntryEntity
         AiUsageEventEntity::class,
         PendingFoodLogEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class NomiDatabase : RoomDatabase() {
@@ -200,89 +200,195 @@ abstract class NomiDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_pending_food_logs_status_created_at_epoch_millis` " +
                         "ON `pending_food_logs` (`status`, `created_at_epoch_millis`)",
                 )
-
-                // Backfill estimated historical usage & costs from pre-update food_logs so
-                // 7-day, 30-day, and all-time Usage & Cost views reflect prior activity immediately.
-                // 1) Exa search calls for AI-researched meals (grouped by meal entry_group_id)
-                db.execSQL(
-                    """
-                    INSERT INTO `ai_usage_events` (
-                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
-                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
-                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
-                    )
-                    SELECT
-                        'FOOD_RESEARCH', 'AI_CALL', 'exa', 'exa-search',
-                        0, 0, 0, 1,
-                        0.005, 'ESTIMATED', MIN(`created_at_epoch_millis`)
-                    FROM `food_logs`
-                    WHERE `input_method` IN ('TYPE', 'VOICE', 'PHOTO', 'MENU')
-                      AND COALESCE(`source_snapshot_kind`, '') NOT IN ('LOCAL_CATALOG', 'USER_MANUAL', 'BARCODE', 'OPEN_FOOD_FACTS')
-                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
-                    """.trimIndent(),
-                )
-                // 2) Model extraction calls for AI-researched meals
-                db.execSQL(
-                    """
-                    INSERT INTO `ai_usage_events` (
-                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
-                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
-                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
-                    )
-                    SELECT
-                        'FOOD_RESEARCH', 'AI_CALL',
-                        CASE
-                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openrouter%' THEN 'openrouter'
-                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openai%' THEN 'openai'
-                            WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%perplexity%'
-                              OR LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%sonar%' THEN 'perplexity'
-                            ELSE 'gemini'
-                        END,
-                        'pre-update-estimate',
-                        3200, 580, 0, 0,
-                        0.00055, 'ESTIMATED', MIN(`created_at_epoch_millis`)
-                    FROM `food_logs`
-                    WHERE `input_method` IN ('TYPE', 'VOICE', 'PHOTO', 'MENU')
-                      AND COALESCE(`source_snapshot_kind`, '') NOT IN ('LOCAL_CATALOG', 'USER_MANUAL', 'BARCODE', 'OPEN_FOOD_FACTS')
-                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
-                    """.trimIndent(),
-                )
-                // 3) Vision calls for photo, nutrition label, and menu scans
-                db.execSQL(
-                    """
-                    INSERT INTO `ai_usage_events` (
-                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
-                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
-                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
-                    )
-                    SELECT
-                        'VISION', 'AI_CALL', 'gemini', 'pre-update-vision',
-                        5400, 640, 0, 0,
-                        0.0024, 'ESTIMATED', MIN(`created_at_epoch_millis`)
-                    FROM `food_logs`
-                    WHERE `input_method` IN ('PHOTO', 'LABEL', 'MENU')
-                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
-                    """.trimIndent(),
-                )
-                // 4) Free local/cached/reused meals
-                db.execSQL(
-                    """
-                    INSERT INTO `ai_usage_events` (
-                        `pipeline`, `resolution_kind`, `provider_id`, `model`,
-                        `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
-                        `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
-                    )
-                    SELECT
-                        'FOOD_RESEARCH', 'CACHE_HIT', 'cache', 'pre-update-reused',
-                        0, 0, 0, 0,
-                        0.0, 'FREE', MIN(`created_at_epoch_millis`)
-                    FROM `food_logs`
-                    WHERE `input_method` IN ('RECENT', 'FAVORITES', 'SAVED_MEALS', 'BARCODE')
-                       OR COALESCE(`source_snapshot_kind`, '') IN ('LOCAL_CATALOG', 'BARCODE', 'OPEN_FOOD_FACTS')
-                    GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
-                    """.trimIndent(),
-                )
             }
+        }
+
+        /**
+         * Repairs and runs the historical AI usage backfill from pre-update `food_logs`.
+         * Earlier `MIGRATION_7_8` filtered on uppercase `AddFoodMethod` enum names instead of the
+         * actual lowercase `food_logs.input_method` values (`ai`, `recent`, `favorite`, etc.),
+         * leaving migrated databases with zero backfilled usage rows.
+         */
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                backfillHistoricalAiUsage(db)
+            }
+        }
+
+        /**
+         * Backfills estimated historical usage & costs from pre-update `food_logs` so 7-day,
+         * 30-day, and all-time Usage & Cost views reflect prior activity immediately.
+         *
+         * Guards against double-counting:
+         * - Skips if pre-update backfill rows already exist.
+         * - Only considers `food_logs` created strictly before the earliest live usage event
+         *   (with a 60-second buffer so the meal that produced the first live event is not
+         *   counted twice).
+         */
+        internal fun backfillHistoricalAiUsage(db: SupportSQLiteDatabase) {
+            val alreadyBackfilled = db.query(
+                "SELECT 1 FROM `ai_usage_events` WHERE `model` LIKE 'pre-update-%' LIMIT 1",
+            ).use { cursor -> cursor.moveToFirst() }
+            if (alreadyBackfilled) return
+
+            val cutoffEpochMillis = db.query(
+                "SELECT MIN(`created_at_epoch_millis`) FROM `ai_usage_events` WHERE `model` NOT LIKE 'pre-update-%'",
+            ).use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    cursor.getLong(0) - 60_000L
+                } else {
+                    Long.MAX_VALUE
+                }
+            }
+
+            val sourceNameExpr =
+                "LOWER(TRIM(COALESCE(NULLIF(TRIM(`source_snapshot_display_name`), ''), NULLIF(TRIM(`source_snapshot_provider_name`), ''), '')))"
+            val inputMethodExpr = "LOWER(TRIM(COALESCE(`input_method`, '')))"
+            val sourceKindExpr = "LOWER(TRIM(COALESCE(`source_snapshot_kind`, '')))"
+
+            val freeSourcesSql = """
+                (
+                    'open food facts',
+                    'nomi food library',
+                    'nomi favorite',
+                    'local barcode cache',
+                    'local barcode estimate',
+                    'nomi local food cache'
+                )
+            """.trimIndent()
+
+            val freeInputMethodsSql = """
+                (
+                    'recent', 'favorite', 'favorites', 'saved_meal', 'saved_meals',
+                    'barcode', 'copied_meal', 'copied_day', 'copied_items', 'shared'
+                )
+            """.trimIndent()
+
+            val freeSourceKindsSql = "('local_catalog', 'barcode', 'open_food_facts', 'shared')"
+
+            val labelPhotoSourcesSql = """
+                (
+                    'nutrition label photo',
+                    'foto der nährwerttabelle',
+                    'foto de la etiqueta nutricional',
+                    'photo de l’étiquette nutritionnelle',
+                    'photo de l''étiquette nutritionnelle',
+                    'foto della tabella nutrizionale',
+                    'foto van de voedingswaardetabel',
+                    'foto do rótulo nutricional',
+                    'foto e etiketës ushqyese',
+                    'foto av näringsdeklarationen',
+                    'besin etiketi fotoğrafı'
+                )
+            """.trimIndent()
+
+            val isManualCondition = """
+                ($inputMethodExpr = 'manual'
+                 OR $sourceKindExpr = 'user_manual'
+                 OR $sourceNameExpr = 'manual entry')
+            """.trimIndent()
+
+            val isLabelPhotoCondition = """
+                ($inputMethodExpr = 'label'
+                 OR $sourceNameExpr IN $labelPhotoSourcesSql)
+            """.trimIndent()
+
+            val isFreeReusedCondition = """
+                ($inputMethodExpr IN $freeInputMethodsSql
+                 OR $sourceKindExpr IN $freeSourceKindsSql
+                 OR $sourceNameExpr IN $freeSourcesSql)
+            """.trimIndent()
+
+            val isAiResearchCondition = """
+                ($inputMethodExpr IN ('ai', 'type', 'voice', 'photo', 'menu')
+                 AND NOT $isManualCondition
+                 AND NOT $isLabelPhotoCondition
+                 AND NOT $isFreeReusedCondition)
+            """.trimIndent()
+
+            // 1) Exa search calls for AI-researched meals (grouped by meal entry_group_id)
+            db.execSQL(
+                """
+                INSERT INTO `ai_usage_events` (
+                    `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                    `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                    `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                )
+                SELECT
+                    'FOOD_RESEARCH', 'AI_CALL', 'exa', 'exa-search',
+                    0, 0, 0, 1,
+                    0.005, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                FROM `food_logs`
+                WHERE $isAiResearchCondition
+                GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                HAVING MIN(`created_at_epoch_millis`) < $cutoffEpochMillis
+                """.trimIndent(),
+            )
+            // 2) Model extraction calls for AI-researched meals
+            db.execSQL(
+                """
+                INSERT INTO `ai_usage_events` (
+                    `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                    `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                    `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                )
+                SELECT
+                    'FOOD_RESEARCH', 'AI_CALL',
+                    CASE
+                        WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openrouter%' THEN 'openrouter'
+                        WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%openai%' THEN 'openai'
+                        WHEN LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%perplexity%'
+                          OR LOWER(COALESCE(MAX(`source_snapshot_provider_name`), '')) LIKE '%sonar%' THEN 'perplexity'
+                        ELSE 'gemini'
+                    END,
+                    'pre-update-estimate',
+                    3200, 580, 0, 0,
+                    0.00055, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                FROM `food_logs`
+                WHERE $isAiResearchCondition
+                GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                HAVING MIN(`created_at_epoch_millis`) < $cutoffEpochMillis
+                """.trimIndent(),
+            )
+            // 3) Vision calls for nutrition label, photo, and menu scans
+            db.execSQL(
+                """
+                INSERT INTO `ai_usage_events` (
+                    `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                    `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                    `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                )
+                SELECT
+                    'VISION', 'AI_CALL', 'gemini', 'pre-update-vision',
+                    5400, 640, 0, 0,
+                    0.0024, 'ESTIMATED', MIN(`created_at_epoch_millis`)
+                FROM `food_logs`
+                WHERE ($isLabelPhotoCondition OR $inputMethodExpr IN ('photo', 'menu'))
+                  AND NOT $isManualCondition
+                GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                HAVING MIN(`created_at_epoch_millis`) < $cutoffEpochMillis
+                """.trimIndent(),
+            )
+            // 4) Free local/cached/barcode/reused meals
+            db.execSQL(
+                """
+                INSERT INTO `ai_usage_events` (
+                    `pipeline`, `resolution_kind`, `provider_id`, `model`,
+                    `prompt_tokens`, `completion_tokens`, `thoughts_tokens`, `exa_searches`,
+                    `estimated_cost_usd`, `cost_source`, `created_at_epoch_millis`
+                )
+                SELECT
+                    'FOOD_RESEARCH', 'CACHE_HIT', 'cache', 'pre-update-reused',
+                    0, 0, 0, 0,
+                    0.0, 'FREE', MIN(`created_at_epoch_millis`)
+                FROM `food_logs`
+                WHERE $isFreeReusedCondition
+                  AND NOT $isManualCondition
+                  AND NOT $isLabelPhotoCondition
+                GROUP BY COALESCE(`entry_group_id`, 'row-' || `id`)
+                HAVING MIN(`created_at_epoch_millis`) < $cutoffEpochMillis
+                """.trimIndent(),
+            )
         }
 
         /** Creates an independent database instance, primarily useful for tests and tools. */
@@ -299,6 +405,7 @@ abstract class NomiDatabase : RoomDatabase() {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             ).build()
 
         /**
