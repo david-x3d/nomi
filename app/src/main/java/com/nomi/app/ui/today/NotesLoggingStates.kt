@@ -40,7 +40,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -69,9 +68,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AnalyzedFoodItem
-import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.ai.model.FoodAnalysis
-import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.NomiTextField
 import com.nomi.app.ui.components.hairlineOnPitchBlack
 import com.nomi.app.ui.feedback.nomiPress
@@ -144,8 +141,8 @@ internal fun InlineLoggingState(
                     onAnalyze = onAnalyze,
                 )
             }
-            is FoodLoggingUiState.Processing -> ProcessingNote(
-                description = rememberedDescription,
+            is FoodLoggingUiState.Processing -> MealProcessingCard(
+                description = animatedState.originalText,
                 stage = animatedState.stage,
                 sourceUrls = animatedState.sourceUrls,
                 onEditText = onEditText,
@@ -281,80 +278,6 @@ internal fun InlineComposerCanvas(
             TypingDots()
         }
     }
-}
-
-@Composable
-private fun ProcessingNote(
-    description: String,
-    stage: AiProcessingStage,
-    sourceUrls: List<String>,
-    onEditText: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    val stageIndex = AiProcessingStage.entries.indexOf(stage)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.38f),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = description.ifBlank {
-                            nomiString("Understanding your meal")
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    AnimatedContent(
-                        targetState = stage,
-                        label = "research source status",
-                    ) { currentStage ->
-                        Text(
-                            text = currentStage.inlineLabel(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
-                    LinearWavyProgressIndicator(
-                        progress = { (stageIndex + 1f) / AiProcessingStage.entries.size },
-                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                    )
-                }
-                AnimatedWebsiteIconStack(
-                    sourceUrls = sourceUrls,
-                    maxIcons = 3,
-                )
-            }
-            Row(
-                modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TextButton(onClick = onEditText) { Text(nomiString("Edit text")) }
-                TextButton(onClick = onCancel) { Text(nomiString("Cancel")) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AiProcessingStage.inlineLabel(): String = when (this) {
-    AiProcessingStage.UNDERSTANDING_MEAL -> nomiString("Understanding your meal")
-    AiProcessingStage.FINDING_NUTRITION -> nomiString("Finding nutrition information")
-    AiProcessingStage.CHECKING_PORTIONS -> nomiString("Checking portions")
-    AiProcessingStage.PUTTING_IT_TOGETHER -> nomiString("Putting it together")
 }
 
 @Composable

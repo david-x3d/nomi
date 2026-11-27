@@ -1,3 +1,7 @@
+## 2.14.4
+
+- **Consistent meal processing cards:** Editing an existing food entry now uses the same Material 3 Expressive processing card as new entries, while retaining text editing, cancellation, and research sources. The background-processing hint is shown only for queued entries.
+
 ## 2.14.3
 
 - **Offline & background logging queue reliability:** Added exponential backoff and a max retry limit for transient network failures while online (preventing tight retry loops), added a persisted `JobService` (`PendingQueueJobService`) so offline-queued meals still drain automatically after Android process death, handled non-auto-saved preview states in headless queue runs, and computed completion notification calories from newly added log IDs instead of whole-day deltas.

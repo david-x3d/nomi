@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.nomi.app.ai.model.AiProcessingStage
 import com.nomi.app.data.local.entity.PendingFoodLogEntity
 import com.nomi.app.integration.logging.PendingLoggingStatus
+import com.nomi.app.ui.components.AnimatedWebsiteIconStack
 import com.nomi.app.ui.components.NomiShapes
 import com.nomi.app.ui.components.nomiCardBorder
 import com.nomi.app.ui.localization.nomiFormat
@@ -124,6 +125,26 @@ private fun ProcessingPendingCard(
         AiProcessingStage.entries.firstOrNull { it.name == label }
     } ?: AiProcessingStage.UNDERSTANDING_MEAL
 
+    MealProcessingCard(
+        description = entry.inputText,
+        stage = stage,
+        onCancel = { onCancel(entry.id) },
+        modifier = modifier,
+        runsInBackground = true,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun MealProcessingCard(
+    description: String,
+    stage: AiProcessingStage,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    runsInBackground: Boolean = false,
+    onEditText: (() -> Unit)? = null,
+    sourceUrls: List<String> = emptyList(),
+) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -157,7 +178,7 @@ private fun ProcessingPendingCard(
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = entry.inputText,
+                        text = description.ifBlank { nomiString("Understanding your meal") },
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
@@ -168,7 +189,7 @@ private fun ProcessingPendingCard(
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                IconButton(onClick = { onCancel(entry.id) }) {
+                IconButton(onClick = onCancel) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = nomiString("Cancel"),
@@ -183,16 +204,32 @@ private fun ProcessingPendingCard(
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             )
 
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ) {
-                Text(
-                    text = nomiString("Finishes in the background if you leave Nomi"),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                )
+            if (runsInBackground) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ) {
+                    Text(
+                        text = nomiString("Finishes in the background if you leave Nomi"),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                }
+            }
+            if (onEditText != null || sourceUrls.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    if (onEditText != null) {
+                        TextButton(onClick = onEditText) { Text(nomiString("Edit text")) }
+                    }
+                    if (sourceUrls.isNotEmpty() || stage == AiProcessingStage.FINDING_NUTRITION) {
+                        AnimatedWebsiteIconStack(sourceUrls = sourceUrls)
+                    }
+                }
             }
         }
     }
